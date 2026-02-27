@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: erp-core
+  datasource:
+    url: jdbc:postgresql://localhost:5432/grandport_erp
+    username: postgres # Geralmente 'postgres'
+    password: admin # Geralmente 'admin'
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update # Cria as tabelas automaticamente (útil no início)
+    show-sql: true # Mostra os comandos SQL no console para debug
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+api:
+  security:
+    token:
+      secret: ${JWT_SECRET:minha-chave-secreta-do-erp-123}
