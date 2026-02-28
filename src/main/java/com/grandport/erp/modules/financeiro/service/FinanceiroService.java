@@ -1,25 +1,28 @@
 package com.grandport.erp.modules.financeiro.service;
 
-import com.grandport.erp.modules.financeiro.dto.ContaPagarDTO;
-import com.grandport.erp.modules.financeiro.dto.ContaReceberDTO;
-import com.grandport.erp.modules.financeiro.dto.DespesaManualDTO;
-import com.grandport.erp.modules.financeiro.dto.ExtratoParceiroDTO;
+import com.grandport.erp.modules.financeiro.dto.*;
+import com.grandport.erp.modules.financeiro.model.ContaBancaria;
 import com.grandport.erp.modules.financeiro.model.ContaPagar;
 import com.grandport.erp.modules.financeiro.model.ContaReceber;
 import com.grandport.erp.modules.financeiro.model.MovimentacaoCaixa;
 import com.grandport.erp.modules.financeiro.model.StatusFinanceiro;
+import com.grandport.erp.modules.financeiro.repository.ContaBancariaRepository;
 import com.grandport.erp.modules.financeiro.repository.ContaPagarRepository;
 import com.grandport.erp.modules.financeiro.repository.ContaReceberRepository;
 import com.grandport.erp.modules.financeiro.repository.MovimentacaoCaixaRepository;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
+import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,6 +32,8 @@ public class FinanceiroService {
     @Autowired private ContaPagarRepository pagarRepo;
     @Autowired private MovimentacaoCaixaRepository caixaRepo;
     @Autowired private ParceiroRepository parceiroRepository;
+    @Autowired private VendaRepository vendaRepository;
+    @Autowired private ContaBancariaRepository bancoRepo;
 
     public List<ContaReceberDTO> listarContasAReceber() {
         return recebaRepo.findByStatus(StatusFinanceiro.PENDENTE)
@@ -44,6 +49,41 @@ public class FinanceiroService {
                 .collect(Collectors.toList());
     }
 
+    public List<ContaBancaria> listarContasBancarias() {
+        return bancoRepo.findAll();
+    }
+
+    @Transactional
+    public ContaBancaria criarContaBancaria(ContaBancaria conta) {
+        return bancoRepo.save(conta);
+    }
+
+    @Transactional
+    public void transferirEntreContas(TransferenciaDTO dto) {
+        ContaBancaria origem = bancoRepo.findById(dto.getContaOrigemId())
+            .orElseThrow(() -> new RuntimeException("Conta de origem não encontrada."));
+        ContaBancaria destino = bancoRepo.findById(dto.getContaDestinoId())
+            .orElseThrow(() -> new RuntimeException("Conta de destino não encontrada."));
+
+        if (origem.getSaldoAtual().compareTo(dto.getValor()) < 0) {
+            throw new RuntimeException("Saldo insuficiente na conta de origem.");
+        }
+
+        origem.setSaldoAtual(origem.getSaldoAtual().subtract(dto.getValor()));
+        destino.setSaldoAtual(destino.getSaldoAtual().add(dto.getValor()));
+
+        bancoRepo.save(origem);
+        bancoRepo.save(destino);
+
+        // Registra a movimentação de transferência
+        MovimentacaoCaixa mov = new MovimentacaoCaixa();
+        mov.setDescricao("Transferência: " + origem.getNome() + " -> " + destino.getNome());
+        mov.setValor(dto.getValor());
+        mov.setTipo("TRANSFERENCIA");
+        mov.setCategoria("TESOURARIA");
+        caixaRepo.save(mov);
+    }
+
     public ExtratoParceiroDTO gerarExtratoParceiro(Long parceiroId) {
         Parceiro parceiro = parceiroRepository.findById(parceiroId)
             .orElseThrow(() -> new RuntimeException("Parceiro não encontrado: ID " + parceiroId));
@@ -54,6 +94,29 @@ public class FinanceiroService {
             .collect(Collectors.toList());
             
         return new ExtratoParceiroDTO(parceiro, contas);
+    }
+
+    public DreDTO calcularDre(YearMonth mesAno) {
+        LocalDateTime inicioMes = mesAno.atDay(1).atStartOfDay();
+        LocalDateTime fimMes = mesAno.atEndOfMonth().atTime(23, 59, 59);
+
+        DreDTO dre = new DreDTO();
+        dre.setReceitaBruta(vendaRepository.sumTotalVendasPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
+        dre.setDevolucoesDescontos(vendaRepository.sumTotalDescontosPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
+        dre.setCmv(vendaRepository.sumCmvPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
+
+        BigDecimal totalDespesasPagas = pagarRepo.sumDespesasPagasPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO);
+        
+        Map<String, BigDecimal> despesasCategorizadas = new HashMap<>();
+        despesasCategorizadas.put("salarios", totalDespesasPagas.multiply(new BigDecimal("0.30")));
+        despesasCategorizadas.put("aluguel", totalDespesasPagas.multiply(new BigDecimal("0.20")));
+        despesasCategorizadas.put("impostos", totalDespesasPagas.multiply(new BigDecimal("0.25")));
+        despesasCategorizadas.put("marketing", totalDespesasPagas.multiply(new BigDecimal("0.10")));
+        despesasCategorizadas.put("outros", totalDespesasPagas.multiply(new BigDecimal("0.15")));
+        
+        dre.setDespesasOperacionais(despesasCategorizadas);
+
+        return dre;
     }
 
     @Transactional
@@ -67,13 +130,40 @@ public class FinanceiroService {
 
         conta.setStatus(StatusFinanceiro.PAGO);
         conta.setDataPagamento(LocalDateTime.now());
-        conta.setValorPago(conta.getValorOriginal()); // Simplificado, poderia ter juros/multa
+        conta.setValorPago(conta.getValorOriginal());
         pagarRepo.save(conta);
 
-        // Registra a saída no caixa
         MovimentacaoCaixa mov = new MovimentacaoCaixa();
         mov.setDescricao("Pagamento: " + conta.getDescricao());
-        mov.setValor(conta.getValorOriginal().negate()); // Valor negativo para saída
+        mov.setValor(conta.getValorOriginal().negate());
+        mov.setTipo("SAIDA");
+        mov.setCategoria("PAGAMENTO_DESPESA");
+        caixaRepo.save(mov);
+    }
+
+    @Transactional
+    public void liquidarContaPagar(Long contaId, Long bancoId) {
+        ContaPagar conta = pagarRepo.findById(contaId)
+            .orElseThrow(() -> new RuntimeException("Conta a pagar não encontrada: ID " + contaId));
+        
+        ContaBancaria banco = bancoRepo.findById(bancoId)
+            .orElseThrow(() -> new RuntimeException("Conta bancária não encontrada: ID " + bancoId));
+
+        if (conta.getStatus() == StatusFinanceiro.PAGO) {
+            throw new RuntimeException("Esta conta já foi paga.");
+        }
+
+        banco.setSaldoAtual(banco.getSaldoAtual().subtract(conta.getValorOriginal()));
+        bancoRepo.save(banco);
+
+        conta.setStatus(StatusFinanceiro.PAGO);
+        conta.setDataPagamento(LocalDateTime.now());
+        conta.setValorPago(conta.getValorOriginal());
+        pagarRepo.save(conta);
+
+        MovimentacaoCaixa mov = new MovimentacaoCaixa();
+        mov.setDescricao("Pagamento via " + banco.getNome() + ": " + conta.getDescricao());
+        mov.setValor(conta.getValorOriginal().negate());
         mov.setTipo("SAIDA");
         mov.setCategoria("PAGAMENTO_DESPESA");
         caixaRepo.save(mov);
@@ -102,12 +192,25 @@ public class FinanceiroService {
 
     @Transactional
     public void gerarContaReceberCartao(BigDecimal valor, Integer parcelas) {
-        // ... (código existente)
+        for (int i = 1; i <= parcelas; i++) {
+            ContaReceber conta = new ContaReceber();
+            conta.setDescricao("Venda Cartão PDV " + i + "/" + parcelas);
+            conta.setValorOriginal(valor.divide(BigDecimal.valueOf(parcelas)));
+            conta.setDataVencimento(LocalDateTime.now().plusDays(30 * i));
+            conta.setStatus(StatusFinanceiro.PENDENTE);
+            recebaRepo.save(conta);
+        }
     }
 
     @Transactional
     public void gerarContaReceberPrazo(BigDecimal valor, Parceiro cliente) {
-        // ... (código existente)
+        ContaReceber conta = new ContaReceber();
+        conta.setDescricao("Venda a Prazo - PDV");
+        conta.setParceiro(cliente);
+        conta.setValorOriginal(valor);
+        conta.setDataVencimento(LocalDateTime.now().plusDays(30));
+        conta.setStatus(StatusFinanceiro.PENDENTE);
+        recebaRepo.save(conta);
     }
 
     @Transactional

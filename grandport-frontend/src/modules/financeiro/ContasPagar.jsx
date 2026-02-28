@@ -1,39 +1,83 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
-import { TrendingDown, Plus, DollarSign } from 'lucide-react';
+import { TrendingDown, Plus, DollarSign, X } from 'lucide-react';
 import { NovaDespesaModal } from './NovaDespesaModal';
+
+const ModalLiquidar = ({ contaPagar, contasBancarias, onClose, onConfirm }) => {
+    const [contaSelecionada, setContaSelecionada] = useState(contasBancarias[0]?.id || '');
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/80 flex items-center justify-center z-[100] p-4">
+            <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md animate-fade-in">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-2xl font-black text-slate-800">Liquidar Despesa</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><X size={20}/></button>
+                </div>
+                <p className="text-slate-500 mb-6 border-b pb-4">
+                    Fornecedor: <strong className="text-slate-800">{contaPagar.fornecedorNome}</strong><br/>
+                    Valor a pagar: <strong className="text-red-600">R$ {contaPagar.valor.toFixed(2)}</strong>
+                </p>
+                
+                <label className="block text-sm font-bold text-gray-500 uppercase mb-2">Origem do Dinheiro</label>
+                <select 
+                    value={contaSelecionada}
+                    onChange={(e) => setContaSelecionada(e.target.value)}
+                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-600 outline-none font-bold text-slate-700 mb-8"
+                >
+                    {contasBancarias.map(banco => (
+                        <option key={banco.id} value={banco.id}>
+                            {banco.nome} (Saldo: R$ {banco.saldoAtual.toFixed(2)})
+                        </option>
+                    ))}
+                </select>
+
+                <div className="flex gap-4">
+                    <button onClick={onClose} className="flex-1 py-4 text-slate-500 font-bold hover:bg-slate-100 rounded-xl">CANCELAR</button>
+                    <button 
+                        onClick={() => onConfirm(contaPagar.id, contaSelecionada)}
+                        className="flex-1 py-4 bg-green-600 text-white font-black rounded-xl hover:bg-green-700 shadow-lg"
+                    >
+                        CONFIRMAR
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export const ContasPagar = () => {
     const [contas, setContas] = useState([]);
+    const [contasBancarias, setContasBancarias] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [contaParaLiquidar, setContaParaLiquidar] = useState(null);
 
-    const carregarContas = async () => {
+    const carregarDados = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/api/financeiro/contas-a-pagar');
-            setContas(res.data);
+            const [resContas, resBancos] = await Promise.all([
+                api.get('/api/financeiro/contas-a-pagar'),
+                api.get('/api/financeiro/contas-bancarias')
+            ]);
+            setContas(resContas.data);
+            setContasBancarias(resBancos.data);
         } catch (error) {
-            console.error("Erro ao carregar contas a pagar:", error);
+            console.error("Erro ao carregar dados financeiros:", error);
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => {
-        carregarContas();
-    }, []);
+    useEffect(() => { carregarDados(); }, []);
 
-    const handleBaixarPagamento = async (contaId) => {
-        if (window.confirm("Confirma o pagamento desta conta? Esta ação registrará uma saída no caixa.")) {
-            try {
-                await api.patch(`/api/financeiro/contas-a-pagar/${contaId}/baixar`);
-                alert("Pagamento registrado com sucesso!");
-                carregarContas(); // Recarrega a lista para remover a conta paga
-            } catch (error) {
-                console.error("Erro ao baixar conta:", error);
-                alert("Erro ao registrar pagamento: " + (error.response?.data?.message || error.message));
-            }
+    const handleLiquidar = async (contaId, bancoId) => {
+        try {
+            await api.patch(`/api/financeiro/contas-a-pagar/${contaId}/liquidar`, { contaBancariaId: bancoId });
+            alert("Pagamento registrado com sucesso!");
+            setContaParaLiquidar(null);
+            carregarDados();
+        } catch (error) {
+            alert("Erro ao registrar pagamento: " + (error.response?.data?.message || error.message));
         }
     };
 
@@ -82,7 +126,7 @@ export const ContasPagar = () => {
                                 </td>
                                 <td className="p-4">
                                     <button 
-                                        onClick={() => handleBaixarPagamento(conta.id)}
+                                        onClick={() => setContaParaLiquidar(conta)}
                                         className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-xs hover:bg-green-700"
                                     >
                                         REGISTRAR PAGAMENTO
@@ -104,7 +148,16 @@ export const ContasPagar = () => {
             {isModalOpen && (
                 <NovaDespesaModal 
                     onClose={() => setIsModalOpen(false)} 
-                    onSuccess={carregarContas}
+                    onSuccess={carregarDados}
+                />
+            )}
+
+            {contaParaLiquidar && (
+                <ModalLiquidar 
+                    contaPagar={contaParaLiquidar}
+                    contasBancarias={contasBancarias}
+                    onClose={() => setContaParaLiquidar(null)}
+                    onConfirm={handleLiquidar}
                 />
             )}
         </div>

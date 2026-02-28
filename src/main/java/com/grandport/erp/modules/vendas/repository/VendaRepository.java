@@ -13,6 +13,15 @@ import java.util.Optional;
 
 public interface VendaRepository extends JpaRepository<Venda, Long> {
 
+    @Query("SELECT SUM(v.valorTotal) FROM Venda v WHERE v.dataHora BETWEEN :inicio AND :fim")
+    Optional<BigDecimal> sumTotalVendasPeriodo(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    @Query("SELECT SUM(v.desconto) FROM Venda v WHERE v.dataHora BETWEEN :inicio AND :fim")
+    Optional<BigDecimal> sumTotalDescontosPeriodo(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    @Query("SELECT SUM(iv.quantidade * iv.produto.precoCusto) FROM ItemVenda iv WHERE iv.venda.dataHora BETWEEN :inicio AND :fim")
+    Optional<BigDecimal> sumCmvPeriodo(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
     @Query("SELECT SUM(v.valorTotal) FROM Venda v WHERE v.dataHora >= FUNCTION('DATE_TRUNC', 'MONTH', CURRENT_DATE)")
     Optional<BigDecimal> sumTotalVendasMesAtual();
 

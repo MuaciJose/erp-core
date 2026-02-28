@@ -14,6 +14,8 @@ import { RelatorioFaltas } from './modules/admin/RelatorioFaltas';
 import { ContasReceber } from './modules/financeiro/ContasReceber';
 import { ContasPagar } from './modules/financeiro/ContasPagar';
 import { ControleCaixa } from './modules/financeiro/ControleCaixa';
+import { FluxoCaixaDre } from './modules/financeiro/FluxoCaixaDre';
+import { ContasBancarias } from './modules/financeiro/ContasBancarias';
 
 function App() {
     const [paginaAtiva, setPaginaAtiva] = useState('dash');
@@ -39,7 +41,7 @@ function App() {
 
             <main className={`flex-1 h-full overflow-y-auto ${isFullScreen ? 'p-0' : 'p-4'}`}>
                 <div className={`${isFullScreen ? 'w-full h-full' : 'max-w-[1600px] mx-auto'}`}>
-                    {paginaAtiva === 'dash' && <Dashboard />}
+                    {paginaAtiva === 'dash' && <Dashboard setPaginaAtiva={setPaginaAtiva} />}
                     {paginaAtiva === 'vendas' && <Pdv />}
                     {paginaAtiva === 'estoque' && <Produtos />}
                     {paginaAtiva === 'marcas' && <Marcas />}
@@ -52,6 +54,8 @@ function App() {
                     {paginaAtiva === 'contas-receber' && <ContasReceber />}
                     {paginaAtiva === 'contas-pagar' && <ContasPagar />}
                     {paginaAtiva === 'caixa' && <ControleCaixa />}
+                    {paginaAtiva === 'dre' && <FluxoCaixaDre />}
+                    {paginaAtiva === 'bancos' && <ContasBancarias />}
                 </div>
             </main>
         </div>
