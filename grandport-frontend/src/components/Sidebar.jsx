@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingCart, Package, DollarSign, LogOut, FileText, Settings, Tag, Calculator, Ban, ShoppingBasket, Users } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, DollarSign, LogOut, FileText, Settings, Tag, Calculator, Ban, ShoppingBasket, Users, TrendingUp } from 'lucide-react';
 
 export const Sidebar = ({ setPaginaAtiva }) => {
   const menuItens = [
@@ -10,6 +10,7 @@ export const Sidebar = ({ setPaginaAtiva }) => {
     { id: 'previsao', label: 'Previsão de Compras', icon: <ShoppingBasket /> },
     { id: 'compras', label: 'Compras (XML)', icon: <FileText /> },
     { id: 'financeiro', label: 'Financeiro', icon: <DollarSign /> },
+    { id: 'contas-receber', label: 'Contas a Receber', icon: <TrendingUp /> },
     { id: 'fechamento', label: 'Fechamento', icon: <Calculator /> },
     { id: 'faltas', label: 'Relatório de Faltas', icon: <Ban /> },
     { id: 'fiscal', label: 'Fiscal / NCM', icon: <Settings /> },

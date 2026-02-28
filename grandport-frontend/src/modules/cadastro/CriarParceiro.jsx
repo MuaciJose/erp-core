@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
-import { Save, ArrowLeft, UserPlus, Loader2 } from 'lucide-react';
+import { Save, ArrowLeft, UserPlus, Loader2, DollarSign } from 'lucide-react';
 
 export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar }) => {
     const [parceiro, setParceiro] = useState({
@@ -17,17 +17,21 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar }) => 
             cidade: '',
             estado: '',
             ibge: ''
-        }
+        },
+        limiteCredito: 0,
+        saldoDevedor: 0
     });
     const [loadingCnpj, setLoadingCnpj] = useState(false);
     const [loadingCep, setLoadingCep] = useState(false);
-    const isEditing = !!parceiroParaEditar?.id; // Verifica se tem ID para ser edição
+    const isEditing = !!parceiroParaEditar?.id;
 
     useEffect(() => {
         if (isEditing) {
             setParceiro({
                 ...parceiroParaEditar,
-                endereco: parceiroParaEditar.endereco || { cep: '', logradouro: '', numero: '', bairro: '', cidade: '', estado: '', ibge: '' }
+                endereco: parceiroParaEditar.endereco || { cep: '', logradouro: '', numero: '', bairro: '', cidade: '', estado: '', ibge: '' },
+                limiteCredito: parceiroParaEditar.limiteCredito || 0,
+                saldoDevedor: parceiroParaEditar.saldoDevedor || 0
             });
         }
     }, [parceiroParaEditar, isEditing]);
@@ -187,6 +191,34 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar }) => 
                     <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Cód. IBGE</label>
                         <input name="ibge" type="text" value={parceiro.endereco.ibge || ''} onChange={handleChange} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-500 outline-none" />
+                    </div>
+                </div>
+
+                {/* Seção Financeira */}
+                <div className="md:col-span-3 border-t pt-6 mt-4">
+                    <h3 className="text-sm font-black text-blue-600 mb-4 flex items-center gap-2">
+                        <DollarSign size={16} /> CONFIGURAÇÕES DE CRÉDITO
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Limite de Crédito (R$)</label>
+                            <input 
+                                name="limiteCredito" 
+                                type="number" 
+                                value={parceiro.limiteCredito || 0}
+                                onChange={handleChange}
+                                className="w-full p-3 bg-blue-50 border-2 border-blue-100 rounded-xl focus:border-blue-500 outline-none font-bold text-blue-700" 
+                                placeholder="0,00" 
+                            />
+                        </div>
+                        <div className="bg-gray-100 p-3 rounded-xl">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase">Saldo Devedor Atual</label>
+                            <p className="text-xl font-black text-red-600">R$ {parceiro.saldoDevedor?.toFixed(2) || '0.00'}</p>
+                        </div>
+                        <div className="bg-green-50 p-3 rounded-xl border border-green-100">
+                            <label className="block text-[10px] font-bold text-green-600 uppercase">Crédito Disponível</label>
+                            <p className="text-xl font-black text-green-700">R$ {((parceiro.limiteCredito || 0) - (parceiro.saldoDevedor || 0)).toFixed(2)}</p>
+                        </div>
                     </div>
                 </div>
 

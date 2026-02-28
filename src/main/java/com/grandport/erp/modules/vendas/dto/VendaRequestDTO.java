@@ -6,5 +6,6 @@ import java.util.List;
 public record VendaRequestDTO(
     List<ItemVendaDTO> itens,
     List<PagamentoVendaDTO> pagamentos,
-    BigDecimal desconto
+    BigDecimal desconto,
+    Long parceiroId
 ) {}

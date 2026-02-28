@@ -29,4 +29,15 @@ public class Parceiro {
 
     @Column(precision = 5, scale = 2)
     private BigDecimal percentualDesconto = BigDecimal.ZERO;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal limiteCredito = BigDecimal.ZERO;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal saldoDevedor = BigDecimal.ZERO;
+
+    @Transient // Não persiste no banco, é calculado
+    public BigDecimal getSaldoDisponivel() {
+        return limiteCredito.subtract(saldoDevedor);
+    }
 }

@@ -58,19 +58,34 @@ export const Pdv = () => {
         }
     };
 
-    const calcularTotal = () => carrinho.reduce((total, item) => total + (item.precoVenda * item.qtd), 0);
-    const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const calcularTotal = () => {
+        let total = carrinho.reduce((acc, item) => acc + (item.precoVenda * item.qtd), 0);
+        // Aplica desconto se houver cliente com percentual
+        if (clienteSelecionado?.percentualDesconto > 0) {
+            total = total * (1 - clienteSelecionado.percentualDesconto / 100);
+        }
+        return total;
+    };
+    
+    const formatCurrency = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    const finalizarVenda = async () => {
+    const finalizarVenda = async (metodoPagamento) => {
+        if (metodoPagamento === 'A_PRAZO' && !clienteSelecionado) {
+            alert("Selecione um cliente para vender a prazo!");
+            return;
+        }
+
+        const total = calcularTotal();
         const dadosVenda = {
             itens: carrinho.map(item => ({ produtoId: item.id, quantidade: item.qtd })),
-            pagamento: 'DINHEIRO',
-            parceiroId: clienteSelecionado ? clienteSelecionado.id : null
+            pagamentos: [{ metodo: metodoPagamento, valor: total }],
+            parceiroId: clienteSelecionado ? clienteSelecionado.id : null,
+            desconto: clienteSelecionado?.percentualDesconto > 0 ? (carrinho.reduce((acc, item) => acc + (item.precoVenda * item.qtd), 0) - total) : 0
         };
 
         try {
             const resVenda = await api.post('/api/vendas', dadosVenda);
-            const vendaParaImpressao = { id: resVenda.data.id, total: calcularTotal(), vendedor: 'CAIXA 01', cliente: clienteSelecionado };
+            const vendaParaImpressao = { id: resVenda.data.id, total: total, vendedor: 'CAIXA 01', cliente: clienteSelecionado };
             setVendaFinalizada(vendaParaImpressao);
             setModalAberto(false);
 
@@ -158,7 +173,7 @@ export const Pdv = () => {
                         </div>
                         <div>
                             <p className="text-slate-400 text-xs uppercase font-bold">Subtotal</p>
-                            <p className="text-2xl font-bold text-slate-200">{formatCurrency(calcularTotal())}</p>
+                            <p className="text-2xl font-bold text-slate-200">{formatCurrency(carrinho.reduce((acc, item) => acc + (item.precoVenda * item.qtd), 0))}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-6">
@@ -173,7 +188,7 @@ export const Pdv = () => {
                 </div>
             </div>
 
-            <ModalFechamento isOpen={modalAberto} onClose={() => setModalAberto(false)} onFinalizar={finalizarVenda} totalVenda={calcularTotal()} />
+            <ModalFechamento isOpen={modalAberto} onClose={() => setModalAberto(false)} onFinalizar={finalizarVenda} totalVenda={calcularTotal()} clienteSelecionado={clienteSelecionado} />
 
             {showModalPerdida && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] print:hidden">
