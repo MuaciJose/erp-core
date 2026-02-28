@@ -13,6 +13,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/produtos")
 public class ProdutoController {
@@ -34,6 +37,15 @@ public class ProdutoController {
         return ResponseEntity.ok(service.cadastrar(dto, imagePath));
     }
 
+    @GetMapping
+    @Operation(summary = "Lista todos os produtos ou filtra por termo")
+    public ResponseEntity<List<Produto>> listarOuBuscar(@RequestParam(required = false) String busca) {
+        if (busca != null && !busca.isEmpty()) {
+            return ResponseEntity.ok(service.buscarProdutos(busca));
+        }
+        return ResponseEntity.ok(produtoRepository.findAll());
+    }
+
     @GetMapping("/barcode/{ean}")
     @Operation(summary = "Busca rápida para App Mobile via Código de Barras")
     public ResponseEntity<Produto> buscarPorCodigoBarras(@PathVariable String ean) {
@@ -47,5 +59,22 @@ public class ProdutoController {
         return produtoRepository.findByCodigoBarras(ean)
             .map(p -> ResponseEntity.ok(new ProdutoResponseDTO(p))) // Retorna dados + URL da Foto
             .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/alertas")
+    @Operation(summary = "Lista produtos com estoque abaixo do mínimo")
+    public ResponseEntity<List<Produto>> listarAlertas() {
+        return ResponseEntity.ok(service.listarAlertasEstoque());
+    }
+
+    @PatchMapping("/{id}/ajuste-estoque")
+    public ResponseEntity<Produto> ajustarEstoque(
+            @PathVariable Long id, 
+            @RequestBody Map<String, Object> dados) {
+        
+        Integer novaQuantidade = (Integer) dados.get("quantidade");
+        String motivo = (String) dados.get("motivo");
+
+        return ResponseEntity.ok(service.atualizarEstoque(id, novaQuantidade, motivo));
     }
 }

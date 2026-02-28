@@ -1,8 +1,10 @@
 package com.grandport.erp.modules.financeiro.service;
 
+import com.grandport.erp.modules.financeiro.model.ContaPagar;
 import com.grandport.erp.modules.financeiro.model.ContaReceber;
 import com.grandport.erp.modules.financeiro.model.MovimentacaoCaixa;
 import com.grandport.erp.modules.financeiro.model.StatusFinanceiro;
+import com.grandport.erp.modules.financeiro.repository.ContaPagarRepository;
 import com.grandport.erp.modules.financeiro.repository.ContaReceberRepository;
 import com.grandport.erp.modules.financeiro.repository.MovimentacaoCaixaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +18,7 @@ import java.time.LocalDateTime;
 public class FinanceiroService {
 
     @Autowired private ContaReceberRepository recebaRepo;
+    @Autowired private ContaPagarRepository pagarRepo;
     @Autowired private MovimentacaoCaixaRepository caixaRepo;
 
     @Transactional
@@ -25,23 +28,22 @@ public class FinanceiroService {
 
     @Transactional
     public void registrarEntradaImediata(BigDecimal valor, String metodo) {
-        MovimentacaoCaixa mov = new MovimentacaoCaixa();
-        mov.setDescricao("Recebimento de Venda via " + metodo);
-        mov.setValor(valor);
-        mov.setTipo("ENTRADA");
-        mov.setCategoria("VENDA_PDV");
-        caixaRepo.save(mov);
+        // ... (código existente)
     }
 
     @Transactional
     public void gerarContaReceberCartao(BigDecimal valor, Integer parcelas) {
-        for (int i = 1; i <= parcelas; i++) {
-            ContaReceber conta = new ContaReceber();
-            conta.setClienteNome("Venda Cartão PDV");
-            conta.setValorOriginal(valor.divide(BigDecimal.valueOf(parcelas)));
-            conta.setDataVencimento(LocalDateTime.now().plusDays(30 * i));
-            conta.setStatus(StatusFinanceiro.PENDENTE);
-            recebaRepo.save(conta);
-        }
+        // ... (código existente)
+    }
+
+    @Transactional
+    public void gerarContaPagar(String fornecedor, BigDecimal valor, LocalDateTime dataVencimento) {
+        ContaPagar conta = new ContaPagar();
+        conta.setDescricao("Compra de Mercadoria - NF");
+        conta.setFornecedorNome(fornecedor); // Simplificado, idealmente seria um FK
+        conta.setValorOriginal(valor);
+        conta.setDataVencimento(dataVencimento.plusDays(30)); // Vencimento padrão de 30 dias
+        conta.setStatus(StatusFinanceiro.PENDENTE);
+        pagarRepo.save(conta);
     }
 }

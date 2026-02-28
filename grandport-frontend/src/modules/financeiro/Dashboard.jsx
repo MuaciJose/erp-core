@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import api from '../../api/axios';
 import { startOfDay, endOfDay, subDays, startOfMonth } from 'date-fns';
+import { AlertOctagon } from 'lucide-react';
 
 export const Dashboard = () => {
     const [dados, setDados] = useState(null);
     const [filtro, setFiltro] = useState('MES'); // Padrão: Mês Atual
+    const [alertas, setAlertas] = useState([]);
 
     const carregarDados = async (periodo) => {
         let inicio = startOfMonth(new Date());
@@ -33,6 +35,16 @@ export const Dashboard = () => {
 
     useEffect(() => {
         carregarDados('MES');
+        
+        const carregarAlertas = async () => {
+            try {
+                const res = await api.get('/api/produtos/alertas');
+                setAlertas(res.data);
+            } catch (error) {
+                console.error("Erro ao carregar alertas de estoque:", error);
+            }
+        };
+        carregarAlertas();
     }, []);
 
     const chartData = [
@@ -86,7 +98,7 @@ export const Dashboard = () => {
                 </div>
             </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm h-[500px] w-full">
+            <div className="bg-white p-6 rounded-xl shadow-sm h-[500px] w-full mb-8">
                 <h3 className="text-lg font-semibold mb-4">Fluxo de Caixa ({filtro})</h3>
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
@@ -101,6 +113,30 @@ export const Dashboard = () => {
                         </Bar>
                     </BarChart>
                 </ResponsiveContainer>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-red-100">
+                <h3 className="text-lg font-bold text-red-700 flex items-center gap-2 mb-4">
+                    <AlertOctagon size={20} /> Atenção: Reposição Necessária
+                </h3>
+                
+                {alertas.length === 0 ? (
+                    <p className="text-gray-500 text-sm italic">Estoque saudável. Nenhuma peça em falta.</p>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {alertas.map(p => (
+                            <div key={p.id} className="p-3 bg-red-50 rounded-lg border border-red-200 flex justify-between items-center">
+                                <div>
+                                    <p className="font-bold text-gray-800">{p.nome}</p>
+                                    <p className="text-xs text-red-600">Restam apenas {p.quantidadeEstoque} unidades</p>
+                                </div>
+                                <span className="bg-red-600 text-white text-[10px] px-2 py-1 rounded-full uppercase font-black">
+                                    Crítico
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

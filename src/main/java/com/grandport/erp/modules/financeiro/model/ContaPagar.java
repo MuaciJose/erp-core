@@ -15,6 +15,8 @@ import lombok.EqualsAndHashCode;
 public class ContaPagar extends Conta {
 
     private String descricao;
+    
+    private String fornecedorNome; // Nome do fornecedor (útil para importação de XML)
 
     @ManyToOne
     @JoinColumn(name = "fornecedor_id")

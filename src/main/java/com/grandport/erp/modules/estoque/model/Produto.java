@@ -21,8 +21,14 @@ public class Produto {
 
     @Column(columnDefinition = "TEXT")
     private String descricao;
+    
+    @Column(columnDefinition = "TEXT")
+    private String aplicacao; // Compatibilidade (Ex: Uno, Palio, Strada)
 
     private String codigoBarras; // EAN para Leitor Mobile
+
+    @Column(length = 20)
+    private String localizacao; // Exemplo: CORREDOR A - PRATEL. 04
 
     @Column(precision = 10, scale = 2)
     private BigDecimal precoCusto;
