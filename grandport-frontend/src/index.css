@@ -20,32 +20,48 @@ html, body, #root {
   width: 100%;
 }
 
-/* Regras de Impressão para Cupom Térmico */
+/* Regras de Impressão para Cupom Térmico e Extratos */
 @media print {
-    /* Esconde tudo que não for o cupom */
+    /* Esconde tudo por padrão */
     body * {
         visibility: hidden;
+    }
+
+    /* Mostra apenas a seção de impressão e seus filhos */
+    .print-section, .print-section * {
+        visibility: visible;
     }
     .print-only, .print-only * {
         visibility: visible;
     }
-    .print-only {
+
+    /* Posiciona a seção de impressão no topo */
+    .print-section, .print-only {
         position: absolute;
         left: 0;
         top: 0;
-        width: 80mm; /* Largura padrão térmica */
-        margin: 0;
-        padding: 0;
-        display: block !important; /* Garante que apareça */
+        width: 100%; /* Ocupa a largura da página para extratos */
     }
-    /* Remove cabeçalhos e rodapés do navegador (data, url) */
+
+    /* Especificidade para o cupom térmico */
+    .print-only {
+        width: 80mm;
+        display: block !important;
+    }
+
+    /* Esconde elementos que não devem ser impressos */
+    .no-print, .no-print * {
+        display: none !important;
+    }
+
+    /* Remove margens da página para economizar papel */
     @page {
         margin: 0;
         size: auto;
     }
 }
 
-/* Esconde o cupom na tela normal */
+/* Esconde o layout de cupom na tela normal */
 .print-only {
   display: none;
 }

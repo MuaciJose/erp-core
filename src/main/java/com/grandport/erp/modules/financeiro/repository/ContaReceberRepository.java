@@ -8,4 +8,5 @@ import java.util.List;
 
 public interface ContaReceberRepository extends JpaRepository<ContaReceber, Long> {
     List<ContaReceber> findByStatus(StatusFinanceiro status);
+    List<ContaReceber> findByParceiroIdAndStatus(Long parceiroId, StatusFinanceiro status);
 }

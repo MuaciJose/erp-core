@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
-import { Users, Plus, Search, Phone, MapPin, Building2, Edit } from 'lucide-react';
+import { Users, Plus, Search, Phone, MapPin, Building2, Edit, FileText } from 'lucide-react';
 import { CriarParceiro } from './CriarParceiro';
+import { ExtratoParceiro } from '../financeiro/ExtratoParceiro';
 
 export const Parceiros = () => {
     const [parceiros, setParceiros] = useState([]);
     const [busca, setBusca] = useState("");
     const [loading, setLoading] = useState(true);
     const [parceiroEmEdicao, setParceiroEmEdicao] = useState(null);
-    const [abaAtiva, setAbaAtiva] = useState('CLIENTE'); // Estado para a aba
+    const [extratoAberto, setExtratoAberto] = useState(null); // ID do cliente para o extrato
+    const [abaAtiva, setAbaAtiva] = useState('CLIENTE');
 
     const carregarParceiros = async () => {
         try {
@@ -23,7 +25,6 @@ export const Parceiros = () => {
 
     useEffect(() => { carregarParceiros(); }, []);
 
-    // Filtro duplo: primeiro pela aba, depois pela busca
     const filtrados = parceiros
         .filter(p => {
             if (abaAtiva === 'CLIENTE') return p.tipo === 'CLIENTE' || p.tipo === 'AMBOS';
@@ -41,6 +42,10 @@ export const Parceiros = () => {
                     onSucesso={() => { setParceiroEmEdicao(null); carregarParceiros(); }} 
                     onCancelar={() => setParceiroEmEdicao(null)} 
                 />;
+    }
+
+    if (extratoAberto) {
+        return <ExtratoParceiro clienteId={extratoAberto} onVoltar={() => setExtratoAberto(null)} />;
     }
 
     if (loading) return <div className="p-8 text-center">Carregando parceiros...</div>;
@@ -63,7 +68,7 @@ export const Parceiros = () => {
                         />
                     </div>
                     <button 
-                        onClick={() => setParceiroEmEdicao({})} // Abre o form vazio para criar
+                        onClick={() => setParceiroEmEdicao({})}
                         className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 transition-colors shadow-md"
                     >
                         <Plus size={20} /> Novo Parceiro
@@ -71,7 +76,6 @@ export const Parceiros = () => {
                 </div>
             </div>
 
-            {/* Abas de Navegação */}
             <div className="flex gap-4 mb-8 border-b">
                 <button 
                     onClick={() => setAbaAtiva('CLIENTE')}
@@ -90,12 +94,14 @@ export const Parceiros = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filtrados.map(p => (
                     <div key={p.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative group">
-                        <button 
-                            onClick={() => setParceiroEmEdicao(p)}
-                            className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-blue-100 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            <Edit size={16} />
-                        </button>
+                        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => setExtratoAberto(p.id)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-blue-100 hover:text-blue-600" title="Ver Extrato">
+                                <FileText size={16} />
+                            </button>
+                            <button onClick={() => setParceiroEmEdicao(p)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-blue-100 hover:text-blue-600" title="Editar">
+                                <Edit size={16} />
+                            </button>
+                        </div>
 
                         <div className="flex justify-between items-start mb-4">
                             <div className={`p-2 rounded-lg ${p.tipo === 'FORNECEDOR' ? 'bg-purple-100 text-purple-600' : 'bg-green-100 text-green-600'}`}>
