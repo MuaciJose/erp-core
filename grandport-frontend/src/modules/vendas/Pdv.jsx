@@ -60,7 +60,6 @@ export const Pdv = () => {
 
     const calcularTotal = () => {
         let total = carrinho.reduce((acc, item) => acc + (item.precoVenda * item.qtd), 0);
-        // Aplica desconto se houver cliente com percentual
         if (clienteSelecionado?.percentualDesconto > 0) {
             total = total * (1 - clienteSelecionado.percentualDesconto / 100);
         }
@@ -166,7 +165,7 @@ export const Pdv = () => {
                 </div>
 
                 <div className="bg-slate-900 text-white p-6 flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-                    <div className="flex gap-8">
+                    <div className="flex gap-8 items-center">
                         <div>
                             <p className="text-slate-400 text-xs uppercase font-bold">Itens</p>
                             <p className="text-2xl font-bold">{carrinho.length}</p>
@@ -175,6 +174,12 @@ export const Pdv = () => {
                             <p className="text-slate-400 text-xs uppercase font-bold">Subtotal</p>
                             <p className="text-2xl font-bold text-slate-200">{formatCurrency(carrinho.reduce((acc, item) => acc + (item.precoVenda * item.qtd), 0))}</p>
                         </div>
+                        <button 
+                            onClick={() => setShowModalPerdida(true)} 
+                            className="ml-8 bg-red-600/20 border border-red-500 text-red-400 px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-red-600/40"
+                        >
+                            <Ban size={16} /> Venda Perdida (F9)
+                        </button>
                     </div>
                     <div className="flex items-center gap-6">
                         <div className="text-right">
