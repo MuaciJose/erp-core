@@ -26,6 +26,9 @@ public class Produto {
     private String aplicacao; // Compatibilidade (Ex: Uno, Palio, Strada)
 
     private String codigoBarras; // EAN para Leitor Mobile
+    
+    @Column(name = "ref_original", length = 50)
+    private String referenciaOriginal; // O "DNA" da peça que une as marcas
 
     @Column(length = 20)
     private String localizacao; // Exemplo: CORREDOR A - PRATEL. 04

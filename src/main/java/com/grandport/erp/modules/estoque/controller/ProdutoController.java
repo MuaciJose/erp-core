@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -76,5 +77,15 @@ public class ProdutoController {
         String motivo = (String) dados.get("motivo");
 
         return ResponseEntity.ok(service.atualizarEstoque(id, novaQuantidade, motivo));
+    }
+
+    @GetMapping("/{id}/similares")
+    @Operation(summary = "Busca produtos equivalentes (mesma Ref. Original)")
+    public ResponseEntity<List<Produto>> getSimilares(@PathVariable Long id) {
+        Produto p = service.findById(id);
+        if (p.getReferenciaOriginal() == null || p.getReferenciaOriginal().isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+        return ResponseEntity.ok(produtoRepository.findByReferenciaOriginalAndIdNot(p.getReferenciaOriginal(), id));
     }
 }

@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
-import { Package, Search, Edit, Trash2, Plus } from 'lucide-react';
+import { Package, Search, Edit, Trash2, Plus, History } from 'lucide-react';
 import { CriarProduto } from './CriarProduto';
+import { ExtratoEstoque } from './ExtratoEstoque';
 
 export const Produtos = () => {
     const [produtos, setProdutos] = useState([]);
     const [busca, setBusca] = useState("");
     const [exibirCadastro, setExibirCadastro] = useState(false);
+    const [produtoSelecionado, setProdutoSelecionado] = useState(null);
 
     const carregarProdutos = async () => {
         try {
@@ -28,6 +30,13 @@ export const Produtos = () => {
         return <CriarProduto 
                     onSucesso={() => { setExibirCadastro(false); carregarProdutos(); }} 
                     onCancelar={() => setExibirCadastro(false)} 
+                />;
+    }
+
+    if (produtoSelecionado) {
+        return <ExtratoEstoque 
+                    produto={produtoSelecionado} 
+                    onVoltar={() => setProdutoSelecionado(null)} 
                 />;
     }
 
@@ -80,6 +89,13 @@ export const Produtos = () => {
                                     {p.quantidadeEstoque} un
                                 </td>
                                 <td className="p-4 flex justify-center gap-2">
+                                    <button 
+                                        onClick={() => setProdutoSelecionado(p)}
+                                        className="p-2 hover:bg-purple-100 text-purple-600 rounded transition-colors"
+                                        title="Ver Extrato de Estoque"
+                                    >
+                                        <History size={18}/>
+                                    </button>
                                     <button className="p-2 hover:bg-blue-100 text-blue-600 rounded transition-colors"><Edit size={18}/></button>
                                     <button className="p-2 hover:bg-red-100 text-red-600 rounded transition-colors"><Trash2 size={18}/></button>
                                 </td>

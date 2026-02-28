@@ -1,22 +1,41 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { Maximize, Minimize, ShoppingCart, Ban } from 'lucide-react';
 import api from '../../api/axios';
 import { ModalFechamento } from './ModalFechamento';
+import { BuscaInteligente } from '../../components/BuscaInteligente';
+import { CupomVenda } from './CupomVenda';
 
 export const Pdv = () => {
     const [carrinho, setCarrinho] = useState([]);
-    const [busca, setBusca] = useState("");
-    const [resultados, setResultados] = useState([]);
     const [modalAberto, setModalAberto] = useState(false);
-    const inputBuscaRef = useRef(null);
+    const [isFullScreen, setIsFullScreen] = useState(false);
+    const [vendaFinalizada, setVendaFinalizada] = useState(null);
+    const [showModalPerdida, setShowModalPerdida] = useState(false);
     const audioBip = new Audio('/sounds/bip.mp3');
 
-    // --- LÓGICA DE ATALHOS ---
-    useHotkeys('f2', (e) => {
-        e.preventDefault();
-        inputBuscaRef.current?.focus();
-    }, { preventDefault: true });
+    // --- LÓGICA DE TELA CHEIA ---
+    const toggleFullScreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.error(`Erro ao ativar tela cheia: ${err.message}`);
+            });
+            setIsFullScreen(true);
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+                setIsFullScreen(false);
+            }
+        }
+    };
 
+    useEffect(() => {
+        const handleFSChange = () => setIsFullScreen(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', handleFSChange);
+        return () => document.removeEventListener('fullscreenchange', handleFSChange);
+    }, []);
+
+    // --- LÓGICA DE ATALHOS GERAIS ---
     useHotkeys('f10', (e) => {
         e.preventDefault();
         if (carrinho.length > 0) {
@@ -26,43 +45,30 @@ export const Pdv = () => {
         }
     }, { preventDefault: true }, [carrinho]);
 
-    useHotkeys('esc', (e) => {
+    useHotkeys('f9', (e) => {
         e.preventDefault();
-        if (modalAberto) {
+        setShowModalPerdida(true);
+    }, { preventDefault: true });
+
+    useHotkeys('esc', (e) => {
+        if (showModalPerdida) {
+            setShowModalPerdida(false);
+        } else if (modalAberto) {
             setModalAberto(false);
-        } else if (busca) {
-            setBusca("");
-            setResultados([]);
         } else if (carrinho.length > 0) {
-            if (window.confirm("Deseja limpar todo o carrinho?")) {
-                setCarrinho([]);
-            }
+            setTimeout(() => {
+                if (window.confirm("Deseja limpar todo o carrinho?")) {
+                    setCarrinho([]);
+                }
+            }, 100);
         }
-    }, { preventDefault: true }, [busca, carrinho, modalAberto]);
+    }, { preventDefault: true }, [carrinho, modalAberto, showModalPerdida]);
 
     // --- LÓGICA DO COMPONENTE ---
     const tocarBip = () => {
         audioBip.currentTime = 0;
         audioBip.play();
     };
-
-    // Busca produtos enquanto digita (debounce simples)
-    useEffect(() => {
-        const delayDebounceFn = setTimeout(async () => {
-            if (busca.length > 2 && !busca.includes('*')) {
-                try {
-                    const res = await api.get(`/api/produtos?busca=${busca}`);
-                    setResultados(res.data);
-                } catch (error) {
-                    console.error("Erro na busca:", error);
-                }
-            } else {
-                setResultados([]);
-            }
-        }, 300);
-
-        return () => clearTimeout(delayDebounceFn);
-    }, [busca]);
 
     const adicionarAoCarrinho = (produto, qtd = 1) => {
         tocarBip();
@@ -74,38 +80,6 @@ export const Pdv = () => {
             ));
         } else {
             setCarrinho(prev => [...prev, { ...produto, qtd: qtd }]);
-        }
-        
-        setBusca("");
-        setResultados([]);
-        inputBuscaRef.current?.focus();
-    };
-
-    const handleKeyDownBusca = async (e) => {
-        if (e.key === 'Enter') {
-            // Lógica para código de barras ou multiplicador
-            let qtd = 1;
-            let termo = busca;
-
-            if (busca.includes('*')) {
-                const partes = busca.split('*');
-                qtd = parseInt(partes[0], 10) || 1;
-                termo = partes[1];
-            }
-
-            // Se for um código de barras exato ou se houver apenas 1 resultado na lista
-            if (resultados.length === 1) {
-                adicionarAoCarrinho(resultados[0], qtd);
-            } else {
-                // Tenta buscar por código de barras exato
-                try {
-                    const res = await api.get(`/api/produtos/barcode/${termo}`);
-                    adicionarAoCarrinho(res.data, qtd);
-                } catch (err) {
-                    // Se não achou por código de barras e tem vários resultados, foca na lista (opcional)
-                    // ou apenas mantém a lista aberta para o usuário clicar
-                }
-            }
         }
     };
 
@@ -120,22 +94,26 @@ export const Pdv = () => {
     const finalizarVenda = async () => {
         const dadosVenda = {
             itens: carrinho.map(item => ({ produtoId: item.id, quantidade: item.qtd })),
-            pagamento: 'DINHEIRO' // Isso virá do Modal no futuro
+            pagamento: 'DINHEIRO'
         };
 
         try {
             const resVenda = await api.post('/api/vendas', dadosVenda);
-            const vendaId = resVenda.data.id;
-
-            const resPdf = await api.get(`/api/vendas/relatorios/${vendaId}/pdf`, { responseType: 'blob' });
-
-            const fileURL = URL.createObjectURL(resPdf.data);
-            const printWindow = window.open(fileURL);
-            printWindow.onload = () => printWindow.print();
-
-            setCarrinho([]);
+            const vendaParaImpressao = {
+                id: resVenda.data.id,
+                total: calcularTotal(),
+                vendedor: 'CAIXA 01'
+            };
+            setVendaFinalizada(vendaParaImpressao);
             setModalAberto(false);
-            alert(`Venda #${vendaId} concluída com sucesso!`);
+
+            setTimeout(() => {
+                window.print();
+                setCarrinho([]);
+                setVendaFinalizada(null);
+                alert(`Venda #${resVenda.data.id} finalizada com sucesso!`);
+            }, 500);
+
         } catch (err) {
             console.error(err);
             alert(`Erro ao finalizar venda: ${err.response?.data?.message || err.message}`);
@@ -143,106 +121,118 @@ export const Pdv = () => {
     };
 
     return (
-        <div className="flex flex-col h-screen bg-gray-200 relative">
-            <header className="bg-blue-900 text-white p-2 rounded-t-lg flex justify-around text-xs shadow-lg">
-                <span>[F2] Buscar Peça</span>
-                <span>[F10] Finalizar e Imprimir</span>
-                <span>[ESC] Limpar</span>
-            </header>
-
-            <div className="p-4 relative z-10">
-                <input 
-                    ref={inputBuscaRef}
-                    type="text"
-                    className="w-full p-4 border-2 border-blue-500 rounded-lg text-xl shadow-inner"
-                    placeholder="Ex: 3*SKU123, 'Amortecedor Uno' ou bipe o código (F2 para focar)"
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
-                    onKeyDown={handleKeyDownBusca}
-                    autoFocus
-                />
-
-                {/* Lista de Sugestões */}
-                {resultados.length > 0 && (
-                    <div className="absolute left-4 right-4 top-20 bg-white shadow-2xl rounded-lg border border-gray-200 max-h-96 overflow-y-auto">
-                        {resultados.map(p => (
-                            <div 
-                                key={p.id} 
-                                onClick={() => adicionarAoCarrinho(p)}
-                                className="flex items-center gap-4 p-4 border-b hover:bg-blue-50 cursor-pointer transition-colors"
-                            >
-                                <img 
-                                    src={p.fotoUrl || 'https://via.placeholder.com/150'} 
-                                    className="w-16 h-16 rounded object-cover border border-gray-200" 
-                                    alt={p.nome} 
-                                />
-                                <div className="flex-1">
-                                    <h4 className="font-bold text-gray-800 text-lg">{p.nome}</h4>
-                                    {p.aplicacao && (
-                                        <p className="text-xs text-blue-600 uppercase font-bold mt-1">
-                                            Aplica-se em: {p.aplicacao}
-                                        </p>
-                                    )}
-                                    <p className="text-sm text-gray-500 mt-1">
-                                        Marca: {p.marca?.nome || 'Genérica'} | SKU: {p.sku} | Estoque: {p.quantidadeEstoque}
-                                    </p>
-                                </div>
-                                <div className="text-right">
-                                    <span className="text-xl font-black text-green-700 block">
-                                        {formatCurrency(p.precoVenda)}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+        <div className={`flex flex-col h-screen bg-slate-100 ${isFullScreen ? 'p-0' : 'p-4'}`}>
             
-            <main className="flex-1 overflow-y-auto px-4 z-0">
-                <table className="w-full bg-white rounded-lg shadow-md">
-                    <thead className="bg-gray-800 text-white">
-                        <tr className="text-left">
-                            <th className="p-3 w-2/5">Peça</th>
-                            <th className="p-3">SKU</th>
-                            <th className="p-3">Preço Unit.</th>
-                            <th className="p-3">Qtd</th>
-                            <th className="p-3 text-right">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {carrinho.map((item, index) => (
-                            <tr key={index} className="border-b hover:bg-gray-50">
-                                <td className="p-3 font-medium">{item.nome}</td>
-                                <td className="p-3 text-gray-600">{item.sku}</td>
-                                <td className="p-3">{formatCurrency(item.precoVenda)}</td>
-                                <td className="p-3 font-bold">{item.qtd}</td>
-                                <td className="p-3 text-right font-semibold">{formatCurrency(item.precoVenda * item.qtd)}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </main>
-            
-            <footer className="mt-auto bg-gray-800 text-white p-4 flex justify-between items-center rounded-lg shadow-2xl m-4">
-                <div>
-                    <p className="text-gray-400">Total de Itens: {carrinho.length}</p>
-                    <p className="text-4xl font-bold text-green-400">{formatCurrency(calcularTotal())}</p>
+            {vendaFinalizada && <CupomVenda venda={vendaFinalizada} itens={carrinho} />}
+
+            <div className="flex justify-between items-center bg-slate-900 text-white p-4 rounded-t-xl shadow-lg print:hidden">
+                <div className="flex items-center gap-4">
+                    <ShoppingCart className="text-blue-400" size={28} />
+                    <h2 className="text-xl font-black tracking-tight">GRANDPORT | PONTO DE VENDA</h2>
                 </div>
-                <button 
-                    onClick={() => setModalAberto(true)}
-                    className="bg-green-500 hover:bg-green-600 px-12 py-4 rounded-xl text-2xl font-black transition-all transform hover:scale-105 shadow-lg"
-                    disabled={carrinho.length === 0}
-                >
-                    FINALIZAR (F10)
-                </button>
-            </footer>
+                <div className="flex items-center gap-6">
+                    <div className="text-right hidden md:block">
+                        <p className="text-[10px] text-slate-400 uppercase">Operador</p>
+                        <p className="text-sm font-bold">CAIXA 01</p>
+                    </div>
+                    <button onClick={toggleFullScreen} className="p-2 hover:bg-slate-700 rounded-full transition-colors" title="Alternar Tela Cheia">
+                        {isFullScreen ? <Minimize size={24} /> : <Maximize size={24} />}
+                    </button>
+                </div>
+            </div>
 
-            <ModalFechamento 
-                isOpen={modalAberto} 
-                onClose={() => setModalAberto(false)} 
-                onFinalizar={finalizarVenda}
-                totalVenda={calcularTotal()}
-            />
+            <div className="flex-1 bg-white shadow-2xl flex flex-col rounded-b-xl overflow-hidden print:hidden">
+                <div className="p-6 bg-slate-50 border-b border-slate-200 z-20">
+                    <BuscaInteligente onSelect={adicionarAoCarrinho} />
+                    <div className="flex justify-between mt-2 text-xs text-slate-500 px-2">
+                        <span>[F2] Buscar Peça</span>
+                        <span>[F10] Finalizar Venda</span>
+                        <span>[F9] Venda Perdida</span>
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-0 z-0">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-100 text-slate-600 uppercase text-xs font-bold sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th className="p-4 w-16 text-center">#</th>
+                                <th className="p-4">Descrição do Produto</th>
+                                <th className="p-4 w-32 text-right">Valor Unit.</th>
+                                <th className="p-4 w-24 text-center">Qtd</th>
+                                <th className="p-4 w-32 text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {carrinho.map((item, index) => (
+                                <tr key={index} className="hover:bg-blue-50 transition-colors">
+                                    <td className="p-4 text-center text-slate-400 font-mono">{index + 1}</td>
+                                    <td className="p-4">
+                                        <p className="font-bold text-slate-800">{item.nome}</p>
+                                        <p className="text-xs text-slate-500 font-mono">{item.sku}</p>
+                                    </td>
+                                    <td className="p-4 text-right font-medium text-slate-600">{formatCurrency(item.precoVenda)}</td>
+                                    <td className="p-4 text-center font-bold text-slate-800 bg-slate-50 rounded-lg mx-2">{item.qtd}</td>
+                                    <td className="p-4 text-right font-black text-slate-800">{formatCurrency(item.precoVenda * item.qtd)}</td>
+                                </tr>
+                            ))}
+                            {carrinho.length === 0 && (
+                                <tr>
+                                    <td colSpan="5" className="p-12 text-center text-slate-400 italic">Caixa livre. Aguardando próximo cliente...</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="bg-slate-900 text-white p-6 flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                    <div className="flex gap-8">
+                        <div>
+                            <p className="text-slate-400 text-xs uppercase font-bold">Itens</p>
+                            <p className="text-2xl font-bold">{carrinho.length}</p>
+                        </div>
+                        <div>
+                            <p className="text-slate-400 text-xs uppercase font-bold">Subtotal</p>
+                            <p className="text-2xl font-bold text-slate-200">{formatCurrency(calcularTotal())}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-6">
+                        <div className="text-right">
+                            <p className="text-green-400 text-xs uppercase font-bold mb-1">Total a Pagar</p>
+                            <p className="text-5xl font-black tracking-tighter text-white">{formatCurrency(calcularTotal())}</p>
+                        </div>
+                        <button onClick={() => setModalAberto(true)} disabled={carrinho.length === 0} className="bg-green-500 hover:bg-green-600 disabled:bg-slate-700 disabled:text-slate-500 text-white px-8 py-4 rounded-xl font-black text-xl shadow-lg hover:shadow-green-500/20 transition-all transform hover:scale-105 active:scale-95">
+                            FINALIZAR
+                            <span className="block text-[10px] font-normal opacity-80">TECLA F10</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <ModalFechamento isOpen={modalAberto} onClose={() => setModalAberto(false)} onFinalizar={finalizarVenda} totalVenda={calcularTotal()} />
+
+            {/* Botão e Modal de Venda Perdida */}
+            <button onClick={() => setShowModalPerdida(true)} className="fixed bottom-6 right-6 bg-red-600 text-white p-4 rounded-full shadow-2xl hover:bg-red-700 flex items-center gap-2 transition-all print:hidden">
+                <Ban size={20} /> <span className="font-bold hidden md:inline">NÃO TINHA NO ESTOQUE (F9)</span>
+            </button>
+
+            {showModalPerdida && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] print:hidden">
+                    <div className="bg-white p-8 rounded-2xl w-[500px] shadow-2xl">
+                        <h2 className="text-xl font-black mb-4 text-red-600">Registrar Falta de Peça</h2>
+                        <input className="w-full p-3 border rounded-lg mb-4" placeholder="Nome da peça ou Referência..." id="inputPerdida" autoFocus />
+                        <div className="flex gap-2">
+                            <button onClick={() => setShowModalPerdida(false)} className="flex-1 py-3 bg-gray-200 rounded-xl font-bold">CANCELAR</button>
+                            <button onClick={async () => {
+                                const desc = document.getElementById('inputPerdida').value;
+                                if (!desc) return alert("Descreva a peça que o cliente procurou.");
+                                await api.post('/api/vendas-perdidas', { descricaoPeca: desc });
+                                setShowModalPerdida(false);
+                                alert("Registrado! O gestor será avisado.");
+                            }} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold">CONFIRMAR</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

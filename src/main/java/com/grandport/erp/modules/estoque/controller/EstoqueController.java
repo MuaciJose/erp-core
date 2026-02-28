@@ -1,30 +1,32 @@
 package com.grandport.erp.modules.estoque.controller;
 
-import com.grandport.erp.modules.estoque.service.NcmService;
+import com.grandport.erp.modules.estoque.dto.PrevisaoCompraDTO;
+import com.grandport.erp.modules.estoque.model.MovimentacaoEstoque;
+import com.grandport.erp.modules.estoque.repository.MovimentacaoEstoqueRepository;
+import com.grandport.erp.modules.estoque.service.EstoqueService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
-@RequestMapping("/estoque")
+@RequestMapping("/api/estoque")
 public class EstoqueController {
 
-    @Autowired
-    private NcmService ncmService;
+    @Autowired private MovimentacaoEstoqueRepository estoqueRepository;
+    @Autowired private EstoqueService estoqueService;
 
-    @PostMapping("/importar-ncm")
-    public ResponseEntity<String> uploadNcm(@RequestParam("file") MultipartFile file) {
-        try {
-            ncmService.importarNcmDoJson(file);
-            return ResponseEntity.ok("Carga de NCM processada com sucesso!");
-        } catch (Exception e) {
-            // Log the exception e
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erro no processamento do arquivo NCM.");
-        }
+    @GetMapping("/produto/{produtoId}/historico")
+    public ResponseEntity<List<MovimentacaoEstoque>> getHistorico(@PathVariable Long produtoId) {
+        return ResponseEntity.ok(estoqueRepository.findByProdutoIdOrderByDataMovimentacaoDesc(produtoId));
+    }
+
+    @GetMapping("/previsao-reposicao")
+    public ResponseEntity<List<PrevisaoCompraDTO>> getPrevisao() {
+        return ResponseEntity.ok(estoqueService.gerarPrevisaoReposicao());
     }
 }

@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Button, Image, StyleSheet, Vibration, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { Audio } from 'expo-av';
 import api from '../api/axios';
 import Scanner from '../components/Scanner';
 
-// Componente para Ajuste de Estoque (NOVO)
+// Componente para Ajuste de Estoque
 const AjusteEstoque = ({ produto, onUpdate }) => {
     const [novaQtd, setNovaQtd] = useState(produto.quantidadeEstoque.toString());
 
@@ -44,6 +44,21 @@ const AjusteEstoque = ({ produto, onUpdate }) => {
 
 // Componente interno para exibir os detalhes
 const DetalheProduto = ({ produto, onVoltar, onReload }) => {
+    const [similares, setSimilares] = useState([]);
+
+    useEffect(() => {
+        // Busca as peças que partilham a mesma Referência Original
+        const carregarSimilares = async () => {
+            try {
+                const res = await api.get(`/api/produtos/${produto.id}/similares`);
+                setSimilares(res.data);
+            } catch (error) {
+                console.error("Erro ao carregar similares:", error);
+            }
+        };
+        carregarSimilares();
+    }, [produto.id]);
+
     return (
         <ScrollView style={styles.container}>
             <View style={styles.imageContainer}>
@@ -80,6 +95,35 @@ const DetalheProduto = ({ produto, onVoltar, onReload }) => {
                     <Text style={styles.similarText}>
                         {produto.aplicacao || "Nenhuma aplicação específica cadastrada."}
                     </Text>
+                </View>
+
+                {/* SECÇÃO DE REFERÊNCIA CRUZADA (NOVO) */}
+                <View style={styles.sectionSimilares}>
+                    <Text style={styles.tituloSecao}>Equivalentes (Mesma Ref. Original)</Text>
+                    <Text style={styles.refOriginalText}>Cód. Original: {produto.referenciaOriginal || 'N/A'}</Text>
+
+                    {similares.length === 0 ? (
+                        <Text style={styles.noData}>Nenhuma outra marca em stock para esta peça.</Text>
+                    ) : (
+                        similares.map((item) => (
+                            <View key={item.id} style={styles.cardSimilar}>
+                                <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1}}>
+                                    <Image
+                                        source={{ uri: item.fotoUrl || 'https://via.placeholder.com/50' }}
+                                        style={styles.miniFoto}
+                                    />
+                                    <View style={{flex: 1}}>
+                                        <Text style={styles.nomeSimilar} numberOfLines={2}>{item.nome}</Text>
+                                        <Text style={styles.marcaSimilar}>Marca: {item.marca?.nome}</Text>
+                                    </View>
+                                </View>
+                                <View style={styles.estoqueSimilar}>
+                                    <Text style={styles.qtdSimilar}>{item.quantidadeEstoque} un</Text>
+                                    <Text style={styles.precoSimilar}>R$ {item.precoVenda ? item.precoVenda.toFixed(2).replace('.', ',') : '0,00'}</Text>
+                                </View>
+                            </View>
+                        ))
+                    )}
                 </View>
 
                 <View style={styles.precoContainer}>
@@ -168,7 +212,29 @@ const styles = StyleSheet.create({
     label: { fontSize: 14, fontWeight: 'bold', color: '#555', marginBottom: 8 },
     similarContainer: { padding: 15, backgroundColor: '#f5f5f5', borderRadius: 8, marginBottom: 20 },
     similarText: { fontSize: 15, color: '#333', lineHeight: 22 },
-    precoContainer: { borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 15, alignItems: 'flex-end' },
+
+    // Estilos dos Similares
+    sectionSimilares: { padding: 15, marginTop: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee' },
+    tituloSecao: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 5 },
+    refOriginalText: { fontSize: 12, color: '#0288d1', marginBottom: 15, fontWeight: 'bold' },
+    cardSimilar: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#eee',
+        borderRadius: 8,
+        marginBottom: 8
+    },
+    miniFoto: { width: 40, height: 40, borderRadius: 4 },
+    nomeSimilar: { fontSize: 14, fontWeight: 'bold', color: '#333' },
+    marcaSimilar: { fontSize: 12, color: '#666' },
+    estoqueSimilar: { alignItems: 'flex-end', minWidth: 70 },
+    qtdSimilar: { fontSize: 14, fontWeight: 'bold', color: '#2e7d32' },
+    precoSimilar: { fontSize: 12, color: '#444' },
+    noData: { fontSize: 12, color: '#999', fontStyle: 'italic' },
+
+    precoContainer: { borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 15, alignItems: 'flex-end', marginTop: 10 },
     precoLabel: { fontSize: 14, color: '#999', marginBottom: 4 },
     precoValue: { fontSize: 32, fontWeight: 'bold', color: '#2e7d32' }
 });

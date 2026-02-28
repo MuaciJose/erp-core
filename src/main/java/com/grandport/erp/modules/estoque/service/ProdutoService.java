@@ -2,9 +2,11 @@ package com.grandport.erp.modules.estoque.service;
 
 import com.grandport.erp.modules.estoque.dto.ProdutoRequestDTO;
 import com.grandport.erp.modules.estoque.model.Marca;
+import com.grandport.erp.modules.estoque.model.MovimentacaoEstoque;
 import com.grandport.erp.modules.estoque.model.Ncm;
 import com.grandport.erp.modules.estoque.model.Produto;
 import com.grandport.erp.modules.estoque.repository.MarcaRepository;
+import com.grandport.erp.modules.estoque.repository.MovimentacaoEstoqueRepository;
 import com.grandport.erp.modules.estoque.repository.NcmRepository;
 import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +21,7 @@ public class ProdutoService {
     @Autowired private ProdutoRepository produtoRepository;
     @Autowired private MarcaRepository marcaRepository;
     @Autowired private NcmRepository ncmRepository;
+    @Autowired private MovimentacaoEstoqueRepository movimentacaoRepository;
 
     @Transactional
     public Produto cadastrar(ProdutoRequestDTO dto, String imagePath) {
@@ -52,7 +55,12 @@ public class ProdutoService {
             produto.setFotoLocalPath("/uploads/produtos/" + imagePath); // Caminho do servidor
         }
 
-        return produtoRepository.save(produto);
+        Produto salvo = produtoRepository.save(produto);
+        
+        // Registra movimentação inicial
+        registrarMovimentacao(salvo, dto.quantidadeEstoque(), "ENTRADA", "Cadastro Inicial");
+        
+        return salvo;
     }
 
     public List<Produto> listarAlertasEstoque() {
@@ -71,12 +79,26 @@ public class ProdutoService {
     @Transactional
     public Produto atualizarEstoque(Long id, Integer novaQuantidade, String motivo) {
         Produto produto = findById(id);
-        System.out.println("AJUSTE DE ESTOQUE | Produto: " + produto.getNome() + 
-                           " | De: " + produto.getQuantidadeEstoque() + 
-                           " | Para: " + novaQuantidade + 
-                           " | Motivo: " + motivo);
+        Integer saldoAnterior = produto.getQuantidadeEstoque();
+        Integer diferenca = novaQuantidade - saldoAnterior;
         
         produto.setQuantidadeEstoque(novaQuantidade);
-        return produtoRepository.save(produto);
+        Produto salvo = produtoRepository.save(produto);
+
+        String tipo = diferenca > 0 ? "ENTRADA" : "SAIDA";
+        registrarMovimentacao(salvo, diferenca, tipo, motivo);
+
+        return salvo;
+    }
+
+    private void registrarMovimentacao(Produto produto, Integer quantidade, String tipo, String motivo) {
+        MovimentacaoEstoque mov = new MovimentacaoEstoque();
+        mov.setProduto(produto);
+        mov.setQuantidade(quantidade);
+        mov.setTipo(tipo);
+        mov.setMotivo(motivo);
+        mov.setSaldoAnterior(produto.getQuantidadeEstoque() - quantidade);
+        mov.setSaldoAtual(produto.getQuantidadeEstoque());
+        movimentacaoRepository.save(mov);
     }
 }

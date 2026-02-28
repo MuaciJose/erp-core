@@ -17,7 +17,18 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long> {
     @Query("SELECT p FROM Produto p WHERE " +
            "LOWER(p.nome) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
            "LOWER(p.aplicacao) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
-           "p.codigoBarras LIKE CONCAT('%', :termo, '%') OR " +
-           "p.sku LIKE CONCAT('%', :termo, '%')")
+           "p.referenciaOriginal LIKE CONCAT('%', :termo, '%') OR " +
+           "p.sku LIKE CONCAT('%', :termo, '%') OR " +
+           "p.codigoBarras LIKE CONCAT('%', :termo, '%')")
     List<Produto> buscarPorTermo(@Param("termo") String termo);
+
+    // Método otimizado sugerido (pode ser usado para buscas mais específicas)
+    @Query("SELECT p FROM Produto p WHERE " +
+           "LOWER(p.nome) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
+           "LOWER(p.aplicacao) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
+           "p.referenciaOriginal LIKE CONCAT('%', :termo, '%') OR " +
+           "p.codigoBarras = :termo")
+    List<Produto> buscaInteligente(@Param("termo") String termo);
+
+    List<Produto> findByReferenciaOriginalAndIdNot(String referenciaOriginal, Long id);
 }

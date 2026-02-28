@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from '../../api/axios';
-import { Save, X, Upload, Loader2 } from 'lucide-react';
+import { Save, X, Upload } from 'lucide-react';
+import { Autocomplete } from '../../components/Autocomplete';
 
 export const CriarProduto = ({ onSucesso, onCancelar }) => {
     const [form, setForm] = useState({
@@ -9,6 +10,7 @@ export const CriarProduto = ({ onSucesso, onCancelar }) => {
         descricao: '',
         aplicacao: '',
         localizacao: '',
+        referenciaOriginal: '',
         codigoBarras: '',
         precoCusto: '',
         precoVenda: '',
@@ -20,8 +22,6 @@ export const CriarProduto = ({ onSucesso, onCancelar }) => {
     });
     const [imagem, setImagem] = useState(null);
     const [preview, setPreview] = useState(null);
-    const [sugestoesNcm, setSugestoesNcm] = useState([]);
-    const [buscandoNcm, setBuscarNcm] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -36,27 +36,29 @@ export const CriarProduto = ({ onSucesso, onCancelar }) => {
         }
     };
 
-    const buscarNcmNoBanco = async (termo) => {
-        if (termo.length > 2) {
-            setBuscarNcm(true);
-            try {
-                const res = await api.get(`/api/ncm/busca?q=${termo}`);
-                console.log("NCMs encontrados:", res.data);
-                setSugestoesNcm(res.data);
-            } catch (error) {
-                console.error("Erro ao buscar NCM:", error);
-                setSugestoesNcm([]);
-            } finally {
-                setBuscarNcm(false);
-            }
-        } else {
-            setSugestoesNcm([]);
-        }
+    // --- Funções de Busca para o Autocomplete ---
+    const buscarNcm = async (termo) => {
+        const res = await api.get(`/api/ncm/busca?q=${termo}`);
+        return res.data;
+    };
+
+    const buscarMarca = async (termo) => {
+        const res = await api.get(`/api/marcas/buscar?nome=${termo}`);
+        return res.data;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         
+        if (!form.marcaId) {
+            alert("Por favor, selecione uma marca válida.");
+            return;
+        }
+        if (!form.ncmCodigo) {
+            alert("Por favor, selecione um NCM válido.");
+            return;
+        }
+
         const formData = new FormData();
         formData.append('produto', new Blob([JSON.stringify(form)], { type: 'application/json' }));
         
@@ -104,61 +106,59 @@ export const CriarProduto = ({ onSucesso, onCancelar }) => {
                         </div>
                     </div>
 
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <label className="block text-sm font-bold text-blue-800 uppercase">
+                            Referência Original (Montadora)
+                        </label>
+                        <input 
+                            name="referenciaOriginal" 
+                            type="text" 
+                            value={form.referenciaOriginal}
+                            onChange={handleChange}
+                            className="w-full p-3 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono mt-1" 
+                            placeholder="Ex: 51834073" 
+                        />
+                        <p className="text-[10px] text-blue-600 mt-1">
+                            * Use este código para agrupar peças de marcas diferentes com a mesma aplicação.
+                        </p>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Compatibilidade / Veículos</label>
                         <textarea name="aplicacao" value={form.aplicacao} onChange={handleChange} className="mt-1 block w-full border rounded-md p-2" rows="2" placeholder="Ex: Uno Mille, Palio G3, Strada" />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Marca (ID)</label>
-                            <input name="marcaId" type="number" value={form.marcaId} onChange={handleChange} className="mt-1 block w-full border rounded-md p-2" required placeholder="Ex: 1" />
-                        </div>
-                        <div className="relative">
-                            <label className="block text-sm font-medium text-gray-700 flex justify-between">
-                                NCM (Fiscal)
-                                {buscandoNcm && <Loader2 size={14} className="animate-spin text-blue-600" />}
-                            </label>
-                            <input 
-                                name="ncmCodigo" 
-                                type="text" 
-                                value={form.ncmCodigo}
-                                onChange={(e) => {
-                                    setForm(prev => ({ ...prev, ncmCodigo: e.target.value }));
-                                    buscarNcmNoBanco(e.target.value);
-                                }}
-                                className="mt-1 block w-full border rounded-md p-2" 
-                                required 
-                                placeholder="Ex: 8708..." 
-                                autoComplete="off"
-                            />
-                            
-                            {sugestoesNcm.length > 0 && (
-                                <ul className="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-y-auto mt-1 left-0">
-                                    {sugestoesNcm.map((n, index) => {
-                                        const codigo = n.Codigo || n.codigo;
-                                        const descricao = n.Descricao || n.descricao;
-                                        
-                                        return (
-                                            <li 
-                                                key={codigo || index}
-                                                onClick={() => {
-                                                    setForm(prev => ({ ...prev, ncmCodigo: codigo }));
-                                                    setSugestoesNcm([]);
-                                                }}
-                                                title={`${codigo} - ${descricao}`} // Tooltip nativo com o texto completo
-                                                className="p-3 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-b-0 flex flex-col group"
-                                            >
-                                                <span className="font-bold text-blue-700">{codigo}</span>
-                                                <span className="text-gray-600 text-xs truncate group-hover:whitespace-normal group-hover:overflow-visible group-hover:h-auto">
-                                                    {descricao}
-                                                </span>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
+                        {/* AUTOCOMPLETE DE MARCA */}
+                        <Autocomplete 
+                            label="Fabricante (Marca)"
+                            placeholder="Digite para buscar..."
+                            onSearch={buscarMarca}
+                            onSelect={(m) => setForm(prev => ({ ...prev, marcaId: m ? m.id : '' }))}
+                            displayValue={(m) => m.nome}
+                            renderItem={(m) => (
+                                <span className="font-bold text-gray-800">{m.nome}</span>
                             )}
-                        </div>
+                        />
+
+                        {/* AUTOCOMPLETE DE NCM */}
+                        <Autocomplete 
+                            label="NCM (Fiscal)"
+                            placeholder="Ex: 8708..."
+                            onSearch={buscarNcm}
+                            onSelect={(n) => setForm(prev => ({ ...prev, ncmCodigo: n ? (n.Codigo || n.codigo) : '' }))}
+                            displayValue={(n) => (n.Codigo || n.codigo)}
+                            renderItem={(n) => {
+                                const codigo = n.Codigo || n.codigo;
+                                const descricao = n.Descricao || n.descricao;
+                                return (
+                                    <div className="flex flex-col">
+                                        <span className="font-bold text-blue-700">{codigo}</span>
+                                        <span className="text-gray-600 text-xs truncate" title={descricao}>{descricao}</span>
+                                    </div>
+                                );
+                            }}
+                        />
                     </div>
                 </div>
 
