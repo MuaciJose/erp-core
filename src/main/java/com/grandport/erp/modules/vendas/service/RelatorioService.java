@@ -6,6 +6,7 @@ import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
+import com.itextpdf.layout.borders.Border;
 import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
 
 @Service
 public class RelatorioService {
@@ -29,20 +31,17 @@ public class RelatorioService {
 
         try {
             PdfWriter writer = new PdfWriter(baos);
-            // Definindo tamanho para bobina térmica (80mm de largura)
-            // 226pt é aproximadamente 80mm
-            PageSize pageSize = new PageSize(226, 842); // Altura maior para vendas longas
+            PageSize pageSize = new PageSize(226, 842);
             PdfDocument pdf = new PdfDocument(writer);
             pdf.setDefaultPageSize(pageSize);
             
             Document document = new Document(pdf);
-            document.setMargins(5, 5, 5, 5); // Margens mínimas para térmica
+            document.setMargins(5, 5, 5, 5);
 
             document.add(new Paragraph("GRANDPORT ERP").setBold().setTextAlignment(TextAlignment.CENTER));
             document.add(new Paragraph("Rua das Pecas, 100 - Centro").setFontSize(8).setTextAlignment(TextAlignment.CENTER));
             document.add(new Paragraph("--------------------------------").setTextAlignment(TextAlignment.CENTER));
 
-            // Tabela compacta para térmica
             Table table = new Table(new float[]{120f, 30f, 60f});
             table.addCell(new Cell().add(new Paragraph("ITEM").setFontSize(8)));
             table.addCell(new Cell().add(new Paragraph("QTD").setFontSize(8)));
@@ -53,10 +52,30 @@ public class RelatorioService {
                 table.addCell(new Cell().add(new Paragraph(String.valueOf(item.getQuantidade())).setFontSize(7)));
                 table.addCell(new Cell().add(new Paragraph(item.getPrecoUnitario().toString()).setFontSize(7)));
             });
-
             document.add(table);
-            document.add(new Paragraph("TOTAL: R$ " + venda.getValorTotal()).setBold().setFontSize(10).setTextAlignment(TextAlignment.RIGHT));
-            document.add(new Paragraph("Obrigado pela preferência!").setFontSize(8).setTextAlignment(TextAlignment.CENTER));
+
+            document.add(new Paragraph("--------------------------------").setTextAlignment(TextAlignment.CENTER));
+            document.add(new Paragraph("SUBTOTAL: R$ " + venda.getValorSubtotal()).setFontSize(9).setTextAlignment(TextAlignment.RIGHT));
+            if (venda.getDesconto() != null && venda.getDesconto().compareTo(BigDecimal.ZERO) > 0) {
+                document.add(new Paragraph("DESCONTO: R$ " + venda.getDesconto()).setFontSize(9).setItalic().setTextAlignment(TextAlignment.RIGHT));
+            }
+            document.add(new Paragraph("TOTAL GERAL: R$ " + venda.getValorTotal()).setBold().setFontSize(11).setTextAlignment(TextAlignment.RIGHT));
+            document.add(new Paragraph("--------------------------------").setTextAlignment(TextAlignment.CENTER));
+
+            document.add(new Paragraph("FORMA DE PAGAMENTO:").setBold().setFontSize(8));
+            venda.getPagamentos().forEach(p -> {
+                String detalhe = p.getMetodo();
+                if (p.getParcelas() != null && p.getParcelas() > 1) {
+                    detalhe += " (" + p.getParcelas() + "x)";
+                }
+                
+                Table pTable = new Table(new float[]{150f, 76f});
+                pTable.addCell(new Cell().add(new Paragraph(detalhe).setFontSize(8)).setBorder(Border.NO_BORDER));
+                pTable.addCell(new Cell().add(new Paragraph("R$ " + p.getValor()).setFontSize(8).setTextAlignment(TextAlignment.RIGHT)).setBorder(Border.NO_BORDER));
+                document.add(pTable);
+            });
+            
+            document.add(new Paragraph("Obrigado pela preferência!").setFontSize(8).setTextAlignment(TextAlignment.CENTER).setMarginTop(10));
 
             document.close();
         } catch (Exception e) {

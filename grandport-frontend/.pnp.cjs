@@ -44,6 +44,7 @@ const RAW_RUNTIME_STATE =
           ["postcss", "npm:8.5.6"],\
           ["react", "npm:19.2.4"],\
           ["react-dom", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:19.2.4"],\
+          ["react-hotkeys-hook", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:5.2.4"],\
           ["react-is", "npm:19.2.4"],\
           ["recharts", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:3.7.0"],\
           ["tailwindcss", "npm:3.4.19"],\
@@ -2623,6 +2624,7 @@ const RAW_RUNTIME_STATE =
           ["postcss", "npm:8.5.6"],\
           ["react", "npm:19.2.4"],\
           ["react-dom", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:19.2.4"],\
+          ["react-hotkeys-hook", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:5.2.4"],\
           ["react-is", "npm:19.2.4"],\
           ["recharts", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:3.7.0"],\
           ["tailwindcss", "npm:3.4.19"],\
@@ -3650,6 +3652,32 @@ const RAW_RUNTIME_STATE =
         ],\
         "packagePeers": [\
           "@types/react",\
+          "react"\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["react-hotkeys-hook", [\
+      ["npm:5.2.4", {\
+        "packageLocation": "../../../.yarn/berry/cache/react-hotkeys-hook-npm-5.2.4-8294c689d7-10c0.zip/node_modules/react-hotkeys-hook/",\
+        "packageDependencies": [\
+          ["react-hotkeys-hook", "npm:5.2.4"]\
+        ],\
+        "linkType": "SOFT"\
+      }],\
+      ["virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:5.2.4", {\
+        "packageLocation": "./.yarn/__virtual__/react-hotkeys-hook-virtual-64460a9c26/4/.yarn/berry/cache/react-hotkeys-hook-npm-5.2.4-8294c689d7-10c0.zip/node_modules/react-hotkeys-hook/",\
+        "packageDependencies": [\
+          ["@types/react", "npm:19.2.14"],\
+          ["@types/react-dom", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:19.2.3"],\
+          ["react", "npm:19.2.4"],\
+          ["react-dom", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:19.2.4"],\
+          ["react-hotkeys-hook", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:5.2.4"]\
+        ],\
+        "packagePeers": [\
+          "@types/react-dom",\
+          "@types/react",\
+          "react-dom",\
           "react"\
         ],\
         "linkType": "HARD"\

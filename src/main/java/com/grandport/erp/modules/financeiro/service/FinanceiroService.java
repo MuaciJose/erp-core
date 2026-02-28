@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Service
@@ -19,25 +20,28 @@ public class FinanceiroService {
 
     @Transactional
     public void baixarTitulo(Long contaId) {
-        ContaReceber conta = recebaRepo.findById(contaId)
-            .orElseThrow(() -> new RuntimeException("Título não encontrado"));
+        // ... (código existente)
+    }
 
-        if (conta.getStatus() == StatusFinanceiro.PAGO) {
-            throw new RuntimeException("Título já está liquidado.");
-        }
-
-        // 1. Atualiza o título
-        conta.setStatus(StatusFinanceiro.PAGO);
-        conta.setDataPagamento(LocalDateTime.now());
-        conta.setValorPago(conta.getValorOriginal());
-        recebaRepo.save(conta);
-
-        // 2. Registra no Fluxo de Caixa (Auditoria)
+    @Transactional
+    public void registrarEntradaImediata(BigDecimal valor, String metodo) {
         MovimentacaoCaixa mov = new MovimentacaoCaixa();
-        mov.setDescricao("Recebimento Título #" + conta.getId() + " - " + conta.getClienteNome());
-        mov.setValor(conta.getValorOriginal());
+        mov.setDescricao("Recebimento de Venda via " + metodo);
+        mov.setValor(valor);
         mov.setTipo("ENTRADA");
-        mov.setCategoria("VENDA_AUTOPEÇAS");
+        mov.setCategoria("VENDA_PDV");
         caixaRepo.save(mov);
+    }
+
+    @Transactional
+    public void gerarContaReceberCartao(BigDecimal valor, Integer parcelas) {
+        for (int i = 1; i <= parcelas; i++) {
+            ContaReceber conta = new ContaReceber();
+            conta.setClienteNome("Venda Cartão PDV");
+            conta.setValorOriginal(valor.divide(BigDecimal.valueOf(parcelas)));
+            conta.setDataVencimento(LocalDateTime.now().plusDays(30 * i));
+            conta.setStatus(StatusFinanceiro.PENDENTE);
+            recebaRepo.save(conta);
+        }
     }
 }
