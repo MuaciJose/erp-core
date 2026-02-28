@@ -1,27 +1,20 @@
 package com.grandport.erp.modules.financeiro.model;
 
 import com.grandport.erp.modules.vendas.model.Venda;
-import jakarta.persistence.*;
+import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.Data;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "contas_receber")
 @Data
-public class ContaReceber {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+@EqualsAndHashCode(callSuper = true)
+public class ContaReceber extends Conta {
     
     private String clienteNome; // Pode ser FK para Clientes depois
-    private BigDecimal valorOriginal;
-    private BigDecimal valorPago;
-    private LocalDateTime dataVencimento;
-    private LocalDateTime dataPagamento;
-    
-    @Enumerated(EnumType.STRING)
-    private StatusFinanceiro status = StatusFinanceiro.PENDENTE;
 
     @ManyToOne
     @JoinColumn(name = "venda_id")
