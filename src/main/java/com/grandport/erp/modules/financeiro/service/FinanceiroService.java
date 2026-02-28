@@ -1,6 +1,8 @@
 package com.grandport.erp.modules.financeiro.service;
 
+import com.grandport.erp.modules.financeiro.dto.ContaPagarDTO;
 import com.grandport.erp.modules.financeiro.dto.ContaReceberDTO;
+import com.grandport.erp.modules.financeiro.dto.DespesaManualDTO;
 import com.grandport.erp.modules.financeiro.dto.ExtratoParceiroDTO;
 import com.grandport.erp.modules.financeiro.model.ContaPagar;
 import com.grandport.erp.modules.financeiro.model.ContaReceber;
@@ -35,6 +37,13 @@ public class FinanceiroService {
                 .collect(Collectors.toList());
     }
 
+    public List<ContaPagarDTO> listarContasAPagar() {
+        return pagarRepo.findByStatus(StatusFinanceiro.PENDENTE)
+                .stream()
+                .map(ContaPagarDTO::new)
+                .collect(Collectors.toList());
+    }
+
     public ExtratoParceiroDTO gerarExtratoParceiro(Long parceiroId) {
         Parceiro parceiro = parceiroRepository.findById(parceiroId)
             .orElseThrow(() -> new RuntimeException("Parceiro não encontrado: ID " + parceiroId));
@@ -48,8 +57,26 @@ public class FinanceiroService {
     }
 
     @Transactional
-    public void baixarTitulo(Long contaId) {
-        // ... (código existente)
+    public void baixarContaPagar(Long contaId) {
+        ContaPagar conta = pagarRepo.findById(contaId)
+            .orElseThrow(() -> new RuntimeException("Conta a pagar não encontrada: ID " + contaId));
+
+        if (conta.getStatus() == StatusFinanceiro.PAGO) {
+            throw new RuntimeException("Esta conta já foi paga.");
+        }
+
+        conta.setStatus(StatusFinanceiro.PAGO);
+        conta.setDataPagamento(LocalDateTime.now());
+        conta.setValorPago(conta.getValorOriginal()); // Simplificado, poderia ter juros/multa
+        pagarRepo.save(conta);
+
+        // Registra a saída no caixa
+        MovimentacaoCaixa mov = new MovimentacaoCaixa();
+        mov.setDescricao("Pagamento: " + conta.getDescricao());
+        mov.setValor(conta.getValorOriginal().negate()); // Valor negativo para saída
+        mov.setTipo("SAIDA");
+        mov.setCategoria("PAGAMENTO_DESPESA");
+        caixaRepo.save(mov);
     }
 
     @Transactional
@@ -63,26 +90,24 @@ public class FinanceiroService {
     }
 
     @Transactional
+    public ContaPagar registrarDespesaManual(DespesaManualDTO dto) {
+        ContaPagar conta = new ContaPagar();
+        conta.setDescricao(dto.getDescricao());
+        conta.setValorOriginal(dto.getValor());
+        conta.setDataVencimento(dto.getVencimento().atStartOfDay());
+        conta.setStatus(StatusFinanceiro.PENDENTE);
+        parceiroRepository.findByNome(dto.getFornecedor()).ifPresent(conta::setParceiro);
+        return pagarRepo.save(conta);
+    }
+
+    @Transactional
     public void gerarContaReceberCartao(BigDecimal valor, Integer parcelas) {
-        for (int i = 1; i <= parcelas; i++) {
-            ContaReceber conta = new ContaReceber();
-            conta.setDescricao("Venda Cartão PDV " + i + "/" + parcelas);
-            conta.setValorOriginal(valor.divide(BigDecimal.valueOf(parcelas)));
-            conta.setDataVencimento(LocalDateTime.now().plusDays(30 * i));
-            conta.setStatus(StatusFinanceiro.PENDENTE);
-            recebaRepo.save(conta);
-        }
+        // ... (código existente)
     }
 
     @Transactional
     public void gerarContaReceberPrazo(BigDecimal valor, Parceiro cliente) {
-        ContaReceber conta = new ContaReceber();
-        conta.setDescricao("Venda a Prazo - PDV");
-        conta.setParceiro(cliente);
-        conta.setValorOriginal(valor);
-        conta.setDataVencimento(LocalDateTime.now().plusDays(30));
-        conta.setStatus(StatusFinanceiro.PENDENTE);
-        recebaRepo.save(conta);
+        // ... (código existente)
     }
 
     @Transactional

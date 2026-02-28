@@ -11,6 +11,7 @@ import java.util.Optional;
 public interface ParceiroRepository extends JpaRepository<Parceiro, Long> {
 
     Optional<Parceiro> findByDocumento(String documento);
+    Optional<Parceiro> findByNome(String nome);
 
     @Query("SELECT p FROM Parceiro p WHERE " +
            "LOWER(p.nome) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +

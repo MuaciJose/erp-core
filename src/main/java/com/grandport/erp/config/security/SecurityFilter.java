@@ -34,12 +34,13 @@ public class SecurityFilter extends OncePerRequestFilter {
             var login = tokenService.validateToken(token);
             UserDetails user = usuarioRepository.findByUsername(login);
 
-            // Se o token for válido, autenticamos o usuário no contexto do Spring
-            var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            // Adiciona a verificação para garantir que o usuário existe no banco
+            if (user != null) {
+                var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
         }
         
-        // Segue para o próximo filtro ou para o Controller
         filterChain.doFilter(request, response);
     }
 

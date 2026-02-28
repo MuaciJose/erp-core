@@ -12,6 +12,8 @@ import { CargaNcm } from './modules/admin/CargaNcm';
 import { FechamentoCaixa } from './modules/financeiro/FechamentoCaixa';
 import { RelatorioFaltas } from './modules/admin/RelatorioFaltas';
 import { ContasReceber } from './modules/financeiro/ContasReceber';
+import { ContasPagar } from './modules/financeiro/ContasPagar';
+import { ControleCaixa } from './modules/financeiro/ControleCaixa';
 
 function App() {
     const [paginaAtiva, setPaginaAtiva] = useState('dash');
@@ -48,6 +50,8 @@ function App() {
                     {paginaAtiva === 'fechamento' && <FechamentoCaixa />}
                     {paginaAtiva === 'faltas' && <RelatorioFaltas />}
                     {paginaAtiva === 'contas-receber' && <ContasReceber />}
+                    {paginaAtiva === 'contas-pagar' && <ContasPagar />}
+                    {paginaAtiva === 'caixa' && <ControleCaixa />}
                 </div>
             </main>
         </div>
