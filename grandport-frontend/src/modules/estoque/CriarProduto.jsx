@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import api from '../../api/axios';
-import { Save, X, Upload } from 'lucide-react';
+import { Save, X, Upload, Loader2 } from 'lucide-react';
 
 export const CriarProduto = ({ onSucesso, onCancelar }) => {
     const [form, setForm] = useState({
@@ -20,6 +20,8 @@ export const CriarProduto = ({ onSucesso, onCancelar }) => {
     });
     const [imagem, setImagem] = useState(null);
     const [preview, setPreview] = useState(null);
+    const [sugestoesNcm, setSugestoesNcm] = useState([]);
+    const [buscandoNcm, setBuscarNcm] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -31,6 +33,24 @@ export const CriarProduto = ({ onSucesso, onCancelar }) => {
         if (file) {
             setImagem(file);
             setPreview(URL.createObjectURL(file));
+        }
+    };
+
+    const buscarNcmNoBanco = async (termo) => {
+        if (termo.length > 2) {
+            setBuscarNcm(true);
+            try {
+                const res = await api.get(`/api/ncm/busca?q=${termo}`);
+                console.log("NCMs encontrados:", res.data);
+                setSugestoesNcm(res.data);
+            } catch (error) {
+                console.error("Erro ao buscar NCM:", error);
+                setSugestoesNcm([]);
+            } finally {
+                setBuscarNcm(false);
+            }
+        } else {
+            setSugestoesNcm([]);
         }
     };
 
@@ -94,9 +114,50 @@ export const CriarProduto = ({ onSucesso, onCancelar }) => {
                             <label className="block text-sm font-medium text-gray-700">Marca (ID)</label>
                             <input name="marcaId" type="number" value={form.marcaId} onChange={handleChange} className="mt-1 block w-full border rounded-md p-2" required placeholder="Ex: 1" />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">NCM (Código)</label>
-                            <input name="ncmCodigo" value={form.ncmCodigo} onChange={handleChange} className="mt-1 block w-full border rounded-md p-2" required placeholder="Ex: 8409.91.11" />
+                        <div className="relative">
+                            <label className="block text-sm font-medium text-gray-700 flex justify-between">
+                                NCM (Fiscal)
+                                {buscandoNcm && <Loader2 size={14} className="animate-spin text-blue-600" />}
+                            </label>
+                            <input 
+                                name="ncmCodigo" 
+                                type="text" 
+                                value={form.ncmCodigo}
+                                onChange={(e) => {
+                                    setForm(prev => ({ ...prev, ncmCodigo: e.target.value }));
+                                    buscarNcmNoBanco(e.target.value);
+                                }}
+                                className="mt-1 block w-full border rounded-md p-2" 
+                                required 
+                                placeholder="Ex: 8708..." 
+                                autoComplete="off"
+                            />
+                            
+                            {sugestoesNcm.length > 0 && (
+                                <ul className="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-y-auto mt-1 left-0">
+                                    {sugestoesNcm.map((n, index) => {
+                                        const codigo = n.Codigo || n.codigo;
+                                        const descricao = n.Descricao || n.descricao;
+                                        
+                                        return (
+                                            <li 
+                                                key={codigo || index}
+                                                onClick={() => {
+                                                    setForm(prev => ({ ...prev, ncmCodigo: codigo }));
+                                                    setSugestoesNcm([]);
+                                                }}
+                                                title={`${codigo} - ${descricao}`} // Tooltip nativo com o texto completo
+                                                className="p-3 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-b-0 flex flex-col group"
+                                            >
+                                                <span className="font-bold text-blue-700">{codigo}</span>
+                                                <span className="text-gray-600 text-xs truncate group-hover:whitespace-normal group-hover:overflow-visible group-hover:h-auto">
+                                                    {descricao}
+                                                </span>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
                         </div>
                     </div>
                 </div>

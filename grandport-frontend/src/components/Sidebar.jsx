@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingCart, Package, DollarSign, LogOut, FileText } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, DollarSign, LogOut, FileText, Settings } from 'lucide-react';
 
 export const Sidebar = ({ setPaginaAtiva }) => {
   const menuItens = [
@@ -7,6 +7,7 @@ export const Sidebar = ({ setPaginaAtiva }) => {
     { id: 'estoque', label: 'Estoque', icon: <Package /> },
     { id: 'compras', label: 'Compras (XML)', icon: <FileText /> },
     { id: 'financeiro', label: 'Financeiro', icon: <DollarSign /> },
+    { id: 'fiscal', label: 'Fiscal / NCM', icon: <Settings /> },
   ];
 
   return (
