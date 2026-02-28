@@ -86,13 +86,13 @@ public class FinanceiroService {
     }
 
     @Transactional
-    public void gerarContaPagar(String fornecedor, BigDecimal valor, LocalDateTime dataVencimento) {
+    public ContaPagar gerarContaPagar(Parceiro fornecedor, BigDecimal valor, LocalDateTime dataVencimento, String descricao) {
         ContaPagar conta = new ContaPagar();
-        conta.setDescricao("Compra de Mercadoria - NF");
-        conta.setFornecedorNome(fornecedor);
+        conta.setDescricao(descricao);
+        conta.setParceiro(fornecedor);
         conta.setValorOriginal(valor);
-        conta.setDataVencimento(dataVencimento.plusDays(30));
+        conta.setDataVencimento(dataVencimento);
         conta.setStatus(StatusFinanceiro.PENDENTE);
-        pagarRepo.save(conta);
+        return pagarRepo.save(conta);
     }
 }

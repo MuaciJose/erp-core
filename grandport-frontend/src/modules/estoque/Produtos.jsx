@@ -7,36 +7,57 @@ import { ExtratoEstoque } from './ExtratoEstoque';
 export const Produtos = () => {
     const [produtos, setProdutos] = useState([]);
     const [busca, setBusca] = useState("");
-    const [exibirCadastro, setExibirCadastro] = useState(false);
-    const [produtoSelecionado, setProdutoSelecionado] = useState(null);
+    const [produtoEmEdicao, setProdutoEmEdicao] = useState(null);
+    const [extratoAberto, setExtratoAberto] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     const carregarProdutos = async () => {
+        setLoading(true);
         try {
             const res = await api.get('/api/produtos');
             setProdutos(res.data);
         } catch (error) {
             console.error("Erro ao carregar produtos:", error);
+        } finally {
+            setLoading(false);
         }
     };
 
     useEffect(() => { carregarProdutos(); }, []);
 
+    const handleDeletar = async (produtoId) => {
+        if (window.confirm("Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.")) {
+            try {
+                await api.delete(`/api/produtos/${produtoId}`);
+                alert("Produto excluído com sucesso!");
+                carregarProdutos(); // Recarrega a lista
+            } catch (error) {
+                console.error("Erro ao excluir produto:", error);
+                alert("Erro ao excluir produto. Verifique se ele não está associado a vendas.");
+            }
+        }
+    };
+
     const produtosFiltrados = produtos.filter(p => 
         p.nome.toLowerCase().includes(busca.toLowerCase()) || 
-        (p.codigoBarras && p.codigoBarras.includes(busca))
+        (p.codigoBarras && p.codigoBarras.includes(busca)) ||
+        (p.sku && p.sku.toLowerCase().includes(busca.toLowerCase()))
     );
 
-    if (exibirCadastro) {
+    // Se um produto está em edição, mostra o formulário de criação/edição
+    if (produtoEmEdicao) {
         return <CriarProduto 
-                    onSucesso={() => { setExibirCadastro(false); carregarProdutos(); }} 
-                    onCancelar={() => setExibirCadastro(false)} 
+                    produtoParaEditar={produtoEmEdicao.id ? produtoEmEdicao : null}
+                    onSucesso={() => { setProdutoEmEdicao(null); carregarProdutos(); }} 
+                    onCancelar={() => setProdutoEmEdicao(null)} 
                 />;
     }
 
-    if (produtoSelecionado) {
+    // Se um extrato está aberto, mostra o extrato
+    if (extratoAberto) {
         return <ExtratoEstoque 
-                    produto={produtoSelecionado} 
-                    onVoltar={() => setProdutoSelecionado(null)} 
+                    produto={extratoAberto} 
+                    onVoltar={() => setExtratoAberto(null)} 
                 />;
     }
 
@@ -51,14 +72,14 @@ export const Produtos = () => {
                         <Search className="absolute left-3 top-3 text-gray-400" size={18} />
                         <input 
                             type="text" 
-                            placeholder="Buscar por nome ou código..." 
+                            placeholder="Buscar por nome, SKU ou código..." 
                             className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 shadow-sm"
                             value={busca}
                             onChange={(e) => setBusca(e.target.value)}
                         />
                     </div>
                     <button 
-                        onClick={() => setExibirCadastro(true)}
+                        onClick={() => setProdutoEmEdicao({})} // Abre o form vazio para criar
                         className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 flex gap-2 items-center shadow-md transition-colors"
                     >
                         <Plus size={20} /> Novo Produto
@@ -79,7 +100,9 @@ export const Produtos = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {produtosFiltrados.map(p => (
+                        {loading ? (
+                            <tr><td colSpan="6" className="p-8 text-center text-gray-500">Carregando produtos...</td></tr>
+                        ) : produtosFiltrados.map(p => (
                             <tr key={p.id} className="border-b hover:bg-gray-50 transition-colors">
                                 <td className="p-4 font-medium text-gray-800">{p.nome}</td>
                                 <td className="p-4 text-gray-500">{p.ncm ? p.ncm.codigo : '-'}</td>
@@ -89,21 +112,21 @@ export const Produtos = () => {
                                     {p.quantidadeEstoque} un
                                 </td>
                                 <td className="p-4 flex justify-center gap-2">
-                                    <button 
-                                        onClick={() => setProdutoSelecionado(p)}
-                                        className="p-2 hover:bg-purple-100 text-purple-600 rounded transition-colors"
-                                        title="Ver Extrato de Estoque"
-                                    >
+                                    <button onClick={() => setExtratoAberto(p)} className="p-2 hover:bg-purple-100 text-purple-600 rounded transition-colors" title="Ver Extrato de Estoque">
                                         <History size={18}/>
                                     </button>
-                                    <button className="p-2 hover:bg-blue-100 text-blue-600 rounded transition-colors"><Edit size={18}/></button>
-                                    <button className="p-2 hover:bg-red-100 text-red-600 rounded transition-colors"><Trash2 size={18}/></button>
+                                    <button onClick={() => setProdutoEmEdicao(p)} className="p-2 hover:bg-blue-100 text-blue-600 rounded transition-colors" title="Editar Produto">
+                                        <Edit size={18}/>
+                                    </button>
+                                    <button onClick={() => handleDeletar(p.id)} className="p-2 hover:bg-red-100 text-red-600 rounded transition-colors" title="Excluir Produto">
+                                        <Trash2 size={18}/>
+                                    </button>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-                {produtosFiltrados.length === 0 && (
+                {!loading && produtosFiltrados.length === 0 && (
                     <div className="p-8 text-center text-gray-500">
                         Nenhum produto encontrado.
                     </div>

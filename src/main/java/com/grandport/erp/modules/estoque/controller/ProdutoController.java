@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.estoque.controller;
 
+import com.grandport.erp.modules.estoque.dto.AtualizarPrecoRequestDTO;
 import com.grandport.erp.modules.estoque.dto.ProdutoRequestDTO;
 import com.grandport.erp.modules.estoque.dto.ProdutoResponseDTO;
 import com.grandport.erp.modules.estoque.model.Produto;
@@ -36,6 +37,18 @@ public class ProdutoController {
         }
 
         return ResponseEntity.ok(service.cadastrar(dto, imagePath));
+    }
+
+    @PutMapping("/atualizar-precos")
+    public ResponseEntity<Void> atualizarPrecos(@RequestBody List<AtualizarPrecoRequestDTO> precos) {
+        service.atualizarPrecos(precos);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletarProduto(@PathVariable Long id) {
+        service.deleteProduto(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping

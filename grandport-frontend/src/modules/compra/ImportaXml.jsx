@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import api from '../../api/axios';
 import { FileUp, CheckCircle, AlertTriangle } from 'lucide-react';
 
-export const ImportarXml = () => {
+export const ImportaXml = () => {
     const [arquivo, setArquivo] = useState(null);
     const [status, setStatus] = useState('idle'); // idle, uploading, success, error
 

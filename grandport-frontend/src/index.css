@@ -20,48 +20,52 @@ html, body, #root {
   width: 100%;
 }
 
-/* Regras de Impressão para Cupom Térmico e Extratos */
+/* Esconde o layout de cupom na tela normal */
+.print-only {
+  display: none;
+}
+
+/* Regras de Impressão para A4 e Térmica */
 @media print {
     /* Esconde tudo por padrão */
     body * {
         visibility: hidden;
     }
 
-    /* Mostra apenas a seção de impressão e seus filhos */
-    .print-section, .print-section * {
-        visibility: visible;
-    }
+    /* Mostra a área de impressão A4 OU o cupom térmico */
+    .print-area, .print-area *,
     .print-only, .print-only * {
         visibility: visible;
     }
 
-    /* Posiciona a seção de impressão no topo */
-    .print-section, .print-only {
+    /* Configura a área de impressão para A4 */
+    .print-area {
         position: absolute;
         left: 0;
         top: 0;
-        width: 100%; /* Ocupa a largura da página para extratos */
+        width: 100%;
+        padding: 2cm; /* Margem padrão de A4 */
     }
 
-    /* Especificidade para o cupom térmico */
+    /* Configura o cupom térmico */
     .print-only {
+        position: absolute;
+        left: 0;
+        top: 0;
         width: 80mm;
         display: block !important;
     }
 
-    /* Esconde elementos que não devem ser impressos */
+    /* Esconde elementos que não devem ser impressos em NENHUM caso */
     .no-print, .no-print * {
         display: none !important;
     }
 
-    /* Remove margens da página para economizar papel */
+    /* Formatação de página */
     @page {
         margin: 0;
         size: auto;
     }
-}
-
-/* Esconde o layout de cupom na tela normal */
-.print-only {
-  display: none;
+    table { page-break-inside: auto; }
+    tr    { page-break-inside: avoid; page-break-after: auto; }
 }

@@ -6,8 +6,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ParceiroRepository extends JpaRepository<Parceiro, Long> {
+
+    Optional<Parceiro> findByDocumento(String documento);
 
     @Query("SELECT p FROM Parceiro p WHERE " +
            "LOWER(p.nome) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +

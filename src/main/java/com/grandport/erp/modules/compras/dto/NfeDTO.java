@@ -7,6 +7,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -33,6 +34,9 @@ public class NfeDTO {
 
         @JacksonXmlProperty(localName = "total")
         private Total total;
+
+        @JacksonXmlProperty(localName = "cobr")
+        private Cobranca cobranca;
     }
 
     @Data
@@ -45,6 +49,8 @@ public class NfeDTO {
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Ide {
+        @JacksonXmlProperty(localName = "nNF")
+        private String numeroNota;
         @JacksonXmlProperty(localName = "dhEmi")
         private OffsetDateTime dataEmissao;
     }
@@ -52,8 +58,10 @@ public class NfeDTO {
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Emitente {
+        @JacksonXmlProperty(localName = "CNPJ")
+        private String cnpj;
         @JacksonXmlProperty(localName = "xNome")
-        private String nomeFornecedor;
+        private String nome;
     }
 
     @Data
@@ -68,5 +76,24 @@ public class NfeDTO {
     public static class IcmsTot {
         @JacksonXmlProperty(localName = "vNF")
         private BigDecimal valorTotal;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Cobranca {
+        @JacksonXmlElementWrapper(useWrapping = false)
+        @JacksonXmlProperty(localName = "dup")
+        private List<Duplicata> duplicatas;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Duplicata {
+        @JacksonXmlProperty(localName = "nDup")
+        private String numero;
+        @JacksonXmlProperty(localName = "dVenc")
+        private LocalDate dataVencimento;
+        @JacksonXmlProperty(localName = "vDup")
+        private BigDecimal valor;
     }
 }

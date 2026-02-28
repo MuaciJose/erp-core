@@ -1,10 +1,7 @@
 package com.grandport.erp.modules.financeiro.model;
 
 import com.grandport.erp.modules.parceiro.model.Parceiro;
-import jakarta.persistence.Entity;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -15,10 +12,8 @@ import lombok.EqualsAndHashCode;
 public class ContaPagar extends Conta {
 
     private String descricao;
-    
-    private String fornecedorNome; // Nome do fornecedor (útil para importação de XML)
 
     @ManyToOne
-    @JoinColumn(name = "fornecedor_id")
-    private Parceiro fornecedor;
+    @JoinColumn(name = "parceiro_id")
+    private Parceiro parceiro;
 }

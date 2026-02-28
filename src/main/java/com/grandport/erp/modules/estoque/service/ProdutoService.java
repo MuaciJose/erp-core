@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.estoque.service;
 
+import com.grandport.erp.modules.estoque.dto.AtualizarPrecoRequestDTO;
 import com.grandport.erp.modules.estoque.dto.ProdutoRequestDTO;
 import com.grandport.erp.modules.estoque.model.Marca;
 import com.grandport.erp.modules.estoque.model.MovimentacaoEstoque;
@@ -25,15 +26,11 @@ public class ProdutoService {
 
     @Transactional
     public Produto cadastrar(ProdutoRequestDTO dto, String imagePath) {
-        // 1. Validar se a Marca existe (Ex: Bosch)
         Marca marca = marcaRepository.findById(dto.marcaId())
                 .orElseThrow(() -> new RuntimeException("Erro: Marca ID " + dto.marcaId() + " não encontrada."));
-
-        // 2. Validar se o NCM existe (Aquele que você importou via JSON)
         Ncm ncm = ncmRepository.findById(dto.ncmCodigo())
                 .orElseThrow(() -> new RuntimeException("Erro: NCM " + dto.ncmCodigo() + " não cadastrado no sistema."));
 
-        // 3. Mapear DTO para Entidade
         Produto produto = new Produto();
         produto.setSku(dto.sku());
         produto.setNome(dto.nome());
@@ -44,23 +41,31 @@ public class ProdutoService {
         produto.setPrecoVenda(dto.precoVenda());
         produto.setQuantidadeEstoque(dto.quantidadeEstoque());
         produto.setEstoqueMinimo(dto.estoqueMinimo());
-        
-        // Relacionamentos
         produto.setMarca(marca);
         produto.setNcm(ncm);
-
-        // Lógica de Fotos: Suporta os dois mundos
-        produto.setFotoUrl(dto.fotoUrl()); // Link externo do fabricante
+        produto.setFotoUrl(dto.fotoUrl());
         if (imagePath != null) {
-            produto.setFotoLocalPath("/uploads/produtos/" + imagePath); // Caminho do servidor
+            produto.setFotoLocalPath("/uploads/produtos/" + imagePath);
         }
 
         Produto salvo = produtoRepository.save(produto);
-        
-        // Registra movimentação inicial
         registrarMovimentacao(salvo, dto.quantidadeEstoque(), "ENTRADA", "Cadastro Inicial");
-        
         return salvo;
+    }
+
+    @Transactional
+    public void atualizarPrecos(List<AtualizarPrecoRequestDTO> precos) {
+        for (AtualizarPrecoRequestDTO dto : precos) {
+            Produto produto = findById(dto.getId());
+            produto.setPrecoVenda(dto.getNovoPrecoVenda());
+            produtoRepository.save(produto);
+        }
+    }
+
+    @Transactional
+    public void deleteProduto(Long id) {
+        // Adicionar validações aqui se necessário (ex: não deletar se houver estoque)
+        produtoRepository.deleteById(id);
     }
 
     public List<Produto> listarAlertasEstoque() {
