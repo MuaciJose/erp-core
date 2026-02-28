@@ -1,15 +1,8 @@
 package com.grandport.erp.modules.financeiro.service;
 
 import com.grandport.erp.modules.financeiro.dto.*;
-import com.grandport.erp.modules.financeiro.model.ContaBancaria;
-import com.grandport.erp.modules.financeiro.model.ContaPagar;
-import com.grandport.erp.modules.financeiro.model.ContaReceber;
-import com.grandport.erp.modules.financeiro.model.MovimentacaoCaixa;
-import com.grandport.erp.modules.financeiro.model.StatusFinanceiro;
-import com.grandport.erp.modules.financeiro.repository.ContaBancariaRepository;
-import com.grandport.erp.modules.financeiro.repository.ContaPagarRepository;
-import com.grandport.erp.modules.financeiro.repository.ContaReceberRepository;
-import com.grandport.erp.modules.financeiro.repository.MovimentacaoCaixaRepository;
+import com.grandport.erp.modules.financeiro.model.*;
+import com.grandport.erp.modules.financeiro.repository.*;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
@@ -34,6 +27,7 @@ public class FinanceiroService {
     @Autowired private ParceiroRepository parceiroRepository;
     @Autowired private VendaRepository vendaRepository;
     @Autowired private ContaBancariaRepository bancoRepo;
+    @Autowired private PlanoContaRepository planoRepo;
 
     public List<ContaReceberDTO> listarContasAReceber() {
         return recebaRepo.findByStatus(StatusFinanceiro.PENDENTE)
@@ -75,7 +69,6 @@ public class FinanceiroService {
         bancoRepo.save(origem);
         bancoRepo.save(destino);
 
-        // Registra a movimentação de transferência
         MovimentacaoCaixa mov = new MovimentacaoCaixa();
         mov.setDescricao("Transferência: " + origem.getNome() + " -> " + destino.getNome());
         mov.setValor(dto.getValor());
@@ -186,6 +179,13 @@ public class FinanceiroService {
         conta.setValorOriginal(dto.getValor());
         conta.setDataVencimento(dto.getVencimento().atStartOfDay());
         conta.setStatus(StatusFinanceiro.PENDENTE);
+        
+        if (dto.getPlanoContaId() != null) {
+            PlanoConta pc = planoRepo.findById(dto.getPlanoContaId())
+                .orElseThrow(() -> new RuntimeException("Plano de conta não encontrado."));
+            conta.setPlanoConta(pc);
+        }
+
         parceiroRepository.findByNome(dto.getFornecedor()).ifPresent(conta::setParceiro);
         return pagarRepo.save(conta);
     }

@@ -7,8 +7,8 @@ import java.time.LocalDate;
 @Data
 public class DespesaManualDTO {
     private String descricao;
-    private String fornecedor; // Nome do favorecido
+    private String fornecedor;
     private BigDecimal valor;
     private LocalDate vencimento;
-    private String categoria;
+    private Long planoContaId;
 }

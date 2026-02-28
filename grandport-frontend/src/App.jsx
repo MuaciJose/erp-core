@@ -9,13 +9,14 @@ import { Parceiros } from './modules/cadastro/Parceiros';
 import { ImportarXml } from './modules/compras/ImportarXml';
 import { Login } from './modules/auth/Login';
 import { CargaNcm } from './modules/admin/CargaNcm';
-import { FechamentoCaixa } from './modules/financeiro/FechamentoCaixa';
 import { RelatorioFaltas } from './modules/admin/RelatorioFaltas';
 import { ContasReceber } from './modules/financeiro/ContasReceber';
 import { ContasPagar } from './modules/financeiro/ContasPagar';
 import { ControleCaixa } from './modules/financeiro/ControleCaixa';
 import { FluxoCaixaDre } from './modules/financeiro/FluxoCaixaDre';
 import { ContasBancarias } from './modules/financeiro/ContasBancarias';
+import { PlanoContas } from './modules/financeiro/PlanoContas';
+import { ConciliacaoBancaria } from './modules/financeiro/ConciliacaoBancaria';
 
 function App() {
     const [paginaAtiva, setPaginaAtiva] = useState('dash');
@@ -49,13 +50,14 @@ function App() {
                     {paginaAtiva === 'previsao' && <PrevisaoCompras />}
                     {paginaAtiva === 'compras' && <ImportarXml />}
                     {paginaAtiva === 'fiscal' && <CargaNcm />}
-                    {paginaAtiva === 'fechamento' && <FechamentoCaixa />}
                     {paginaAtiva === 'faltas' && <RelatorioFaltas />}
                     {paginaAtiva === 'contas-receber' && <ContasReceber />}
                     {paginaAtiva === 'contas-pagar' && <ContasPagar />}
                     {paginaAtiva === 'caixa' && <ControleCaixa />}
                     {paginaAtiva === 'dre' && <FluxoCaixaDre />}
                     {paginaAtiva === 'bancos' && <ContasBancarias />}
+                    {paginaAtiva === 'plano-contas' && <PlanoContas />}
+                    {paginaAtiva === 'conciliacao' && <ConciliacaoBancaria />}
                 </div>
             </main>
         </div>

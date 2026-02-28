@@ -16,4 +16,8 @@ public class ContaPagar extends Conta {
     @ManyToOne
     @JoinColumn(name = "parceiro_id")
     private Parceiro parceiro;
+
+    @ManyToOne
+    @JoinColumn(name = "plano_conta_id")
+    private PlanoConta planoConta;
 }

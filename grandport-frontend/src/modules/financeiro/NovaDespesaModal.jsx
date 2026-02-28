@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
 import { X, Save, FileText, Calendar, DollarSign, Tag } from 'lucide-react';
 
@@ -8,9 +8,22 @@ export const NovaDespesaModal = ({ onClose, onSuccess }) => {
         fornecedor: '',
         valor: '',
         vencimento: '',
-        categoria: 'CUSTO FIXO',
+        planoContaId: '',
     });
+    const [planoContas, setPlanoContas] = useState([]);
     const [salvando, setSalvando] = useState(false);
+
+    useEffect(() => {
+        const carregarPlano = async () => {
+            try {
+                const res = await api.get('/api/planocontas/lancamentos?tipo=DESPESA');
+                setPlanoContas(res.data);
+            } catch (error) {
+                console.error("Erro ao carregar plano de contas", error);
+            }
+        };
+        carregarPlano();
+    }, []);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -19,17 +32,22 @@ export const NovaDespesaModal = ({ onClose, onSuccess }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!despesa.planoContaId) {
+            alert("Selecione uma categoria do plano de contas.");
+            return;
+        }
         setSalvando(true);
         try {
             await api.post('/api/financeiro/contas-pagar/manual', {
                 ...despesa,
-                valor: parseFloat(despesa.valor)
+                valor: parseFloat(despesa.valor),
+                planoContaId: parseInt(despesa.planoContaId)
             });
             alert("Despesa registrada com sucesso!");
             onSuccess();
             onClose();
         } catch (err) {
-            alert("Erro ao registrar a despesa. Verifique os dados.");
+            alert("Erro ao registrar a despesa.");
         } finally {
             setSalvando(false);
         }
@@ -44,7 +62,7 @@ export const NovaDespesaModal = ({ onClose, onSuccess }) => {
                         <FileText className="text-blue-400" size={28} />
                         <div>
                             <h2 className="text-xl font-black tracking-widest">NOVA DESPESA</h2>
-                            <p className="text-sm text-slate-400">Registro manual de contas e custos</p>
+                            <p className="text-sm text-slate-400">Registro manual com classificação contábil</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
@@ -60,14 +78,15 @@ export const NovaDespesaModal = ({ onClose, onSuccess }) => {
                             <input name="descricao" type="text" required value={despesa.descricao} onChange={handleChange} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl" placeholder="Ex: Fatura da Luz, Aluguel..." />
                         </div>
 
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1 flex items-center gap-1"><Tag size={14}/> Categoria</label>
-                            <select name="categoria" value={despesa.categoria} onChange={handleChange} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-slate-700">
-                                <option value="CUSTO FIXO">Custo Fixo</option>
-                                <option value="SALARIOS">Salários</option>
-                                <option value="IMPOSTOS">Impostos</option>
-                                <option value="MANUTENCAO">Manutenção</option>
-                                <option value="OUTROS">Outros</option>
+                        <div className="md:col-span-2">
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1 flex items-center gap-1"><Tag size={14}/> Categoria (Plano de Contas)</label>
+                            <select name="planoContaId" value={despesa.planoContaId} onChange={handleChange} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-slate-700">
+                                <option value="">Selecione uma classificação...</option>
+                                {planoContas.map(conta => (
+                                    <option key={conta.id} value={conta.id}>
+                                        {conta.codigo} - {conta.descricao}
+                                    </option>
+                                ))}
                             </select>
                         </div>
 
@@ -81,7 +100,7 @@ export const NovaDespesaModal = ({ onClose, onSuccess }) => {
                             <input name="vencimento" type="date" required value={despesa.vencimento} onChange={handleChange} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl" />
                         </div>
 
-                        <div>
+                        <div className="md:col-span-2">
                             <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Fornecedor (Opcional)</label>
                             <input name="fornecedor" type="text" value={despesa.fornecedor} onChange={handleChange} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl" placeholder="Ex: EDP, Senhorio..." />
                         </div>
