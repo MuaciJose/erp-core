@@ -5,6 +5,7 @@ import api from '../../api/axios';
 import { ModalFechamento } from './ModalFechamento';
 import { BuscaInteligente } from '../../components/BuscaInteligente';
 import { CupomVenda } from './CupomVenda';
+import { BarraClientePdv } from '../../components/BarraClientePdv';
 
 export const Pdv = () => {
     const [carrinho, setCarrinho] = useState([]);
@@ -12,20 +13,15 @@ export const Pdv = () => {
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [vendaFinalizada, setVendaFinalizada] = useState(null);
     const [showModalPerdida, setShowModalPerdida] = useState(false);
+    const [clienteSelecionado, setClienteSelecionado] = useState(null);
     const audioBip = new Audio('/sounds/bip.mp3');
 
     // --- LÓGICA DE TELA CHEIA ---
     const toggleFullScreen = () => {
         if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(err => {
-                console.error(`Erro ao ativar tela cheia: ${err.message}`);
-            });
-            setIsFullScreen(true);
+            document.documentElement.requestFullscreen().catch(err => console.error(`Erro: ${err.message}`));
         } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-                setIsFullScreen(false);
-            }
+            if (document.exitFullscreen) document.exitFullscreen();
         }
     };
 
@@ -36,84 +32,55 @@ export const Pdv = () => {
     }, []);
 
     // --- LÓGICA DE ATALHOS GERAIS ---
-    useHotkeys('f10', (e) => {
-        e.preventDefault();
-        if (carrinho.length > 0) {
-            setModalAberto(true);
-        } else {
-            alert("Adicione produtos antes de finalizar!");
-        }
-    }, { preventDefault: true }, [carrinho]);
-
-    useHotkeys('f9', (e) => {
-        e.preventDefault();
-        setShowModalPerdida(true);
-    }, { preventDefault: true });
+    useHotkeys('f10', (e) => { e.preventDefault(); if (carrinho.length > 0) setModalAberto(true); }, { preventDefault: true }, [carrinho]);
+    useHotkeys('f9', (e) => { e.preventDefault(); setShowModalPerdida(true); }, { preventDefault: true });
 
     useHotkeys('esc', (e) => {
-        if (showModalPerdida) {
-            setShowModalPerdida(false);
-        } else if (modalAberto) {
-            setModalAberto(false);
-        } else if (carrinho.length > 0) {
+        if (showModalPerdida) setShowModalPerdida(false);
+        else if (modalAberto) setModalAberto(false);
+        else if (carrinho.length > 0) {
             setTimeout(() => {
-                if (window.confirm("Deseja limpar todo o carrinho?")) {
-                    setCarrinho([]);
-                }
+                if (window.confirm("Deseja limpar todo o carrinho?")) setCarrinho([]);
             }, 100);
         }
     }, { preventDefault: true }, [carrinho, modalAberto, showModalPerdida]);
 
     // --- LÓGICA DO COMPONENTE ---
-    const tocarBip = () => {
-        audioBip.currentTime = 0;
-        audioBip.play();
-    };
+    const tocarBip = () => { audioBip.currentTime = 0; audioBip.play(); };
 
     const adicionarAoCarrinho = (produto, qtd = 1) => {
         tocarBip();
         const itemExistente = carrinho.find(item => item.id === produto.id);
-
         if (itemExistente) {
-            setCarrinho(carrinho.map(item =>
-                item.id === produto.id ? { ...item, qtd: item.qtd + qtd } : item
-            ));
+            setCarrinho(carrinho.map(item => item.id === produto.id ? { ...item, qtd: item.qtd + qtd } : item));
         } else {
             setCarrinho(prev => [...prev, { ...produto, qtd: qtd }]);
         }
     };
 
-    const calcularTotal = () => {
-        return carrinho.reduce((total, item) => total + (item.precoVenda * item.qtd), 0);
-    };
-
-    const formatCurrency = (value) => {
-        return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    };
+    const calcularTotal = () => carrinho.reduce((total, item) => total + (item.precoVenda * item.qtd), 0);
+    const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
     const finalizarVenda = async () => {
         const dadosVenda = {
             itens: carrinho.map(item => ({ produtoId: item.id, quantidade: item.qtd })),
-            pagamento: 'DINHEIRO'
+            pagamento: 'DINHEIRO',
+            parceiroId: clienteSelecionado ? clienteSelecionado.id : null
         };
 
         try {
             const resVenda = await api.post('/api/vendas', dadosVenda);
-            const vendaParaImpressao = {
-                id: resVenda.data.id,
-                total: calcularTotal(),
-                vendedor: 'CAIXA 01'
-            };
+            const vendaParaImpressao = { id: resVenda.data.id, total: calcularTotal(), vendedor: 'CAIXA 01', cliente: clienteSelecionado };
             setVendaFinalizada(vendaParaImpressao);
             setModalAberto(false);
 
             setTimeout(() => {
                 window.print();
                 setCarrinho([]);
+                setClienteSelecionado(null);
                 setVendaFinalizada(null);
                 alert(`Venda #${resVenda.data.id} finalizada com sucesso!`);
             }, 500);
-
         } catch (err) {
             console.error(err);
             alert(`Erro ao finalizar venda: ${err.response?.data?.message || err.message}`);
@@ -122,7 +89,6 @@ export const Pdv = () => {
 
     return (
         <div className={`flex flex-col h-screen bg-slate-100 ${isFullScreen ? 'p-0' : 'p-4'}`}>
-            
             {vendaFinalizada && <CupomVenda venda={vendaFinalizada} itens={carrinho} />}
 
             <div className="flex justify-between items-center bg-slate-900 text-white p-4 rounded-t-xl shadow-lg print:hidden">
@@ -140,6 +106,8 @@ export const Pdv = () => {
                     </button>
                 </div>
             </div>
+
+            <BarraClientePdv onClienteSelecionado={setClienteSelecionado} />
 
             <div className="flex-1 bg-white shadow-2xl flex flex-col rounded-b-xl overflow-hidden print:hidden">
                 <div className="p-6 bg-slate-50 border-b border-slate-200 z-20">
@@ -176,9 +144,7 @@ export const Pdv = () => {
                                 </tr>
                             ))}
                             {carrinho.length === 0 && (
-                                <tr>
-                                    <td colSpan="5" className="p-12 text-center text-slate-400 italic">Caixa livre. Aguardando próximo cliente...</td>
-                                </tr>
+                                <tr><td colSpan="5" className="p-12 text-center text-slate-400 italic">Caixa livre. Aguardando próximo cliente...</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -201,19 +167,13 @@ export const Pdv = () => {
                             <p className="text-5xl font-black tracking-tighter text-white">{formatCurrency(calcularTotal())}</p>
                         </div>
                         <button onClick={() => setModalAberto(true)} disabled={carrinho.length === 0} className="bg-green-500 hover:bg-green-600 disabled:bg-slate-700 disabled:text-slate-500 text-white px-8 py-4 rounded-xl font-black text-xl shadow-lg hover:shadow-green-500/20 transition-all transform hover:scale-105 active:scale-95">
-                            FINALIZAR
-                            <span className="block text-[10px] font-normal opacity-80">TECLA F10</span>
+                            FINALIZAR<span className="block text-[10px] font-normal opacity-80">TECLA F10</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             <ModalFechamento isOpen={modalAberto} onClose={() => setModalAberto(false)} onFinalizar={finalizarVenda} totalVenda={calcularTotal()} />
-
-            {/* Botão e Modal de Venda Perdida */}
-            <button onClick={() => setShowModalPerdida(true)} className="fixed bottom-6 right-6 bg-red-600 text-white p-4 rounded-full shadow-2xl hover:bg-red-700 flex items-center gap-2 transition-all print:hidden">
-                <Ban size={20} /> <span className="font-bold hidden md:inline">NÃO TINHA NO ESTOQUE (F9)</span>
-            </button>
 
             {showModalPerdida && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] print:hidden">

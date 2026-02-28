@@ -38,6 +38,8 @@ public class SecurityConfig {
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers("/api/ncm/**").permitAll() // Libera endpoints de NCM para carga inicial
+                .requestMatchers("/api/parceiros/consulta-cnpj/**").permitAll() // Libera consulta de CNPJ
+                .requestMatchers("/api/parceiros/consulta-cep/**").permitAll() // Libera consulta de CEP
                 .anyRequest().authenticated()
             )
             .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
@@ -48,7 +50,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173")); // URL do React
-        configuration.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE", "PATCH")); // Adicionei PATCH
+        configuration.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

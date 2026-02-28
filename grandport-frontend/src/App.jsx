@@ -5,6 +5,7 @@ import { Pdv } from './modules/vendas/Pdv';
 import { Produtos } from './modules/estoque/Produtos';
 import { Marcas } from './modules/estoque/Marcas';
 import { PrevisaoCompras } from './modules/estoque/PrevisaoCompras';
+import { Parceiros } from './modules/cadastro/Parceiros';
 import { ImportarXml } from './modules/compras/ImportarXml';
 import { Login } from './modules/auth/Login';
 import { CargaNcm } from './modules/admin/CargaNcm';
@@ -39,6 +40,7 @@ function App() {
                     {paginaAtiva === 'vendas' && <Pdv />}
                     {paginaAtiva === 'estoque' && <Produtos />}
                     {paginaAtiva === 'marcas' && <Marcas />}
+                    {paginaAtiva === 'parceiros' && <Parceiros />}
                     {paginaAtiva === 'previsao' && <PrevisaoCompras />}
                     {paginaAtiva === 'compras' && <ImportarXml />}
                     {paginaAtiva === 'fiscal' && <CargaNcm />}
