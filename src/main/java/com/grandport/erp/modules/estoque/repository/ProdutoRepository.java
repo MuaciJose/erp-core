@@ -14,6 +14,9 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long> {
     @Query("SELECT p FROM Produto p WHERE p.quantidadeEstoque <= p.estoqueMinimo")
     List<Produto> findAlertasEstoque();
 
+    @Query("SELECT COUNT(p) FROM Produto p WHERE p.quantidadeEstoque <= p.estoqueMinimo")
+    Long countProdutosBaixoEstoque();
+
     @Query("SELECT p FROM Produto p WHERE " +
            "LOWER(p.nome) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
            "LOWER(p.aplicacao) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
@@ -22,7 +25,6 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long> {
            "p.codigoBarras LIKE CONCAT('%', :termo, '%')")
     List<Produto> buscarPorTermo(@Param("termo") String termo);
 
-    // Método otimizado sugerido (pode ser usado para buscas mais específicas)
     @Query("SELECT p FROM Produto p WHERE " +
            "LOWER(p.nome) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
            "LOWER(p.aplicacao) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
