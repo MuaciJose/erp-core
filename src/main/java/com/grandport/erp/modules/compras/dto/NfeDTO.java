@@ -7,7 +7,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Data
@@ -46,7 +46,7 @@ public class NfeDTO {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Ide {
         @JacksonXmlProperty(localName = "dhEmi")
-        private LocalDateTime dataEmissao;
+        private OffsetDateTime dataEmissao;
     }
 
     @Data

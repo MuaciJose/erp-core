@@ -2,6 +2,7 @@ package com.grandport.erp.modules.compras.service;
 
 import com.grandport.erp.modules.compras.dto.ItemNotaDTO;
 import com.grandport.erp.modules.compras.dto.NfeDTO;
+import com.grandport.erp.modules.compras.dto.NfeProcDTO;
 import com.grandport.erp.modules.estoque.model.Marca;
 import com.grandport.erp.modules.estoque.model.Ncm;
 import com.grandport.erp.modules.estoque.model.Produto;
@@ -24,14 +25,19 @@ public class CompraService {
     @Autowired private MarcaRepository marcaRepository;
 
     @Transactional
-    public void processarEntradaNota(NfeDTO nfe) {
+    public void processarEntradaNota(NfeProcDTO nfeProc) {
+        NfeDTO nfe = nfeProc.getNfe();
+
         for (NfeDTO.Detalhe detalhe : nfe.getInfNFe().getDetalhes()) {
             ItemNotaDTO item = detalhe.getProduto();
 
             Produto produto = produtoRepository.findByCodigoBarras(item.getEan())
                 .orElseGet(() -> criarNovoProdutoPelaNota(item));
 
-            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
+            // Converte a quantidade de BigDecimal para Integer
+            int quantidadeEntrada = item.getQuantidade().intValue();
+            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + quantidadeEntrada);
+            
             produto.setPrecoCusto(item.getValorUnitario());
             produtoRepository.save(produto);
         }
@@ -39,22 +45,19 @@ public class CompraService {
         financeiroService.gerarContaPagar(
             nfe.getInfNFe().getEmitente().getNomeFornecedor(),
             nfe.getInfNFe().getTotal().getIcmsTot().getValorTotal(),
-            nfe.getInfNFe().getIde().getDataEmissao()
+            nfe.getInfNFe().getIde().getDataEmissao().toLocalDateTime()
         );
     }
 
     private Produto criarNovoProdutoPelaNota(ItemNotaDTO item) {
         Produto novo = new Produto();
         novo.setNome(item.getNomeProduto());
-        novo.setSku(item.getCodigoProduto()); // Usa o código do fornecedor como SKU inicial
+        novo.setSku(item.getCodigoProduto());
         novo.setCodigoBarras(item.getEan());
         novo.setPrecoCusto(item.getValorUnitario());
         novo.setQuantidadeEstoque(0);
-
-        // Define um preço de venda inicial (ex: custo + 40% de margem)
         novo.setPrecoVenda(item.getValorUnitario().multiply(new BigDecimal("1.40")));
 
-        // Busca ou cria NCM
         Ncm ncm = ncmRepository.findById(item.getNcm())
                 .orElseGet(() -> {
                     Ncm novoNcm = new Ncm();
@@ -64,7 +67,6 @@ public class CompraService {
                 });
         novo.setNcm(ncm);
 
-        // Define uma marca padrão (obrigatório)
         Marca marca = marcaRepository.findAll().stream().findFirst()
                 .orElseGet(() -> {
                     Marca novaMarca = new Marca();

@@ -33,13 +33,22 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // Rotas Públicas
                 .requestMatchers(HttpMethod.POST, "/auth/login").permitAll() 
-                .requestMatchers(HttpMethod.POST, "/auth/register").hasRole("ADMIN") // Só Admin cria usuários
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
-                .requestMatchers("/api/ncm/**").permitAll() // Libera endpoints de NCM para carga inicial
-                .requestMatchers("/api/parceiros/consulta-cnpj/**").permitAll() // Libera consulta de CNPJ
-                .requestMatchers("/api/parceiros/consulta-cep/**").permitAll() // Libera consulta de CEP
+                .requestMatchers("/api/ncm/**").permitAll() 
+                .requestMatchers("/api/parceiros/consulta-cnpj/**").permitAll()
+                .requestMatchers("/api/parceiros/consulta-cep/**").permitAll()
+
+                // Rotas de Admin
+                .requestMatchers(HttpMethod.POST, "/auth/register").hasRole("ADMIN")
+
+                // Rotas Financeiras (Exigem autenticação, mas não role específica por enquanto)
+                .requestMatchers("/api/financeiro/**").authenticated()
+                .requestMatchers("/api/vendas/fechamento-hoje").authenticated()
+                
+                // Demais rotas exigem autenticação
                 .anyRequest().authenticated()
             )
             .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
@@ -59,7 +68,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(); // Criptografia de nível bancário
+        return new BCryptPasswordEncoder();
     }
     
     @Bean

@@ -1,6 +1,6 @@
 package com.grandport.erp.modules.compras.controller;
 
-import com.grandport.erp.modules.compras.dto.NfeDTO;
+import com.grandport.erp.modules.compras.dto.NfeProcDTO;
 import com.grandport.erp.modules.compras.service.CompraService;
 import com.grandport.erp.modules.compras.service.XmlService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,8 +21,8 @@ public class CompraController {
     @PostMapping("/upload")
     public ResponseEntity<String> uploadNfe(@RequestParam("file") MultipartFile file) {
         try {
-            NfeDTO nfe = xmlService.lerXml(file);
-            compraService.processarEntradaNota(nfe);
+            NfeProcDTO nfeProc = xmlService.lerXml(file);
+            compraService.processarEntradaNota(nfeProc);
             return ResponseEntity.ok("Nota Fiscal processada com sucesso!");
         } catch (Exception e) {
             e.printStackTrace();

@@ -12,22 +12,22 @@ export const BarraClientePdv = ({ onClienteSelecionado }) => {
         
         setLoading(true);
         try {
-            // O endpoint de busca de parceiros já busca por nome ou documento
             const res = await api.get(`/api/parceiros?termo=${termo}`);
+            console.log("Clientes encontrados:", res.data); // DEBUG
             
-            // Se encontrar exatamente um, seleciona automaticamente
             if (res.data && res.data.length === 1) {
                 const parceiroEncontrado = res.data[0];
                 setCliente(parceiroEncontrado);
                 onClienteSelecionado(parceiroEncontrado);
             } else {
-                // Se encontrar mais de um, você poderia abrir um modal de seleção aqui
-                // Por enquanto, vamos limpar se não for exato
                 setCliente(null);
                 onClienteSelecionado(null);
+                if (res.data && res.data.length > 1) {
+                    alert("Múltiplos clientes encontrados. Por favor, seja mais específico.");
+                }
             }
         } catch (err) {
-            console.error("Cliente não encontrado");
+            console.error("Cliente não encontrado:", err);
             setCliente(null);
             onClienteSelecionado(null);
         } finally {

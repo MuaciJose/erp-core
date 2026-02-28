@@ -20,7 +20,7 @@ public class ItemNotaDTO {
     private String ncm;
 
     @JacksonXmlProperty(localName = "qCom")
-    private Integer quantidade;
+    private BigDecimal quantidade;
 
     @JacksonXmlProperty(localName = "vUnCom")
     private BigDecimal valorUnitario;

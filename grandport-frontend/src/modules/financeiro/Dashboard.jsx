@@ -100,19 +100,23 @@ export const Dashboard = () => {
 
             <div className="bg-white p-6 rounded-xl shadow-sm h-[500px] w-full mb-8">
                 <h3 className="text-lg font-semibold mb-4">Fluxo de Caixa ({filtro})</h3>
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis tickFormatter={formatCurrency} />
-                        <Tooltip formatter={formatCurrency} />
-                        <Bar dataKey="valor">
-                            {chartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : '#ef4444'} />
-                            ))}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
+                {dados ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis tickFormatter={formatCurrency} />
+                            <Tooltip formatter={formatCurrency} />
+                            <Bar dataKey="valor">
+                                {chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : '#ef4444'} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400">Carregando dados do gráfico...</div>
+                )}
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow-sm border border-red-100">

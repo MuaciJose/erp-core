@@ -2,19 +2,19 @@ package com.grandport.erp.modules.compras.service;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import com.grandport.erp.modules.compras.dto.NfeDTO;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.grandport.erp.modules.compras.dto.NfeProcDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class XmlService {
 
-    public NfeDTO lerXml(MultipartFile arquivo) throws Exception {
+    public NfeProcDTO lerXml(MultipartFile arquivo) throws Exception {
         XmlMapper xmlMapper = new XmlMapper();
-        // Configura para ignorar tags que não precisamos (como transportadora)
+        xmlMapper.registerModule(new JavaTimeModule()); // Registra o módulo de data/hora
         xmlMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-        // O Jackson mapeia a estrutura do XML para o seu DTO
-        return xmlMapper.readValue(arquivo.getInputStream(), NfeDTO.class);
+        return xmlMapper.readValue(arquivo.getInputStream(), NfeProcDTO.class);
     }
 }
