@@ -2,6 +2,7 @@ package com.grandport.erp.modules.parceiro.controller;
 
 import com.grandport.erp.modules.parceiro.dto.BrasilApiCepDTO;
 import com.grandport.erp.modules.parceiro.dto.BrasilApiCnpjDTO;
+import com.grandport.erp.modules.parceiro.dto.HistoricoComprasClienteDTO;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 import com.grandport.erp.modules.parceiro.service.ConsultaDocumentoService;
@@ -26,6 +27,11 @@ public class ParceiroController {
             return ResponseEntity.ok(repository.buscarPorTermo(termo));
         }
         return ResponseEntity.ok(repository.findAll());
+    }
+
+    @GetMapping("/{id}/historico-compras")
+    public ResponseEntity<List<HistoricoComprasClienteDTO>> getHistoricoCompras(@PathVariable Long id) {
+        return ResponseEntity.ok(service.buscarHistoricoCompras(id));
     }
 
     @PostMapping

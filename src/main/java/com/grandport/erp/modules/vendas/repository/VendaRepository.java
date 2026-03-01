@@ -1,6 +1,7 @@
 package com.grandport.erp.modules.vendas.repository;
 
 import com.grandport.erp.modules.financeiro.dto.DashboardResumoDTO;
+import com.grandport.erp.modules.vendas.model.StatusVenda;
 import com.grandport.erp.modules.vendas.model.Venda;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -14,6 +15,9 @@ import java.util.Optional;
 public interface VendaRepository extends JpaRepository<Venda, Long> {
 
     List<Venda> findByVeiculoIdOrderByDataHoraDesc(Long veiculoId);
+    List<Venda> findByClienteIdOrderByDataHoraDesc(Long clienteId); // Adicionado
+
+    List<Venda> findByStatus(StatusVenda status);
 
     @Query("SELECT SUM(v.valorTotal) FROM Venda v WHERE v.dataHora BETWEEN :inicio AND :fim")
     Optional<BigDecimal> sumTotalVendasPeriodo(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);

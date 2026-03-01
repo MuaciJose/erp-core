@@ -26,7 +26,12 @@ public class Venda {
     @JoinColumn(name = "veiculo_id")
     private Veiculo veiculo;
 
-    private Integer kmVeiculo; // KM registrado no momento da venda
+    private Integer kmVeiculo;
+
+    private String vendedorNome;
+
+    @Enumerated(EnumType.STRING)
+    private StatusVenda status = StatusVenda.CONCLUIDA; // Padrão para vendas diretas no PDV
 
     @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ItemVenda> itens = new ArrayList<>();

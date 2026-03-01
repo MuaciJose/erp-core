@@ -1,12 +1,15 @@
 package com.grandport.erp.modules.financeiro.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.util.List;
 
 @Entity
 @Table(name = "plano_contas")
 @Data
+@ToString(exclude = {"contaPai", "filhas"}) // Evita recursão no toString do Lombok também
 public class PlanoConta {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,6 +23,7 @@ public class PlanoConta {
 
     @ManyToOne
     @JoinColumn(name = "conta_pai_id")
+    @JsonIgnore // Impede a recursão infinita na serialização JSON
     private PlanoConta contaPai;
 
     @OneToMany(mappedBy = "contaPai", cascade = CascadeType.ALL)

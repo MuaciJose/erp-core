@@ -8,7 +8,7 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: create # MUDADO PARA CREATE PARA RECRIAR O BANCO COM A COLUNA TEXT
+      ddl-auto: update # MUDADO PARA CREATE PARA RECRIAR O BANCO COM A COLUNA TEXT
     show-sql: true # Mostra os comandos SQL no console para debug
     properties:
       hibernate:

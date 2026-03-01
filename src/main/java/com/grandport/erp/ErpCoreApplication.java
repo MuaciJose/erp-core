@@ -22,12 +22,11 @@ public class ErpCoreApplication {
     CommandLineRunner initDatabase(UsuarioRepository repository, PasswordEncoder passwordEncoder) {
         return args -> {
             List<String> todasPermissoes = Arrays.asList(
-                "dash", "vendas", "estoque", "marcas", "compras", "previsao", "faltas",
+                "dash", "vendas", "orcamentos", "fila-caixa", "estoque", "marcas", "compras", "previsao", "faltas",
                 "caixa", "contas-pagar", "contas-receber", "bancos", "conciliacao", "plano-contas", "dre",
-                "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes"
+                "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes", "calculadora"
             );
 
-            // Adiciona o cast para Usuario
             Usuario admin = (Usuario) repository.findByUsername("admin");
             
             if (admin == null) {

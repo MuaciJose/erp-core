@@ -35,21 +35,7 @@ public class ProdutoService {
                 .orElseThrow(() -> new RuntimeException("Erro: NCM " + dto.ncmCodigo() + " não cadastrado no sistema."));
 
         Produto produto = new Produto();
-        produto.setSku(dto.sku());
-        produto.setNome(dto.nome());
-        produto.setDescricao(dto.descricao());
-        produto.setAplicacao(dto.aplicacao());
-        produto.setCodigoBarras(dto.codigoBarras());
-        produto.setPrecoCusto(dto.precoCusto());
-        produto.setPrecoVenda(dto.precoVenda());
-        produto.setQuantidadeEstoque(dto.quantidadeEstoque());
-        produto.setEstoqueMinimo(dto.estoqueMinimo());
-        produto.setMarca(marca);
-        produto.setNcm(ncm);
-        produto.setFotoUrl(dto.fotoUrl());
-        if (imagePath != null) {
-            produto.setFotoLocalPath("/uploads/produtos/" + imagePath);
-        }
+        updateProdutoFromDto(produto, dto, marca, ncm, imagePath);
 
         Produto salvo = produtoRepository.save(produto);
         registrarMovimentacao(salvo, dto.quantidadeEstoque(), "ENTRADA", "Cadastro Inicial");
@@ -57,6 +43,43 @@ public class ProdutoService {
         auditoriaService.registrar("ESTOQUE", "CRIACAO", "Cadastrou o produto: " + salvo.getNome());
         
         return salvo;
+    }
+
+    @Transactional
+    public Produto atualizar(Long id, ProdutoRequestDTO dto, String imagePath) {
+        Produto produto = findById(id);
+        Marca marca = marcaRepository.findById(dto.marcaId())
+                .orElseThrow(() -> new RuntimeException("Marca não encontrada."));
+        Ncm ncm = ncmRepository.findById(dto.ncmCodigo())
+                .orElseThrow(() -> new RuntimeException("NCM não encontrado."));
+
+        updateProdutoFromDto(produto, dto, marca, ncm, imagePath);
+        
+        Produto salvo = produtoRepository.save(produto);
+        auditoriaService.registrar("ESTOQUE", "EDICAO", "Atualizou o produto: " + salvo.getNome());
+        
+        return salvo;
+    }
+
+    private void updateProdutoFromDto(Produto p, ProdutoRequestDTO dto, Marca marca, Ncm ncm, String imagePath) {
+        p.setSku(dto.sku());
+        p.setNome(dto.nome());
+        p.setDescricao(dto.descricao());
+        p.setAplicacao(dto.aplicacao());
+        p.setCodigoBarras(dto.codigoBarras());
+        p.setPrecoCusto(dto.precoCusto());
+        p.setPrecoVenda(dto.precoVenda());
+        p.setEstoqueMinimo(dto.estoqueMinimo());
+        p.setMarca(marca);
+        p.setNcm(ncm);
+        p.setFotoUrl(dto.fotoUrl());
+        if (imagePath != null) {
+            p.setFotoLocalPath("/uploads/produtos/" + imagePath);
+        }
+        // Quantidade de estoque não é alterada aqui por segurança (use ajuste-estoque)
+        if (p.getId() == null) {
+            p.setQuantidadeEstoque(dto.quantidadeEstoque());
+        }
     }
 
     @Transactional
@@ -101,7 +124,7 @@ public class ProdutoService {
         Produto salvo = produtoRepository.save(produto);
 
         String tipo = diferenca > 0 ? "ENTRADA" : "SAIDA";
-        registrarMovimentacao(salvo, diferenca, tipo, motivo);
+        registrarMovimentacao(salvo, Math.abs(diferenca), tipo, motivo);
 
         auditoriaService.registrar("ESTOQUE", "AJUSTE", "Ajustou estoque de " + produto.getNome() + ": " + saldoAnterior + " -> " + novaQuantidade + ". Motivo: " + motivo);
 
@@ -114,7 +137,7 @@ public class ProdutoService {
         mov.setQuantidade(quantidade);
         mov.setTipo(tipo);
         mov.setMotivo(motivo);
-        mov.setSaldoAnterior(produto.getQuantidadeEstoque() - quantidade);
+        mov.setSaldoAnterior(produto.getQuantidadeEstoque() - (tipo.equals("ENTRADA") ? quantidade : -quantidade));
         mov.setSaldoAtual(produto.getQuantidadeEstoque());
         movimentacaoRepository.save(mov);
     }

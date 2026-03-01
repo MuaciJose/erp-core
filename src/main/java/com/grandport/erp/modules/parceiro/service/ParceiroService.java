@@ -1,17 +1,23 @@
 package com.grandport.erp.modules.parceiro.service;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+import com.grandport.erp.modules.parceiro.dto.HistoricoComprasClienteDTO;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
+import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ParceiroService {
 
     @Autowired private ParceiroRepository repository;
     @Autowired private AuditoriaService auditoriaService;
+    @Autowired private VendaRepository vendaRepository;
 
     @Transactional
     public Parceiro criar(Parceiro parceiro) {
@@ -42,5 +48,18 @@ public class ParceiroService {
         Parceiro p = repository.findById(id).orElseThrow(() -> new RuntimeException("Parceiro não encontrado"));
         repository.deleteById(id);
         auditoriaService.registrar("CADASTROS", "EXCLUSAO_PARCEIRO", "Excluiu o parceiro: " + p.getNome());
+    }
+
+    public List<HistoricoComprasClienteDTO> buscarHistoricoCompras(Long clienteId) {
+        return vendaRepository.findByClienteIdOrderByDataHoraDesc(clienteId).stream()
+            .map(venda -> new HistoricoComprasClienteDTO(
+                venda.getId(),
+                venda.getDataHora(),
+                venda.getValorTotal(),
+                venda.getStatus().name(),
+                venda.getVeiculo() != null ? venda.getVeiculo().getModelo() + " (" + venda.getVeiculo().getPlaca() + ")" : "Nenhum",
+                venda.getItens().size()
+            ))
+            .collect(Collectors.toList());
     }
 }

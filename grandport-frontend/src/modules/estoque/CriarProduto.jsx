@@ -86,7 +86,6 @@ export const CriarProduto = ({ onSucesso, onCancelar, produtoParaEditar }) => {
 
         try {
             if (isEditing) {
-                // O endpoint de atualização também precisa ser multipart
                 await api.put(`/api/produtos/${produtoParaEditar.id}`, formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
@@ -139,8 +138,29 @@ export const CriarProduto = ({ onSucesso, onCancelar, produtoParaEditar }) => {
                         <textarea name="aplicacao" value={form.aplicacao} onChange={handleChange} className="mt-1 block w-full border rounded-md p-2" rows="2" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <Autocomplete label="Fabricante (Marca)" placeholder="Digite para buscar..." onSearch={buscarMarca} onSelect={(m) => setForm(prev => ({ ...prev, marcaId: m ? m.id : '' }))} displayValue={(m) => m?.nome || ''} initialValue={produtoParaEditar?.marca} />
-                        <Autocomplete label="NCM (Fiscal)" placeholder="Ex: 8708..." onSearch={buscarNcm} onSelect={(n) => setForm(prev => ({ ...prev, ncmCodigo: n ? (n.Codigo || n.codigo) : '' }))} displayValue={(n) => n?.codigo || n?.Codigo || ''} initialValue={produtoParaEditar?.ncm} />
+                        <Autocomplete 
+                            label="Fabricante (Marca)" 
+                            placeholder="Digite para buscar..." 
+                            onSearch={buscarMarca} 
+                            onSelect={(m) => setForm(prev => ({ ...prev, marcaId: m ? m.id : '' }))} 
+                            displayValue={(m) => m?.nome || ''} 
+                            renderItem={(m) => <span className="font-bold">{m.nome}</span>}
+                            initialValue={produtoParaEditar?.marca} 
+                        />
+                        <Autocomplete 
+                            label="NCM (Fiscal)" 
+                            placeholder="Ex: 8708..." 
+                            onSearch={buscarNcm} 
+                            onSelect={(n) => setForm(prev => ({ ...prev, ncmCodigo: n ? (n.Codigo || n.codigo) : '' }))} 
+                            displayValue={(n) => n?.codigo || n?.Codigo || ''} 
+                            renderItem={(n) => (
+                                <div className="flex flex-col">
+                                    <span className="font-bold text-blue-700">{n.codigo || n.Codigo}</span>
+                                    <span className="text-xs text-gray-500 truncate">{n.descricao || n.Descricao}</span>
+                                </div>
+                            )}
+                            initialValue={produtoParaEditar?.ncm} 
+                        />
                     </div>
                 </div>
 

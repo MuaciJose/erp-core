@@ -19,7 +19,9 @@ import {
     ShoppingBasket,
     Calculator,
     Wallet,
-    Activity
+    Activity,
+    ClipboardList,
+    Clock
 } from 'lucide-react';
 
 export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }) => {
@@ -42,7 +44,11 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             id: 'vendas',
             titulo: 'Vendas & PDV',
             icone: <ShoppingCart size={20} />,
-            acao: 'vendas'
+            submenus: [
+                { titulo: 'Ponto de Venda (PDV)', acao: 'vendas' },
+                { titulo: 'Orçamentos e Pedidos', acao: 'orcamentos' },
+                { titulo: 'Fila de Pedidos (Caixa)', acao: 'fila-caixa' }
+            ]
         },
         {
             id: 'estoque',

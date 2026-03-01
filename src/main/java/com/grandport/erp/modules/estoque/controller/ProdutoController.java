@@ -39,6 +39,20 @@ public class ProdutoController {
         return ResponseEntity.ok(service.cadastrar(dto, imagePath));
     }
 
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Produto> atualizar(
+            @PathVariable Long id,
+            @RequestPart("produto") ProdutoRequestDTO dto,
+            @RequestPart(value = "image", required = false) MultipartFile file) {
+        
+        String imagePath = null;
+        if (file != null && !file.isEmpty()) {
+            imagePath = fileService.salvarArquivo(file);
+        }
+
+        return ResponseEntity.ok(service.atualizar(id, dto, imagePath));
+    }
+
     @PutMapping("/atualizar-precos")
     public ResponseEntity<Void> atualizarPrecos(@RequestBody List<AtualizarPrecoRequestDTO> precos) {
         service.atualizarPrecos(precos);
@@ -71,7 +85,7 @@ public class ProdutoController {
     @GetMapping("/mobile/scan/{ean}")
     public ResponseEntity<ProdutoResponseDTO> scanProduto(@PathVariable String ean) {
         return produtoRepository.findByCodigoBarras(ean)
-            .map(p -> ResponseEntity.ok(new ProdutoResponseDTO(p))) // Retorna dados + URL da Foto
+            .map(p -> ResponseEntity.ok(new ProdutoResponseDTO(p)))
             .orElse(ResponseEntity.notFound().build());
     }
 

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
-import { Users, Plus, Search, Phone, MapPin, Building2, Edit, FileText } from 'lucide-react';
+import { Users, Plus, Search, Phone, MapPin, Building2, Edit, FileText, History } from 'lucide-react';
 import { CriarParceiro } from './CriarParceiro';
 import { ExtratoParceiro } from '../financeiro/ExtratoParceiro';
+import { HistoricoClienteModal } from './HistoricoClienteModal';
 
 export const Parceiros = () => {
     const [parceiros, setParceiros] = useState([]);
@@ -11,6 +12,7 @@ export const Parceiros = () => {
     const [parceiroEmEdicao, setParceiroEmEdicao] = useState(null);
     const [extratoAberto, setExtratoAberto] = useState(null);
     const [abaAtiva, setAbaAtiva] = useState('CLIENTE');
+    const [clienteParaHistorico, setClienteParaHistorico] = useState(null);
 
     const carregarParceiros = async () => {
         try {
@@ -39,7 +41,7 @@ export const Parceiros = () => {
     if (parceiroEmEdicao) {
         return <CriarParceiro 
                     parceiroParaEditar={parceiroEmEdicao}
-                    parceirosLista={parceiros} // Passa a lista completa para o componente de edição
+                    parceirosLista={parceiros}
                     onSucesso={() => { setParceiroEmEdicao(null); carregarParceiros(); }} 
                     onCancelar={() => setParceiroEmEdicao(null)} 
                 />;
@@ -96,6 +98,11 @@ export const Parceiros = () => {
                 {filtrados.map(p => (
                     <div key={p.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative group">
                         <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {p.tipo !== 'FORNECEDOR' && (
+                                <button onClick={() => setClienteParaHistorico(p)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-blue-100 hover:text-blue-600" title="Ver Histórico de Compras">
+                                    <History size={16} />
+                                </button>
+                            )}
                             <button onClick={() => setExtratoAberto(p.id)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-blue-100 hover:text-blue-600" title="Ver Extrato">
                                 <FileText size={16} />
                             </button>
@@ -129,6 +136,13 @@ export const Parceiros = () => {
                     <p className="col-span-3 text-center text-gray-400 py-12">Nenhum parceiro encontrado nesta categoria.</p>
                 )}
             </div>
+
+            {clienteParaHistorico && (
+                <HistoricoClienteModal 
+                    cliente={clienteParaHistorico} 
+                    onClose={() => setClienteParaHistorico(null)} 
+                />
+            )}
         </div>
     );
 };

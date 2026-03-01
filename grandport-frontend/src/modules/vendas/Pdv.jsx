@@ -1,20 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { Maximize, Minimize, ShoppingCart, Ban } from 'lucide-react';
+import { Maximize, Minimize, ShoppingCart, Ban, Lock, Wallet } from 'lucide-react';
 import api from '../../api/axios';
 import { ModalFinalizarVenda } from './ModalFinalizarVenda';
 import { BuscaInteligente } from '../../components/BuscaInteligente';
 import { CupomVenda } from './CupomVenda';
 import { BarraClientePdv } from '../../components/BarraClientePdv';
 
-export const Pdv = () => {
+export const Pdv = ({ setPaginaAtiva }) => {
     const [carrinho, setCarrinho] = useState([]);
     const [modalAberto, setModalAberto] = useState(false);
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [vendaFinalizada, setVendaFinalizada] = useState(null);
     const [showModalPerdida, setShowModalPerdida] = useState(false);
     const [clienteSelecionado, setClienteSelecionado] = useState(null);
+    
+    const [caixaStatus, setCaixaStatus] = useState(null);
+    const [loadingCaixa, setLoadingCaixa] = useState(true);
+
     const audioBip = new Audio('/sounds/bip.mp3');
+
+    const verificarCaixa = async () => {
+        setLoadingCaixa(true);
+        try {
+            const res = await api.get('/api/caixa/atual');
+            setCaixaStatus(res.data.status);
+        } catch (err) {
+            setCaixaStatus('FECHADO');
+        } finally {
+            setLoadingCaixa(false);
+        }
+    };
+
+    useEffect(() => {
+        verificarCaixa();
+        const handleFSChange = () => setIsFullScreen(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', handleFSChange);
+        return () => document.removeEventListener('fullscreenchange', handleFSChange);
+    }, []);
 
     const toggleFullScreen = () => {
         if (!document.fullscreenElement) {
@@ -23,12 +46,6 @@ export const Pdv = () => {
             if (document.exitFullscreen) document.exitFullscreen();
         }
     };
-
-    useEffect(() => {
-        const handleFSChange = () => setIsFullScreen(!!document.fullscreenElement);
-        document.addEventListener('fullscreenchange', handleFSChange);
-        return () => document.removeEventListener('fullscreenchange', handleFSChange);
-    }, []);
 
     useHotkeys('f10', (e) => { e.preventDefault(); if (carrinho.length > 0) setModalAberto(true); }, { preventDefault: true }, [carrinho]);
     useHotkeys('f9', (e) => { e.preventDefault(); setShowModalPerdida(true); }, { preventDefault: true });
@@ -93,6 +110,30 @@ export const Pdv = () => {
             alert(`Erro ao finalizar venda: ${err.response?.data?.message || err.message}`);
         }
     };
+
+    if (loadingCaixa) return <div className="h-screen bg-slate-100 flex items-center justify-center font-black text-slate-400 animate-pulse">VALIDANDO ESTADO DO CAIXA...</div>;
+
+    if (caixaStatus === 'FECHADO') {
+        return (
+            <div className="h-screen bg-slate-100 flex items-center justify-center p-4">
+                <div className="bg-white p-12 rounded-3xl shadow-2xl border border-red-100 text-center max-w-md animate-fade-in">
+                    <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Lock size={48} className="text-red-500" />
+                    </div>
+                    <h1 className="text-3xl font-black text-slate-800 mb-2">CAIXA BLOQUEADO</h1>
+                    <p className="text-slate-500 mb-8 font-medium">Você não pode realizar vendas enquanto o caixa estiver fechado. Abra o caixa para liberar o terminal.</p>
+                    
+                    <button 
+                        onClick={() => setPaginaAtiva('caixa')}
+                        className="w-full bg-slate-900 text-white py-4 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-slate-800 transition-all mb-4"
+                    >
+                        <Wallet size={20} /> IR PARA CONTROLE DE CAIXA
+                    </button>
+                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">GrandPort ERP Security</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className={`flex flex-col h-screen bg-slate-100 ${isFullScreen ? 'p-0' : 'p-4'}`}>
