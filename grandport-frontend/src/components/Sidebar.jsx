@@ -9,15 +9,22 @@ import {
     ChevronRight,
     ShoppingCart,
     FileText,
-    LogOut
+    LogOut,
+    PieChart,
+    Landmark,
+    Layers,
+    Link as LinkIcon,
+    Ban
 } from 'lucide-react';
 
-export const Sidebar = ({ paginaAtiva, setPaginaAtiva }) => {
+export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }) => {
     const [menuExpandido, setMenuExpandido] = useState('financeiro');
 
     const toggleMenu = (menuId) => {
         setMenuExpandido(menuExpandido === menuId ? null : menuId);
     };
+
+    const perfil = usuarioLogado?.perfil || 'VENDEDOR';
 
     const menus = [
         {
@@ -64,6 +71,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva }) => {
             icone: <Users size={20} />,
             submenus: [
                 { titulo: 'Clientes & Fornecedores', acao: 'parceiros' },
+                { titulo: 'Vendedores / Usuários', acao: 'usuarios' },
                 { titulo: 'Fiscal / NCM', acao: 'fiscal' }
             ]
         },
@@ -74,6 +82,20 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva }) => {
             acao: 'configuracoes'
         }
     ];
+
+    // Lógica de Perfis de Acesso (RBAC)
+    const menusPermitidos = menus.filter(menu => {
+        if (menu.id === 'financeiro') {
+            return perfil === 'ADMIN' || perfil === 'CAIXA';
+        }
+        if (menu.id === 'cadastros' || menu.id === 'configuracoes') {
+            return perfil === 'ADMIN';
+        }
+        if (menu.id === 'estoque') {
+            return perfil === 'ADMIN' || perfil === 'ESTOQUISTA';
+        }
+        return true; 
+    });
 
     return (
         <aside className="w-72 bg-slate-900 text-white h-screen flex flex-col shadow-2xl transition-all z-50">
@@ -87,7 +109,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva }) => {
             </div>
 
             <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2 custom-scrollbar">
-                {menus.map((menu) => (
+                {menusPermitidos.map((menu) => (
                     <div key={menu.id}>
                         {menu.submenus ? (
                             <>
@@ -149,18 +171,15 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva }) => {
                 <div className="flex items-center justify-between p-2">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center font-black text-white">
-                            AD
+                            {usuarioLogado?.nome?.substring(0, 2).toUpperCase()}
                         </div>
                         <div>
-                            <p className="text-sm font-bold text-white">Administrador</p>
-                            <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                <p className="text-[10px] text-green-400 font-bold uppercase tracking-widest">Online</p>
-                            </div>
+                            <p className="text-sm font-bold text-white leading-tight">{usuarioLogado?.nome?.split(' ')[0]}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase">{usuarioLogado?.perfil}</p>
                         </div>
                     </div>
                     <button 
-                        onClick={() => { localStorage.clear(); window.location.reload(); }}
+                        onClick={onLogout}
                         className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
                         title="Sair"
                     >

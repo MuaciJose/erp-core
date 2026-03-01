@@ -19,7 +19,7 @@ public class Usuario implements UserDetails {
     private Long id;
 
     @Column(unique = true, nullable = false)
-    private String username; // Nome de usuário (ex: joao.vendas)
+    private String username; // Usaremos o e-mail como username
 
     @Column(nullable = false)
     private String senha;
@@ -27,9 +27,10 @@ public class Usuario implements UserDetails {
     private String nomeCompleto;
 
     @Enumerated(EnumType.STRING)
-    private Role role; // Ex: ADMIN, VENDEDOR, ESTOQUISTA
+    private Role role;
 
-    // Métodos do UserDetails
+    private boolean ativo = true;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
@@ -39,5 +40,5 @@ public class Usuario implements UserDetails {
     @Override public boolean isAccountNonExpired() { return true; }
     @Override public boolean isAccountNonLocked() { return true; }
     @Override public boolean isCredentialsNonExpired() { return true; }
-    @Override public boolean isEnabled() { return true; }
+    @Override public boolean isEnabled() { return ativo; } // Vincula o status do Spring Security ao campo ativo
 }

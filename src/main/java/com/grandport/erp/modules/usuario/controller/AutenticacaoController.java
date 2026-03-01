@@ -1,7 +1,8 @@
 package com.grandport.erp.modules.usuario.controller;
 
 import com.grandport.erp.modules.usuario.dto.LoginDTO;
-import com.grandport.erp.modules.usuario.dto.TokenDTO;
+import com.grandport.erp.modules.usuario.dto.LoginResponseDTO;
+import com.grandport.erp.modules.usuario.dto.UsuarioDTO;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.usuario.service.TokenService;
 import jakarta.validation.Valid;
@@ -26,12 +27,13 @@ public class AutenticacaoController {
 
     @PostMapping("/login")
     public ResponseEntity login(@RequestBody @Valid LoginDTO data) {
-        // O Spring Security valida automaticamente o username e senha criptografada
         var usernamePassword = new UsernamePasswordAuthenticationToken(data.username(), data.senha());
         var auth = this.authenticationManager.authenticate(usernamePassword);
 
-        var token = tokenService.gerarToken((Usuario) auth.getPrincipal());
+        Usuario usuario = (Usuario) auth.getPrincipal();
+        var token = tokenService.gerarToken(usuario);
 
-        return ResponseEntity.ok(new TokenDTO(token));
+        // Retorna o token e os dados do usuário formatados pelo DTO
+        return ResponseEntity.ok(new LoginResponseDTO(token, new UsuarioDTO(usuario)));
     }
 }
