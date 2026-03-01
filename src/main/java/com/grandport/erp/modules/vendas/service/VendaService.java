@@ -35,12 +35,34 @@ public class VendaService {
     @Autowired private AuditoriaService auditoriaService;
 
     @Transactional
-    public Venda criarPedido(VendaRequestDTO dto) {
+    public Venda salvarOrcamento(VendaRequestDTO dto) {
         Venda venda = new Venda();
-        venda.setStatus(StatusVenda.AGUARDANDO_PAGAMENTO);
+        venda.setStatus(StatusVenda.ORCAMENTO);
+        return preencherESalvarVenda(venda, dto);
+    }
+
+    @Transactional
+    public Venda atualizarOrcamento(Long id, VendaRequestDTO dto) {
+        Venda venda = vendaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Orçamento não encontrado"));
         
-        Usuario vendedor = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        venda.setVendedorNome(vendedor.getNomeCompleto());
+        if (venda.getStatus() != StatusVenda.ORCAMENTO) {
+            throw new RuntimeException("Apenas orçamentos podem ser editados.");
+        }
+
+        // Limpa os itens antigos para adicionar os novos
+        venda.getItens().clear();
+        
+        return preencherESalvarVenda(venda, dto);
+    }
+
+    private Venda preencherESalvarVenda(Venda venda, VendaRequestDTO dto) {
+        try {
+            Usuario vendedor = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            venda.setVendedorNome(vendedor.getNomeCompleto());
+        } catch (Exception e) {
+            venda.setVendedorNome("Balcão");
+        }
 
         if (dto.parceiroId() != null) {
             venda.setCliente(parceiroRepository.findById(dto.parceiroId()).orElse(null));
@@ -65,6 +87,13 @@ public class VendaService {
     }
 
     @Transactional
+    public Venda criarPedido(VendaRequestDTO dto) {
+        Venda venda = new Venda();
+        venda.setStatus(StatusVenda.AGUARDANDO_PAGAMENTO);
+        return preencherESalvarVenda(venda, dto);
+    }
+
+    @Transactional
     public Venda finalizarPagamentoPedido(Long vendaId, List<PagamentoVendaDTO> pagamentos) {
         Venda venda = vendaRepository.findById(vendaId).orElseThrow();
         
@@ -76,11 +105,20 @@ public class VendaService {
             venda.getPagamentos().add(pagamento);
 
             if ("A_PRAZO".equals(pagDTO.metodo())) {
-                processarVendaAPrazo(venda, venda.getCliente().getId());
+                processarVendaAPrazo(venda, venda.getCliente() != null ? venda.getCliente().getId() : null);
             } else {
                 caixaService.adicionarVendaAoCaixa(pagDTO.metodo(), pagDTO.valor());
                 financeiroService.registrarEntradaImediata(pagDTO.valor(), pagDTO.metodo());
             }
+        }
+
+        for (ItemVenda item : venda.getItens()) {
+            Produto produto = item.getProduto();
+            if (produto.getQuantidadeEstoque() < item.getQuantidade()) {
+                throw new RuntimeException("Estoque insuficiente para: " + produto.getNome());
+            }
+            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - item.getQuantidade());
+            produtoRepository.save(produto);
         }
 
         venda.setStatus(StatusVenda.CONCLUIDA);
@@ -89,13 +127,83 @@ public class VendaService {
 
     @Transactional
     public Venda processarVenda(VendaRequestDTO dto) {
-        // Lógica de venda direta no PDV (já existente)
         Venda venda = new Venda();
-        // ... (resto do código igual ao anterior, mas garantindo o status CONCLUIDA)
-        return venda; 
+        venda.setStatus(StatusVenda.CONCLUIDA);
+        
+        // ... (lógica de venda direta mantida, mas idealmente refatorada para usar preencherESalvarVenda se possível, mas tem a questão do estoque imediato)
+        // Para simplificar e não quebrar o que já funciona, vou manter o código original do processarVenda aqui, mas você pode refatorar depois.
+        
+        try {
+            Usuario vendedor = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            venda.setVendedorNome(vendedor.getNomeCompleto());
+        } catch (Exception e) {
+            venda.setVendedorNome("Caixa Direto");
+        }
+
+        if (dto.parceiroId() != null) {
+            venda.setCliente(parceiroRepository.findById(dto.parceiroId()).orElse(null));
+        }
+        if (dto.veiculoId() != null) {
+            venda.setVeiculo(veiculoRepository.findById(dto.veiculoId()).orElse(null));
+        }
+
+        BigDecimal subtotal = BigDecimal.ZERO;
+
+        for (ItemVendaDTO itemDTO : dto.itens()) {
+            Produto produto = produtoRepository.findById(itemDTO.produtoId())
+                .orElseThrow(() -> new RuntimeException("Produto não encontrado: ID " + itemDTO.produtoId()));
+
+            if (produto.getQuantidadeEstoque() < itemDTO.quantidade()) {
+                throw new RuntimeException("Estoque insuficiente para: " + produto.getNome());
+            }
+
+            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - itemDTO.quantidade());
+            
+            ItemVenda item = new ItemVenda(venda, produto, itemDTO.quantidade(), produto.getPrecoVenda());
+            venda.getItens().add(item);
+            
+            subtotal = subtotal.add(produto.getPrecoVenda().multiply(BigDecimal.valueOf(itemDTO.quantidade())));
+        }
+        
+        venda.setValorSubtotal(subtotal);
+        venda.setDesconto(dto.desconto() != null ? dto.desconto() : BigDecimal.ZERO);
+        venda.setValorTotal(subtotal.subtract(venda.getDesconto()));
+
+        for (PagamentoVendaDTO pagDTO : dto.pagamentos()) {
+            PagamentoVenda pagamento = new PagamentoVenda();
+            pagamento.setMetodo(pagDTO.metodo());
+            pagamento.setValor(pagDTO.valor());
+            pagamento.setParcelas(pagDTO.parcelas());
+            venda.getPagamentos().add(pagamento);
+
+            if ("A_PRAZO".equals(pagDTO.metodo())) {
+                processarVendaAPrazo(venda, dto.parceiroId());
+            } else {
+                caixaService.adicionarVendaAoCaixa(pagDTO.metodo(), pagDTO.valor());
+                financeiroService.registrarEntradaImediata(pagDTO.valor(), pagDTO.metodo());
+            }
+        }
+
+        Venda salva = vendaRepository.save(venda);
+        auditoriaService.registrar("PDV", "VENDA", "Venda #" + salva.getId() + " realizada no valor de R$ " + salva.getValorTotal());
+        return salva;
     }
 
     private void processarVendaAPrazo(Venda venda, Long parceiroId) {
-        // ... (lógica de limite de crédito já existente)
+        if (parceiroId == null) throw new RuntimeException("Cliente não informado para venda a prazo.");
+
+        Parceiro cliente = parceiroRepository.findById(parceiroId)
+            .orElseThrow(() -> new RuntimeException("Cliente não encontrado: ID " + parceiroId));
+
+        BigDecimal saldoDisponivel = cliente.getLimiteCredito().subtract(cliente.getSaldoDevedor());
+
+        if (venda.getValorTotal().compareTo(saldoDisponivel) > 0) {
+            throw new RuntimeException("Venda Bloqueada! Limite de crédito insuficiente.");
+        }
+
+        cliente.setSaldoDevedor(cliente.getSaldoDevedor().add(venda.getValorTotal()));
+        parceiroRepository.save(cliente);
+
+        financeiroService.gerarContaReceberPrazo(venda.getValorTotal(), cliente);
     }
 }

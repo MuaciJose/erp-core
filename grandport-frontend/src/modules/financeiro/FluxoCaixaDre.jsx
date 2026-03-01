@@ -33,7 +33,10 @@ export const FluxoCaixaDre = () => {
 
     const receitaLiquida = dados.receitaBruta - dados.devolucoesDescontos;
     const lucroBruto = receitaLiquida - dados.cmv;
-    const totalDespesas = Object.values(dados.despesasOperacionais).reduce((acc, val) => acc + val, 0);
+    
+    // Soma o total das despesas dinamicamente
+    const totalDespesas = Object.values(dados.despesasOperacionais || {}).reduce((acc, val) => acc + val, 0);
+    
     const lucroLiquido = lucroBruto - totalDespesas;
     const margemLiquida = dados.receitaBruta > 0 ? (lucroLiquido / dados.receitaBruta) * 100 : 0;
 
@@ -116,13 +119,20 @@ export const FluxoCaixaDre = () => {
 
                         <div className="mt-6">
                             <span className="font-black text-lg text-slate-800 px-4 block mb-4">(-) DESPESAS OPERACIONAIS</span>
+                            
+                            {/* RENDERIZAÇÃO DINÂMICA DAS DESPESAS */}
                             <div className="space-y-2 px-8 text-slate-600 font-medium">
-                                <div className="flex justify-between"><span>Salários e Encargos</span><span>{formatCurrency(dados.despesasOperacionais.salarios)}</span></div>
-                                <div className="flex justify-between"><span>Aluguel e IPTU</span><span>{formatCurrency(dados.despesasOperacionais.aluguel)}</span></div>
-                                <div className="flex justify-between"><span>Impostos</span><span>{formatCurrency(dados.despesasOperacionais.impostos)}</span></div>
-                                <div className="flex justify-between"><span>Marketing</span><span>{formatCurrency(dados.despesasOperacionais.marketing)}</span></div>
-                                <div className="flex justify-between"><span>Outras Despesas</span><span>{formatCurrency(dados.despesasOperacionais.outros)}</span></div>
+                                {Object.entries(dados.despesasOperacionais || {}).map(([nome, valor]) => (
+                                    <div key={nome} className="flex justify-between border-b border-slate-100 pb-1 last:border-0">
+                                        <span className="capitalize">{nome}</span>
+                                        <span>{formatCurrency(valor)}</span>
+                                    </div>
+                                ))}
+                                {Object.keys(dados.despesasOperacionais || {}).length === 0 && (
+                                    <p className="text-sm text-slate-400 italic">Nenhuma despesa registrada neste período.</p>
+                                )}
                             </div>
+
                             <div className="flex justify-between items-center px-4 text-red-600 font-bold border-b border-solid pb-4 pt-4 mt-2">
                                 <span>Total de Despesas Operacionais</span>
                                 <span>{formatCurrency(totalDespesas)}</span>

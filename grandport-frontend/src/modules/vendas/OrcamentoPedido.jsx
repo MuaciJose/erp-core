@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
-import {
-    Search, FileText, Printer, CheckCircle, Package, User,
-    Trash2, ArrowRight, Tag, Percent, DollarSign, Save, FolderOpen, Car, X, Gauge, Phone
+import { 
+    Search, FileText, Printer, CheckCircle, Package, User, 
+    Trash2, ArrowRight, Tag, Percent, DollarSign, Save, FolderOpen, Car, X, Gauge, Phone 
 } from 'lucide-react';
 
 export const OrcamentoPedido = () => {
     // ESTADOS GERAIS DO PEDIDO
-    const [modo, setModo] = useState('ORCAMENTO');
+    const [modo, setModo] = useState('ORCAMENTO'); 
     const [itens, setItens] = useState([]);
-
+    const [orcamentoId, setOrcamentoId] = useState(null); // ID do orçamento em edição
+    
     // ESTADOS DO CLIENTE E VEÍCULO
     const [buscaCliente, setBuscaCliente] = useState('');
     const [clienteSelecionado, setClienteSelecionado] = useState(null);
@@ -27,28 +28,31 @@ export const OrcamentoPedido = () => {
     const [descontoInput, setDescontoInput] = useState('');
     const [modalListaAberto, setModalListaAberto] = useState(false);
 
-    const [orcamentosSalvos, setOrcamentosSalvos] = useState([]); // Mock para orçamentos salvos, ainda não implementado no backend
+    const [orcamentosSalvos, setOrcamentosSalvos] = useState([]); 
 
     // ==========================================
     // LÓGICA DE BUSCA E SELEÇÃO (CLIENTE E PEÇAS)
     // ==========================================
-
+    
     // Busca Clientes no Backend
     useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
             if (buscaCliente.length > 2 && !clienteSelecionado) {
                 try {
                     const res = await api.get(`/api/parceiros?busca=${buscaCliente}`);
-                    // Filtra apenas clientes (tipo 'CLIENTE' ou 'AMBOS')
-                    setResultadosClientes(res.data.filter(p => p.tipo === 'CLIENTE' || p.tipo === 'AMBOS'));
-                } catch (error) {
-                    console.error("Erro ao buscar clientes", error);
-                    setResultadosClientes([]); // Limpa resultados em caso de erro
+                    if (Array.isArray(res.data)) {
+                        setResultadosClientes(res.data.filter(p => p.tipo === 'CLIENTE' || p.tipo === 'AMBOS'));
+                    } else {
+                        setResultadosClientes([]);
+                    }
+                } catch (error) { 
+                    console.error("Erro ao buscar clientes", error); 
+                    setResultadosClientes([]); 
                 }
             } else {
                 setResultadosClientes([]);
             }
-        }, 300); // Debounce para evitar muitas requisições
+        }, 300); 
         return () => clearTimeout(delayDebounceFn);
     }, [buscaCliente, clienteSelecionado]);
 
@@ -56,18 +60,21 @@ export const OrcamentoPedido = () => {
         setClienteSelecionado(cliente);
         setBuscaCliente(cliente.nome);
         setResultadosClientes([]);
-
+        
         // Busca veículos do cliente no backend
         try {
             const res = await api.get(`/api/veiculos/cliente/${cliente.id}`);
-            cliente.veiculos = res.data; // Adiciona os veículos ao objeto cliente
-            if(res.data.length === 1) setVeiculoSelecionado(res.data[0].id); // Autoseleciona se só tiver 1
+            setClienteSelecionado(prev => ({ ...prev, veiculos: res.data || [] }));
+            
+            if(res.data && res.data.length === 1) {
+                setVeiculoSelecionado(res.data[0].id); 
+            }
         } catch (error) {
             console.error("Erro ao buscar veículos do cliente", error);
-            cliente.veiculos = []; // Garante que a lista de veículos não seja undefined
+            setClienteSelecionado(prev => ({ ...prev, veiculos: [] }));
         }
-
-        inputPecaRef.current?.focus(); // Salta para a busca de peças para agilizar!
+        
+        inputPecaRef.current?.focus(); 
     };
 
     const limparCliente = () => {
@@ -79,14 +86,15 @@ export const OrcamentoPedido = () => {
     // Atualiza a KM do carro diretamente no fluxo do pedido
     const atualizarKmVeiculo = (novoKm) => {
         if(!clienteSelecionado || !veiculoSelecionado) return;
-        const clienteAtualizado = { ...clienteSelecionado };
-        const veiculoIndex = clienteAtualizado.veiculos.findIndex(v => v.id == veiculoSelecionado);
-        if(veiculoIndex !== -1) {
-            clienteAtualizado.veiculos[veiculoIndex].km = parseInt(novoKm);
-            setClienteSelecionado(clienteAtualizado);
-            // No mundo real, você faria uma chamada rápida à API aqui para persistir o KM: 
-            // api.patch(`/api/veiculos/${veiculoSelecionado}/km`, { km: novoKm })
-        }
+        
+        const novosVeiculos = clienteSelecionado.veiculos.map(v => {
+            if (v.id == veiculoSelecionado) {
+                return { ...v, km: parseInt(novoKm) || 0 };
+            }
+            return v;
+        });
+
+        setClienteSelecionado(prev => ({ ...prev, veiculos: novosVeiculos }));
     };
 
     // Busca Peças no Backend
@@ -95,17 +103,21 @@ export const OrcamentoPedido = () => {
             if (buscaPeca.length > 1) {
                 try {
                     const res = await api.get(`/api/produtos?busca=${buscaPeca}`);
-                    setResultadosPecas(res.data);
-                    setIndexFocadoPeca(0); // Foca no primeiro item automaticamente
+                    if (Array.isArray(res.data)) {
+                        setResultadosPecas(res.data);
+                        setIndexFocadoPeca(0); 
+                    } else {
+                        setResultadosPecas([]);
+                    }
                 } catch (error) {
                     console.error("Erro ao buscar peças", error);
-                    setResultadosPecas([]); // Limpa resultados em caso de erro
+                    setResultadosPecas([]); 
                 }
             } else {
                 setResultadosPecas([]);
                 setIndexFocadoPeca(-1);
             }
-        }, 300); // Debounce de 300ms para não sobrecarregar o servidor
+        }, 300); 
         return () => clearTimeout(delayDebounceFn);
     }, [buscaPeca]);
 
@@ -126,15 +138,13 @@ export const OrcamentoPedido = () => {
     };
 
     const adicionarItem = (peca) => {
-        // Verifica se já existe no carrinho para somar a quantidade
         const itemExistente = itens.find(i => i.id === peca.id);
         if (itemExistente) {
             setItens(itens.map(i => i.id === peca.id ? { ...i, qtd: i.qtd + 1 } : i));
         } else {
-            setItens(prev => [...prev, { ...peca, qtd: 1, preco: peca.precoVenda }]); // Usa precoVenda do produto real
+            setItens(prev => [...prev, { ...peca, qtd: 1, preco: peca.precoVenda }]); 
         }
-
-        // Limpa a busca e mantém o cursor no input para a próxima peça
+        
         setBuscaPeca('');
         setResultadosPecas([]);
         inputPecaRef.current.focus();
@@ -149,58 +159,114 @@ export const OrcamentoPedido = () => {
         setItens(itens.map(i => i.id === id ? { ...i, qtd: novaQtd } : i));
     };
 
+    // CARREGA ORÇAMENTOS SALVOS QUANDO O MODAL ABRE
+    useEffect(() => {
+        if (modalListaAberto) {
+            const carregarOrcamentos = async () => {
+                try {
+                    const res = await api.get('/api/vendas/orcamentos');
+                    const orcamentosFormatados = res.data.map(orc => ({
+                        id: orc.id,
+                        data: orc.dataHora,
+                        cliente: orc.cliente ? orc.cliente.nome : 'Cliente Avulso',
+                        clienteObj: orc.cliente,
+                        veiculo: orc.veiculo ? orc.veiculo.modelo : 'Nenhum',
+                        veiculoId: orc.veiculo ? orc.veiculo.id : null,
+                        valor: orc.valorTotal,
+                        status: orc.status,
+                        itens: orc.itens.map(item => ({
+                            id: item.produto.id,
+                            sku: item.produto.sku,
+                            nome: item.produto.nome,
+                            qtd: item.quantidade,
+                            preco: item.precoUnitario,
+                            precoVenda: item.precoUnitario
+                        }))
+                    }));
+                    setOrcamentosSalvos(orcamentosFormatados);
+                } catch (error) {
+                    console.error("Erro ao carregar orçamentos", error);
+                }
+            };
+            carregarOrcamentos();
+        }
+    }, [modalListaAberto]);
+
     // ==========================================
     // LÓGICA FINANCEIRA E AÇÕES
     // ==========================================
     const subtotal = itens.reduce((acc, item) => acc + (item.preco * item.qtd), 0);
-
+    
     let valorDescontoReal = 0;
     const valorDigitado = parseFloat(descontoInput) || 0;
 
     if (descontoTipo === 'VALOR') {
         valorDescontoReal = valorDigitado > subtotal ? subtotal : valorDigitado;
-    } else { // PERCENTUAL
+    } else { 
         valorDescontoReal = subtotal * (valorDigitado / 100);
-        if (valorDescontoReal > subtotal) valorDescontoReal = subtotal; // Limite de 100%
+        if (valorDescontoReal > subtotal) valorDescontoReal = subtotal; 
     }
 
     const totalFinal = subtotal - valorDescontoReal;
 
-    const salvarOrcamento = () => {
+    const salvarOrcamento = async () => {
         if (itens.length === 0) return alert("Não pode guardar um orçamento vazio.");
-        // No mundo real, você enviaria este payload para o backend
-        const novoOrcamento = {
-            id: Math.floor(Math.random() * 10000), // ID temporário
-            data: new Date().toISOString(),
-            cliente: clienteSelecionado ? clienteSelecionado.nome : 'Cliente Avulso',
-            veiculo: clienteSelecionado && veiculoSelecionado ? clienteSelecionado.veiculos.find(v => v.id == veiculoSelecionado)?.modelo || 'Nenhum' : 'Nenhum',
-            valor: totalFinal,
-            status: modo,
-            itens: [...itens]
+        
+        const payload = {
+            itens: itens.map(item => ({ produtoId: item.id, quantidade: item.qtd, precoUnitario: item.preco })),
+            desconto: valorDescontoReal,
+            parceiroId: clienteSelecionado ? clienteSelecionado.id : null,
+            veiculoId: veiculoSelecionado ? parseInt(veiculoSelecionado) : null
         };
-        setOrcamentosSalvos([novoOrcamento, ...orcamentosSalvos]);
-        alert(`${modo} guardado com sucesso! N.º ${novoOrcamento.id}`);
-        limparEcra();
+
+        try {
+            let res;
+            if (orcamentoId) {
+                // Atualiza orçamento existente
+                res = await api.put(`/api/vendas/orcamento/${orcamentoId}`, payload);
+                alert(`Orçamento #${res.data.id} atualizado com sucesso!`);
+            } else {
+                // Cria novo orçamento
+                res = await api.post('/api/vendas/orcamento', payload);
+                alert(`Orçamento #${res.data.id} guardado com sucesso!`);
+            }
+            limparEcra();
+        } catch (error) {
+            alert("Erro ao salvar orçamento: " + (error.response?.data?.message || error.message));
+        }
     };
 
-    const carregarOrcamento = (orcamento) => {
+    const carregarOrcamento = async (orcamento) => {
+        setOrcamentoId(orcamento.id); // Define o ID para edição
         setItens(orcamento.itens);
         setModo(orcamento.status);
-        // Tenta encontrar o cliente pelo nome para reconstruir o estado
-        // Isso é um mock, no real você buscaria o cliente pelo ID e seus veículos
-        const clienteAchado = {
-            id: 999, // ID mock
-            nome: orcamento.cliente,
-            documento: '000.000.000-00',
-            telefone: '',
-            veiculos: orcamento.veiculo !== 'Nenhum' ? [{ id: 999, descricao: orcamento.veiculo, placa: '', marca: '', modelo: '', ano: '', km: '' }] : []
-        };
-        selecionarCliente(clienteAchado);
+        
+        if (orcamento.clienteObj) {
+            try {
+                const res = await api.get(`/api/veiculos/cliente/${orcamento.clienteObj.id}`);
+                const clienteCompleto = { ...orcamento.clienteObj, veiculos: res.data || [] };
+                setClienteSelecionado(clienteCompleto);
+                if (orcamento.veiculoId) {
+                    setVeiculoSelecionado(orcamento.veiculoId);
+                }
+            } catch (error) {
+                console.error("Erro ao carregar veículos do orçamento", error);
+                setClienteSelecionado({ ...orcamento.clienteObj, veiculos: [] });
+            }
+        } else {
+            limparCliente();
+        }
+        
         setModalListaAberto(false);
     };
 
     const limparEcra = () => {
-        setItens([]); limparCliente(); setBuscaPeca(''); setDescontoInput(''); setModo('ORCAMENTO');
+        setItens([]); 
+        limparCliente(); 
+        setBuscaPeca(''); 
+        setDescontoInput(''); 
+        setModo('ORCAMENTO');
+        setOrcamentoId(null); // Limpa o ID para criar um novo na próxima vez
     };
 
     const enviarParaCaixa = async () => {
@@ -231,7 +297,9 @@ export const OrcamentoPedido = () => {
     };
 
     // Obtém o objeto completo do veículo selecionado para exibir no painel
-    const veiculoDetalhado = clienteSelecionado && veiculoSelecionado ? clienteSelecionado.veiculos.find(v => v.id == veiculoSelecionado) : null;
+    const veiculoDetalhado = clienteSelecionado && clienteSelecionado.veiculos && veiculoSelecionado 
+        ? clienteSelecionado.veiculos.find(v => v.id == veiculoSelecionado) 
+        : null;
 
     return (
         <>
@@ -239,7 +307,7 @@ export const OrcamentoPedido = () => {
             {/* TELA NORMAL DO SISTEMA (ESCONDIDA NA IMPRESSÃO)           */}
             {/* ========================================================= */}
             <div className="p-8 max-w-7xl mx-auto flex flex-col h-[90vh] animate-fade-in relative print:hidden">
-
+                
                 {/* CABEÇALHO DA TELA E IDENTIFICAÇÃO DO CLIENTE */}
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 z-40">
                     <div className="flex-1 w-full">
@@ -257,13 +325,13 @@ export const OrcamentoPedido = () => {
                         <div className="flex flex-col md:flex-row gap-4 relative">
                             <div className="flex-1 relative">
                                 <User className="absolute left-3 top-3 text-slate-400" size={18} />
-                                <input
-                                    type="text" placeholder="Nome ou CPF do Cliente..."
+                                <input 
+                                    type="text" placeholder="Nome ou CPF do Cliente..." 
                                     value={buscaCliente} onChange={(e) => setBuscaCliente(e.target.value)} disabled={clienteSelecionado !== null}
                                     className={`w-full pl-10 pr-10 py-3 border-2 rounded-xl font-bold outline-none transition-colors ${clienteSelecionado ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-slate-50 border-slate-200 focus:border-blue-500 text-slate-700'}`}
                                 />
                                 {clienteSelecionado && <button onClick={limparCliente} className="absolute right-3 top-3.5 text-blue-400 hover:text-red-500"><X size={16}/></button>}
-
+                                
                                 {/* Autocomplete do Cliente */}
                                 {resultadosClientes.length > 0 && !clienteSelecionado && (
                                     <div className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50">
@@ -279,13 +347,13 @@ export const OrcamentoPedido = () => {
 
                             <div className="flex-1 relative">
                                 <Car className={`absolute left-3 top-3 ${clienteSelecionado ? 'text-blue-500' : 'text-slate-300'}`} size={18} />
-                                <select
+                                <select 
                                     value={veiculoSelecionado} onChange={(e) => setVeiculoSelecionado(e.target.value)} disabled={!clienteSelecionado}
                                     className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl font-bold outline-none appearance-none ${clienteSelecionado ? 'bg-white border-blue-200 text-slate-700 cursor-pointer focus:border-blue-500' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
                                 >
                                     <option value="">Selecione o Veículo...</option>
-                                    {clienteSelecionado?.veiculos?.map(v => (
-                                        <option key={v.id} value={v.id}>{v.marca} {v.modelo} ({v.placa})</option>
+                                    {clienteSelecionado?.veiculos.map(v => (
+                                        <option key={v.id} value={v.id}>{v.descricao}</option>
                                     ))}
                                 </select>
                             </div>
@@ -303,7 +371,7 @@ export const OrcamentoPedido = () => {
                                         <p className="text-xs text-slate-500 font-medium flex items-center gap-2"><Phone size={12}/> {clienteSelecionado.telefone}</p>
                                     </div>
                                 </div>
-
+                                
                                 {/* Dados do Carro e KM */}
                                 {veiculoDetalhado ? (
                                     <div className="flex-1 md:border-l border-slate-200 md:pl-6">
@@ -319,8 +387,8 @@ export const OrcamentoPedido = () => {
                                                 <p className="text-[10px] uppercase font-black tracking-widest text-blue-500 mb-1">KM Atual</p>
                                                 <div className="flex items-center gap-2">
                                                     <Gauge size={16} className="text-slate-400"/>
-                                                    <input
-                                                        type="number"
+                                                    <input 
+                                                        type="number" 
                                                         value={veiculoDetalhado.km}
                                                         onChange={(e) => atualizarKmVeiculo(e.target.value)}
                                                         className="w-24 p-1 border-b-2 border-slate-300 text-right font-black text-slate-700 text-sm outline-none focus:border-blue-500 bg-transparent transition-colors"
@@ -344,7 +412,7 @@ export const OrcamentoPedido = () => {
                 {/* BARRA DE BUSCA INTELIGENTE DE PEÇAS */}
                 <div className="relative mb-6 z-30">
                     <Search className="absolute left-4 top-4 text-slate-400" size={24} />
-                    <input
+                    <input 
                         ref={inputPecaRef} type="text" value={buscaPeca} onChange={(e) => setBuscaPeca(e.target.value)} onKeyDown={handleKeyDownPeca}
                         placeholder="Pesquise Peças (Setas para navegar, Enter para adicionar ao carrinho)"
                         className="w-full pl-14 pr-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-lg font-black text-slate-800 shadow-sm focus:border-blue-600 outline-none transition-all"
@@ -352,17 +420,18 @@ export const OrcamentoPedido = () => {
                     {resultadosPecas.length > 0 && (
                         <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
                             {resultadosPecas.map((peca, index) => (
-                                <div
-                                    key={peca.id}
+                                <div 
+                                    key={peca.id} 
                                     onClick={() => adicionarItem(peca)}
                                     className={`flex justify-between items-center p-4 cursor-pointer border-b ${index === indexFocadoPeca ? 'bg-blue-50 border-l-4 border-l-blue-600' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}
                                 >
                                     <div className="flex items-center gap-4">
                                         <div className="bg-slate-100 p-2 rounded-lg"><Package size={20} className="text-slate-500" /></div>
-                                        <div><p className="font-bold text-slate-800">{peca.nome}</p><p className="text-xs font-mono text-slate-500">{peca.codigo}</p></div>
+                                        <div><p className="font-bold text-slate-800">{peca.nome}</p><p className="text-xs font-mono text-slate-500">{peca.sku}</p></div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="font-black text-blue-700">R$ {peca.precoVenda?.toFixed(2) || '0.00'}</p>
+                                        <p className="font-black text-blue-700">R$ {peca.precoVenda.toFixed(2)}</p>
+                                        <p className={`text-[10px] font-bold uppercase tracking-widest ${peca.quantidadeEstoque > 0 ? 'text-green-600' : 'text-red-500'}`}>{peca.quantidadeEstoque > 0 ? `Estoque: ${peca.quantidadeEstoque}` : 'EM FALTA'}</p>
                                     </div>
                                 </div>
                             ))}
@@ -375,37 +444,39 @@ export const OrcamentoPedido = () => {
                     <div className="overflow-y-auto flex-1 custom-scrollbar">
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-black tracking-widest sticky top-0">
-                            <tr>
-                                <th className="p-4 pl-6">Código</th>
-                                <th className="p-4">Descrição</th>
-                                <th className="p-4 text-center">Qtd</th>
-                                <th className="p-4 text-right">Unitário</th>
-                                <th className="p-4 text-right pr-6">Subtotal</th>
-                                <th className="p-4"></th>
-                            </tr>
+                                <tr>
+                                    <th className="p-4 pl-6">Código</th>
+                                    <th className="p-4">Descrição</th>
+                                    <th className="p-4 text-center">Qtd</th>
+                                    <th className="p-4 text-right">Unitário</th>
+                                    <th className="p-4 text-right pr-6">Subtotal</th>
+                                    <th className="p-4"></th>
+                                </tr>
                             </thead>
                             <tbody>
-                            {itens.length === 0 ? (
-                                <tr><td colSpan="6" className="p-16 text-center text-slate-400 font-bold">Carrinho vazio. Use a busca acima.</td></tr>
-                            ) : (
-                                itens.map((item) => (
-                                    <tr key={item.id} className="border-b hover:bg-slate-50 group">
-                                        <td className="p-4 pl-6 font-mono text-xs text-slate-500">{item.codigo}</td>
-                                        <td className="p-4 font-bold text-slate-800 text-sm">{item.nome}</td>
-                                        <td className="p-4 text-center">
-                                            <input
-                                                type="number"
-                                                value={item.qtd}
-                                                onChange={(e) => alterarQuantidade(item.id, parseInt(e.target.value) || 1)}
-                                                className="w-16 p-2 text-center font-black bg-white border-2 border-slate-200 rounded-lg outline-none focus:border-blue-500"
-                                            />
-                                        </td>
-                                        <td className="p-4 text-right font-bold text-slate-600 text-sm">R$ {item.preco?.toFixed(2)}</td>
-                                        <td className="p-4 pr-6 text-right font-black text-blue-700">R$ {(item.preco * item.qtd).toFixed(2)}</td>
-                                        <td className="p-4 text-center"><button onClick={() => removerItem(item.id)} className="text-red-400 hover:bg-red-50 p-2 rounded-lg"><Trash2 size={16} /></button></td>
-                                    </tr>
-                                ))
-                            )}
+                                {itens.length === 0 ? (
+                                    <tr><td colSpan="6" className="p-16 text-center text-slate-400 font-bold">Carrinho vazio. Use a busca acima.</td></tr>
+                                ) : (
+                                    itens.map((item) => (
+                                        <tr key={item.id} className="border-b hover:bg-slate-50 group">
+                                            <td className="p-4 pl-6 font-mono text-xs text-slate-500">{item.sku}</td>
+                                            <td className="p-4 font-bold text-slate-800 text-sm">{item.nome}</td>
+                                            <td className="p-4 text-center">
+                                                <input 
+                                                    type="number" 
+                                                    value={item.qtd}
+                                                    onChange={(e) => alterarQuantidade(item.id, parseInt(e.target.value) || 1)}
+                                                    className="w-16 p-2 text-center font-black bg-white border-2 border-slate-200 rounded-lg outline-none focus:border-blue-500"
+                                                />
+                                            </td>
+                                            <td className="p-4 text-right font-bold text-slate-600 text-sm">R$ {item.preco.toFixed(2)}</td>
+                                            <td className="p-4 pr-6 text-right font-black text-blue-700">R$ {(item.preco * item.qtd).toFixed(2)}</td>
+                                            <td className="p-4 text-center">
+                                                <button onClick={() => removerItem(item.id)} className="text-red-400 hover:bg-red-50 p-2 rounded-lg"><Trash2 size={16} /></button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -432,7 +503,7 @@ export const OrcamentoPedido = () => {
                             </button>
                         )}
                     </div>
-
+                    
                     <div className="w-full md:w-[400px] bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-col gap-3">
                         <div className="flex justify-between items-center text-slate-300 font-bold text-sm">
                             <span>Subtotal das Peças:</span><span>R$ {subtotal.toFixed(2)}</span>
@@ -497,24 +568,24 @@ export const OrcamentoPedido = () => {
 
                 <table className="w-full text-left border-collapse mb-6">
                     <thead className="border-b-2 border-black">
-                    <tr>
-                        <th className="py-2 text-xs font-black uppercase">Cód</th>
-                        <th className="py-2 text-xs font-black uppercase">Descrição da Peça</th>
-                        <th className="py-2 text-center text-xs font-black uppercase">Qtd</th>
-                        <th className="py-2 text-right text-xs font-black uppercase">Vl. Unit</th>
-                        <th className="py-2 text-right text-xs font-black uppercase">Subtotal</th>
-                    </tr>
+                        <tr>
+                            <th className="py-2 text-xs font-black uppercase">Cód</th>
+                            <th className="py-2 text-xs font-black uppercase">Descrição da Peça</th>
+                            <th className="py-2 text-center text-xs font-black uppercase">Qtd</th>
+                            <th className="py-2 text-right text-xs font-black uppercase">Vl. Unit</th>
+                            <th className="py-2 text-right text-xs font-black uppercase">Subtotal</th>
+                        </tr>
                     </thead>
                     <tbody>
-                    {itens.map(item => (
-                        <tr key={item.id} className="border-b border-gray-300">
-                            <td className="py-2 text-xs font-mono">{item.codigo}</td>
-                            <td className="py-2 text-sm font-bold">{item.nome}</td>
-                            <td className="py-2 text-center font-bold">{item.qtd}</td>
-                            <td className="py-2 text-right text-sm">R$ {item.preco?.toFixed(2)}</td>
-                            <td className="py-2 text-right font-black">R$ {(item.preco * item.qtd).toFixed(2)}</td>
-                        </tr>
-                    ))}
+                        {itens.map(item => (
+                            <tr key={item.id} className="border-b border-gray-300">
+                                <td className="py-2 text-xs font-mono">{item.sku}</td>
+                                <td className="py-2 text-sm font-bold">{item.nome}</td>
+                                <td className="py-2 text-center font-bold">{item.qtd}</td>
+                                <td className="py-2 text-right text-sm">R$ {item.preco.toFixed(2)}</td>
+                                <td className="py-2 text-right font-black">R$ {(item.preco * item.qtd).toFixed(2)}</td>
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
 
@@ -564,7 +635,7 @@ export const OrcamentoPedido = () => {
                                                 <div className="flex items-center gap-3 mb-2">
                                                     <span className="bg-blue-100 text-blue-700 font-black text-[10px] px-2 py-1 rounded uppercase tracking-widest">#{orc.id}</span>
                                                     <span className={`font-black text-[10px] px-2 py-1 rounded uppercase tracking-widest ${orc.status === 'ORCAMENTO' ? 'bg-slate-100 text-slate-600' : 'bg-green-100 text-green-700'}`}>{orc.status}</span>
-                                                    <span className="text-xs text-slate-400 font-bold">{new Date(orc.data).toLocaleDateString('pt-BR')}</span>
+                                                    <span className="text-xs text-slate-400 font-bold">{new Date(orc.data).toLocaleString('pt-BR')}</span>
                                                 </div>
                                                 <p className="font-bold text-slate-800 text-lg flex items-center gap-2"><User size={16} className="text-slate-400"/> {orc.cliente}</p>
                                                 <p className="text-xs font-bold text-slate-500 flex items-center gap-2 mt-1"><Car size={14} className="text-slate-400"/> Veículo: {orc.veiculo}</p>

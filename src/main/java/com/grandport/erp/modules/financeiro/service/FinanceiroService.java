@@ -153,7 +153,37 @@ public class FinanceiroService {
         return salva;
     }
 
-    // ... outros métodos ...
+    public DreDTO calcularDre(YearMonth mesAno) {
+        LocalDateTime inicioMes = mesAno.atDay(1).atStartOfDay();
+        LocalDateTime fimMes = mesAno.atEndOfMonth().atTime(23, 59, 59);
+
+        DreDTO dre = new DreDTO();
+        dre.setReceitaBruta(vendaRepository.sumTotalVendasPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
+        dre.setDevolucoesDescontos(vendaRepository.sumTotalDescontosPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
+        dre.setCmv(vendaRepository.sumCmvPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
+
+        List<DespesaPorPlanoContaDTO> despesasAgrupadas = pagarRepo.sumDespesasPagasAgrupadasPorPlanoConta(inicioMes, fimMes);
+        Map<String, BigDecimal> despesasOperacionais = despesasAgrupadas.stream()
+            .collect(Collectors.toMap(
+                DespesaPorPlanoContaDTO::getDescricaoPlanoConta,
+                DespesaPorPlanoContaDTO::getTotalPago
+            ));
+        
+        dre.setDespesasOperacionais(despesasOperacionais);
+
+        return dre;
+    }
+
+    @Transactional
+    public ContaPagar gerarContaPagar(Parceiro fornecedor, BigDecimal valor, LocalDateTime dataVencimento, String descricao) {
+        ContaPagar conta = new ContaPagar();
+        conta.setDescricao(descricao);
+        conta.setParceiro(fornecedor);
+        conta.setValorOriginal(valor);
+        conta.setDataVencimento(dataVencimento);
+        conta.setStatus(StatusFinanceiro.PENDENTE);
+        return pagarRepo.save(conta);
+    }
 
     public ExtratoParceiroDTO gerarExtratoParceiro(Long parceiroId) {
         Parceiro parceiro = parceiroRepository.findById(parceiroId)
@@ -165,29 +195,6 @@ public class FinanceiroService {
             .collect(Collectors.toList());
             
         return new ExtratoParceiroDTO(parceiro, contas);
-    }
-
-    public DreDTO calcularDre(YearMonth mesAno) {
-        LocalDateTime inicioMes = mesAno.atDay(1).atStartOfDay();
-        LocalDateTime fimMes = mesAno.atEndOfMonth().atTime(23, 59, 59);
-
-        DreDTO dre = new DreDTO();
-        dre.setReceitaBruta(vendaRepository.sumTotalVendasPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
-        dre.setDevolucoesDescontos(vendaRepository.sumTotalDescontosPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
-        dre.setCmv(vendaRepository.sumCmvPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
-
-        BigDecimal totalDespesasPagas = pagarRepo.sumDespesasPagasPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO);
-        
-        Map<String, BigDecimal> despesasCategorizadas = new HashMap<>();
-        despesasCategorizadas.put("salarios", totalDespesasPagas.multiply(new BigDecimal("0.30")));
-        despesasCategorizadas.put("aluguel", totalDespesasPagas.multiply(new BigDecimal("0.20")));
-        despesasCategorizadas.put("impostos", totalDespesasPagas.multiply(new BigDecimal("0.25")));
-        despesasCategorizadas.put("marketing", totalDespesasPagas.multiply(new BigDecimal("0.10")));
-        despesasCategorizadas.put("outros", totalDespesasPagas.multiply(new BigDecimal("0.15")));
-        
-        dre.setDespesasOperacionais(despesasCategorizadas);
-
-        return dre;
     }
 
     @Transactional
@@ -221,16 +228,5 @@ public class FinanceiroService {
         conta.setDataVencimento(LocalDateTime.now().plusDays(30));
         conta.setStatus(StatusFinanceiro.PENDENTE);
         recebaRepo.save(conta);
-    }
-
-    @Transactional
-    public ContaPagar gerarContaPagar(Parceiro fornecedor, BigDecimal valor, LocalDateTime dataVencimento, String descricao) {
-        ContaPagar conta = new ContaPagar();
-        conta.setDescricao(descricao);
-        conta.setParceiro(fornecedor);
-        conta.setValorOriginal(valor);
-        conta.setDataVencimento(dataVencimento);
-        conta.setStatus(StatusFinanceiro.PENDENTE);
-        return pagarRepo.save(conta);
     }
 }

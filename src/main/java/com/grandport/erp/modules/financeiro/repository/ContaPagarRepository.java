@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.financeiro.repository;
 
+import com.grandport.erp.modules.financeiro.dto.DespesaPorPlanoContaDTO;
 import com.grandport.erp.modules.financeiro.model.ContaPagar;
 import com.grandport.erp.modules.financeiro.model.StatusFinanceiro;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,4 +17,13 @@ public interface ContaPagarRepository extends JpaRepository<ContaPagar, Long> {
 
     @Query("SELECT SUM(c.valorPago) FROM ContaPagar c WHERE c.status = 'PAGO' AND c.dataPagamento BETWEEN :inicio AND :fim")
     Optional<BigDecimal> sumDespesasPagasPeriodo(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    // Se não tiver plano de contas, usa a descrição da conta como categoria
+    @Query("SELECT new com.grandport.erp.modules.financeiro.dto.DespesaPorPlanoContaDTO(COALESCE(pc.descricao, cp.descricao, 'Despesa Não Identificada'), SUM(cp.valorPago)) " +
+           "FROM ContaPagar cp LEFT JOIN cp.planoConta pc " +
+           "WHERE cp.status = 'PAGO' AND cp.dataPagamento BETWEEN :inicio AND :fim " +
+           "GROUP BY COALESCE(pc.descricao, cp.descricao, 'Despesa Não Identificada')")
+    List<DespesaPorPlanoContaDTO> sumDespesasPagasAgrupadasPorPlanoConta(
+            @Param("inicio") LocalDateTime inicio, 
+            @Param("fim") LocalDateTime fim);
 }

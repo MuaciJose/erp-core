@@ -15,23 +15,24 @@ import java.util.Optional;
 public interface VendaRepository extends JpaRepository<Venda, Long> {
 
     List<Venda> findByVeiculoIdOrderByDataHoraDesc(Long veiculoId);
-    List<Venda> findByClienteIdOrderByDataHoraDesc(Long clienteId); // Adicionado
+    List<Venda> findByClienteIdOrderByDataHoraDesc(Long clienteId);
 
     List<Venda> findByStatus(StatusVenda status);
 
-    @Query("SELECT SUM(v.valorTotal) FROM Venda v WHERE v.dataHora BETWEEN :inicio AND :fim")
+    @Query("SELECT SUM(v.valorTotal) FROM Venda v WHERE v.status = 'CONCLUIDA' AND v.dataHora BETWEEN :inicio AND :fim")
     Optional<BigDecimal> sumTotalVendasPeriodo(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 
-    @Query("SELECT SUM(v.desconto) FROM Venda v WHERE v.dataHora BETWEEN :inicio AND :fim")
+    @Query("SELECT SUM(v.desconto) FROM Venda v WHERE v.status = 'CONCLUIDA' AND v.dataHora BETWEEN :inicio AND :fim")
     Optional<BigDecimal> sumTotalDescontosPeriodo(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 
-    @Query("SELECT SUM(iv.quantidade * iv.produto.precoCusto) FROM ItemVenda iv WHERE iv.venda.dataHora BETWEEN :inicio AND :fim")
+    @Query("SELECT SUM(iv.quantidade * iv.produto.precoCusto) FROM ItemVenda iv WHERE iv.venda.status = 'CONCLUIDA' AND iv.venda.dataHora BETWEEN :inicio AND :fim")
     Optional<BigDecimal> sumCmvPeriodo(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 
-    @Query("SELECT COUNT(v) FROM Venda v WHERE v.dataHora BETWEEN :inicio AND :fim")
+    @Query("SELECT COUNT(v) FROM Venda v WHERE v.status = 'CONCLUIDA' AND v.dataHora BETWEEN :inicio AND :fim")
     Long countVendasByData(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 
     @Query("SELECT new com.grandport.erp.modules.financeiro.dto.DashboardResumoDTO$TopProdutoDTO(iv.produto.nome, SUM(iv.quantidade), SUM(iv.quantidade * iv.precoUnitario)) " +
-           "FROM ItemVenda iv GROUP BY iv.produto.nome ORDER BY SUM(iv.quantidade * iv.precoUnitario) DESC")
+           "FROM ItemVenda iv WHERE iv.venda.status = 'CONCLUIDA' " +
+           "GROUP BY iv.produto.nome ORDER BY SUM(iv.quantidade * iv.precoUnitario) DESC")
     List<DashboardResumoDTO.TopProdutoDTO> findTop5ProdutosMaisVendidosMes();
 }

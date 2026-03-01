@@ -29,6 +29,21 @@ public class VendaController {
         return ResponseEntity.ok(service.criarPedido(dto));
     }
 
+    @PostMapping("/orcamento")
+    public ResponseEntity<Venda> salvarOrcamento(@RequestBody VendaRequestDTO dto) {
+        return ResponseEntity.ok(service.salvarOrcamento(dto));
+    }
+
+    @PutMapping("/orcamento/{id}")
+    public ResponseEntity<Venda> atualizarOrcamento(@PathVariable Long id, @RequestBody VendaRequestDTO dto) {
+        return ResponseEntity.ok(service.atualizarOrcamento(id, dto));
+    }
+
+    @GetMapping("/orcamentos")
+    public ResponseEntity<List<Venda>> listarOrcamentos() {
+        return ResponseEntity.ok(repository.findByStatus(StatusVenda.ORCAMENTO));
+    }
+
     @GetMapping("/fila-caixa")
     public ResponseEntity<List<Venda>> getFilaCaixa() {
         return ResponseEntity.ok(repository.findByStatus(StatusVenda.AGUARDANDO_PAGAMENTO));
