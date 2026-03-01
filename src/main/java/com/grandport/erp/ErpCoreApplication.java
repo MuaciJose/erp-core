@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Arrays;
+import java.util.List;
 
 @SpringBootApplication
 public class ErpCoreApplication {
@@ -20,18 +21,27 @@ public class ErpCoreApplication {
     @Bean
     CommandLineRunner initDatabase(UsuarioRepository repository, PasswordEncoder passwordEncoder) {
         return args -> {
-            if (repository.findByUsername("admin") == null) {
-                Usuario admin = new Usuario();
+            List<String> todasPermissoes = Arrays.asList(
+                "dash", "vendas", "estoque", "marcas", "compras", "previsao", "faltas",
+                "caixa", "contas-pagar", "contas-receber", "bancos", "conciliacao", "plano-contas", "dre",
+                "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes"
+            );
+
+            // Adiciona o cast para Usuario
+            Usuario admin = (Usuario) repository.findByUsername("admin");
+            
+            if (admin == null) {
+                admin = new Usuario();
                 admin.setUsername("admin");
                 admin.setSenha(passwordEncoder.encode("admin123"));
                 admin.setNomeCompleto("Administrador do Sistema");
-                admin.setPermissoes(Arrays.asList(
-                    "dash", "vendas", "estoque", "marcas", "compras", "previsao", "faltas",
-                    "caixa", "contas-pagar", "contas-receber", "bancos", "conciliacao", "plano-contas", "dre",
-                    "parceiros", "usuarios", "fiscal", "configuracoes"
-                ));
+                admin.setPermissoes(todasPermissoes);
                 repository.save(admin);
                 System.out.println(">>> Usuário ADMIN criado com sucesso! Use: admin / admin123");
+            } else {
+                admin.setPermissoes(todasPermissoes);
+                repository.save(admin);
+                System.out.println(">>> Permissões do usuário ADMIN atualizadas com sucesso!");
             }
         };
     }

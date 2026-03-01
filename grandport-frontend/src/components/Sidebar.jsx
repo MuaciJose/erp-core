@@ -18,7 +18,8 @@ import {
     Tag,
     ShoppingBasket,
     Calculator,
-    Wallet
+    Wallet,
+    Activity
 } from 'lucide-react';
 
 export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }) => {
@@ -76,6 +77,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             submenus: [
                 { titulo: 'Clientes & Fornecedores', acao: 'parceiros' },
                 { titulo: 'Vendedores / Usuários', acao: 'usuarios' },
+                { titulo: 'Auditoria de Sistema', acao: 'auditoria' },
                 { titulo: 'Fiscal / NCM', acao: 'fiscal' }
             ]
         },
@@ -87,7 +89,6 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         }
     ];
 
-    // Lógica de Filtragem de Menus por Permissões
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {
             const submenusPermitidos = menu.submenus.filter(sub => permissoesUsuario.includes(sub.acao));

@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.vendas.service;
 
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.estoque.model.Produto;
 import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
 import com.grandport.erp.modules.financeiro.service.CaixaService;
@@ -27,6 +28,7 @@ public class VendaService {
     @Autowired private FinanceiroService financeiroService;
     @Autowired private ParceiroRepository parceiroRepository;
     @Autowired private CaixaService caixaService;
+    @Autowired private AuditoriaService auditoriaService;
 
     @Transactional
     public Venda processarVenda(VendaRequestDTO dto) {
@@ -63,19 +65,18 @@ public class VendaService {
             if ("A PRAZO".equals(pagDTO.metodo())) {
                 processarVendaAPrazo(venda, dto.parceiroId());
             } else {
-                // Adiciona ao caixa diário e registra movimentação imediata
                 caixaService.adicionarVendaAoCaixa(pagDTO.metodo(), pagDTO.valor());
                 financeiroService.registrarEntradaImediata(pagDTO.valor(), pagDTO.metodo());
             }
         }
 
-        return vendaRepository.save(venda);
+        Venda salva = vendaRepository.save(venda);
+        auditoriaService.registrar("PDV", "VENDA", "Venda #" + salva.getId() + " realizada no valor de R$ " + salva.getValorTotal());
+        return salva;
     }
 
     private void processarVendaAPrazo(Venda venda, Long parceiroId) {
-        if (parceiroId == null) {
-            throw new RuntimeException("Cliente não informado para venda a prazo.");
-        }
+        if (parceiroId == null) throw new RuntimeException("Cliente não informado para venda a prazo.");
 
         Parceiro cliente = parceiroRepository.findById(parceiroId)
             .orElseThrow(() -> new RuntimeException("Cliente não encontrado: ID " + parceiroId));
@@ -83,7 +84,7 @@ public class VendaService {
         BigDecimal saldoDisponivel = cliente.getLimiteCredito().subtract(cliente.getSaldoDevedor());
 
         if (venda.getValorTotal().compareTo(saldoDisponivel) > 0) {
-            throw new RuntimeException("Venda Bloqueada! Limite de crédito insuficiente. Disponível: R$ " + saldoDisponivel);
+            throw new RuntimeException("Venda Bloqueada! Limite de crédito insuficiente.");
         }
 
         cliente.setSaldoDevedor(cliente.getSaldoDevedor().add(venda.getValorTotal()));

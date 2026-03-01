@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.parceiro.service;
 
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,13 +10,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ParceiroService {
 
-    @Autowired
-    private ParceiroRepository repository;
+    @Autowired private ParceiroRepository repository;
+    @Autowired private AuditoriaService auditoriaService;
 
     @Transactional
     public Parceiro criar(Parceiro parceiro) {
-        // Aqui poderiam entrar validações de negócio
-        return repository.save(parceiro);
+        Parceiro salvo = repository.save(parceiro);
+        auditoriaService.registrar("CADASTROS", "CRIACAO_PARCEIRO", "Cadastrou o parceiro: " + salvo.getNome() + " (" + salvo.getTipo() + ")");
+        return salvo;
     }
 
     @Transactional
@@ -23,7 +25,6 @@ public class ParceiroService {
         Parceiro parceiroExistente = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Parceiro não encontrado com ID: " + id));
 
-        // Atualiza os campos
         parceiroExistente.setNome(dadosAtualizados.getNome());
         parceiroExistente.setDocumento(dadosAtualizados.getDocumento());
         parceiroExistente.setEmail(dadosAtualizados.getEmail());
@@ -31,6 +32,15 @@ public class ParceiroService {
         parceiroExistente.setTipo(dadosAtualizados.getTipo());
         parceiroExistente.setEndereco(dadosAtualizados.getEndereco());
         
-        return repository.save(parceiroExistente);
+        Parceiro salvo = repository.save(parceiroExistente);
+        auditoriaService.registrar("CADASTROS", "EDICAO_PARCEIRO", "Atualizou dados do parceiro: " + salvo.getNome());
+        return salvo;
+    }
+
+    @Transactional
+    public void excluir(Long id) {
+        Parceiro p = repository.findById(id).orElseThrow(() -> new RuntimeException("Parceiro não encontrado"));
+        repository.deleteById(id);
+        auditoriaService.registrar("CADASTROS", "EXCLUSAO_PARCEIRO", "Excluiu o parceiro: " + p.getNome());
     }
 }

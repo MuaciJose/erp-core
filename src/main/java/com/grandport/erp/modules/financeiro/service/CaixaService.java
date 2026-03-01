@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.financeiro.service;
 
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.financeiro.dto.CaixaDiarioDTO;
 import com.grandport.erp.modules.financeiro.model.CaixaDiario;
 import com.grandport.erp.modules.financeiro.model.MovimentacaoCaixa;
@@ -19,29 +20,29 @@ public class CaixaService {
 
     @Autowired private CaixaDiarioRepository caixaRepository;
     @Autowired private MovimentacaoCaixaRepository movimentacaoRepository;
+    @Autowired private AuditoriaService auditoriaService;
 
     public CaixaDiarioDTO getCaixaAtual() {
         return caixaRepository.findByStatus(StatusCaixa.ABERTO)
                 .map(CaixaDiarioDTO::new)
-                .orElse(new CaixaDiarioDTO()); // Retorna DTO de caixa fechado
+                .orElse(new CaixaDiarioDTO());
     }
 
     @Transactional
     public CaixaDiario abrirCaixa(BigDecimal saldoInicial) {
         Optional<CaixaDiario> caixaAberto = caixaRepository.findByStatus(StatusCaixa.ABERTO);
-        if (caixaAberto.isPresent()) {
-            throw new RuntimeException("Já existe um caixa aberto.");
-        }
+        if (caixaAberto.isPresent()) throw new RuntimeException("Já existe um caixa aberto.");
 
         CaixaDiario novoCaixa = new CaixaDiario();
         novoCaixa.setDataAbertura(LocalDateTime.now());
         novoCaixa.setSaldoInicial(saldoInicial);
         novoCaixa.setStatus(StatusCaixa.ABERTO);
         
-        // Registra a entrada do troco inicial
         registrarMovimentacao(novoCaixa, saldoInicial, "ENTRADA", "Fundo de Caixa (Abertura)");
-
-        return caixaRepository.save(novoCaixa);
+        
+        CaixaDiario salvo = caixaRepository.save(novoCaixa);
+        auditoriaService.registrar("CAIXA", "ABERTURA", "Abriu o caixa com troco inicial de R$ " + saldoInicial);
+        return salvo;
     }
 
     @Transactional
@@ -50,7 +51,10 @@ public class CaixaService {
         caixa.setDataFechamento(LocalDateTime.now());
         caixa.setStatus(StatusCaixa.FECHADO);
         caixa.setValorInformadoFechamento(valorInformado);
-        return caixaRepository.save(caixa);
+        
+        CaixaDiario salvo = caixaRepository.save(caixa);
+        auditoriaService.registrar("CAIXA", "FECHAMENTO", "Fechou o caixa. Valor informado em gaveta: R$ " + valorInformado);
+        return salvo;
     }
 
     @Transactional
@@ -59,23 +63,18 @@ public class CaixaService {
         caixa.setTotalSangrias(caixa.getTotalSangrias().add(valor));
         
         registrarMovimentacao(caixa, valor.negate(), "SAIDA", motivo);
-
         caixaRepository.save(caixa);
+        
+        auditoriaService.registrar("CAIXA", "SANGRIA", "Realizou sangria de R$ " + valor + ". Motivo: " + motivo);
     }
     
     @Transactional
     public void adicionarVendaAoCaixa(String metodoPagamento, BigDecimal valor) {
         CaixaDiario caixa = getCaixaAberto();
         switch (metodoPagamento) {
-            case "DINHEIRO":
-                caixa.setTotalDinheiro(caixa.getTotalDinheiro().add(valor));
-                break;
-            case "CARTAO":
-                caixa.setTotalCartao(caixa.getTotalCartao().add(valor));
-                break;
-            case "PIX":
-                caixa.setTotalPix(caixa.getTotalPix().add(valor));
-                break;
+            case "DINHEIRO": caixa.setTotalDinheiro(caixa.getTotalDinheiro().add(valor)); break;
+            case "CARTAO": caixa.setTotalCartao(caixa.getTotalCartao().add(valor)); break;
+            case "PIX": caixa.setTotalPix(caixa.getTotalPix().add(valor)); break;
         }
         caixaRepository.save(caixa);
     }

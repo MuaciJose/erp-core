@@ -51,6 +51,7 @@ export const GestaoUsuarios = () => {
             telas: [
                 { acao: 'parceiros', nome: 'Cadastros (Clientes/Fornecedores)' },
                 { acao: 'usuarios', nome: 'Gestão de Usuários e Permissões' },
+                { acao: 'auditoria', nome: 'Auditoria de Sistema (Logs)' },
                 { acao: 'fiscal', nome: 'Fiscal / NCM' },
                 { acao: 'configuracoes', nome: 'Configurações do Sistema' }
             ]

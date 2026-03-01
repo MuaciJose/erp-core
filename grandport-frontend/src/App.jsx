@@ -19,6 +19,7 @@ import { ContasBancarias } from './modules/financeiro/ContasBancarias';
 import { PlanoContas } from './modules/financeiro/PlanoContas';
 import { ConciliacaoBancaria } from './modules/financeiro/ConciliacaoBancaria';
 import { GestaoUsuarios } from './modules/cadastro/GestaoUsuarios';
+import { Auditoria } from './modules/cadastro/Auditoria';
 
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
@@ -56,13 +57,20 @@ function App() {
         setPaginaAtiva(definirTelaInicial(usuario));
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem('grandport_token');
-        localStorage.removeItem('grandport_user');
-        api.defaults.headers.common['Authorization'] = '';
-        setUsuarioLogado(null);
-        setPaginaAtiva('');
-        window.location.reload();
+    const handleLogout = async () => {
+        try {
+            // Notifica o backend para auditar o logout
+            await api.post('/auth/logout');
+        } catch (e) {
+            console.error("Erro ao registrar logout", e);
+        } finally {
+            localStorage.removeItem('grandport_token');
+            localStorage.removeItem('grandport_user');
+            api.defaults.headers.common['Authorization'] = '';
+            setUsuarioLogado(null);
+            setPaginaAtiva('');
+            window.location.reload();
+        }
     };
 
     if (carregandoApp) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white font-black tracking-widest">CARREGANDO GRANDPORT ERP...</div>;
@@ -111,6 +119,7 @@ function App() {
                             {paginaAtiva === 'plano-contas' && <PlanoContas />}
                             {paginaAtiva === 'conciliacao' && <ConciliacaoBancaria />}
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
+                            {paginaAtiva === 'auditoria' && <Auditoria />}
                         </>
                     )}
                 </div>

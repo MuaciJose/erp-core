@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.estoque.service;
 
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.estoque.dto.AtualizarPrecoRequestDTO;
 import com.grandport.erp.modules.estoque.dto.ProdutoRequestDTO;
 import com.grandport.erp.modules.estoque.model.Marca;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -23,6 +25,7 @@ public class ProdutoService {
     @Autowired private MarcaRepository marcaRepository;
     @Autowired private NcmRepository ncmRepository;
     @Autowired private MovimentacaoEstoqueRepository movimentacaoRepository;
+    @Autowired private AuditoriaService auditoriaService;
 
     @Transactional
     public Produto cadastrar(ProdutoRequestDTO dto, String imagePath) {
@@ -50,6 +53,9 @@ public class ProdutoService {
 
         Produto salvo = produtoRepository.save(produto);
         registrarMovimentacao(salvo, dto.quantidadeEstoque(), "ENTRADA", "Cadastro Inicial");
+        
+        auditoriaService.registrar("ESTOQUE", "CRIACAO", "Cadastrou o produto: " + salvo.getNome());
+        
         return salvo;
     }
 
@@ -57,15 +63,19 @@ public class ProdutoService {
     public void atualizarPrecos(List<AtualizarPrecoRequestDTO> precos) {
         for (AtualizarPrecoRequestDTO dto : precos) {
             Produto produto = findById(dto.getId());
+            BigDecimal precoAntigo = produto.getPrecoVenda();
             produto.setPrecoVenda(dto.getNovoPrecoVenda());
             produtoRepository.save(produto);
+            
+            auditoriaService.registrar("ESTOQUE", "ALTERACAO_PRECO", "Alterou preço de " + produto.getNome() + ": R$ " + precoAntigo + " -> R$ " + dto.getNovoPrecoVenda());
         }
     }
 
     @Transactional
     public void deleteProduto(Long id) {
-        // Adicionar validações aqui se necessário (ex: não deletar se houver estoque)
+        Produto p = findById(id);
         produtoRepository.deleteById(id);
+        auditoriaService.registrar("ESTOQUE", "EXCLUSAO", "Excluiu o produto: " + p.getNome());
     }
 
     public List<Produto> listarAlertasEstoque() {
@@ -92,6 +102,8 @@ public class ProdutoService {
 
         String tipo = diferenca > 0 ? "ENTRADA" : "SAIDA";
         registrarMovimentacao(salvo, diferenca, tipo, motivo);
+
+        auditoriaService.registrar("ESTOQUE", "AJUSTE", "Ajustou estoque de " + produto.getNome() + ": " + saldoAnterior + " -> " + novaQuantidade + ". Motivo: " + motivo);
 
         return salvo;
     }

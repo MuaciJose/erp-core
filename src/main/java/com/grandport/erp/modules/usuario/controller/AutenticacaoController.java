@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.usuario.controller;
 
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.usuario.dto.LoginDTO;
 import com.grandport.erp.modules.usuario.dto.LoginResponseDTO;
 import com.grandport.erp.modules.usuario.dto.UsuarioDTO;
@@ -19,11 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/auth")
 public class AutenticacaoController {
 
-    @Autowired
-    private AuthenticationManager authenticationManager;
-
-    @Autowired
-    private TokenService tokenService;
+    @Autowired private AuthenticationManager authenticationManager;
+    @Autowired private TokenService tokenService;
+    @Autowired private AuditoriaService auditoriaService;
 
     @PostMapping("/login")
     public ResponseEntity login(@RequestBody @Valid LoginDTO data) {
@@ -33,7 +32,14 @@ public class AutenticacaoController {
         Usuario usuario = (Usuario) auth.getPrincipal();
         var token = tokenService.gerarToken(usuario);
 
-        // Retorna o token e os dados do usuário formatados pelo DTO
+        auditoriaService.registrar("SISTEMA", "LOGIN", "Usuário realizou login no sistema.");
+
         return ResponseEntity.ok(new LoginResponseDTO(token, new UsuarioDTO(usuario)));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity logout() {
+        auditoriaService.registrar("SISTEMA", "LOGOUT", "Usuário realizou logout do sistema.");
+        return ResponseEntity.ok().build();
     }
 }
