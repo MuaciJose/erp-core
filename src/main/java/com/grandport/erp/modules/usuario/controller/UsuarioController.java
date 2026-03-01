@@ -1,7 +1,6 @@
 package com.grandport.erp.modules.usuario.controller;
 
 import com.grandport.erp.modules.usuario.dto.UsuarioDTO;
-import com.grandport.erp.modules.usuario.model.Role;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +33,7 @@ public class UsuarioController {
         novo.setNomeCompleto(dto.getNome());
         novo.setUsername(dto.getEmail());
         novo.setSenha(new BCryptPasswordEncoder().encode(dto.getSenha()));
-        novo.setRole(Role.valueOf(dto.getPerfil()));
+        novo.setPermissoes(dto.getPermissoes());
         novo.setAtivo(true);
         
         repository.save(novo);
@@ -48,7 +47,7 @@ public class UsuarioController {
         
         usuario.setNomeCompleto(dto.getNome());
         usuario.setUsername(dto.getEmail());
-        usuario.setRole(Role.valueOf(dto.getPerfil()));
+        usuario.setPermissoes(dto.getPermissoes());
         
         if (dto.getSenha() != null && !dto.getSenha().isEmpty()) {
             usuario.setSenha(new BCryptPasswordEncoder().encode(dto.getSenha()));

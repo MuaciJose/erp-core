@@ -10,11 +10,52 @@ export const GestaoUsuarios = () => {
     const [usuarioForm, setUsuarioForm] = useState({
         id: null,
         nome: '',
-        email: '', // Mantemos o nome da chave como 'email' no estado para não quebrar o DTO do backend por enquanto
+        email: '',
         senha: '',
-        perfil: 'VENDEDOR',
-        ativo: true
+        ativo: true,
+        permissoes: []
     });
+
+    const modulosPermissoes = [
+        {
+            grupo: 'Vendas & Frente de Loja',
+            telas: [
+                { acao: 'vendas', nome: 'Ponto de Venda (PDV)' },
+                { acao: 'dash', nome: 'Dashboard Inicial' }
+            ]
+        },
+        {
+            grupo: 'Estoque & Compras',
+            telas: [
+                { acao: 'estoque', nome: 'Buscar Peças / Consulta' },
+                { acao: 'marcas', nome: 'Gestão de Marcas' },
+                { acao: 'compras', nome: 'Importar NF-e (XML)' },
+                { acao: 'previsao', nome: 'Previsão de Compras' },
+                { acao: 'faltas', nome: 'Relatório de Faltas' }
+            ]
+        },
+        {
+            grupo: 'Financeiro',
+            telas: [
+                { acao: 'caixa', nome: 'Controle de Caixa (Abrir/Fechar)' },
+                { acao: 'contas-receber', nome: 'Contas a Receber (Fiado)' },
+                { acao: 'contas-pagar', nome: 'Contas a Pagar (Despesas)' },
+                { acao: 'bancos', nome: 'Contas Bancárias / Tesouraria' },
+                { acao: 'conciliacao', nome: 'Conciliação Bancária' },
+                { acao: 'plano-contas', nome: 'Plano de Contas' },
+                { acao: 'dre', nome: 'Resultado e Lucro (DRE)' }
+            ]
+        },
+        {
+            grupo: 'Administrativo',
+            telas: [
+                { acao: 'parceiros', nome: 'Cadastros (Clientes/Fornecedores)' },
+                { acao: 'usuarios', nome: 'Gestão de Usuários e Permissões' },
+                { acao: 'fiscal', nome: 'Fiscal / NCM' },
+                { acao: 'configuracoes', nome: 'Configurações do Sistema' }
+            ]
+        }
+    ];
 
     const carregarUsuarios = async () => {
         setLoading(true);
@@ -30,8 +71,31 @@ export const GestaoUsuarios = () => {
 
     useEffect(() => { carregarUsuarios(); }, []);
 
+    const handleTogglePermissao = (acaoTela) => {
+        setUsuarioForm(prev => {
+            const jaTem = prev.permissoes.includes(acaoTela);
+            if (jaTem) {
+                return { ...prev, permissoes: prev.permissoes.filter(p => p !== acaoTela) };
+            } else {
+                return { ...prev, permissoes: [...prev.permissoes, acaoTela] };
+            }
+        });
+    };
+
+    const handleToggleGrupo = (telas) => {
+        const acoesDoGrupo = telas.map(t => t.acao);
+        const todasMarcadas = acoesDoGrupo.every(a => usuarioForm.permissoes.includes(a));
+
+        if (todasMarcadas) {
+            setUsuarioForm(prev => ({ ...prev, permissoes: prev.permissoes.filter(p => !acoesDoGrupo.includes(p)) }));
+        } else {
+            const novas = acoesDoGrupo.filter(a => !usuarioForm.permissoes.includes(a));
+            setUsuarioForm(prev => ({ ...prev, permissoes: [...prev.permissoes, ...novas] }));
+        }
+    };
+
     const abrirModalNovo = () => {
-        setUsuarioForm({ id: null, nome: '', email: '', senha: '', perfil: 'VENDEDOR', ativo: true });
+        setUsuarioForm({ id: null, nome: '', email: '', senha: '', ativo: true, permissoes: [] });
         setModalAberto(true);
     };
 
@@ -53,7 +117,7 @@ export const GestaoUsuarios = () => {
             setModalAberto(false);
             carregarUsuarios();
         } catch (err) {
-            alert("Erro ao salvar usuário. Verifique os dados.");
+            alert("Erro ao salvar usuário.");
         }
     };
 
@@ -65,15 +129,6 @@ export const GestaoUsuarios = () => {
             } catch(err) {
                 alert("Erro ao alterar status.");
             }
-        }
-    };
-
-    const corPerfil = (perfil) => {
-        switch(perfil) {
-            case 'ADMIN': return 'bg-purple-100 text-purple-700 border-purple-200';
-            case 'CAIXA': return 'bg-green-100 text-green-700 border-green-200';
-            case 'ESTOQUISTA': return 'bg-orange-100 text-orange-700 border-orange-200';
-            default: return 'bg-blue-100 text-blue-700 border-blue-200';
         }
     };
 
@@ -89,10 +144,7 @@ export const GestaoUsuarios = () => {
                     </h1>
                     <p className="text-slate-500 mt-1">Gerencie os funcionários e os níveis de permissão</p>
                 </div>
-                <button 
-                    onClick={abrirModalNovo}
-                    className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg"
-                >
+                <button onClick={abrirModalNovo} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg">
                     <UserPlus size={20} /> NOVO USUÁRIO
                 </button>
             </div>
@@ -103,7 +155,6 @@ export const GestaoUsuarios = () => {
                         <tr>
                             <th className="p-4 pl-6">Nome do Funcionário</th>
                             <th className="p-4">Login (Usuário)</th>
-                            <th className="p-4 text-center">Nível de Acesso</th>
                             <th className="p-4 text-center">Status</th>
                             <th className="p-4 text-center pr-6">Ações</th>
                         </tr>
@@ -119,23 +170,14 @@ export const GestaoUsuarios = () => {
                                 </td>
                                 <td className="p-4 text-sm text-slate-500 font-mono">{user.email}</td>
                                 <td className="p-4 text-center">
-                                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black tracking-widest border ${corPerfil(user.perfil)}`}>
-                                        {user.perfil}
-                                    </span>
-                                </td>
-                                <td className="p-4 text-center">
                                     {user.ativo 
                                         ? <span className="text-green-600 font-bold text-xs flex items-center justify-center gap-1"><CheckCircle size={14}/> ATIVO</span>
                                         : <span className="text-red-500 font-bold text-xs flex items-center justify-center gap-1"><Ban size={14}/> BLOQUEADO</span>
                                     }
                                 </td>
                                 <td className="p-4 pr-6 flex justify-center gap-3">
-                                    <button onClick={() => abrirModalEditar(user)} className="text-blue-500 hover:text-blue-700 bg-blue-50 p-2 rounded-lg">
-                                        <Edit size={18} />
-                                    </button>
-                                    <button onClick={() => alternarStatus(user.id, user.ativo)} className={`${user.ativo ? 'text-red-500 hover:text-red-700 bg-red-50' : 'text-green-600 hover:text-green-800 bg-green-50'} p-2 rounded-lg`}>
-                                        {user.ativo ? <Ban size={18} /> : <CheckCircle size={18} />}
-                                    </button>
+                                    <button onClick={() => abrirModalEditar(user)} className="text-blue-500 hover:text-blue-700 bg-blue-50 p-2 rounded-lg"><Edit size={18} /></button>
+                                    <button onClick={() => alternarStatus(user.id, user.ativo)} className={`${user.ativo ? 'text-red-500 hover:text-red-700 bg-red-50' : 'text-green-600 hover:text-green-800 bg-green-50'} p-2 rounded-lg`}>{user.ativo ? <Ban size={18} /> : <CheckCircle size={18} />}</button>
                                 </td>
                             </tr>
                         ))}
@@ -145,44 +187,61 @@ export const GestaoUsuarios = () => {
 
             {modalAberto && (
                 <div className="fixed inset-0 bg-slate-900/80 flex items-center justify-center z-[100] p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in">
                         <div className="bg-slate-900 p-6 flex justify-between items-center text-white">
-                            <h2 className="text-xl font-black tracking-widest flex items-center gap-2">
-                                <ShieldCheck className="text-blue-400" /> 
-                                {usuarioForm.id ? 'EDITAR USUÁRIO' : 'NOVO USUÁRIO'}
-                            </h2>
+                            <h2 className="text-xl font-black tracking-widest flex items-center gap-2"><ShieldCheck className="text-blue-400" /> {usuarioForm.id ? 'EDITAR USUÁRIO' : 'NOVO USUÁRIO'}</h2>
                             <button onClick={() => setModalAberto(false)} className="hover:text-red-400 font-bold uppercase text-xs">Fechar</button>
                         </div>
 
-                        <form onSubmit={salvarUsuario} className="p-8 space-y-5">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
-                                <input type="text" required value={usuarioForm.nome} onChange={e => setUsuarioForm({...usuarioForm, nome: e.target.value})} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-600 outline-none font-bold text-slate-700" placeholder="Ex: João da Silva" />
+                        <div className="overflow-y-auto p-8 space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
+                                    <input type="text" value={usuarioForm.nome} onChange={e => setUsuarioForm({...usuarioForm, nome: e.target.value})} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-600 outline-none font-bold text-slate-700" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Usuário de Login</label>
+                                    <input type="text" value={usuarioForm.email} onChange={e => setUsuarioForm({...usuarioForm, email: e.target.value})} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-600 outline-none text-slate-700 font-mono" />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Usuário de Login</label>
-                                <input type="text" required value={usuarioForm.email} onChange={e => setUsuarioForm({...usuarioForm, email: e.target.value})} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-600 outline-none text-slate-700 font-mono" placeholder="Ex: joao.silva" />
-                            </div>
+
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex justify-between">
                                     <span>Senha de Acesso</span>
                                     {usuarioForm.id && <span className="text-orange-500 text-[10px]">Preencha apenas se for alterar</span>}
                                 </label>
-                                <input type="password" required={!usuarioForm.id} value={usuarioForm.senha} onChange={e => setUsuarioForm({...usuarioForm, senha: e.target.value})} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-600 outline-none text-slate-700" placeholder="******" />
+                                <input type="password" value={usuarioForm.senha} onChange={e => setUsuarioForm({...usuarioForm, senha: e.target.value})} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-600 outline-none text-slate-700" placeholder="******" />
                             </div>
+
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1"><Shield size={14}/> Perfil de Permissão</label>
-                                <select value={usuarioForm.perfil} onChange={e => setUsuarioForm({...usuarioForm, perfil: e.target.value})} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-600 outline-none font-black text-slate-700">
-                                    <option value="VENDEDOR">VENDEDOR (Balcão e PDV)</option>
-                                    <option value="CAIXA">CAIXA (Recebimentos e Fechamento)</option>
-                                    <option value="ESTOQUISTA">ESTOQUISTA (App Mobile e XML)</option>
-                                    <option value="ADMIN">ADMINISTRADOR (Acesso Total)</option>
-                                </select>
+                                <h3 className="text-sm font-black text-slate-800 uppercase mb-4 border-b pb-2">Controle de Acesso às Telas</h3>
+                                <div className="space-y-4">
+                                    {modulosPermissoes.map((modulo, index) => (
+                                        <div key={index} className="bg-slate-50 border rounded-xl p-4">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <h4 className="font-bold text-blue-800">{modulo.grupo}</h4>
+                                                <button type="button" onClick={() => handleToggleGrupo(modulo.telas)} className="text-[10px] font-bold text-blue-600 uppercase hover:underline">Marcar/Desmarcar Grupo</button>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {modulo.telas.map(tela => (
+                                                    <label key={tela.acao} className="flex items-center gap-3 cursor-pointer group" onClick={() => handleTogglePermissao(tela.acao)}>
+                                                        <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${usuarioForm.permissoes.includes(tela.acao) ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white group-hover:border-blue-400'}`}>
+                                                            {usuarioForm.permissoes.includes(tela.acao) && <CheckCircle size={14} />}
+                                                        </div>
+                                                        <span className="text-sm font-medium text-slate-700 select-none">{tela.nome}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                            <button type="submit" className="w-full mt-4 bg-blue-600 text-white py-4 rounded-xl font-black text-lg hover:bg-blue-700 shadow-lg transition-all">
-                                {usuarioForm.id ? 'SALVAR ALTERAÇÕES' : 'CRIAR ACESSO'}
-                            </button>
-                        </form>
+                        </div>
+
+                        <div className="p-6 bg-slate-50 border-t flex gap-4">
+                            <button onClick={() => setModalAberto(false)} className="flex-1 py-4 font-bold text-slate-500 rounded-xl hover:bg-slate-100">CANCELAR</button>
+                            <button onClick={salvarUsuario} className="flex-1 bg-blue-600 text-white py-4 rounded-xl font-black shadow-lg hover:bg-blue-700">SALVAR USUÁRIO</button>
+                        </div>
                     </div>
                 </div>
             )}

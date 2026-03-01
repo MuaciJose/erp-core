@@ -14,7 +14,11 @@ import {
     Landmark,
     Layers,
     Link as LinkIcon,
-    Ban
+    Ban,
+    Tag,
+    ShoppingBasket,
+    Calculator,
+    Wallet
 } from 'lucide-react';
 
 export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }) => {
@@ -24,7 +28,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         setMenuExpandido(menuExpandido === menuId ? null : menuId);
     };
 
-    const perfil = usuarioLogado?.perfil || 'VENDEDOR';
+    const permissoesUsuario = usuarioLogado?.permissoes || [];
 
     const menus = [
         {
@@ -83,19 +87,20 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         }
     ];
 
-    // Lógica de Perfis de Acesso (RBAC)
-    const menusPermitidos = menus.filter(menu => {
-        if (menu.id === 'financeiro') {
-            return perfil === 'ADMIN' || perfil === 'CAIXA';
+    // Lógica de Filtragem de Menus por Permissões
+    const menusFiltrados = menus.map(menu => {
+        if (menu.submenus) {
+            const submenusPermitidos = menu.submenus.filter(sub => permissoesUsuario.includes(sub.acao));
+            if (submenusPermitidos.length > 0) {
+                return { ...menu, submenus: submenusPermitidos };
+            }
+            return null;
         }
-        if (menu.id === 'cadastros' || menu.id === 'configuracoes') {
-            return perfil === 'ADMIN';
+        if (permissoesUsuario.includes(menu.acao)) {
+            return menu;
         }
-        if (menu.id === 'estoque') {
-            return perfil === 'ADMIN' || perfil === 'ESTOQUISTA';
-        }
-        return true; 
-    });
+        return null;
+    }).filter(menu => menu !== null);
 
     return (
         <aside className="w-72 bg-slate-900 text-white h-screen flex flex-col shadow-2xl transition-all z-50">
@@ -109,7 +114,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             </div>
 
             <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2 custom-scrollbar">
-                {menusPermitidos.map((menu) => (
+                {menusFiltrados.map((menu) => (
                     <div key={menu.id}>
                         {menu.submenus ? (
                             <>
@@ -175,7 +180,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                         </div>
                         <div>
                             <p className="text-sm font-bold text-white leading-tight">{usuarioLogado?.nome?.split(' ')[0]}</p>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase">{usuarioLogado?.perfil}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase">Acesso Personalizado</p>
                         </div>
                     </div>
                     <button 

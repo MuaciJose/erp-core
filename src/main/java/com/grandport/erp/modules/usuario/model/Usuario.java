@@ -6,8 +6,10 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "usuarios")
@@ -19,26 +21,31 @@ public class Usuario implements UserDetails {
     private Long id;
 
     @Column(unique = true, nullable = false)
-    private String username; // Usaremos o e-mail como username
+    private String username;
 
     @Column(nullable = false)
     private String senha;
 
     private String nomeCompleto;
 
-    @Enumerated(EnumType.STRING)
-    private Role role;
-
     private boolean ativo = true;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "usuario_permissoes", joinColumns = @JoinColumn(name = "usuario_id"))
+    @Column(name = "permissao")
+    private List<String> permissoes = new ArrayList<>();
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+        // Cada permissão vira uma autoridade no Spring Security
+        return permissoes.stream()
+                .map(p -> new SimpleGrantedAuthority("ROLE_" + p.toUpperCase()))
+                .collect(Collectors.toList());
     }
     @Override public String getPassword() { return senha; }
     @Override public String getUsername() { return username; }
     @Override public boolean isAccountNonExpired() { return true; }
     @Override public boolean isAccountNonLocked() { return true; }
     @Override public boolean isCredentialsNonExpired() { return true; }
-    @Override public boolean isEnabled() { return ativo; } // Vincula o status do Spring Security ao campo ativo
+    @Override public boolean isEnabled() { return ativo; }
 }

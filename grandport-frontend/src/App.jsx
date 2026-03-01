@@ -22,9 +22,17 @@ import { GestaoUsuarios } from './modules/cadastro/GestaoUsuarios';
 
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
-    const [paginaAtiva, setPaginaAtiva] = useState('dash');
+    const [paginaAtiva, setPaginaAtiva] = useState('');
     const [carregandoApp, setCarregandoApp] = useState(true);
     const [isFullScreen, setIsFullScreen] = useState(false);
+
+    const definirTelaInicial = (usuario) => {
+        const permissoes = usuario.permissoes || [];
+        if (permissoes.includes('dash')) return 'dash';
+        if (permissoes.includes('vendas')) return 'vendas';
+        if (permissoes.length > 0) return permissoes[0];
+        return '';
+    };
 
     useEffect(() => {
         const token = localStorage.getItem('grandport_token');
@@ -32,7 +40,9 @@ function App() {
         
         if (token && userSaved) {
             api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-            setUsuarioLogado(JSON.parse(userSaved));
+            const usuario = JSON.parse(userSaved);
+            setUsuarioLogado(usuario);
+            setPaginaAtiva(definirTelaInicial(usuario));
         }
         setCarregandoApp(false);
 
@@ -41,19 +51,27 @@ function App() {
         return () => document.removeEventListener('fullscreenchange', handleFSChange);
     }, []);
 
+    const handleLoginSucesso = (usuario) => {
+        setUsuarioLogado(usuario);
+        setPaginaAtiva(definirTelaInicial(usuario));
+    };
+
     const handleLogout = () => {
         localStorage.removeItem('grandport_token');
         localStorage.removeItem('grandport_user');
         api.defaults.headers.common['Authorization'] = '';
         setUsuarioLogado(null);
+        setPaginaAtiva('');
         window.location.reload();
     };
 
     if (carregandoApp) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white font-black tracking-widest">CARREGANDO GRANDPORT ERP...</div>;
 
     if (!usuarioLogado) {
-        return <Login onLoginSuccess={(user) => setUsuarioLogado(user)} />;
+        return <Login onLoginSuccess={handleLoginSucesso} />;
     }
+
+    const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva);
 
     return (
         <div className="flex h-screen w-screen bg-slate-50 overflow-hidden font-sans">
@@ -69,23 +87,32 @@ function App() {
 
             <main className={`flex-1 h-full overflow-y-auto ${isFullScreen ? 'p-0' : 'p-4'}`}>
                 <div className={`${isFullScreen ? 'w-full h-full' : 'max-w-[1600px] mx-auto'}`}>
-                    {paginaAtiva === 'dash' && <Dashboard setPaginaAtiva={setPaginaAtiva} />}
-                    {paginaAtiva === 'vendas' && <Pdv />}
-                    {paginaAtiva === 'estoque' && <Produtos />}
-                    {paginaAtiva === 'marcas' && <Marcas />}
-                    {paginaAtiva === 'parceiros' && <Parceiros />}
-                    {paginaAtiva === 'previsao' && <PrevisaoCompras />}
-                    {paginaAtiva === 'compras' && <ImportarXml />}
-                    {paginaAtiva === 'fiscal' && <CargaNcm />}
-                    {paginaAtiva === 'faltas' && <RelatorioFaltas />}
-                    {paginaAtiva === 'contas-receber' && <ContasReceber />}
-                    {paginaAtiva === 'contas-pagar' && <ContasPagar />}
-                    {paginaAtiva === 'caixa' && <ControleCaixa />}
-                    {paginaAtiva === 'dre' && <FluxoCaixaDre />}
-                    {paginaAtiva === 'bancos' && <ContasBancarias />}
-                    {paginaAtiva === 'plano-contas' && <PlanoContas />}
-                    {paginaAtiva === 'conciliacao' && <ConciliacaoBancaria />}
-                    {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
+                    {!temPermissao ? (
+                        <div className="p-10 text-center mt-20">
+                            <h2 className="text-2xl font-black text-red-500 mb-2">ACESSO NEGADO</h2>
+                            <p className="text-slate-500">Você não tem permissão para visualizar esta tela.</p>
+                        </div>
+                    ) : (
+                        <>
+                            {paginaAtiva === 'dash' && <Dashboard setPaginaAtiva={setPaginaAtiva} />}
+                            {paginaAtiva === 'vendas' && <Pdv />}
+                            {paginaAtiva === 'estoque' && <Produtos />}
+                            {paginaAtiva === 'marcas' && <Marcas />}
+                            {paginaAtiva === 'parceiros' && <Parceiros />}
+                            {paginaAtiva === 'previsao' && <PrevisaoCompras />}
+                            {paginaAtiva === 'compras' && <ImportarXml />}
+                            {paginaAtiva === 'fiscal' && <CargaNcm />}
+                            {paginaAtiva === 'faltas' && <RelatorioFaltas />}
+                            {paginaAtiva === 'contas-receber' && <ContasReceber />}
+                            {paginaAtiva === 'contas-pagar' && <ContasPagar />}
+                            {paginaAtiva === 'caixa' && <ControleCaixa />}
+                            {paginaAtiva === 'dre' && <FluxoCaixaDre />}
+                            {paginaAtiva === 'bancos' && <ContasBancarias />}
+                            {paginaAtiva === 'plano-contas' && <PlanoContas />}
+                            {paginaAtiva === 'conciliacao' && <ConciliacaoBancaria />}
+                            {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
+                        </>
+                    )}
                 </div>
             </main>
         </div>
