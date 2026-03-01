@@ -37,7 +37,7 @@ public class Usuario implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Cada permissão vira uma autoridade no Spring Security
+        if (permissoes == null) return new ArrayList<>();
         return permissoes.stream()
                 .map(p -> new SimpleGrantedAuthority("ROLE_" + p.toUpperCase()))
                 .collect(Collectors.toList());

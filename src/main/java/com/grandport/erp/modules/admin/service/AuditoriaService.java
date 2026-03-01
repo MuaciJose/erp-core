@@ -5,6 +5,7 @@ import com.grandport.erp.modules.admin.repository.LogAuditoriaRepository;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -26,29 +27,29 @@ public class AuditoriaService {
         log.setAcao(acao);
         log.setDetalhes(detalhes);
 
-        // Captura o IP da requisição
+        // Captura o IP com segurança
         try {
-            HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()).getRequest();
-            String ip = request.getHeader("X-Forwarded-For");
-            if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-                ip = request.getRemoteAddr();
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes != null) {
+                HttpServletRequest request = attributes.getRequest();
+                String ip = request.getHeader("X-Forwarded-For");
+                if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+                    ip = request.getRemoteAddr();
+                }
+                if ("0:0:0:0:0:0:0:1".equals(ip)) ip = "127.0.0.1";
+                log.setIpOrigem(ip);
+            } else {
+                log.setIpOrigem("SISTEMA");
             }
-            
-            // Traduz o loopback IPv6 para IPv4 para melhor legibilidade
-            if ("0:0:0:0:0:0:0:1".equals(ip)) {
-                ip = "127.0.0.1";
-            }
-
-            log.setIpOrigem(ip);
         } catch (Exception e) {
             log.setIpOrigem("0.0.0.0");
         }
 
-        // Captura o usuário logado
+        // Captura o usuário com segurança
         try {
-            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-            if (principal instanceof Usuario) {
-                log.setUsuarioNome(((Usuario) principal).getNomeCompleto());
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof Usuario) {
+                log.setUsuarioNome(((Usuario) auth.getPrincipal()).getNomeCompleto());
             } else {
                 log.setUsuarioNome("SISTEMA");
             }

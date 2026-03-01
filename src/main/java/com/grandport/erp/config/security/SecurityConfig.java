@@ -29,7 +29,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-            .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Habilita o CORS
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
@@ -41,14 +41,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/parceiros/consulta-cnpj/**").permitAll()
                 .requestMatchers("/api/parceiros/consulta-cep/**").permitAll()
 
-                // Rotas de Admin
-                .requestMatchers(HttpMethod.POST, "/auth/register").hasRole("ADMIN")
-
-                // Rotas Financeiras (Exigem autenticação, mas não role específica por enquanto)
-                .requestMatchers("/api/financeiro/**").authenticated()
-                .requestMatchers("/api/vendas/fechamento-hoje").authenticated()
+                // Todas as outras rotas da API exigem apenas que o usuário esteja autenticado
+                // A lógica de permissão granular (telas) é controlada no Frontend e nos Services se necessário
+                .requestMatchers("/api/**").authenticated()
+                .requestMatchers("/auth/logout").authenticated()
                 
-                // Demais rotas exigem autenticação
                 .anyRequest().authenticated()
             )
             .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
@@ -58,8 +55,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173")); // URL do React
-        configuration.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE", "PATCH"));
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
+        configuration.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

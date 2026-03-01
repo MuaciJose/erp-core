@@ -22,14 +22,10 @@ public interface VendaRepository extends JpaRepository<Venda, Long> {
     @Query("SELECT SUM(iv.quantidade * iv.produto.precoCusto) FROM ItemVenda iv WHERE iv.venda.dataHora BETWEEN :inicio AND :fim")
     Optional<BigDecimal> sumCmvPeriodo(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 
-    @Query("SELECT SUM(v.valorTotal) FROM Venda v WHERE v.dataHora >= FUNCTION('DATE_TRUNC', 'MONTH', CURRENT_DATE)")
-    Optional<BigDecimal> sumTotalVendasMesAtual();
-
     @Query("SELECT COUNT(v) FROM Venda v WHERE v.dataHora BETWEEN :inicio AND :fim")
     Long countVendasByData(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 
     @Query("SELECT new com.grandport.erp.modules.financeiro.dto.DashboardResumoDTO$TopProdutoDTO(iv.produto.nome, SUM(iv.quantidade), SUM(iv.quantidade * iv.precoUnitario)) " +
-           "FROM ItemVenda iv WHERE iv.venda.dataHora >= FUNCTION('DATE_TRUNC', 'MONTH', CURRENT_DATE) " +
-           "GROUP BY iv.produto.nome ORDER BY SUM(iv.quantidade * iv.precoUnitario) DESC")
+           "FROM ItemVenda iv GROUP BY iv.produto.nome ORDER BY SUM(iv.quantidade * iv.precoUnitario) DESC")
     List<DashboardResumoDTO.TopProdutoDTO> findTop5ProdutosMaisVendidosMes();
 }

@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.usuario.controller;
 
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.usuario.dto.UsuarioDTO;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
@@ -16,8 +17,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/usuarios")
 public class UsuarioController {
 
-    @Autowired
-    private UsuarioRepository repository;
+    @Autowired private UsuarioRepository repository;
+    @Autowired private AuditoriaService auditoriaService;
 
     @GetMapping
     public ResponseEntity<List<UsuarioDTO>> listar() {
@@ -36,8 +37,9 @@ public class UsuarioController {
         novo.setPermissoes(dto.getPermissoes());
         novo.setAtivo(true);
         
-        repository.save(novo);
-        return ResponseEntity.ok(new UsuarioDTO(novo));
+        Usuario salvo = repository.save(novo);
+        auditoriaService.registrar("SISTEMA", "CRIACAO_USUARIO", "Cadastrou o usuário: " + salvo.getNomeCompleto());
+        return ResponseEntity.ok(new UsuarioDTO(salvo));
     }
 
     @PutMapping("/{id}")
@@ -53,8 +55,9 @@ public class UsuarioController {
             usuario.setSenha(new BCryptPasswordEncoder().encode(dto.getSenha()));
         }
         
-        repository.save(usuario);
-        return ResponseEntity.ok(new UsuarioDTO(usuario));
+        Usuario salvo = repository.save(usuario);
+        auditoriaService.registrar("SISTEMA", "EDICAO_USUARIO", "Atualizou o usuário: " + salvo.getNomeCompleto());
+        return ResponseEntity.ok(new UsuarioDTO(salvo));
     }
 
     @PutMapping("/{id}/status")
@@ -62,8 +65,11 @@ public class UsuarioController {
         Usuario usuario = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
         
-        usuario.setAtivo(payload.get("ativo"));
+        boolean novoStatus = payload.get("ativo");
+        usuario.setAtivo(novoStatus);
         repository.save(usuario);
+        
+        auditoriaService.registrar("SISTEMA", "STATUS_USUARIO", (novoStatus ? "Desbloqueou" : "Bloqueou") + " o acesso de: " + usuario.getNomeCompleto());
         return ResponseEntity.ok().build();
     }
 }

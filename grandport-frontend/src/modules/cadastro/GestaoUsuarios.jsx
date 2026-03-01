@@ -52,6 +52,7 @@ export const GestaoUsuarios = () => {
                 { acao: 'parceiros', nome: 'Cadastros (Clientes/Fornecedores)' },
                 { acao: 'usuarios', nome: 'Gestão de Usuários e Permissões' },
                 { acao: 'auditoria', nome: 'Auditoria de Sistema (Logs)' },
+                { acao: 'calculadora', nome: 'Calculadora de Markup' },
                 { acao: 'fiscal', nome: 'Fiscal / NCM' },
                 { acao: 'configuracoes', nome: 'Configurações do Sistema' }
             ]

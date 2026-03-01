@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,6 +17,14 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long> {
 
     @Query("SELECT COUNT(p) FROM Produto p WHERE p.quantidadeEstoque <= p.estoqueMinimo")
     Long countProdutosBaixoEstoque();
+
+    @Query("SELECT p FROM Produto p WHERE p.quantidadeEstoque <= p.estoqueMinimo " +
+           "AND p.id IN (SELECT iv.produto.id FROM ItemVenda iv GROUP BY iv.produto.id HAVING COUNT(iv) > 5)")
+    List<Produto> findProdutosCriticosCurvaA();
+
+    @Query("SELECT p FROM Produto p WHERE p.quantidadeEstoque > 10 " +
+           "AND p.id NOT IN (SELECT iv.produto.id FROM ItemVenda iv WHERE iv.venda.dataHora >= :dataCorte)")
+    List<Produto> findProdutosSemVendaDesde(@Param("dataCorte") LocalDateTime dataCorte);
 
     @Query("SELECT p FROM Produto p WHERE " +
            "LOWER(p.nome) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +

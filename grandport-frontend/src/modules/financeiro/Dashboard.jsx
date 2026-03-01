@@ -8,6 +8,7 @@ import {
     Calendar,
     ArrowRight
 } from 'lucide-react';
+import { PainelInteligencia } from './PainelInteligencia';
 
 export const Dashboard = ({ setPaginaAtiva }) => {
     const [resumo, setResumo] = useState(null);
@@ -41,6 +42,9 @@ export const Dashboard = ({ setPaginaAtiva }) => {
                     </p>
                 </div>
             </div>
+
+            {/* Assistente Inteligente em Destaque */}
+            <PainelInteligencia />
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 

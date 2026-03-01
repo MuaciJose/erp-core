@@ -20,6 +20,7 @@ import { PlanoContas } from './modules/financeiro/PlanoContas';
 import { ConciliacaoBancaria } from './modules/financeiro/ConciliacaoBancaria';
 import { GestaoUsuarios } from './modules/cadastro/GestaoUsuarios';
 import { Auditoria } from './modules/cadastro/Auditoria';
+import { WidgetCalculadora } from './components/WidgetCalculadora';
 
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
@@ -59,7 +60,6 @@ function App() {
 
     const handleLogout = async () => {
         try {
-            // Notifica o backend para auditar o logout
             await api.post('/auth/logout');
         } catch (e) {
             console.error("Erro ao registrar logout", e);
@@ -124,6 +124,8 @@ function App() {
                     )}
                 </div>
             </main>
+
+            <WidgetCalculadora />
         </div>
     );
 }
