@@ -9,7 +9,7 @@ export const Parceiros = () => {
     const [busca, setBusca] = useState("");
     const [loading, setLoading] = useState(true);
     const [parceiroEmEdicao, setParceiroEmEdicao] = useState(null);
-    const [extratoAberto, setExtratoAberto] = useState(null); // ID do cliente para o extrato
+    const [extratoAberto, setExtratoAberto] = useState(null);
     const [abaAtiva, setAbaAtiva] = useState('CLIENTE');
 
     const carregarParceiros = async () => {
@@ -39,6 +39,7 @@ export const Parceiros = () => {
     if (parceiroEmEdicao) {
         return <CriarParceiro 
                     parceiroParaEditar={parceiroEmEdicao}
+                    parceirosLista={parceiros} // Passa a lista completa para o componente de edição
                     onSucesso={() => { setParceiroEmEdicao(null); carregarParceiros(); }} 
                     onCancelar={() => setParceiroEmEdicao(null)} 
                 />;

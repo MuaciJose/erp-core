@@ -1,0 +1,26 @@
+package com.grandport.erp.modules.veiculo.model;
+
+import com.grandport.erp.modules.parceiro.model.Parceiro;
+import jakarta.persistence.*;
+import lombok.Data;
+
+@Entity
+@Table(name = "veiculos")
+@Data
+public class Veiculo {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(unique = true, nullable = false)
+    private String placa;
+
+    private String marca;
+    private String modelo;
+    private Integer ano;
+    private Integer km; // Novo campo KM
+
+    @ManyToOne
+    @JoinColumn(name = "cliente_id")
+    private Parceiro cliente; // Dono atual
+}

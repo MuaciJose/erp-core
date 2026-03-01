@@ -1,5 +1,7 @@
 package com.grandport.erp.modules.vendas.model;
 
+import com.grandport.erp.modules.parceiro.model.Parceiro;
+import com.grandport.erp.modules.veiculo.model.Veiculo;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -16,14 +18,24 @@ public class Venda {
     
     private LocalDateTime dataHora = LocalDateTime.now();
     
+    @ManyToOne
+    @JoinColumn(name = "cliente_id")
+    private Parceiro cliente;
+
+    @ManyToOne
+    @JoinColumn(name = "veiculo_id")
+    private Veiculo veiculo;
+
+    private Integer kmVeiculo; // KM registrado no momento da venda
+
     @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ItemVenda> itens = new ArrayList<>();
     
     private BigDecimal desconto = BigDecimal.ZERO;
-    private BigDecimal valorSubtotal; // Soma dos produtos sem desconto
-    private BigDecimal valorTotal;    // Subtotal - Desconto
+    private BigDecimal valorSubtotal;
+    private BigDecimal valorTotal;
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "venda_id") // Garante a chave estrangeira na tabela de pagamentos
+    @JoinColumn(name = "venda_id")
     private List<PagamentoVenda> pagamentos = new ArrayList<>();
 }

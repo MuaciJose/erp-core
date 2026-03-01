@@ -7,5 +7,6 @@ public record VendaRequestDTO(
     List<ItemVendaDTO> itens,
     List<PagamentoVendaDTO> pagamentos,
     BigDecimal desconto,
-    Long parceiroId
+    Long parceiroId,
+    Long veiculoId
 ) {}

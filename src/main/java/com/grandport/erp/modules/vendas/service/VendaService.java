@@ -7,6 +7,8 @@ import com.grandport.erp.modules.financeiro.service.CaixaService;
 import com.grandport.erp.modules.financeiro.service.FinanceiroService;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
+import com.grandport.erp.modules.veiculo.model.Veiculo;
+import com.grandport.erp.modules.veiculo.repository.VeiculoRepository;
 import com.grandport.erp.modules.vendas.dto.ItemVendaDTO;
 import com.grandport.erp.modules.vendas.dto.PagamentoVendaDTO;
 import com.grandport.erp.modules.vendas.dto.VendaRequestDTO;
@@ -27,6 +29,7 @@ public class VendaService {
     @Autowired private VendaRepository vendaRepository;
     @Autowired private FinanceiroService financeiroService;
     @Autowired private ParceiroRepository parceiroRepository;
+    @Autowired private VeiculoRepository veiculoRepository;
     @Autowired private CaixaService caixaService;
     @Autowired private AuditoriaService auditoriaService;
 
@@ -35,6 +38,20 @@ public class VendaService {
         Venda venda = new Venda();
         BigDecimal subtotal = BigDecimal.ZERO;
 
+        // 1. Associa Cliente e Veículo (se informados)
+        if (dto.parceiroId() != null) {
+            Parceiro cliente = parceiroRepository.findById(dto.parceiroId())
+                .orElseThrow(() -> new RuntimeException("Cliente não encontrado."));
+            venda.setCliente(cliente);
+        }
+
+        if (dto.veiculoId() != null) {
+            Veiculo veiculo = veiculoRepository.findById(dto.veiculoId())
+                .orElseThrow(() -> new RuntimeException("Veículo não encontrado."));
+            venda.setVeiculo(veiculo);
+        }
+
+        // 2. Processa itens e abate estoque
         for (ItemVendaDTO itemDTO : dto.itens()) {
             Produto produto = produtoRepository.findById(itemDTO.produtoId())
                 .orElseThrow(() -> new RuntimeException("Produto não encontrado: ID " + itemDTO.produtoId()));
@@ -55,6 +72,7 @@ public class VendaService {
         venda.setDesconto(dto.desconto() != null ? dto.desconto() : BigDecimal.ZERO);
         venda.setValorTotal(subtotal.subtract(venda.getDesconto()));
 
+        // 3. Processa pagamentos
         for (PagamentoVendaDTO pagDTO : dto.pagamentos()) {
             PagamentoVenda pagamento = new PagamentoVenda();
             pagamento.setMetodo(pagDTO.metodo());

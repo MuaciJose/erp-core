@@ -13,6 +13,8 @@ import java.util.Optional;
 
 public interface VendaRepository extends JpaRepository<Venda, Long> {
 
+    List<Venda> findByVeiculoIdOrderByDataHoraDesc(Long veiculoId);
+
     @Query("SELECT SUM(v.valorTotal) FROM Venda v WHERE v.dataHora BETWEEN :inicio AND :fim")
     Optional<BigDecimal> sumTotalVendasPeriodo(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Maximize, Minimize, ShoppingCart, Ban } from 'lucide-react';
 import api from '../../api/axios';
-import { ModalFechamento } from './ModalFechamento';
+import { ModalFinalizarVenda } from './ModalFinalizarVenda';
 import { BuscaInteligente } from '../../components/BuscaInteligente';
 import { CupomVenda } from './CupomVenda';
 import { BarraClientePdv } from '../../components/BarraClientePdv';
@@ -16,7 +16,6 @@ export const Pdv = () => {
     const [clienteSelecionado, setClienteSelecionado] = useState(null);
     const audioBip = new Audio('/sounds/bip.mp3');
 
-    // --- LÓGICA DE TELA CHEIA ---
     const toggleFullScreen = () => {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(err => console.error(`Erro: ${err.message}`));
@@ -31,7 +30,6 @@ export const Pdv = () => {
         return () => document.removeEventListener('fullscreenchange', handleFSChange);
     }, []);
 
-    // --- LÓGICA DE ATALHOS GERAIS ---
     useHotkeys('f10', (e) => { e.preventDefault(); if (carrinho.length > 0) setModalAberto(true); }, { preventDefault: true }, [carrinho]);
     useHotkeys('f9', (e) => { e.preventDefault(); setShowModalPerdida(true); }, { preventDefault: true });
 
@@ -45,7 +43,6 @@ export const Pdv = () => {
         }
     }, { preventDefault: true }, [carrinho, modalAberto, showModalPerdida]);
 
-    // --- LÓGICA DO COMPONENTE ---
     const tocarBip = () => { audioBip.currentTime = 0; audioBip.play(); };
 
     const adicionarAoCarrinho = (produto, qtd = 1) => {
@@ -68,17 +65,13 @@ export const Pdv = () => {
     
     const formatCurrency = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    const finalizarVenda = async (metodoPagamento) => {
-        if (metodoPagamento === 'A_PRAZO' && !clienteSelecionado) {
-            alert("Selecione um cliente para vender a prazo!");
-            return;
-        }
-
+    const finalizarVenda = async (dadosFinalizacao) => {
         const total = calcularTotal();
         const dadosVenda = {
             itens: carrinho.map(item => ({ produtoId: item.id, quantidade: item.qtd })),
-            pagamentos: [{ metodo: metodoPagamento, valor: total }],
+            pagamentos: [{ metodo: dadosFinalizacao.metodoPagamento, valor: total }],
             parceiroId: clienteSelecionado ? clienteSelecionado.id : null,
+            veiculoId: dadosFinalizacao.veiculoId,
             desconto: clienteSelecionado?.percentualDesconto > 0 ? (carrinho.reduce((acc, item) => acc + (item.precoVenda * item.qtd), 0) - total) : 0
         };
 
@@ -193,7 +186,14 @@ export const Pdv = () => {
                 </div>
             </div>
 
-            <ModalFechamento isOpen={modalAberto} onClose={() => setModalAberto(false)} onFinalizar={finalizarVenda} totalVenda={calcularTotal()} clienteSelecionado={clienteSelecionado} />
+            {modalAberto && (
+                <ModalFinalizarVenda 
+                    totalVenda={calcularTotal()} 
+                    clienteSelecionado={clienteSelecionado} 
+                    onClose={() => setModalAberto(false)} 
+                    onConfirmarVenda={finalizarVenda} 
+                />
+            )}
 
             {showModalPerdida && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] print:hidden">
