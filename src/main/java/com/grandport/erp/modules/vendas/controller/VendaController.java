@@ -7,6 +7,7 @@ import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.service.VendaService;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,19 +20,9 @@ public class VendaController {
     @Autowired private VendaService service;
     @Autowired private VendaRepository repository;
 
-    @PostMapping
-    public ResponseEntity<Venda> realizarVenda(@RequestBody VendaRequestDTO dto) {
-        return ResponseEntity.ok(service.processarVenda(dto));
-    }
-
-    @PostMapping("/pedido")
-    public ResponseEntity<Venda> criarPedido(@RequestBody VendaRequestDTO dto) {
-        return ResponseEntity.ok(service.converterParaPedido(null, dto));
-    }
-
-    @PostMapping("/pedido/{id}")
-    public ResponseEntity<Venda> converterParaPedido(@PathVariable Long id, @RequestBody VendaRequestDTO dto) {
-        return ResponseEntity.ok(service.converterParaPedido(id, dto));
+    @GetMapping
+    public ResponseEntity<List<Venda>> listarTodas() {
+        return ResponseEntity.ok(repository.findAll(Sort.by(Sort.Direction.DESC, "dataHora")));
     }
 
     @PostMapping("/orcamento")
@@ -40,8 +31,13 @@ public class VendaController {
     }
 
     @PutMapping("/orcamento/{id}")
-    public ResponseEntity<Venda> atualizarOrcamento(@PathVariable Long id, @RequestBody VendaRequestDTO dto) {
-        return ResponseEntity.ok(service.atualizarOrcamento(id, dto));
+    public ResponseEntity<Venda> atualizarVenda(@PathVariable Long id, @RequestBody VendaRequestDTO dto) {
+        return ResponseEntity.ok(service.atualizarVenda(id, dto));
+    }
+
+    @PostMapping("/pedido")
+    public ResponseEntity<Venda> criarPedido(@RequestBody VendaRequestDTO dto) {
+        return ResponseEntity.ok(service.criarPedido(dto));
     }
 
     @GetMapping("/orcamentos")
@@ -59,9 +55,15 @@ public class VendaController {
         return ResponseEntity.ok(service.finalizarPagamentoPedido(id, pagamentos));
     }
 
+    // NOVA ROTA: O Caixa devolve a venda para o Vendedor
+    @PostMapping("/{id}/devolver")
+    public ResponseEntity<Venda> devolverAoVendedor(@PathVariable Long id) {
+        return ResponseEntity.ok(service.devolverAoVendedor(id));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(@PathVariable Long id) {
-        repository.deleteById(id);
+        service.excluirVenda(id);
         return ResponseEntity.noContent().build();
     }
 }

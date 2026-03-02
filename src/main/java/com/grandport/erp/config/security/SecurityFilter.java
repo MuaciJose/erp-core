@@ -25,22 +25,33 @@ public class SecurityFilter extends OncePerRequestFilter {
     private UsuarioRepository usuarioRepository;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) 
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        
-        var token = this.recoverToken(request);
-        
-        if (token != null) {
-            var login = tokenService.validateToken(token);
-            UserDetails user = usuarioRepository.findByUsername(login);
 
-            // Adiciona a verificação para garantir que o usuário existe no banco
-            if (user != null) {
-                var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+        var token = this.recoverToken(request);
+
+        if (token != null) {
+            try {
+                // Tenta validar o token. Se expirar, cai no catch silenciosamente.
+                var login = tokenService.validateToken(token);
+
+                if (login != null && !login.isEmpty()) {
+                    UserDetails user = usuarioRepository.findByUsername(login);
+
+                    // Adiciona a verificação para garantir que o usuário existe no banco
+                    if (user != null) {
+                        var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
+                }
+            } catch (Exception e) {
+                // Ignora o erro do token expirado silenciosamente.
+                // Se a rota precisar de autenticação, o Spring Security bloqueia lá na frente.
+                // Se for a rota /auth/login, a requisição passa limpa.
+                System.out.println("Token ignorado (provavelmente expirado ou inválido).");
             }
         }
-        
+
         filterChain.doFilter(request, response);
     }
 

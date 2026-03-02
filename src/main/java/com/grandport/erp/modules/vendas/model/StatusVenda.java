@@ -2,7 +2,8 @@ package com.grandport.erp.modules.vendas.model;
 
 public enum StatusVenda {
     ORCAMENTO,
-    AGUARDANDO_PAGAMENTO,
-    CONCLUIDA,
+    PEDIDO,                 // <-- NOVO STATUS ADICIONADO!
+    AGUARDANDO_PAGAMENTO,   // Fila do Caixa
+    CONCLUIDA,              // Faturado
     CANCELADA
 }

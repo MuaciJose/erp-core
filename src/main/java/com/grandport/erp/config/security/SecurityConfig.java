@@ -29,25 +29,29 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.POST, "/auth/login").permitAll() 
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
-                .requestMatchers("/uploads/**").permitAll()
-                .requestMatchers("/api/ncm/**").permitAll() 
-                .requestMatchers("/api/parceiros/consulta-cnpj/**").permitAll()
-                .requestMatchers("/api/parceiros/consulta-cep/**").permitAll()
-                
-                // Garante que qualquer requisição para /api/** seja permitida se autenticada
-                .requestMatchers("/api/**").authenticated()
-                .requestMatchers("/auth/logout").authenticated()
-                
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
-            .build();
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        // 1. A MÁGICA PARA O REACT: Permite todas as requisições OPTIONS (Preflight do CORS)
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // 2. Rotas Públicas
+                        .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
+                        .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers("/api/ncm/**").permitAll()
+                        .requestMatchers("/api/parceiros/consulta-cnpj/**").permitAll()
+                        .requestMatchers("/api/parceiros/consulta-cep/**").permitAll()
+
+                        // 3. Rotas Privadas (Garante que qualquer requisição para /api/** passe se autenticada)
+                        .requestMatchers("/api/**").authenticated()
+                        .requestMatchers("/auth/logout").authenticated()
+
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
     }
 
     @Bean
@@ -55,7 +59,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
         configuration.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE", "PATCH", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*")); // Permite todos os headers para evitar 403 por header faltando
+        configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setExposedHeaders(Arrays.asList("Authorization"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
@@ -66,7 +70,7 @@ public class SecurityConfig {
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
-    
+
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
