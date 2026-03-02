@@ -33,16 +33,14 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Rotas Públicas
                 .requestMatchers(HttpMethod.POST, "/auth/login").permitAll() 
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers("/api/ncm/**").permitAll() 
                 .requestMatchers("/api/parceiros/consulta-cnpj/**").permitAll()
                 .requestMatchers("/api/parceiros/consulta-cep/**").permitAll()
-
-                // Todas as outras rotas da API exigem apenas que o usuário esteja autenticado
-                // A lógica de permissão granular (telas) é controlada no Frontend e nos Services se necessário
+                
+                // Garante que qualquer requisição para /api/** seja permitida se autenticada
                 .requestMatchers("/api/**").authenticated()
                 .requestMatchers("/auth/logout").authenticated()
                 
@@ -57,7 +55,8 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
         configuration.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE", "PATCH", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        configuration.setAllowedHeaders(Arrays.asList("*")); // Permite todos os headers para evitar 403 por header faltando
+        configuration.setExposedHeaders(Arrays.asList("Authorization"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

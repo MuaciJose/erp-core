@@ -26,7 +26,12 @@ public class VendaController {
 
     @PostMapping("/pedido")
     public ResponseEntity<Venda> criarPedido(@RequestBody VendaRequestDTO dto) {
-        return ResponseEntity.ok(service.criarPedido(dto));
+        return ResponseEntity.ok(service.converterParaPedido(null, dto));
+    }
+
+    @PostMapping("/pedido/{id}")
+    public ResponseEntity<Venda> converterParaPedido(@PathVariable Long id, @RequestBody VendaRequestDTO dto) {
+        return ResponseEntity.ok(service.converterParaPedido(id, dto));
     }
 
     @PostMapping("/orcamento")
@@ -52,5 +57,11 @@ public class VendaController {
     @PostMapping("/{id}/pagar")
     public ResponseEntity<Venda> finalizarPagamento(@PathVariable Long id, @RequestBody List<PagamentoVendaDTO> pagamentos) {
         return ResponseEntity.ok(service.finalizarPagamentoPedido(id, pagamentos));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(@PathVariable Long id) {
+        repository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }

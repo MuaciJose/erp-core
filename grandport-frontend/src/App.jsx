@@ -21,7 +21,7 @@ import { ConciliacaoBancaria } from './modules/financeiro/ConciliacaoBancaria';
 import { GestaoUsuarios } from './modules/cadastro/GestaoUsuarios';
 import { Auditoria } from './modules/cadastro/Auditoria';
 import { WidgetCalculadora } from './components/WidgetCalculadora';
-import { OrcamentoPedido } from './modules/vendas/OrcamentoPedido';
+import { GestaoVendas } from './modules/vendas/GestaoVendas';
 import { FilaPedidosCaixa } from './modules/vendas/FilaPedidosCaixa';
 
 function App() {
@@ -106,7 +106,7 @@ function App() {
                         <>
                             {paginaAtiva === 'dash' && <Dashboard setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'vendas' && <Pdv setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'orcamentos' && <OrcamentoPedido />}
+                            {paginaAtiva === 'orcamentos' && <GestaoVendas />}
                             {paginaAtiva === 'fila-caixa' && <FilaPedidosCaixa setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'estoque' && <Produtos />}
                             {paginaAtiva === 'marcas' && <Marcas />}
