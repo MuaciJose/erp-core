@@ -1,31 +1,18 @@
 import React, { useState } from 'react';
-import { 
-    LayoutDashboard, 
-    DollarSign, 
-    Package, 
-    Users, 
-    Settings, 
-    ChevronDown, 
+import {
+    LayoutDashboard,
+    DollarSign,
+    Package,
+    Users,
+    Settings,
+    ChevronDown,
     ChevronRight,
     ShoppingCart,
-    FileText,
-    LogOut,
-    PieChart,
-    Landmark,
-    Layers,
-    Link as LinkIcon,
-    Ban,
-    Tag,
-    ShoppingBasket,
-    Calculator,
-    Wallet,
-    Activity,
-    ClipboardList,
-    Clock
+    LogOut
 } from 'lucide-react';
 
 export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }) => {
-    const [menuExpandido, setMenuExpandido] = useState('financeiro');
+    const [menuExpandido, setMenuExpandido] = useState('vendas');
 
     const toggleMenu = (menuId) => {
         setMenuExpandido(menuExpandido === menuId ? null : menuId);
@@ -42,12 +29,13 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         },
         {
             id: 'vendas',
-            titulo: 'Vendas & PDV',
+            titulo: 'Vendas & Frente de Loja',
             icone: <ShoppingCart size={20} />,
             submenus: [
-                { titulo: 'Ponto de Venda (PDV)', acao: 'vendas' },
-                { titulo: 'Orçamentos e Pedidos', acao: 'orcamentos' },
-                { titulo: 'Fila de Pedidos (Caixa)', acao: 'fila-caixa' }
+                { titulo: 'Ponto de Venda (PDV)', acao: 'pdv' },
+                { titulo: 'Balcão / Central', acao: 'vendas' },
+                { titulo: 'Fila do Caixa', acao: 'fila-caixa' },
+                { titulo: 'Controle de Caixa', acao: 'caixa' }
             ]
         },
         {
@@ -67,7 +55,6 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             titulo: 'Financeiro',
             icone: <DollarSign size={20} />,
             submenus: [
-                { titulo: 'Controle de Caixa', acao: 'caixa' },
                 { titulo: 'Contas a Pagar', acao: 'contas-pagar' },
                 { titulo: 'Contas a Receber', acao: 'contas-receber' },
                 { titulo: 'Contas Bancárias', acao: 'bancos' },
@@ -78,11 +65,11 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         },
         {
             id: 'cadastros',
-            titulo: 'Cadastros',
+            titulo: 'Administrativo',
             icone: <Users size={20} />,
             submenus: [
                 { titulo: 'Clientes & Fornecedores', acao: 'parceiros' },
-                { titulo: 'Vendedores / Usuários', acao: 'usuarios' },
+                { titulo: 'Equipe e Acessos', acao: 'usuarios' },
                 { titulo: 'Auditoria de Sistema', acao: 'auditoria' },
                 { titulo: 'Fiscal / NCM', acao: 'fiscal' }
             ]
@@ -125,11 +112,11 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                     <div key={menu.id}>
                         {menu.submenus ? (
                             <>
-                                <button 
+                                <button
                                     onClick={() => toggleMenu(menu.id)}
                                     className={`w-full flex items-center justify-between p-3 rounded-xl transition-all font-bold ${
                                         menuExpandido === menu.id || menu.submenus.some(sub => sub.acao === paginaAtiva)
-                                            ? 'bg-slate-800 text-blue-400' 
+                                            ? 'bg-slate-800 text-blue-400'
                                             : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                                     }`}
                                 >
@@ -147,8 +134,8 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                                                 key={index}
                                                 onClick={() => setPaginaAtiva(sub.acao)}
                                                 className={`w-full text-left p-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
-                                                    paginaAtiva === sub.acao 
-                                                        ? 'bg-blue-600 text-white shadow-md' 
+                                                    paginaAtiva === sub.acao
+                                                        ? 'bg-blue-600 text-white shadow-md'
                                                         : 'text-slate-400 hover:text-white hover:bg-slate-800'
                                                 }`}
                                             >
@@ -160,14 +147,14 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                                 )}
                             </>
                         ) : (
-                            <button 
+                            <button
                                 onClick={() => {
                                     setPaginaAtiva(menu.acao);
                                     setMenuExpandido(null);
                                 }}
                                 className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all font-bold ${
-                                    paginaAtiva === menu.acao 
-                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' 
+                                    paginaAtiva === menu.acao
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
                                         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                                 }`}
                             >
@@ -190,7 +177,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                             <p className="text-[10px] text-slate-400 font-bold uppercase">Acesso Personalizado</p>
                         </div>
                     </div>
-                    <button 
+                    <button
                         onClick={onLogout}
                         className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
                         title="Sair"

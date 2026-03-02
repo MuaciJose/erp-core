@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
 import {
     Search, FileText, Printer, CheckCircle, Package, User,
-    Trash2, ArrowRight, Tag, Percent, DollarSign, Save, FolderOpen, Car, X, Gauge, Phone, UserPlus, RefreshCw, AlertTriangle
+    Trash2, ArrowRight, Tag, Percent, DollarSign, Save, FolderOpen, Car, X, Gauge, Phone, UserPlus, RefreshCw, AlertTriangle, Info
 } from 'lucide-react';
 
 export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
@@ -35,9 +35,20 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     const [modalListaAberto, setModalListaAberto] = useState(false);
     const [orcamentosSalvos, setOrcamentosSalvos] = useState([]);
 
-    // ESTADOS DE AUTO-SAVE
+    // ESTADOS DE AUTO-SAVE E NOTIFICAÇÕES
     const [avisoRascunho, setAvisoRascunho] = useState(false);
     const [rascunhoCarregado, setRascunhoCarregado] = useState(false);
+    const [notificacao, setNotificacao] = useState(null);
+
+    // =================================================================================
+    // SISTEMA DE NOTIFICAÇÕES PROFISSIONAIS
+    // =================================================================================
+    const showToast = (tipo, titulo, mensagem) => {
+        setNotificacao({ tipo, titulo, mensagem });
+        setTimeout(() => {
+            setNotificacao(null);
+        }, 4000);
+    };
 
     // =================================================================================
     // FUNÇÃO DE VALIDAÇÃO DE ESTOQUE (FRONT-END)
@@ -46,8 +57,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         const itensSemEstoque = itens.filter(item => item.qtd > (item.estoqueDisponivel || 0));
 
         if (itensSemEstoque.length > 0) {
-            const listaNomes = itensSemEstoque.map(i => `- ${i.nome} (Pedido: ${i.qtd} | No Estoque: ${i.estoqueDisponivel || 0})`).join('\n');
-            alert(`⚠️ ATENÇÃO VENDEDOR: ESTOQUE INSUFICIENTE!\n\n${listaNomes}\n\nPor favor, ajuste as quantidades antes de prosseguir.`);
+            const listaNomes = itensSemEstoque.map(i => `• ${i.nome} (Pedido: ${i.qtd} | No Estoque: ${i.estoqueDisponivel || 0})`).join('\n');
+            showToast('erro', 'Estoque Insuficiente', `Os seguintes itens excedem a quantidade disponível:\n\n${listaNomes}\n\nAjuste as quantidades antes de prosseguir.`);
             return false;
         }
         return true;
@@ -153,7 +164,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     };
 
     const salvarNovoClienteRapido = async () => {
-        if (!novoCliente.nome) return alert("O Nome do cliente é obrigatório!");
+        if (!novoCliente.nome) return showToast('aviso', 'Atenção', 'O Nome do cliente é obrigatório!');
         try {
             const resCliente = await api.post('/api/parceiros', {
                 nome: novoCliente.nome, documento: novoCliente.documento, telefone: novoCliente.telefone, tipo: 'CLIENTE'
@@ -171,9 +182,11 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
             if (veiculosDoCliente.length > 0) setVeiculoSelecionado(veiculosDoCliente[0].id);
             setModalNovoClienteAberto(false);
             setNovoCliente({ nome: '', documento: '', telefone: '', placa: '', marca: '', modelo: '', ano: '', km: '' });
-            alert("Cliente cadastrado com sucesso!");
+            showToast('sucesso', 'Concluído', 'Cliente cadastrado com sucesso!');
             inputPecaRef.current?.focus();
-        } catch (error) { alert("Erro ao cadastrar cliente rápido."); }
+        } catch (error) {
+            showToast('erro', 'Erro no Cadastro', 'Ocorreu uma falha ao tentar cadastrar o cliente rápido.');
+        }
     };
 
     // BUSCA PEÇAS
@@ -207,7 +220,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
             nome: peca.nome,
             qtd: 1,
             preco: peca.precoVenda || 0,
-            estoqueDisponivel: peca.quantidadeEstoque || 0 // ADICIONADO PARA VALIDAÇÃO
+            estoqueDisponivel: peca.quantidadeEstoque || 0
         }]);
         setBuscaPeca(''); setResultadosPecas([]); inputPecaRef.current.focus();
     };
@@ -224,9 +237,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     // O CORAÇÃO DO FLUXO: Avança o status de forma estruturada.
     // =================================================================================
     const processarVendaAPI = async (statusDesejado) => {
-        if (itens.length === 0) return alert("Não pode guardar um documento vazio.");
+        if (itens.length === 0) return showToast('aviso', 'Documento Vazio', 'Não é possível guardar um documento sem itens.');
 
-        // VALIDAÇÃO DE ESTOQUE ANTES DE AVANÇAR
         if (statusDesejado === 'PEDIDO' || statusDesejado === 'AGUARDANDO_PAGAMENTO') {
             if (!validarEstoqueNoFront()) return;
         }
@@ -234,7 +246,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         const kmAtual = veiculoSelecionado && clienteSelecionado ? clienteSelecionado.veiculos.find(v => v.id == veiculoSelecionado)?.km : null;
 
         const payload = {
-            id: orcamentoId, // Opcional no POST, obrigatório no PUT
+            id: orcamentoId,
             status: statusDesejado,
             itens: itens.map(item => ({ produtoId: item.produtoId || item.id, quantidade: item.qtd, precoUnitario: item.preco })),
             desconto: valorDescontoReal,
@@ -248,15 +260,15 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                 await api.put(`/api/vendas/orcamento/${orcamentoId}`, payload);
 
                 if (statusDesejado === 'AGUARDANDO_PAGAMENTO') {
-                    alert("Enviado para a Fila do Caixa com sucesso!");
+                    showToast('sucesso', 'Sucesso!', 'Documento enviado para a Fila do Caixa.');
                     limparEcra();
-                    if (onVoltar) onVoltar();
+                    if (onVoltar) setTimeout(() => onVoltar(), 1500);
                     return;
                 } else if (statusDesejado === 'PEDIDO') {
-                    alert("Promovido a Pedido Oficial com sucesso!");
+                    showToast('sucesso', 'Aprovado', 'Promovido a Pedido Oficial com sucesso!');
                     setModo('PEDIDO');
                 } else {
-                    alert("Orçamento atualizado com sucesso!");
+                    showToast('sucesso', 'Salvo', 'Orçamento atualizado com sucesso!');
                     setModo('ORCAMENTO');
                 }
             } else {
@@ -265,23 +277,23 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                 setOrcamentoId(resposta.data.id);
 
                 if (statusDesejado === 'AGUARDANDO_PAGAMENTO') {
-                    alert("Enviado para a Fila do Caixa com sucesso!");
+                    showToast('sucesso', 'Sucesso!', 'Documento enviado para a Fila do Caixa.');
                     limparEcra();
-                    if (onVoltar) onVoltar();
+                    if (onVoltar) setTimeout(() => onVoltar(), 1500);
                     return;
                 } else if (statusDesejado === 'PEDIDO') {
-                    alert("Pedido Oficial criado com sucesso!");
+                    showToast('sucesso', 'Aprovado', 'Pedido Oficial criado com sucesso!');
                     setModo('PEDIDO');
                 } else {
-                    alert("Orçamento guardado com sucesso!");
+                    showToast('sucesso', 'Salvo', 'Orçamento guardado com sucesso!');
                     setModo('ORCAMENTO');
                 }
             }
             localStorage.removeItem('RASCUNHO_BALCAO');
         } catch (error) {
             console.error(error);
-            const msgErro = error.response?.data?.message || "Sem permissão (403) ou falha no servidor.";
-            alert("Erro ao processar o documento: " + msgErro);
+            const msgErro = error.response?.data?.message || "Ocorreu uma falha no servidor.";
+            showToast('erro', 'Falha na Operação', msgErro);
         }
     };
 
@@ -338,7 +350,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     };
 
     const handleImprimir = () => {
-        if (itens.length === 0) return alert("Adicione peças ao orçamento antes de imprimir.");
+        if (itens.length === 0) return showToast('aviso', 'Impressão Inválida', 'Adicione peças ao orçamento antes de imprimir.');
         window.print();
     };
 
@@ -347,6 +359,29 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
 
     return (
         <div className="flex flex-col h-full bg-white relative z-[15]">
+
+            {/* NOTIFICAÇÃO PROFISSIONAL FLUTUANTE */}
+            {notificacao && (
+                <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-[9999] animate-fade-in print:hidden w-full max-w-lg px-4">
+                    <div className={`p-4 rounded-2xl shadow-2xl flex items-start gap-4 border-l-4 ${
+                        notificacao.tipo === 'sucesso' ? 'bg-green-50 border-green-500 text-green-800' :
+                            notificacao.tipo === 'erro' ? 'bg-red-50 border-red-500 text-red-800' :
+                                'bg-orange-50 border-orange-500 text-orange-800'
+                    }`}>
+                        <div className="mt-1">
+                            {notificacao.tipo === 'sucesso' && <CheckCircle size={24} />}
+                            {notificacao.tipo === 'erro' && <AlertTriangle size={24} />}
+                            {notificacao.tipo === 'aviso' && <Info size={24} />}
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="font-black text-lg">{notificacao.titulo}</h4>
+                            <p className="text-sm font-medium mt-1 whitespace-pre-line leading-relaxed">{notificacao.mensagem}</p>
+                        </div>
+                        <button onClick={() => setNotificacao(null)} className="text-slate-400 hover:text-slate-700 transition-colors p-1"><X size={20}/></button>
+                    </div>
+                </div>
+            )}
+
             <div className="p-8 max-w-7xl mx-auto flex flex-col h-full animate-fade-in relative print:hidden">
 
                 {avisoRascunho && (
@@ -450,7 +485,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
 
                 <div className="relative mb-6 z-30">
                     <Search className="absolute left-4 top-4 text-slate-400" size={24} />
-                    <input ref={inputPecaRef} type="text" value={buscaPeca} onChange={(e) => setBuscaPeca(e.target.value)} onKeyDown={handleKeyDownPeca} placeholder="Pesquise Peças (Setas para navegar, Enter para adicionar)" className="w-full pl-14 pr-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-lg font-black text-slate-800 shadow-sm focus:border-blue-600 outline-none" />
+                    {/* AQUI ESTÁ A MUDANÇA NO PLACEHOLDER */}
+                    <input ref={inputPecaRef} type="text" value={buscaPeca} onChange={(e) => setBuscaPeca(e.target.value)} onKeyDown={handleKeyDownPeca} placeholder="Buscar por Código, Referência ou Descrição..." className="w-full pl-14 pr-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-lg font-black text-slate-800 shadow-sm focus:border-blue-600 outline-none" />
                     {resultadosPecas.length > 0 && (
                         <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
                             {resultadosPecas.map((peca, index) => (

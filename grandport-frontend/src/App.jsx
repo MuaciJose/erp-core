@@ -33,7 +33,9 @@ function App() {
     const definirTelaInicial = (usuario) => {
         const permissoes = usuario.permissoes || [];
         if (permissoes.includes('dash')) return 'dash';
+        if (permissoes.includes('pdv')) return 'pdv';
         if (permissoes.includes('vendas')) return 'vendas';
+        if (permissoes.includes('fila-caixa')) return 'fila-caixa';
         if (permissoes.length > 0) return permissoes[0];
         return '';
     };
@@ -41,7 +43,7 @@ function App() {
     useEffect(() => {
         const token = localStorage.getItem('grandport_token');
         const userSaved = localStorage.getItem('grandport_user');
-        
+
         if (token && userSaved) {
             api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
             const usuario = JSON.parse(userSaved);
@@ -85,11 +87,11 @@ function App() {
 
     return (
         <div className="flex h-screen w-screen bg-slate-50 overflow-hidden font-sans">
-            
+
             {!isFullScreen && (
-                <Sidebar 
-                    paginaAtiva={paginaAtiva} 
-                    setPaginaAtiva={setPaginaAtiva} 
+                <Sidebar
+                    paginaAtiva={paginaAtiva}
+                    setPaginaAtiva={setPaginaAtiva}
                     usuarioLogado={usuarioLogado}
                     onLogout={handleLogout}
                 />
@@ -104,10 +106,14 @@ function App() {
                         </div>
                     ) : (
                         <>
+                            {/* VENDAS E FRENTE DE LOJA */}
                             {paginaAtiva === 'dash' && <Dashboard setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'vendas' && <Pdv setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'orcamentos' && <GestaoVendas />}
+                            {paginaAtiva === 'pdv' && <Pdv setPaginaAtiva={setPaginaAtiva} />}
+                            {paginaAtiva === 'vendas' && <GestaoVendas />}
                             {paginaAtiva === 'fila-caixa' && <FilaPedidosCaixa setPaginaAtiva={setPaginaAtiva} />}
+                            {paginaAtiva === 'caixa' && <ControleCaixa />}
+
+                            {/* ESTOQUE E COMPRAS */}
                             {paginaAtiva === 'estoque' && <Produtos />}
                             {paginaAtiva === 'marcas' && <Marcas />}
                             {paginaAtiva === 'parceiros' && <Parceiros />}
@@ -115,13 +121,16 @@ function App() {
                             {paginaAtiva === 'compras' && <ImportarXml />}
                             {paginaAtiva === 'fiscal' && <CargaNcm />}
                             {paginaAtiva === 'faltas' && <RelatorioFaltas />}
+
+                            {/* FINANCEIRO E ADMINISTRATIVO */}
                             {paginaAtiva === 'contas-receber' && <ContasReceber />}
                             {paginaAtiva === 'contas-pagar' && <ContasPagar />}
-                            {paginaAtiva === 'caixa' && <ControleCaixa />}
                             {paginaAtiva === 'dre' && <FluxoCaixaDre />}
                             {paginaAtiva === 'bancos' && <ContasBancarias />}
                             {paginaAtiva === 'plano-contas' && <PlanoContas />}
                             {paginaAtiva === 'conciliacao' && <ConciliacaoBancaria />}
+
+                            {/* CADASTROS E CONFIGS */}
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
                             {paginaAtiva === 'auditoria' && <Auditoria />}
                         </>
