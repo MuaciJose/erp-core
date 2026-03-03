@@ -59,64 +59,102 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
     const kmAtual = veiculoObj.kmAtual || veiculoObj.quilometragem || '';
 
     // ============================================================================
-    // LAYOUT 1: BOBINA TÉRMICA (Ultra Compacto)
+    // LAYOUT 1: BOBINA TÉRMICA (Como você pediu: Fonte Maior e Mais Confortável)
     // ============================================================================
     const renderBobina = () => {
         const is58mm = tamanhoPapel === '58mm';
         const largura = is58mm ? 'max-w-[58mm] w-[58mm]' : 'max-w-[80mm] w-[80mm]';
-        const txt = is58mm ? 'text-[8px]' : 'text-[10px]';
+        const txt = is58mm ? 'text-[10px]' : 'text-xs';
 
         return (
-            <div className={`mx-auto ${largura} p-2 font-mono text-black leading-tight`}>
-                <div className="text-center border-b border-black pb-1 mb-1 border-dashed">
-                    <h1 className="text-sm font-black uppercase mb-1">{config.nomeFantasia || 'NOME DA LOJA'}</h1>
-                    {config.cnpj && <p className={`${txt} font-bold`}>CNPJ: {config.cnpj}</p>}
-                    {config.telefone && <p className={`${txt}`}>Tel: {config.telefone}</p>}
+            <div className={`mx-auto ${largura} p-4 font-mono text-black`}>
+                {/* CABEÇALHO DA EMPRESA */}
+                <div className="text-center border-b border-black pb-3 mb-3 border-dashed">
+                    <h1 className="text-lg font-black uppercase leading-none mb-2">{config.nomeFantasia || 'NOME DA LOJA'}</h1>
+                    {config.razaoSocial && <p className={`${txt} uppercase leading-tight`}>{config.razaoSocial}</p>}
+                    {config.cnpj && <p className={`${txt} mt-1 font-bold`}>CNPJ: {config.cnpj}</p>}
+                    {config.endereco && <p className={`${txt} whitespace-pre-line mt-1`}>{config.endereco}</p>}
+                    {config.telefone && <p className={`${txt} mt-1`}>Tel: {config.telefone}</p>}
                 </div>
 
-                <div className={`border-b border-black pb-1 mb-1 border-dashed ${txt}`}>
-                    <p className="font-black text-center mb-1 text-[11px]">{tituloCupom} #{pedido.id}</p>
+                {/* DADOS DO PEDIDO / CLIENTE */}
+                <div className={`border-b border-black pb-3 mb-3 border-dashed ${txt}`}>
+                    <p className="font-black text-center mb-2 text-sm">{tituloCupom} - #{pedido.id}</p>
                     <p><strong>Data:</strong> {new Date(pedido.dataHora || Date.now()).toLocaleString('pt-BR')}</p>
-                    <p className="truncate"><strong>Cli:</strong> {extrairNomeCliente(pedido.cliente)}</p>
-                    {veiculoNome !== 'Nenhum' && <p className="truncate"><strong>Vei:</strong> {veiculoNome} {placa && `(${placa})`}</p>}
-                    {config.exibirVendedorCupom && <p><strong>Vend:</strong> {vendedorNome}</p>}
+                    <p><strong>Cliente:</strong> {extrairNomeCliente(pedido.cliente)}</p>
+
+                    {veiculoNome !== 'Nenhum' && (
+                        <p><strong>Veículo:</strong> {veiculoNome} {placa && `(${placa})`}</p>
+                    )}
+
+                    {config.exibirVendedorCupom && (
+                        <p><strong>Vend:</strong> {vendedorNome}</p>
+                    )}
+
+                    {isOrcamento && (
+                        <p className="font-bold mt-1">Válido por {config.diasValidadeOrcamento} dias.</p>
+                    )}
                 </div>
 
-                <table className={`w-full text-left mb-1 ${txt}`}>
+                {/* LISTA DE ITENS */}
+                <table className={`w-full text-left mb-4 ${txt}`}>
                     <thead>
                     <tr className="border-b border-black border-dashed">
-                        <th className="pb-0.5">DESCRIÇÃO</th>
-                        <th className="pb-0.5 text-center">QTD</th>
-                        <th className="pb-0.5 text-right">TOTAL</th>
+                        <th className="pb-2 w-2/3">DESCRIÇÃO</th>
+                        <th className="pb-2 text-center">QTD</th>
+                        <th className="pb-2 text-right">TOTAL</th>
                     </tr>
                     </thead>
                     <tbody className="align-top">
                     {(pedido.itens || []).map((item, index) => {
                         const preco = Number(item.precoUnitario || item.preco) || 0;
                         const qtd = Number(item.quantidade || item.qtd) || 0;
+                        const nome = item.produto?.nome || item.nome || 'Produto Indefinido';
+                        const codigo = item.produto?.sku || item.codigo || 'S/N';
+
                         return (
                             <tr key={index} className="border-b border-gray-300 border-dotted">
-                                <td className="py-0.5 pr-1 leading-none">
-                                    <p className="font-bold">{item.produto?.nome || item.nome}</p>
-                                    <p className="text-[8px] text-gray-600">{item.produto?.sku || item.codigo || 'S/N'}</p>
+                                <td className="py-2 pr-1">
+                                    <p className="font-bold">{nome}</p>
+                                    <p className="text-[10px] text-gray-500">Cód: {codigo}</p>
                                 </td>
-                                <td className="py-0.5 text-center font-bold">{qtd}</td>
-                                <td className="py-0.5 text-right font-bold">{(preco * qtd).toFixed(2)}</td>
+                                <td className="py-2 text-center font-bold">{qtd}</td>
+                                <td className="py-2 text-right font-bold">{(preco * qtd).toFixed(2)}</td>
                             </tr>
                         )
                     })}
                     </tbody>
                 </table>
 
-                <div className={`border-t border-black pt-1 mb-2 border-dashed flex flex-col items-end ${txt}`}>
-                    {valorDesconto > 0 && <div className="w-full flex justify-between text-gray-600"><span>Subtotal:</span><span>{valorSubtotal.toFixed(2)}</span></div>}
-                    {valorDesconto > 0 && <div className="w-full flex justify-between text-gray-600"><span>Desc:</span><span>-{valorDesconto.toFixed(2)}</span></div>}
-                    <div className="w-full flex justify-between font-black mt-1 pt-1 border-t border-black text-xs"><span>TOTAL:</span><span>R$ {valorTotal.toFixed(2)}</span></div>
-                    {!isOrcamento && <div className="w-full flex justify-between mt-1 font-bold"><span>Pagto:</span><span className="uppercase">{pedido.metodoPagamento || 'DINH'}</span></div>}
+                {/* TOTAIS E PAGAMENTO */}
+                <div className={`border-t border-black pt-2 mb-4 border-dashed flex flex-col items-end ${txt}`}>
+                    <div className="w-full flex justify-between mb-1 text-gray-600">
+                        <span>Subtotal:</span>
+                        <span>R$ {valorSubtotal.toFixed(2)}</span>
+                    </div>
+                    {valorDesconto > 0 && (
+                        <div className="w-full flex justify-between mb-1 text-gray-600">
+                            <span>Desconto:</span>
+                            <span>- R$ {valorDesconto.toFixed(2)}</span>
+                        </div>
+                    )}
+                    <div className="w-full flex justify-between font-black mt-2 pt-2 border-t border-black text-sm">
+                        <span>TOTAL:</span>
+                        <span>R$ {valorTotal.toFixed(2)}</span>
+                    </div>
+
+                    {!isOrcamento && (
+                        <div className="w-full flex justify-between mt-3 font-bold">
+                            <span>Pagamento:</span>
+                            <span className="uppercase">{pedido.metodoPagamento || 'DINHEIRO'}</span>
+                        </div>
+                    )}
                 </div>
 
-                <div className={`text-center mt-2 ${txt}`}>
-                    <p className="font-bold leading-tight">{isOrcamento ? 'Orcamento sujeito a alteracao.' : config.mensagemRodape}</p>
+                {/* RODAPÉ CONFIGURÁVEL */}
+                <div className={`text-center mt-6 ${txt}`}>
+                    <p className="whitespace-pre-line font-bold">{isOrcamento ? 'Orçamento sujeito a alteração de valores e disponibilidade de estoque.' : config.mensagemRodape}</p>
+                    <p className="mt-4 text-[9px] text-gray-400 font-sans">Gerado por Grandport ERP</p>
                 </div>
             </div>
         );
