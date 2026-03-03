@@ -21,14 +21,16 @@ public class ErpCoreApplication {
     @Bean
     CommandLineRunner initDatabase(UsuarioRepository repository, PasswordEncoder passwordEncoder) {
         return args -> {
+            // LISTA ATUALIZADA: Agora inclui "pdv" e "ajuste_estoque"
             List<String> todasPermissoes = Arrays.asList(
-                "dash", "vendas", "orcamentos", "fila-caixa", "estoque", "marcas", "compras", "previsao", "faltas",
-                "caixa", "contas-pagar", "contas-receber", "bancos", "conciliacao", "plano-contas", "dre",
-                "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes", "calculadora"
+                    "dash", "pdv", "vendas", "orcamentos", "fila-caixa", "caixa",
+                    "estoque", "marcas", "ajuste_estoque", "compras", "previsao", "faltas",
+                    "contas-pagar", "contas-receber", "bancos", "conciliacao", "plano-contas", "dre",
+                    "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes", "calculadora"
             );
 
             Usuario admin = (Usuario) repository.findByUsername("admin");
-            
+
             if (admin == null) {
                 admin = new Usuario();
                 admin.setUsername("admin");
