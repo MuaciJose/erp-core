@@ -59,7 +59,7 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
     const kmAtual = veiculoObj.kmAtual || veiculoObj.quilometragem || '';
 
     // ============================================================================
-    // LAYOUT 1: BOBINA TÉRMICA (Como você pediu: Fonte Maior e Mais Confortável)
+    // LAYOUT 1: BOBINA TÉRMICA
     // ============================================================================
     const renderBobina = () => {
         const is58mm = tamanhoPapel === '58mm';
@@ -68,7 +68,6 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
 
         return (
             <div className={`mx-auto ${largura} p-4 font-mono text-black`}>
-                {/* CABEÇALHO DA EMPRESA */}
                 <div className="text-center border-b border-black pb-3 mb-3 border-dashed">
                     <h1 className="text-lg font-black uppercase leading-none mb-2">{config.nomeFantasia || 'NOME DA LOJA'}</h1>
                     {config.razaoSocial && <p className={`${txt} uppercase leading-tight`}>{config.razaoSocial}</p>}
@@ -77,26 +76,16 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     {config.telefone && <p className={`${txt} mt-1`}>Tel: {config.telefone}</p>}
                 </div>
 
-                {/* DADOS DO PEDIDO / CLIENTE */}
                 <div className={`border-b border-black pb-3 mb-3 border-dashed ${txt}`}>
-                    <p className="font-black text-center mb-2 text-sm">{tituloCupom} - #{pedido.id}</p>
+                    {/* REDUZIDO: de text-sm para text-[10px] */}
+                    <p className="font-black text-center mb-2 text-[10px]">{tituloCupom} - #{pedido.id}</p>
                     <p><strong>Data:</strong> {new Date(pedido.dataHora || Date.now()).toLocaleString('pt-BR')}</p>
                     <p><strong>Cliente:</strong> {extrairNomeCliente(pedido.cliente)}</p>
-
-                    {veiculoNome !== 'Nenhum' && (
-                        <p><strong>Veículo:</strong> {veiculoNome} {placa && `(${placa})`}</p>
-                    )}
-
-                    {config.exibirVendedorCupom && (
-                        <p><strong>Vend:</strong> {vendedorNome}</p>
-                    )}
-
-                    {isOrcamento && (
-                        <p className="font-bold mt-1">Válido por {config.diasValidadeOrcamento} dias.</p>
-                    )}
+                    {veiculoNome !== 'Nenhum' && <p><strong>Veículo:</strong> {veiculoNome} {placa && `(${placa})`}</p>}
+                    {config.exibirVendedorCupom && <p><strong>Vend:</strong> {vendedorNome}</p>}
+                    {isOrcamento && <p className="font-bold mt-1">Válido por {config.diasValidadeOrcamento} dias.</p>}
                 </div>
 
-                {/* LISTA DE ITENS */}
                 <table className={`w-full text-left mb-4 ${txt}`}>
                     <thead>
                     <tr className="border-b border-black border-dashed">
@@ -109,14 +98,11 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     {(pedido.itens || []).map((item, index) => {
                         const preco = Number(item.precoUnitario || item.preco) || 0;
                         const qtd = Number(item.quantidade || item.qtd) || 0;
-                        const nome = item.produto?.nome || item.nome || 'Produto Indefinido';
-                        const codigo = item.produto?.sku || item.codigo || 'S/N';
-
                         return (
                             <tr key={index} className="border-b border-gray-300 border-dotted">
                                 <td className="py-2 pr-1">
-                                    <p className="font-bold">{nome}</p>
-                                    <p className="text-[10px] text-gray-500">Cód: {codigo}</p>
+                                    <p className="font-bold">{item.produto?.nome || item.nome}</p>
+                                    <p className="text-[10px] text-gray-500">Cód: {item.produto?.sku || item.codigo || 'S/N'}</p>
                                 </td>
                                 <td className="py-2 text-center font-bold">{qtd}</td>
                                 <td className="py-2 text-right font-bold">{(preco * qtd).toFixed(2)}</td>
@@ -126,34 +112,15 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     </tbody>
                 </table>
 
-                {/* TOTAIS E PAGAMENTO */}
                 <div className={`border-t border-black pt-2 mb-4 border-dashed flex flex-col items-end ${txt}`}>
-                    <div className="w-full flex justify-between mb-1 text-gray-600">
-                        <span>Subtotal:</span>
-                        <span>R$ {valorSubtotal.toFixed(2)}</span>
-                    </div>
-                    {valorDesconto > 0 && (
-                        <div className="w-full flex justify-between mb-1 text-gray-600">
-                            <span>Desconto:</span>
-                            <span>- R$ {valorDesconto.toFixed(2)}</span>
-                        </div>
-                    )}
-                    <div className="w-full flex justify-between font-black mt-2 pt-2 border-t border-black text-sm">
-                        <span>TOTAL:</span>
-                        <span>R$ {valorTotal.toFixed(2)}</span>
-                    </div>
-
-                    {!isOrcamento && (
-                        <div className="w-full flex justify-between mt-3 font-bold">
-                            <span>Pagamento:</span>
-                            <span className="uppercase">{pedido.metodoPagamento || 'DINHEIRO'}</span>
-                        </div>
-                    )}
+                    <div className="w-full flex justify-between mb-1 text-gray-600"><span>Subtotal:</span><span>R$ {valorSubtotal.toFixed(2)}</span></div>
+                    {valorDesconto > 0 && <div className="w-full flex justify-between mb-1 text-gray-600"><span>Desconto:</span><span>- R$ {valorDesconto.toFixed(2)}</span></div>}
+                    <div className="w-full flex justify-between font-black mt-2 pt-2 border-t border-black text-sm"><span>TOTAL:</span><span>R$ {valorTotal.toFixed(2)}</span></div>
+                    {!isOrcamento && <div className="w-full flex justify-between mt-3 font-bold"><span>Pagamento:</span><span className="uppercase">{pedido.metodoPagamento || 'DINHEIRO'}</span></div>}
                 </div>
 
-                {/* RODAPÉ CONFIGURÁVEL */}
                 <div className={`text-center mt-6 ${txt}`}>
-                    <p className="whitespace-pre-line font-bold">{isOrcamento ? 'Orçamento sujeito a alteração de valores e disponibilidade de estoque.' : config.mensagemRodape}</p>
+                    <p className="whitespace-pre-line font-bold">{isOrcamento ? 'Orçamento sujeito a alteração de valores.' : config.mensagemRodape}</p>
                     <p className="mt-4 text-[9px] text-gray-400 font-sans">Gerado por Grandport ERP</p>
                 </div>
             </div>
@@ -161,32 +128,36 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
     };
 
     // ============================================================================
-    // LAYOUT 2: FOLHA A4 OFICIAL (Ultra Compacto / Econômico)
+    // LAYOUT 2: FOLHA A4 OFICIAL
     // ============================================================================
     const renderA4 = () => {
         return (
             <div className="mx-auto w-[210mm] min-h-[297mm] p-8 font-sans bg-white text-slate-900 leading-snug">
 
-                {/* CABEÇALHO */}
                 <div className="flex justify-between items-start border-b-2 border-slate-800 pb-3 mb-4">
-                    <div className="max-w-md">
-                        <h1 className="text-xl font-black uppercase tracking-tight">{config.nomeFantasia || 'NOME DA LOJA'}</h1>
-                        {config.razaoSocial && <p className="text-[10px] font-bold text-slate-600 uppercase mt-0.5">{config.razaoSocial}</p>}
-                        <div className="mt-1 flex flex-wrap gap-x-3 text-[10px] text-slate-700">
-                            {config.cnpj && <span><strong>CNPJ:</strong> {config.cnpj}</span>}
-                            {config.telefone && <span><strong>TEL:</strong> {config.telefone}</span>}
-                            {config.endereco && <span className="w-full"><strong>END:</strong> {config.endereco}</span>}
+                    <div className="flex items-center gap-4">
+                        {config.logoBase64 && (
+                            <img src={config.logoBase64} alt="Logo" className="w-20 h-20 object-contain" />
+                        )}
+                        <div className="max-w-md">
+                            <h1 className="text-xl font-black uppercase tracking-tight">{config.nomeFantasia || 'NOME DA LOJA'}</h1>
+                            {config.razaoSocial && <p className="text-[10px] font-bold text-slate-600 uppercase mt-0.5">{config.razaoSocial}</p>}
+                            <div className="mt-1 flex flex-wrap gap-x-3 text-[10px] text-slate-700">
+                                {config.cnpj && <span><strong>CNPJ:</strong> {config.cnpj}</span>}
+                                {config.telefone && <span><strong>TEL:</strong> {config.telefone}</span>}
+                                {config.endereco && <span className="w-full"><strong>END:</strong> {config.endereco}</span>}
+                            </div>
                         </div>
                     </div>
                     <div className="text-right">
-                        <h2 className="text-lg font-black uppercase border border-slate-800 px-3 py-1 rounded bg-slate-50 inline-block">{tituloCupom}</h2>
+                        {/* REDUZIDO: de text-lg para text-sm para o título ficar discreto */}
+                        <h2 className="text-sm font-black uppercase border border-slate-800 px-3 py-1 rounded bg-slate-50 inline-block">{tituloCupom}</h2>
                         <p className="text-base font-black mt-1">Nº {pedido.id}</p>
                         <p className="text-[10px] font-medium text-slate-600">Emitido: {new Date(pedido.dataHora || Date.now()).toLocaleString('pt-BR')}</p>
                         {isOrcamento && <p className="text-[10px] font-bold text-red-600 mt-0.5">Válido por {config.diasValidadeOrcamento} dias</p>}
                     </div>
                 </div>
 
-                {/* DADOS DO CLIENTE E VEÍCULO (Caixa Baixa) */}
                 <div className="border border-slate-300 rounded p-2 mb-4 flex justify-between bg-slate-50 text-xs">
                     <div>
                         <p className="text-[9px] font-black uppercase text-slate-500 mb-0.5">Cliente</p>
@@ -205,7 +176,6 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     </div>
                 </div>
 
-                {/* TABELA DE ITENS (Sem preenchimentos exagerados) */}
                 <table className="w-full text-left border-collapse mb-4">
                     <thead>
                     <tr className="border-b-2 border-slate-800 text-slate-800">
@@ -220,12 +190,10 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     {(pedido.itens || []).map((item, index) => {
                         const preco = Number(item.precoUnitario || item.preco) || 0;
                         const qtd = Number(item.quantidade || item.qtd) || 0;
-                        const nome = item.produto?.nome || item.nome || 'Produto Indefinido';
-                        const codigo = item.produto?.sku || item.codigo || 'S/N';
                         return (
                             <tr key={index} className="border-b border-slate-200 text-[11px]">
-                                <td className="py-1 px-1 font-mono text-slate-600">{codigo}</td>
-                                <td className="py-1 px-1 font-bold text-slate-900">{nome}</td>
+                                <td className="py-1 px-1 font-mono text-slate-600">{item.produto?.sku || item.codigo || 'S/N'}</td>
+                                <td className="py-1 px-1 font-bold text-slate-900">{item.produto?.nome || item.nome}</td>
                                 <td className="py-1 px-1 text-center font-bold">{qtd}</td>
                                 <td className="py-1 px-1 text-right text-slate-700">R$ {preco.toFixed(2)}</td>
                                 <td className="py-1 px-1 text-right font-black text-slate-900">R$ {(preco * qtd).toFixed(2)}</td>
@@ -235,7 +203,6 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     </tbody>
                 </table>
 
-                {/* TOTAIS E ASSINATURA */}
                 <div className="flex justify-between items-end mt-4">
                     <div className="w-1/2">
                         {!isOrcamento && (
@@ -256,9 +223,8 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     </div>
                 </div>
 
-                {/* RODAPÉ A4 */}
                 <div className="text-center mt-6 text-[10px] text-slate-500 font-medium">
-                    <p>{isOrcamento ? 'Orçamento sujeito a alteração de valores e disponibilidade de estoque.' : config.mensagemRodape}</p>
+                    <p>{isOrcamento ? 'Orçamento sujeito a alteração de valores.' : config.mensagemRodape}</p>
                 </div>
             </div>
         );

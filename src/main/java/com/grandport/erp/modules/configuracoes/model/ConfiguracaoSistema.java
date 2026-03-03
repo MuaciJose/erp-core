@@ -39,4 +39,7 @@ public class ConfiguracaoSistema {
 
     private Boolean permitirEstoqueNegativoGlobal = false;
     private Integer diasValidadeOrcamento = 5;
+
+    @Column(columnDefinition = "TEXT")
+    private String logoBase64;
 }
