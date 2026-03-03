@@ -10,9 +10,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/ncm")
+@RequestMapping("/api/ncms")
 @Tag(name = "Fiscal - NCM")
 public class NcmController {
 
@@ -30,8 +31,37 @@ public class NcmController {
         }
     }
 
+    // NOVA ROTA: LIMPAR TABELA (ESSENCIAL ANTES DE NOVA IMPORTAÇÃO)
+    @DeleteMapping("/limpar-todos")
+    @Operation(summary = "Remove todos os NCMs cadastrados para permitir uma nova importação limpa")
+    public ResponseEntity<Map<String, String>> limparTudo() {
+        try {
+            service.limparTabela();
+            return ResponseEntity.ok(Map.of("message", "Tabela de NCMs limpa com sucesso!"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Erro ao limpar tabela: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping
+    @Operation(summary = "Lista ou Busca NCM por código ou descrição (Usado pelo Autocomplete)")
+    public ResponseEntity<List<Ncm>> listarOuBuscar(@RequestParam(value = "busca", required = false) String busca) {
+        if (busca == null || busca.trim().isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        List<Ncm> resultados = service.buscarNcm(busca);
+
+        // Limita a 50 resultados para manter a performance do Front-end
+        if (resultados.size() > 50) {
+            return ResponseEntity.ok(resultados.subList(0, 50));
+        }
+
+        return ResponseEntity.ok(resultados);
+    }
+
+    // Mantido por compatibilidade
     @GetMapping("/busca")
-    @Operation(summary = "Busca NCM por código ou descrição")
     public ResponseEntity<List<Ncm>> buscar(@RequestParam("q") String termo) {
         return ResponseEntity.ok(service.buscarNcm(termo));
     }

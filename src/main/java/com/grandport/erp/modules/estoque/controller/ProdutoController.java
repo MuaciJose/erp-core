@@ -26,11 +26,30 @@ public class ProdutoController {
     @Autowired private FileStorageService fileService;
     @Autowired private ProdutoRepository produtoRepository;
 
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    // =========================================================================================
+    // 1. ROTAS WEB (JSON PADRÃO) - O React usa estas rotas!
+    // =========================================================================================
+
+    @PostMapping
+    public ResponseEntity<Produto> cadastrar(@RequestBody ProdutoRequestDTO dto) {
+        // Envia null na foto, pois o React já envia a fotoUrl/fotoLocalPath direto no DTO
+        return ResponseEntity.ok(service.cadastrar(dto, null));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Produto> atualizar(@PathVariable Long id, @RequestBody ProdutoRequestDTO dto) {
+        return ResponseEntity.ok(service.atualizar(id, dto, null));
+    }
+
+    // =========================================================================================
+    // 2. ROTAS MOBILE/AVANÇADAS (MULTIPART) - Para envio físico de arquivos
+    // =========================================================================================
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Produto> cadastrarComFoto(
             @RequestPart("produto") ProdutoRequestDTO dto,
             @RequestPart(value = "image", required = false) MultipartFile file) {
-        
+
         String imagePath = null;
         if (file != null && !file.isEmpty()) {
             imagePath = fileService.salvarArquivo(file);
@@ -39,12 +58,12 @@ public class ProdutoController {
         return ResponseEntity.ok(service.cadastrar(dto, imagePath));
     }
 
-    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<Produto> atualizar(
+    @PutMapping(value = "/{id}/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Produto> atualizarComFoto(
             @PathVariable Long id,
             @RequestPart("produto") ProdutoRequestDTO dto,
             @RequestPart(value = "image", required = false) MultipartFile file) {
-        
+
         String imagePath = null;
         if (file != null && !file.isEmpty()) {
             imagePath = fileService.salvarArquivo(file);
@@ -52,6 +71,10 @@ public class ProdutoController {
 
         return ResponseEntity.ok(service.atualizar(id, dto, imagePath));
     }
+
+    // =========================================================================================
+    // 3. DEMAIS ROTAS (MANTIDAS INTACTAS)
+    // =========================================================================================
 
     @PutMapping("/atualizar-precos")
     public ResponseEntity<Void> atualizarPrecos(@RequestBody List<AtualizarPrecoRequestDTO> precos) {
@@ -85,8 +108,8 @@ public class ProdutoController {
     @GetMapping("/mobile/scan/{ean}")
     public ResponseEntity<ProdutoResponseDTO> scanProduto(@PathVariable String ean) {
         return produtoRepository.findByCodigoBarras(ean)
-            .map(p -> ResponseEntity.ok(new ProdutoResponseDTO(p)))
-            .orElse(ResponseEntity.notFound().build());
+                .map(p -> ResponseEntity.ok(new ProdutoResponseDTO(p)))
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/alertas")
@@ -97,9 +120,9 @@ public class ProdutoController {
 
     @PatchMapping("/{id}/ajuste-estoque")
     public ResponseEntity<Produto> ajustarEstoque(
-            @PathVariable Long id, 
+            @PathVariable Long id,
             @RequestBody Map<String, Object> dados) {
-        
+
         Integer novaQuantidade = (Integer) dados.get("quantidade");
         String motivo = (String) dados.get("motivo");
 

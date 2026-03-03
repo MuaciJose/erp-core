@@ -42,10 +42,18 @@ public class VendaService {
             Produto produto = produtoRepository.findById(itemDTO.produtoId())
                     .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
 
-            if (produto.getQuantidadeEstoque() < itemDTO.quantidade()) {
+            // MÁGICA: Se a flag estiver ativa, ignora a falta de estoque!
+            if (Boolean.TRUE.equals(produto.getPermitirEstoqueNegativo())) {
+                continue;
+            }
+
+            // Proteção contra nulos caso existam produtos antigos sem a quantidade preenchida
+            int estoqueDisponivel = produto.getQuantidadeEstoque() != null ? produto.getQuantidadeEstoque() : 0;
+
+            if (estoqueDisponivel < itemDTO.quantidade()) {
                 throw new RuntimeException("Estoque insuficiente da peça: " + produto.getNome()
-                        + " (Faltam " + (itemDTO.quantidade() - produto.getQuantidadeEstoque())
-                        + " unidades. Disponível: " + produto.getQuantidadeEstoque() + ")");
+                        + " (Faltam " + (itemDTO.quantidade() - estoqueDisponivel)
+                        + " unidades. Disponível: " + estoqueDisponivel + ")");
             }
         }
     }
@@ -59,9 +67,7 @@ public class VendaService {
 
     @Transactional
     public Venda criarPedido(VendaRequestDTO dto) {
-        // Bloqueia o vendedor logo na criação se não houver estoque!
         validarEstoque(dto);
-
         Venda venda = new Venda();
         venda.setStatus(StatusVenda.AGUARDANDO_PAGAMENTO);
         return preencherESalvarVenda(venda, dto);
@@ -72,12 +78,10 @@ public class VendaService {
         Venda venda = vendaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Registro não encontrado"));
 
-        // REGRA DE SEGURANÇA 1
         if (venda.getStatus() == StatusVenda.CONCLUIDA) {
             throw new RuntimeException("Operação Negada: Vendas faturadas não podem ser alteradas.");
         }
 
-        // REGRA DE SEGURANÇA 2
         if (venda.getStatus() == StatusVenda.AGUARDANDO_PAGAMENTO && (dto.status() == StatusVenda.ORCAMENTO || dto.status() == StatusVenda.PEDIDO)) {
             throw new RuntimeException("Operação Negada: O documento já está no Caixa e só pode ser devolvido através da tela do Caixa.");
         }
@@ -85,8 +89,6 @@ public class VendaService {
             throw new RuntimeException("Operação Negada: Um Pedido Oficial não pode ser revertido para Orçamento.");
         }
 
-        // REGRA DE SEGURANÇA 3 (A MÁGICA ACONTECE AQUI):
-        // Se o vendedor clicar em "Avançar para Pedido" ou "Enviar para o Caixa", checamos o estoque!
         if (dto.status() == StatusVenda.PEDIDO || dto.status() == StatusVenda.AGUARDANDO_PAGAMENTO) {
             validarEstoque(dto);
         }
@@ -95,7 +97,6 @@ public class VendaService {
             venda.setStatus(dto.status());
         }
 
-        // Limpa os itens antigos para reescrever
         venda.getItens().clear();
 
         Venda salva = preencherESalvarVenda(venda, dto);
@@ -174,10 +175,16 @@ public class VendaService {
             throw new RuntimeException("Este pedido já foi faturado!");
         }
 
-        // Mantemos a trava no Caixa apenas como segurança extra (ex: se 2 clientes pegarem a última peça ao mesmo tempo)
         for (ItemVenda item : venda.getItens()) {
             Produto produto = item.getProduto();
-            if (produto.getQuantidadeEstoque() < item.getQuantidade()) {
+
+            // MÁGICA NO CAIXA TAMBÉM: Ignora se a flag estiver ativa
+            if (Boolean.TRUE.equals(produto.getPermitirEstoqueNegativo())) {
+                continue;
+            }
+
+            int estoqueDisponivel = produto.getQuantidadeEstoque() != null ? produto.getQuantidadeEstoque() : 0;
+            if (estoqueDisponivel < item.getQuantidade()) {
                 throw new RuntimeException("ATENÇÃO CAIXA: O Estoque desta peça acabou enquanto o cliente estava na fila. Devolva o pedido ao vendedor. (" + produto.getNome() + ")");
             }
         }
@@ -197,10 +204,12 @@ public class VendaService {
             }
         }
 
-        // Abate o estoque finalmente
         for (ItemVenda item : venda.getItens()) {
             Produto produto = item.getProduto();
-            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - item.getQuantidade());
+
+            // Abate o estoque mesmo que fique negativo (se a flag permitir, ele ficará ex: -2)
+            int estoqueAtual = produto.getQuantidadeEstoque() != null ? produto.getQuantidadeEstoque() : 0;
+            produto.setQuantidadeEstoque(estoqueAtual - item.getQuantidade());
             produtoRepository.save(produto);
         }
 
