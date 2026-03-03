@@ -44,6 +44,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/parceiros/consulta-cnpj/**").permitAll()
                         .requestMatchers("/api/parceiros/consulta-cep/**").permitAll()
 
+                        // LIBERAÇÃO DO BACKUP PARA EVITAR ERRO 403
+                        .requestMatchers(HttpMethod.GET, "/api/configuracoes/backup").permitAll()
+
                         // 3. Rotas Privadas (Garante que qualquer requisição para /api/** passe se autenticada)
                         .requestMatchers("/api/**").authenticated()
                         .requestMatchers("/auth/logout").authenticated()

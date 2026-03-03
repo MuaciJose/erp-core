@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
 import {
     Settings, Building2, Printer, Sliders, Save, CheckCircle,
-    AlertTriangle, Info, X, Store, FileText, Percent, ShieldAlert, Search, Loader2, Camera, Plus
+    AlertTriangle, Info, X, Store, FileText, Percent, ShieldAlert, Search, Loader2, Camera, Plus,
+    Database, Download, Trash2, ShieldCheck, Clock // Adicionado Clock
 } from 'lucide-react';
 
 export const Configuracoes = () => {
@@ -20,13 +21,14 @@ export const Configuracoes = () => {
         telefone: '',
         email: '',
         endereco: '',
-        logoBase64: '', // NOVO CAMPO ADICIONADO
+        logoBase64: '',
         tamanhoImpressora: '80mm',
         mensagemRodape: '',
         exibirVendedorCupom: true,
         descontoMaximoPermitido: 10.00,
         permitirEstoqueNegativoGlobal: false,
-        diasValidadeOrcamento: 5
+        diasValidadeOrcamento: 5,
+        horarioBackupAuto: '03:00' // Novo campo inicializado
     });
 
     const showToast = (tipo, titulo, mensagem) => {
@@ -59,13 +61,10 @@ export const Configuracoes = () => {
         }));
     };
 
-    // =======================================================================
-    // LÓGICA DE UPLOAD DE LOGO (CONVERSÃO PARA BASE64)
-    // =======================================================================
     const handleLogoChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            if (file.size > 500000) { // Limite de 500KB
+            if (file.size > 500000) {
                 showToast('aviso', 'Arquivo muito grande', 'Escolha uma logo de até 500KB para não pesar o sistema.');
                 return;
             }
@@ -77,28 +76,51 @@ export const Configuracoes = () => {
         }
     };
 
+    const handleGerarBackup = async () => {
+        setSalvando(true);
+        try {
+            const response = await api.get('/api/configuracoes/backup', { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `backup_sistema_${new Date().toISOString().split('T')[0]}.sql`);
+            document.body.appendChild(link);
+            link.click();
+            showToast('sucesso', 'Backup Concluído', 'A cópia de segurança foi baixada com sucesso!');
+        } catch (error) {
+            showToast('erro', 'Falha no Backup', 'Não foi possível gerar o arquivo de segurança.');
+        } finally {
+            setSalvando(false);
+        }
+    };
+
+    const handleLimparLogs = async () => {
+        if(!window.confirm("Deseja apagar os registros de erros técnicos? Isso ajuda a manter o sistema rápido.")) return;
+        setSalvando(true);
+        try {
+            await api.post('/api/configuracoes/limpar-logs');
+            showToast('sucesso', 'Limpeza Concluída', 'O histórico de registros técnicos foi resetado.');
+        } catch (error) {
+            showToast('erro', 'Falha na Limpeza', 'Ocorreu um erro ao tentar limpar os registros.');
+        } finally {
+            setSalvando(false);
+        }
+    };
+
     const buscarCNPJ = async () => {
         const cnpjLimpo = config.cnpj.replace(/\D/g, '');
-
         if (cnpjLimpo.length !== 14) {
             return showToast('aviso', 'CNPJ Inválido', 'Digite os 14 números do CNPJ para realizar a busca.');
         }
-
         setBuscandoCnpj(true);
         try {
             const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
-
-            if (!response.ok) {
-                throw new Error('CNPJ não encontrado');
-            }
-
+            if (!response.ok) throw new Error('CNPJ não encontrado');
             const data = await response.json();
-
             const enderecoFormatado = `${data.logradouro}, ${data.numero}${data.complemento ? ' - ' + data.complemento : ''}
 Bairro: ${data.bairro}
 Cidade: ${data.municipio} - ${data.uf}
 CEP: ${data.cep}`;
-
             setConfig(prev => ({
                 ...prev,
                 razaoSocial: data.razao_social || prev.razaoSocial,
@@ -107,12 +129,9 @@ CEP: ${data.cep}`;
                 email: data.email || prev.email,
                 endereco: enderecoFormatado
             }));
-
             showToast('sucesso', 'Dados Encontrados', 'As informações da empresa foram preenchidas automaticamente!');
-
         } catch (error) {
-            console.error("Erro ao buscar CNPJ:", error);
-            showToast('erro', 'Falha na Busca', 'Não foi possível encontrar os dados para este CNPJ. Verifique o número e tente novamente.');
+            showToast('erro', 'Falha na Busca', 'Não foi possível encontrar os dados para este CNPJ.');
         } finally {
             setBuscandoCnpj(false);
         }
@@ -176,6 +195,9 @@ CEP: ${data.cep}`;
                     <button onClick={() => setAbaAtiva('REGRAS')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all text-left ${abaAtiva === 'REGRAS' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
                         <Sliders size={20} /> Regras de Negócio
                     </button>
+                    <button onClick={() => setAbaAtiva('SISTEMA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all text-left ${abaAtiva === 'SISTEMA' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
+                        <Database size={20} /> Sistema & Backup
+                    </button>
                 </div>
 
                 <div className="flex-1 bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
@@ -184,7 +206,6 @@ CEP: ${data.cep}`;
                         <div className="space-y-6 animate-fade-in">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><Store className="text-blue-500" /> Identidade e Contato</h2>
 
-                            {/* NOVO: SEÇÃO DE UPLOAD DA LOGO */}
                             <div className="flex flex-col md:flex-row items-center gap-8 bg-blue-50 p-6 rounded-3xl border-2 border-dashed border-blue-200 mb-8">
                                 <div className="relative group">
                                     {config.logoBase64 ? (
@@ -265,7 +286,6 @@ CEP: ${data.cep}`;
                         </div>
                     )}
 
-                    {/* ABA: IMPRESSÃO E CUPONS */}
                     {abaAtiva === 'IMPRESSAO' && (
                         <div className="space-y-6 animate-fade-in">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><FileText className="text-blue-500" /> Parametrização de Recibos</h2>
@@ -294,7 +314,6 @@ CEP: ${data.cep}`;
                         </div>
                     )}
 
-                    {/* ABA: REGRAS DE NEGÓCIO */}
                     {abaAtiva === 'REGRAS' && (
                         <div className="space-y-6 animate-fade-in">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><ShieldAlert className="text-blue-500" /> Travas e Permissões Globais</h2>
@@ -303,7 +322,7 @@ CEP: ${data.cep}`;
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2"><Percent size={14}/> Desconto Máximo Permitido (%)</label>
                                     <p className="text-[10px] text-slate-400 mb-2">Trava o limite de desconto que vendedores podem dar.</p>
-                                    <input type="number" step="0.01" name="descontoMaximoPermitido" value={config.descontoMaximoPermitido} onChange={handleChange} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-slate-800 focus:border-blue-500 outline-none text-2xl" />
+                                    <input type="number" step="0.01" name="descontoMaximoPermitido" value={config.descontoMaximoPermitido} onChange={handleChange} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-black text-slate-800 focus:border-blue-500 outline-none text-2xl" />
                                 </div>
 
                                 <div>
@@ -322,6 +341,60 @@ CEP: ${data.cep}`;
                                         <input type="checkbox" name="permitirEstoqueNegativoGlobal" checked={config.permitirEstoqueNegativoGlobal} onChange={handleChange} className="w-5 h-5 accent-red-600 cursor-pointer" />
                                         <span className="font-bold text-red-700">Liberar Estoque Negativo</span>
                                     </label>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {abaAtiva === 'SISTEMA' && (
+                        <div className="space-y-8 animate-fade-in">
+                            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><Database className="text-slate-600" /> Manutenção e Segurança</h2>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* CARD: HORÁRIO DO BACKUP AUTOMÁTICO */}
+                                <div className="p-6 bg-slate-50 border-2 border-slate-200 rounded-3xl group hover:border-orange-500 transition-all">
+                                    <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-orange-600 group-hover:text-white transition-all">
+                                        <Clock size={24} />
+                                    </div>
+                                    <h3 className="font-black text-slate-800 text-lg">Horário do Auto-Backup</h3>
+                                    <p className="text-sm text-slate-500 mt-2 mb-6 font-medium">Defina em qual horário o sistema deve realizar o backup silencioso diário.</p>
+                                    <input
+                                        type="time"
+                                        name="horarioBackupAuto"
+                                        value={config.horarioBackupAuto || "03:00"}
+                                        onChange={handleChange}
+                                        className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-black text-2xl text-slate-800 focus:border-orange-500 outline-none transition-all"
+                                    />
+                                </div>
+
+                                <div className="p-6 bg-slate-50 border-2 border-slate-200 rounded-3xl group hover:border-blue-500 transition-all">
+                                    <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                                        <Download size={24} />
+                                    </div>
+                                    <h3 className="font-black text-slate-800 text-lg">Cópia de Segurança</h3>
+                                    <p className="text-sm text-slate-500 mt-2 mb-6 font-medium">Gere um arquivo com todos os dados para salvar externamente agora.</p>
+                                    <button onClick={handleGerarBackup} className="w-full py-3 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 transition-all">
+                                        <Download size={18} /> GERAR BACKUP AGORA
+                                    </button>
+                                </div>
+
+                                <div className="p-6 bg-slate-50 border-2 border-slate-200 rounded-3xl group hover:border-red-500 transition-all">
+                                    <div className="w-12 h-12 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-red-600 group-hover:text-white transition-all">
+                                        <Trash2 size={24} />
+                                    </div>
+                                    <h3 className="font-black text-slate-800 text-lg">Limpeza de Logs</h3>
+                                    <p className="text-sm text-slate-500 mt-2 mb-6 font-medium">Apaga registros técnicos antigos para otimizar o banco de dados.</p>
+                                    <button onClick={handleLimparLogs} className="w-full py-3 bg-white text-red-600 border-2 border-red-200 font-black rounded-xl hover:bg-red-50 transition-colors flex items-center justify-center gap-2">
+                                        <Trash2 size={18} /> LIMPAR REGISTROS
+                                    </button>
+                                </div>
+
+                                <div className="p-6 bg-blue-900 text-white rounded-3xl flex items-center gap-6 shadow-xl col-span-1 md:col-span-1">
+                                    <ShieldCheck size={48} className="text-blue-400 shrink-0" />
+                                    <div>
+                                        <h4 className="font-black text-sm">Proteção Ativa</h4>
+                                        <p className="text-blue-200 text-[10px] font-medium leading-tight">Backup diário agendado para segurança total.</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>

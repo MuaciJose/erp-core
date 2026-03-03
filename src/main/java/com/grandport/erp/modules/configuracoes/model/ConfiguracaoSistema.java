@@ -42,4 +42,7 @@ public class ConfiguracaoSistema {
 
     @Column(columnDefinition = "TEXT")
     private String logoBase64;
+
+    // ================= MANUTENÇÃO E SISTEMA =================
+    private String horarioBackupAuto = "03:00"; // Adicionado para suportar o Backup Automático agendado
 }
