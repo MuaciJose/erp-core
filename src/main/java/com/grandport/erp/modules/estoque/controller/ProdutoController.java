@@ -4,6 +4,7 @@ import com.grandport.erp.modules.estoque.dto.AtualizarPrecoRequestDTO;
 import com.grandport.erp.modules.estoque.dto.ProdutoRequestDTO;
 import com.grandport.erp.modules.estoque.dto.ProdutoResponseDTO;
 import com.grandport.erp.modules.estoque.model.Produto;
+import com.grandport.erp.modules.estoque.repository.MovimentacaoEstoqueRepository;
 import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
 import com.grandport.erp.modules.estoque.service.FileStorageService;
 import com.grandport.erp.modules.estoque.service.ProdutoService;
@@ -15,8 +16,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/produtos")
@@ -25,6 +28,9 @@ public class ProdutoController {
     @Autowired private ProdutoService service;
     @Autowired private FileStorageService fileService;
     @Autowired private ProdutoRepository produtoRepository;
+
+    // Injeção do repositório para o histórico de estoque
+    @Autowired private MovimentacaoEstoqueRepository movimentacaoRepository;
 
     // =========================================================================================
     // 1. ROTAS WEB (JSON PADRÃO) - O React usa estas rotas!
@@ -104,6 +110,36 @@ public class ProdutoController {
             return ResponseEntity.ok(service.buscarProdutos(busca));
         }
         return ResponseEntity.ok(produtoRepository.findAll());
+    }
+
+    // =========================================================================================
+    // ROTA PARA O HISTÓRICO DE INVENTÁRIO E AJUSTES
+    // =========================================================================================
+    @GetMapping("/movimentacoes")
+    @Operation(summary = "Lista o histórico de movimentações e ajustes de estoque")
+    public ResponseEntity<List<Map<String, Object>>> listarMovimentacoes() {
+        List<com.grandport.erp.modules.estoque.model.MovimentacaoEstoque> movs = movimentacaoRepository.findAll();
+
+        List<Map<String, Object>> dados = movs.stream().map(m -> {
+            Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", m.getId());
+            map.put("tipo", m.getTipo());
+            map.put("quantidade", m.getQuantidade());
+            map.put("saldoAnterior", m.getSaldoAnterior());
+            map.put("saldoAtual", m.getSaldoAtual());
+            map.put("motivo", m.getMotivo());
+
+            // CORREÇÃO AQUI: Usa o nome exato do campo no seu Model (dataMovimentacao)
+            map.put("dataHora", m.getDataMovimentacao());
+
+            if (m.getProduto() != null) {
+                map.put("produtoNome", m.getProduto().getNome());
+                map.put("produtoSku", m.getProduto().getSku());
+            }
+            return map;
+        }).collect(java.util.stream.Collectors.toList());
+
+        return ResponseEntity.ok(dados);
     }
 
     @GetMapping("/barcode/{ean}")
