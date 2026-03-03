@@ -48,11 +48,20 @@ public class ConfiguracaoSistema {
     // ================= MANUTENÇÃO E SISTEMA =================
     private String horarioBackupAuto = "03:00";
 
-    // ================= VENDEDORES E COMISSÕES (NOVO) =================
+    // ================= VENDEDORES E COMISSÕES =================
     @ElementCollection
     @CollectionTable(
             name = "configuracao_vendedores_comissao",
             joinColumns = @JoinColumn(name = "configuracao_id")
     )
     private List<VendedorComissao> vendedores = new ArrayList<>();
+
+    // ================= INTEGRAÇÕES E APIS (NOVO) =================
+    @Column(length = 1000) // Tamanho maior pois tokens de API costumam ser longos
+    private String whatsappToken = "";
+
+    @Column(length = 2)
+    private String tipoCertificado = "A1";
+
+    private String senhaCertificado = "";
 }

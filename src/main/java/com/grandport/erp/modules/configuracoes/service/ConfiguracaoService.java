@@ -4,7 +4,6 @@ import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.scheduling.TaskScheduler;
@@ -38,34 +37,39 @@ public class ConfiguracaoService {
         reagendarBackup(); // Inicia o agendamento assim que o sistema liga
     }
 
-    // Atualize o obterConfiguracao para garantir que o campo não venha nulo do banco
     public ConfiguracaoSistema obterConfiguracao() {
         ConfiguracaoSistema config = repository.findById(1L).orElseGet(() -> {
             ConfiguracaoSistema configPadrao = new ConfiguracaoSistema();
             configPadrao.setId(1L);
-            configPadrao.setHorarioBackupAuto("03:00"); // Define o padrão na criação
+            configPadrao.setHorarioBackupAuto("03:00");
             return repository.save(configPadrao);
         });
 
-        // Caso a config já exista mas o campo novo esteja nulo (seu caso atual)
+        // Travas de segurança para campos antigos e novos não ficarem nulos na interface
         if (config.getHorarioBackupAuto() == null) {
             config.setHorarioBackupAuto("03:00");
+        }
+        if (config.getTipoCertificado() == null) {
+            config.setTipoCertificado("A1");
         }
 
         return config;
     }
 
     public ConfiguracaoSistema atualizarConfiguracao(ConfiguracaoSistema dadosAtualizados) {
+        // Como o Spring Data JPA recebe o objeto completo do React,
+        // ele já salva os campos novos (Whatsapp, Certificado) automaticamente!
         dadosAtualizados.setId(1L);
         ConfiguracaoSistema salva = repository.save(dadosAtualizados);
+
         reagendarBackup(); // Reagenda o backup se o horário mudou
+
         return salva;
     }
 
     // =======================================================================
     // LÓGICA DE REAGENDAMENTO DINÂMICO
     // =======================================================================
-    // Atualize o reagendarBackup com a trava de segurança
     public void reagendarBackup() {
         if (tarefaAgendada != null) {
             tarefaAgendada.cancel(false);
@@ -87,7 +91,6 @@ public class ConfiguracaoService {
             System.out.println("### [SISTEMA] Backup Automático agendado para às " + horario);
         } catch (Exception e) {
             System.err.println("### [ERRO] Falha ao processar horário de backup: " + horario);
-            // Agendamento de emergência caso o formato do horário esteja inválido
             tarefaAgendada = taskScheduler.schedule(this::rotinaManutencaoSistema, new CronTrigger("0 0 3 * * *"));
         }
     }
