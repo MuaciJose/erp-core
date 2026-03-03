@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.estoque.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -58,6 +59,8 @@ public class Produto {
     // ================= ESTOQUE & LOGÍSTICA =================
     private String unidadeMedida = "UN"; // UN, PC, KG, LT
 
+    @Column(name = "quantidade_estoque")
+    @JsonProperty("quantidadeEstoque") // Garante que o JSON terá este nome exato
     private Integer quantidadeEstoque = 0;
     private Integer estoqueMinimo = 0;
     private Integer estoqueMaximo = 0;

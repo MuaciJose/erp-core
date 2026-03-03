@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Clock, User, FileText, CheckCircle, DollarSign, Package, AlertCircle, Lock, Wallet, Undo } from 'lucide-react';
+import { Search, Clock, User, FileText, CheckCircle, DollarSign, Package, AlertCircle, Lock, Wallet, Undo, X, Info } from 'lucide-react';
 import { ModalFinalizarVenda } from './ModalFinalizarVenda';
 import { CupomReciboModal } from './CupomReciboModal';
 import api from '../../api/axios';
@@ -11,8 +11,20 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const [modalPagamentoAberto, setModalPagamentoAberto] = useState(false);
     const [pedidoPago, setPedidoPago] = useState(null);
 
+    // ESTADOS PARA MENSAGENS PROFISSIONAIS
+    const [notificacao, setNotificacao] = useState(null);
+    const [modalDevolucaoAberto, setModalDevolucaoAberto] = useState(false);
+
     const [caixaStatus, setCaixaStatus] = useState(null);
     const [loadingCaixa, setLoadingCaixa] = useState(true);
+
+    // SISTEMA DE NOTIFICAÇÕES PROFISSIONAIS
+    const showToast = (tipo, titulo, mensagem) => {
+        setNotificacao({ tipo, titulo, mensagem });
+        setTimeout(() => {
+            setNotificacao(null);
+        }, 4000);
+    };
 
     const verificarCaixa = async () => {
         setLoadingCaixa(true);
@@ -66,7 +78,9 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
             }];
 
             const res = await api.post(`/api/vendas/${pedidoSelecionado.id}/pagar`, payload);
-            alert(`Pagamento do Pedido #${pedidoSelecionado.id} aprovado com sucesso!`);
+
+            // SUBSTITUÍDO: alert() por Toast de Sucesso
+            showToast('sucesso', 'Pagamento Aprovado!', `O recebimento do Pedido #${pedidoSelecionado.id} foi concluído com sucesso.`);
 
             const pedidoFormatadoParaCupom = {
                 id: res.data.id || pedidoSelecionado.id,
@@ -92,23 +106,23 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
             carregarPedidos();
         } catch (error) {
             const msgErro = error.response?.data?.message || error.message;
-            alert("ERRO NO PAGAMENTO: " + msgErro);
+            // SUBSTITUÍDO: alert() por Toast de Erro
+            showToast('erro', 'Falha no Recebimento', msgErro);
         }
     };
 
-    const devolverAoVendedor = async () => {
-        if (!window.confirm(`Tem certeza que deseja devolver o Pedido #${pedidoSelecionado.id} para o Balcão de Vendas? O vendedor precisará enviá-lo novamente.`)) {
-            return;
-        }
-
+    // NOVA FUNÇÃO: Executada após confirmar no Modal de Devolução
+    const confirmarDevolucaoAoVendedor = async () => {
         try {
             await api.post(`/api/vendas/${pedidoSelecionado.id}/devolver`);
-            alert("Pedido devolvido ao vendedor com sucesso!");
+            showToast('sucesso', 'Pedido Devolvido', `O Pedido #${pedidoSelecionado.id} retornou para o balcão de vendas.`);
             setPedidoSelecionado(null);
+            setModalDevolucaoAberto(false);
             carregarPedidos();
         } catch (error) {
-            const msgErro = error.response?.data?.message || "Erro no servidor.";
-            alert("Falha ao devolver pedido: " + msgErro);
+            const msgErro = error.response?.data?.message || "Erro de conexão com o servidor.";
+            showToast('erro', 'Falha ao Devolver', msgErro);
+            setModalDevolucaoAberto(false);
         }
     };
 
@@ -132,6 +146,29 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     return (
         <>
             <div className="p-8 max-w-7xl mx-auto flex h-[90vh] gap-6 animate-fade-in relative print:hidden">
+
+                {/* NOTIFICAÇÃO PROFISSIONAL FLUTUANTE (TOAST) */}
+                {notificacao && (
+                    <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-[9999] animate-fade-in w-full max-w-md px-4">
+                        <div className={`p-4 rounded-2xl shadow-2xl flex items-start gap-4 border-l-4 ${
+                            notificacao.tipo === 'sucesso' ? 'bg-green-50 border-green-500 text-green-800' :
+                                notificacao.tipo === 'erro' ? 'bg-red-50 border-red-500 text-red-800' :
+                                    'bg-orange-50 border-orange-500 text-orange-800'
+                        }`}>
+                            <div className="mt-1">
+                                {notificacao.tipo === 'sucesso' && <CheckCircle size={24} />}
+                                {notificacao.tipo === 'erro' && <AlertCircle size={24} />}
+                                {notificacao.tipo === 'aviso' && <Info size={24} />}
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="font-black text-lg">{notificacao.titulo}</h4>
+                                <p className="text-sm font-medium mt-1 leading-relaxed">{notificacao.mensagem}</p>
+                            </div>
+                            <button onClick={() => setNotificacao(null)} className="text-slate-400 hover:text-slate-700 transition-colors p-1"><X size={20}/></button>
+                        </div>
+                    </div>
+                )}
+
                 {/* LADO ESQUERDO: FILA DE PEDIDOS */}
                 <div className="w-1/3 bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
                     <div className="p-6 bg-slate-900 text-white">
@@ -212,7 +249,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
                             <div className="p-6 bg-slate-900 border-t border-slate-800 flex flex-col xl:flex-row items-center justify-between gap-4">
                                 <button
-                                    onClick={devolverAoVendedor}
+                                    onClick={() => setModalDevolucaoAberto(true)} // SUBSTITUÍDO: Abre Modal em vez do window.confirm
                                     className="px-6 py-4 bg-slate-800 text-red-400 hover:bg-red-500 hover:text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors border border-slate-700 w-full xl:w-auto"
                                     title="O cliente desistiu ou quer alterar o pedido"
                                 >
@@ -231,11 +268,41 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                 </div>
             </div>
 
-            {/* MODAIS */}
+            {/* MODAL DE PAGAMENTO (CRIAR RECEBIMENTO) */}
             {modalPagamentoAberto && (
                 <ModalFinalizarVenda totalVenda={pedidoSelecionado?.valorTotal || 0} clienteSelecionado={pedidoSelecionado?.cliente} onClose={() => setModalPagamentoAberto(false)} onConfirmarVenda={confirmarRecebimento} />
             )}
 
+            {/* MODAL DE CONFIRMAÇÃO DE DEVOLUÇÃO (SUBSTITUI O window.confirm) */}
+            {modalDevolucaoAberto && (
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 print:hidden animate-fade-in">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden p-8 text-center">
+                        <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Undo size={40} className="text-orange-500" />
+                        </div>
+                        <h2 className="text-2xl font-black text-slate-800 mb-2">Devolver Pedido?</h2>
+                        <p className="text-slate-500 font-medium mb-8 leading-relaxed">
+                            Tem certeza que deseja devolver o <strong className="text-slate-700">Pedido #{pedidoSelecionado?.id}</strong> para o Balcão de Vendas?<br/> O vendedor precisará editá-lo e enviá-lo novamente.
+                        </p>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => setModalDevolucaoAberto(false)}
+                                className="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                            >
+                                CANCELAR
+                            </button>
+                            <button
+                                onClick={confirmarDevolucaoAoVendedor}
+                                className="flex-1 py-4 bg-orange-500 text-white font-black rounded-xl hover:bg-orange-400 transition-colors shadow-lg shadow-orange-500/30"
+                            >
+                                SIM, DEVOLVER
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL DO CUPOM FISCAL/RECIBO */}
             {pedidoPago && (
                 <CupomReciboModal pedido={pedidoPago} onClose={() => setPedidoPago(null)} />
             )}

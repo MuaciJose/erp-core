@@ -23,7 +23,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         nome: '', documento: '', telefone: '', placa: '', marca: '', modelo: '', ano: '', km: ''
     });
 
-    // ESTADOS DE PEÇAS
+    // ESTADOS DE PEÇAS E NAVEGAÇÃO
     const [buscaPeca, setBuscaPeca] = useState('');
     const [resultadosPecas, setResultadosPecas] = useState([]);
     const [indexFocadoPeca, setIndexFocadoPeca] = useState(-1);
@@ -41,23 +41,53 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     const [notificacao, setNotificacao] = useState(null);
 
     // =================================================================================
-    // SISTEMA DE NOTIFICAÇÕES PROFISSIONAIS
+    // NOTIFICAÇÕES
     // =================================================================================
     const showToast = (tipo, titulo, mensagem) => {
         setNotificacao({ tipo, titulo, mensagem });
-        setTimeout(() => {
-            setNotificacao(null);
-        }, 4000);
+        setTimeout(() => setNotificacao(null), 4000);
     };
 
     // =================================================================================
-    // FUNÇÃO DE VALIDAÇÃO DE ESTOQUE (FRONT-END)
+    // FUNÇÃO DE SINCRONIZAÇÃO DE ESTOQUE (CORREÇÃO PARA ESTORNO DO CAIXA)
+    // =================================================================================
+    const sincronizarEstoques = async (itensParaSincronizar) => {
+        setItens(itensParaSincronizar); // Atualiza logo para não travar a tela
+
+        const promessas = itensParaSincronizar.map(async (item) => {
+            try {
+                const idProd = item.produtoId || item.id;
+                // Exige a rota GET /api/produtos/{id} no Controller Java
+                const res = await api.get(`/api/produtos/${idProd}`);
+                return {
+                    ...item,
+                    estoqueDisponivel: res.data.quantidadeEstoque ?? item.estoqueDisponivel
+                };
+            } catch (e) {
+                console.error(`Erro ao sincronizar estoque da peça ID: ${item.id}`, e);
+                return item;
+            }
+        });
+
+        const itensAtualizados = await Promise.all(promessas);
+        setItens(itensAtualizados);
+    };
+
+    // =================================================================================
+    // VALIDAÇÃO DE ESTOQUE (IMPEDE AVANÇAR SE FALTAR PEÇA)
     // =================================================================================
     const validarEstoqueNoFront = () => {
-        const itensSemEstoque = itens.filter(item => item.qtd > (item.estoqueDisponivel || 0));
+        const itensSemEstoque = itens.filter(item => {
+            const disponivel = item.estoqueDisponivel ?? item.quantidadeEstoque ?? 0;
+            return item.qtd > disponivel;
+        });
 
         if (itensSemEstoque.length > 0) {
-            const listaNomes = itensSemEstoque.map(i => `• ${i.nome} (Pedido: ${i.qtd} | No Estoque: ${i.estoqueDisponivel || 0})`).join('\n');
+            const listaNomes = itensSemEstoque.map(i => {
+                const disponivel = i.estoqueDisponivel ?? i.quantidadeEstoque ?? 0;
+                return `• ${i.nome} (Pedido: ${i.qtd} | No Estoque: ${disponivel})`;
+            }).join('\n');
+
             showToast('erro', 'Estoque Insuficiente', `Os seguintes itens excedem a quantidade disponível:\n\n${listaNomes}\n\nAjuste as quantidades antes de prosseguir.`);
             return false;
         }
@@ -65,7 +95,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     };
 
     // =================================================================================
-    // 1. RECUPERAÇÃO DO RASCUNHO AUTOMÁTICO
+    // RECUPERAÇÃO DO RASCUNHO E AUTO-SAVE
     // =================================================================================
     useEffect(() => {
         if (!orcamentoParaEditar) {
@@ -77,13 +107,10 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                         setModo(dados.modo || 'ORCAMENTO');
                         setItens(dados.itens || []);
                         setBuscaCliente(dados.buscaCliente || '');
-                        if (dados.clienteSelecionado) {
-                            setClienteSelecionado(dados.clienteSelecionado);
-                        }
+                        if (dados.clienteSelecionado) setClienteSelecionado(dados.clienteSelecionado);
                         setVeiculoSelecionado(dados.veiculoSelecionado || '');
                         setDescontoTipo(dados.descontoTipo || 'VALOR');
                         setDescontoInput(dados.descontoInput || '');
-
                         setAvisoRascunho(true);
                         setTimeout(() => setAvisoRascunho(false), 5000);
                     }
@@ -93,7 +120,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         setRascunhoCarregado(true);
     }, [orcamentoParaEditar]);
 
-    // 2. GRAVA O RASCUNHO A CADA TECLA DIGITADA
     useEffect(() => {
         if (rascunhoCarregado && !orcamentoId) {
             if (clienteSelecionado || itens.length > 0 || descontoInput || buscaCliente.length > 0) {
@@ -105,13 +131,25 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         }
     }, [modo, itens, clienteSelecionado, veiculoSelecionado, descontoTipo, descontoInput, buscaCliente, orcamentoId, rascunhoCarregado]);
 
-
-    // CARREGA ORÇAMENTO EXISTENTE DO BANCO DE DADOS
+    // =================================================================================
+    // CARREGA ORÇAMENTO (QUANDO VEM POR PROPS)
+    // =================================================================================
     useEffect(() => {
         if (orcamentoParaEditar) {
             setOrcamentoId(orcamentoParaEditar.id);
             setModo(orcamentoParaEditar.tipo === 'PEDIDO' ? 'PEDIDO' : 'ORCAMENTO');
-            setItens(orcamentoParaEditar.itens || []);
+
+            const itensFormatados = (orcamentoParaEditar.itens || []).map(item => ({
+                produtoId: item.produto?.id || item.produtoId,
+                id: item.produto?.id || item.id,
+                codigo: item.produto?.sku || item.codigo,
+                nome: item.produto?.nome || item.nome,
+                qtd: item.quantidade || item.qtd,
+                preco: item.precoUnitario || item.preco,
+                estoqueDisponivel: item.produto?.quantidadeEstoque ?? item.quantidadeEstoque ?? 0
+            }));
+
+            sincronizarEstoques(itensFormatados);
             setDescontoInput(orcamentoParaEditar.desconto?.toString() || '');
 
             const restaurarCliente = async () => {
@@ -127,7 +165,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         }
     }, [orcamentoParaEditar]);
 
-    // BUSCA CLIENTES
+    // =================================================================================
+    // BUSCA DE CLIENTES
+    // =================================================================================
     useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
             if (buscaCliente.length > 2 && !clienteSelecionado) {
@@ -189,29 +229,48 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         }
     };
 
-    // BUSCA PEÇAS
+    // =================================================================================
+    // BUSCA DE PEÇAS E CONTROLE DE TECLADO (CORRIGIDO)
+    // =================================================================================
     useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
             if (buscaPeca.length > 1) {
                 try {
                     const res = await api.get(`/api/produtos?busca=${buscaPeca}`);
-                    if (Array.isArray(res.data)) { setResultadosPecas(res.data); setIndexFocadoPeca(0); }
+                    if (Array.isArray(res.data)) {
+                        setResultadosPecas(res.data);
+                        setIndexFocadoPeca(0);
+                    }
                 } catch (error) { setResultadosPecas([]); }
             } else { setResultadosPecas([]); setIndexFocadoPeca(-1); }
         }, 300);
         return () => clearTimeout(delayDebounceFn);
     }, [buscaPeca]);
 
+    // A FUNÇÃO QUE FALTAVA
     const handleKeyDownPeca = (e) => {
         if (resultadosPecas.length > 0) {
-            if (e.key === 'ArrowDown') { e.preventDefault(); setIndexFocadoPeca(prev => (prev < resultadosPecas.length - 1 ? prev + 1 : prev)); }
-            else if (e.key === 'ArrowUp') { e.preventDefault(); setIndexFocadoPeca(prev => (prev > 0 ? prev - 1 : 0)); }
-            else if (e.key === 'Enter') { e.preventDefault(); adicionarItem(resultadosPecas[indexFocadoPeca]); }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setIndexFocadoPeca(prev => (prev < resultadosPecas.length - 1 ? prev + 1 : prev));
+            }
+            else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setIndexFocadoPeca(prev => (prev > 0 ? prev - 1 : 0));
+            }
+            else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (indexFocadoPeca >= 0 && indexFocadoPeca < resultadosPecas.length) {
+                    adicionarItem(resultadosPecas[indexFocadoPeca]);
+                }
+            }
         }
     };
 
     const adicionarItem = (peca) => {
         const itemExistente = itens.find(i => i.id === peca.id || i.produtoId === peca.id);
+        const estoqueReal = peca.quantidadeEstoque ?? peca.estoqueDisponivel ?? 0;
+
         if (itemExistente) setItens(itens.map(i => (i.id === peca.id || i.produtoId === peca.id) ? { ...i, qtd: i.qtd + 1 } : i));
         else setItens(prev => [...prev, {
             produtoId: peca.id,
@@ -220,7 +279,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
             nome: peca.nome,
             qtd: 1,
             preco: peca.precoVenda || 0,
-            estoqueDisponivel: peca.quantidadeEstoque || 0
+            estoqueDisponivel: estoqueReal
         }]);
         setBuscaPeca(''); setResultadosPecas([]); inputPecaRef.current.focus();
     };
@@ -234,7 +293,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     const totalFinal = subtotal - valorDescontoReal;
 
     // =================================================================================
-    // O CORAÇÃO DO FLUXO: Avança o status de forma estruturada.
+    // SALVAR / ENVIAR AO CAIXA
     // =================================================================================
     const processarVendaAPI = async (statusDesejado) => {
         if (itens.length === 0) return showToast('aviso', 'Documento Vazio', 'Não é possível guardar um documento sem itens.');
@@ -258,7 +317,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         try {
             if (orcamentoId) {
                 await api.put(`/api/vendas/orcamento/${orcamentoId}`, payload);
-
                 if (statusDesejado === 'AGUARDANDO_PAGAMENTO') {
                     showToast('sucesso', 'Sucesso!', 'Documento enviado para a Fila do Caixa.');
                     limparEcra();
@@ -297,7 +355,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         }
     };
 
-    // CARREGA ORÇAMENTOS SALVOS QUANDO O MODAL ABRE
+    // =================================================================================
+    // CARREGAR LISTA DE ORÇAMENTOS GUARDADOS
+    // =================================================================================
     useEffect(() => {
         if (modalListaAberto) {
             const carregarOrcamentos = async () => {
@@ -319,7 +379,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                             nome: item.produto?.nome,
                             qtd: item.quantidade || 0,
                             preco: item.precoUnitario || 0,
-                            estoqueDisponivel: item.produto?.quantidadeEstoque || 0
+                            estoqueDisponivel: item.produto?.quantidadeEstoque ?? 0
                         }))
                     }));
                     setOrcamentosSalvos(orcamentosFormatados);
@@ -333,13 +393,12 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
 
     const carregarOrcamentoLocal = async (orcamento) => {
         setOrcamentoId(orcamento.id);
-        setItens(orcamento.itens);
         setModo(orcamento.status);
-        if (orcamento.clienteObj) {
-            selecionarCliente(orcamento.clienteObj);
-        } else {
-            limparCliente();
-        }
+        if (orcamento.clienteObj) selecionarCliente(orcamento.clienteObj);
+        else limparCliente();
+
+        // Garante a sincronização dos itens ao abrir do Modal
+        await sincronizarEstoques(orcamento.itens);
         setModalListaAberto(false);
     };
 
@@ -485,13 +544,18 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
 
                 <div className="relative mb-6 z-30">
                     <Search className="absolute left-4 top-4 text-slate-400" size={24} />
-                    {/* AQUI ESTÁ A MUDANÇA NO PLACEHOLDER */}
                     <input ref={inputPecaRef} type="text" value={buscaPeca} onChange={(e) => setBuscaPeca(e.target.value)} onKeyDown={handleKeyDownPeca} placeholder="Buscar por Código, Referência ou Descrição..." className="w-full pl-14 pr-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-lg font-black text-slate-800 shadow-sm focus:border-blue-600 outline-none" />
                     {resultadosPecas.length > 0 && (
                         <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
                             {resultadosPecas.map((peca, index) => (
                                 <div key={peca.id} onClick={() => adicionarItem(peca)} className={`flex justify-between items-center p-4 cursor-pointer border-b hover:bg-slate-50`}>
-                                    <div className="flex items-center gap-4"><div><p className="font-bold text-slate-800">{peca.nome}</p><p className="text-xs font-mono text-slate-500">{peca.sku}</p></div></div>
+                                    <div className="flex items-center gap-4">
+                                        <div>
+                                            <p className="font-bold text-slate-800">{peca.nome}</p>
+                                            <p className="text-xs font-mono text-slate-500">{peca.sku}</p>
+                                            <p className="text-[10px] font-bold text-blue-500 uppercase mt-1">Disp: {peca.quantidadeEstoque ?? 0}</p>
+                                        </div>
+                                    </div>
                                     <div className="text-right"><p className="font-black text-blue-700">R$ {(peca.precoVenda || 0).toFixed(2)}</p></div>
                                 </div>
                             ))}
@@ -506,25 +570,32 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                             <tr><th className="p-4 pl-6">Código</th><th className="p-4">Descrição</th><th className="p-4 text-center">Qtd</th><th className="p-4 text-right">Unitário</th><th className="p-4 text-right pr-6">Subtotal</th><th className="p-4"></th></tr>
                             </thead>
                             <tbody>
-                            {itens.map((item) => (
-                                <tr key={item.id || item.produtoId} className={`border-b hover:bg-slate-50 ${item.qtd > (item.estoqueDisponivel || 0) ? 'bg-red-50' : ''}`}>
-                                    <td className="p-4 pl-6 font-mono text-xs text-slate-500">{item.codigo}</td>
-                                    <td className="p-4 font-bold text-slate-800 text-sm">
-                                        <div>
-                                            <p>{item.nome}</p>
-                                            {item.qtd > (item.estoqueDisponivel || 0) && (
-                                                <span className="text-[10px] font-black text-red-600 flex items-center gap-1 uppercase tracking-tighter">
-                                                    <AlertTriangle size={10}/> Falta Estoque (Disponível: {item.estoqueDisponivel || 0})
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="p-4 text-center"><input type="number" value={item.qtd} onChange={(e) => alterarQuantidade(item.id || item.produtoId, parseInt(e.target.value) || 1)} className={`w-16 p-2 text-center font-black bg-white border-2 rounded-lg outline-none ${item.qtd > (item.estoqueDisponivel || 0) ? 'border-red-500 bg-red-100' : 'border-slate-200'}`} /></td>
-                                    <td className="p-4 text-right font-bold text-slate-600 text-sm">R$ {(item.preco || 0).toFixed(2)}</td>
-                                    <td className="p-4 pr-6 text-right font-black text-blue-700">R$ {((item.preco || 0) * (item.qtd || 0)).toFixed(2)}</td>
-                                    <td className="p-4 text-center"><button onClick={() => removerItem(item.id || item.produtoId)} className="text-red-400 hover:bg-red-50 p-2 rounded-lg"><Trash2 size={16} /></button></td>
-                                </tr>
-                            ))}
+                            {itens.map((item) => {
+                                const disponivel = item.estoqueDisponivel ?? item.quantidadeEstoque ?? 0;
+                                const faltaEstoque = item.qtd > disponivel;
+
+                                return (
+                                    <tr key={item.id || item.produtoId} className={`border-b hover:bg-slate-50 ${faltaEstoque ? 'bg-red-50' : ''}`}>
+                                        <td className="p-4 pl-6 font-mono text-xs text-slate-500">{item.codigo}</td>
+                                        <td className="p-4 font-bold text-slate-800 text-sm">
+                                            <div>
+                                                <p>{item.nome}</p>
+                                                {faltaEstoque && (
+                                                    <span className="text-[10px] font-black text-red-600 flex items-center gap-1 uppercase tracking-tighter">
+                                                        <AlertTriangle size={10}/> Falta Estoque (Disponível: {disponivel})
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <input type="number" value={item.qtd} onChange={(e) => alterarQuantidade(item.id || item.produtoId, parseInt(e.target.value) || 1)} className={`w-16 p-2 text-center font-black bg-white border-2 rounded-lg outline-none ${faltaEstoque ? 'border-red-500 bg-red-100' : 'border-slate-200'}`} />
+                                        </td>
+                                        <td className="p-4 text-right font-bold text-slate-600 text-sm">R$ {(item.preco || 0).toFixed(2)}</td>
+                                        <td className="p-4 pr-6 text-right font-black text-blue-700">R$ {((item.preco || 0) * (item.qtd || 0)).toFixed(2)}</td>
+                                        <td className="p-4 text-center"><button onClick={() => removerItem(item.id || item.produtoId)} className="text-red-400 hover:bg-red-50 p-2 rounded-lg"><Trash2 size={16} /></button></td>
+                                    </tr>
+                                );
+                            })}
                             </tbody>
                         </table>
                     </div>

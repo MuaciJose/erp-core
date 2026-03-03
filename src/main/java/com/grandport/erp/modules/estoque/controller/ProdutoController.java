@@ -42,6 +42,15 @@ public class ProdutoController {
     }
 
     // =========================================================================================
+    // NOVA ROTA ADICIONADA: Busca produto por ID (Crucial para o Balcão atualizar estoque no estorno)
+    // =========================================================================================
+    @GetMapping("/{id}")
+    @Operation(summary = "Busca produto por ID para sincronizar estoque no Front-end")
+    public ResponseEntity<Produto> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(service.findById(id));
+    }
+
+    // =========================================================================================
     // 2. ROTAS MOBILE/AVANÇADAS (MULTIPART) - Para envio físico de arquivos
     // =========================================================================================
 
