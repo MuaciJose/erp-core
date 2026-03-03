@@ -7,7 +7,7 @@ export const GestaoUsuarios = () => {
     const [loading, setLoading] = useState(true);
     const [modalAberto, setModalAberto] = useState(false);
 
-    // NOVO: Estado para mensagens profissionais
+    // Estado para mensagens profissionais
     const [notificacao, setNotificacao] = useState(null);
 
     const [usuarioForm, setUsuarioForm] = useState({
@@ -35,6 +35,7 @@ export const GestaoUsuarios = () => {
             telas: [
                 { acao: 'estoque', nome: 'Buscar Peças / Consulta' },
                 { acao: 'marcas', nome: 'Gestão de Marcas' },
+                { acao: 'ajuste_estoque', nome: 'Ajuste de Estoque / Inventário' }, // <-- NOVA TELA ADICIONADA AQUI
                 { acao: 'compras', nome: 'Importar NF-e (XML)' },
                 { acao: 'previsao', nome: 'Previsão de Compras' },
                 { acao: 'faltas', nome: 'Relatório de Faltas' }

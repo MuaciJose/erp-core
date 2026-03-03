@@ -5,6 +5,7 @@ import { Dashboard } from './modules/financeiro/Dashboard';
 import { Pdv } from './modules/vendas/Pdv';
 import { Produtos } from './modules/estoque/Produtos';
 import { Marcas } from './modules/estoque/Marcas';
+import { AjusteEstoque } from './modules/estoque/AjusteEstoque'; // <-- IMPORTAÇÃO ADICIONADA AQUI
 import { PrevisaoCompras } from './modules/estoque/PrevisaoCompras';
 import { Parceiros } from './modules/cadastro/Parceiros';
 import { ImportarXml } from './modules/compras/ImportarXml';
@@ -23,6 +24,7 @@ import { Auditoria } from './modules/cadastro/Auditoria';
 import { WidgetCalculadora } from './components/WidgetCalculadora';
 import { GestaoVendas } from './modules/vendas/GestaoVendas';
 import { FilaPedidosCaixa } from './modules/vendas/FilaPedidosCaixa';
+
 
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
@@ -116,6 +118,7 @@ function App() {
                             {/* ESTOQUE E COMPRAS */}
                             {paginaAtiva === 'estoque' && <Produtos />}
                             {paginaAtiva === 'marcas' && <Marcas />}
+                            {paginaAtiva === 'ajuste_estoque' && <AjusteEstoque />} {/* <-- TELA DE INVENTÁRIO ADICIONADA AQUI */}
                             {paginaAtiva === 'parceiros' && <Parceiros />}
                             {paginaAtiva === 'previsao' && <PrevisaoCompras />}
                             {paginaAtiva === 'compras' && <ImportarXml />}

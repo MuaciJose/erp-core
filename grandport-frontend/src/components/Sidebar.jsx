@@ -45,6 +45,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             submenus: [
                 { titulo: 'Buscar Peças', acao: 'estoque' },
                 { titulo: 'Marcas', acao: 'marcas' },
+                { titulo: 'Ajuste de Estoque', acao: 'ajuste_estoque' }, // <-- NOVA TELA ADICIONADA AQUI
                 { titulo: 'Importar NF-e (XML)', acao: 'compras' },
                 { titulo: 'Previsão de Compras', acao: 'previsao' },
                 { titulo: 'Relatório de Faltas', acao: 'faltas' }
