@@ -22,6 +22,7 @@ public class UsuarioController {
 
     @GetMapping
     public ResponseEntity<List<UsuarioDTO>> listar() {
+        // O React agora vai carregar esses dados na aba de vendedores
         List<UsuarioDTO> usuarios = repository.findAll().stream()
                 .map(UsuarioDTO::new)
                 .collect(Collectors.toList());
@@ -36,7 +37,7 @@ public class UsuarioController {
         novo.setSenha(new BCryptPasswordEncoder().encode(dto.getSenha()));
         novo.setPermissoes(dto.getPermissoes());
         novo.setAtivo(true);
-        
+
         Usuario salvo = repository.save(novo);
         auditoriaService.registrar("SISTEMA", "CRIACAO_USUARIO", "Cadastrou o usuário: " + salvo.getNomeCompleto());
         return ResponseEntity.ok(new UsuarioDTO(salvo));
@@ -46,15 +47,15 @@ public class UsuarioController {
     public ResponseEntity<UsuarioDTO> atualizar(@PathVariable Long id, @RequestBody UsuarioDTO dto) {
         Usuario usuario = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-        
+
         usuario.setNomeCompleto(dto.getNome());
         usuario.setUsername(dto.getEmail());
         usuario.setPermissoes(dto.getPermissoes());
-        
+
         if (dto.getSenha() != null && !dto.getSenha().isEmpty()) {
             usuario.setSenha(new BCryptPasswordEncoder().encode(dto.getSenha()));
         }
-        
+
         Usuario salvo = repository.save(usuario);
         auditoriaService.registrar("SISTEMA", "EDICAO_USUARIO", "Atualizou o usuário: " + salvo.getNomeCompleto());
         return ResponseEntity.ok(new UsuarioDTO(salvo));
@@ -64,11 +65,11 @@ public class UsuarioController {
     public ResponseEntity<Void> alternarStatus(@PathVariable Long id, @RequestBody Map<String, Boolean> payload) {
         Usuario usuario = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-        
+
         boolean novoStatus = payload.get("ativo");
         usuario.setAtivo(novoStatus);
         repository.save(usuario);
-        
+
         auditoriaService.registrar("SISTEMA", "STATUS_USUARIO", (novoStatus ? "Desbloqueou" : "Bloqueou") + " o acesso de: " + usuario.getNomeCompleto());
         return ResponseEntity.ok().build();
     }

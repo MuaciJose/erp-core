@@ -27,7 +27,8 @@ export const GestaoUsuarios = () => {
                 { acao: 'pdv', nome: 'Ponto de Venda Rápido (PDV)' },
                 { acao: 'vendas', nome: 'Balcão de Peças / Central' },
                 { acao: 'fila-caixa', nome: 'Fila do Caixa (Receber Pagamentos)' },
-                { acao: 'caixa', nome: 'Controle de Caixa (Abrir/Fechar Turno)' }
+                { acao: 'caixa', nome: 'Controle de Caixa (Abrir/Fechar Turno)' },
+                { acao: 'relatorio-comissoes', nome: 'Relatório de Comissões' } // <-- TELA ADICIONADA AQUI
             ]
         },
         {
@@ -35,7 +36,7 @@ export const GestaoUsuarios = () => {
             telas: [
                 { acao: 'estoque', nome: 'Buscar Peças / Consulta' },
                 { acao: 'marcas', nome: 'Gestão de Marcas' },
-                { acao: 'ajuste_estoque', nome: 'Ajuste de Estoque / Inventário' }, // <-- NOVA TELA ADICIONADA AQUI
+                { acao: 'ajuste_estoque', nome: 'Ajuste de Estoque / Inventário' },
                 { acao: 'compras', nome: 'Importar NF-e (XML)' },
                 { acao: 'previsao', nome: 'Previsão de Compras' },
                 { acao: 'faltas', nome: 'Relatório de Faltas' }

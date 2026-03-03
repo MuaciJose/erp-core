@@ -1,6 +1,9 @@
 package com.grandport.erp.modules.vendas.service;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema; // NOVO
+import com.grandport.erp.modules.configuracoes.model.VendedorComissao;   // NOVO
+import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService; // NOVO
 import com.grandport.erp.modules.estoque.model.Produto;
 import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
 import com.grandport.erp.modules.financeiro.service.CaixaService;
@@ -21,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode; // NOVO
 import java.util.List;
 
 @Service
@@ -33,21 +37,44 @@ public class VendaService {
     @Autowired private VeiculoRepository veiculoRepository;
     @Autowired private CaixaService caixaService;
     @Autowired private AuditoriaService auditoriaService;
+    @Autowired private ConfiguracaoService configService; // NOVO: Injetado para pegar as regras de comissão
 
     // =========================================================================
-    // MÉTODO AUXILIAR: VALIDA O ESTOQUE (A NOVA BARREIRA DO VENDEDOR)
+    // MÉTODO AUXILIAR: CALCULA E GRAVA A COMISSÃO (CONGELA O VALOR)
     // =========================================================================
+    private void aplicarComissaoVendedor(Venda venda) {
+        if (venda.getVendedorId() == null) return;
+
+        ConfiguracaoSistema configs = configService.obterConfiguracao();
+
+        // Busca a porcentagem definida para este vendedor nas configurações
+        BigDecimal percentual = configs.getVendedores().stream()
+                .filter(v -> v.getUsuarioId().equals(venda.getVendedorId()))
+                .map(VendedorComissao::getComissao)
+                .findFirst()
+                .orElse(BigDecimal.ZERO);
+
+        if (percentual.compareTo(BigDecimal.ZERO) > 0) {
+            // Cálculo: (ValorTotal * Percentual) / 100
+            BigDecimal valorCalculado = venda.getValorTotal()
+                    .multiply(percentual)
+                    .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+
+            venda.setValorComissao(valorCalculado);
+        } else {
+            venda.setValorComissao(BigDecimal.ZERO);
+        }
+    }
+
     private void validarEstoque(VendaRequestDTO dto) {
         for (ItemVendaDTO itemDTO : dto.itens()) {
             Produto produto = produtoRepository.findById(itemDTO.produtoId())
                     .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
 
-            // MÁGICA: Se a flag estiver ativa, ignora a falta de estoque!
             if (Boolean.TRUE.equals(produto.getPermitirEstoqueNegativo())) {
                 continue;
             }
 
-            // Proteção contra nulos caso existam produtos antigos sem a quantidade preenchida
             int estoqueDisponivel = produto.getQuantidadeEstoque() != null ? produto.getQuantidadeEstoque() : 0;
 
             if (estoqueDisponivel < itemDTO.quantidade()) {
@@ -83,8 +110,9 @@ public class VendaService {
         }
 
         if (venda.getStatus() == StatusVenda.AGUARDANDO_PAGAMENTO && (dto.status() == StatusVenda.ORCAMENTO || dto.status() == StatusVenda.PEDIDO)) {
-            throw new RuntimeException("Operação Negada: O documento já está no Caixa e só pode ser devolvido através da tela do Caixa.");
+            throw new RuntimeException("Operação Negada: O documento já está no Caixa.");
         }
+
         if (venda.getStatus() == StatusVenda.PEDIDO && dto.status() == StatusVenda.ORCAMENTO) {
             throw new RuntimeException("Operação Negada: Um Pedido Oficial não pode ser revertido para Orçamento.");
         }
@@ -98,7 +126,6 @@ public class VendaService {
         }
 
         venda.getItens().clear();
-
         Venda salva = preencherESalvarVenda(venda, dto);
 
         if (venda.getStatus() == StatusVenda.AGUARDANDO_PAGAMENTO && dto.status() == StatusVenda.AGUARDANDO_PAGAMENTO) {
@@ -125,8 +152,10 @@ public class VendaService {
         try {
             Usuario vendedor = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
             venda.setVendedorNome(vendedor.getNomeCompleto());
+            venda.setVendedorId(vendedor.getId()); // NOVO: Vincula o ID do vendedor logado
         } catch (Exception e) {
             venda.setVendedorNome("Balcão");
+            venda.setVendedorId(null);
         }
 
         if (dto.parceiroId() != null) {
@@ -177,15 +206,11 @@ public class VendaService {
 
         for (ItemVenda item : venda.getItens()) {
             Produto produto = item.getProduto();
-
-            // MÁGICA NO CAIXA TAMBÉM: Ignora se a flag estiver ativa
-            if (Boolean.TRUE.equals(produto.getPermitirEstoqueNegativo())) {
-                continue;
-            }
+            if (Boolean.TRUE.equals(produto.getPermitirEstoqueNegativo())) continue;
 
             int estoqueDisponivel = produto.getQuantidadeEstoque() != null ? produto.getQuantidadeEstoque() : 0;
             if (estoqueDisponivel < item.getQuantidade()) {
-                throw new RuntimeException("ATENÇÃO CAIXA: O Estoque desta peça acabou enquanto o cliente estava na fila. Devolva o pedido ao vendedor. (" + produto.getNome() + ")");
+                throw new RuntimeException("Estoque insuficiente de " + produto.getNome());
             }
         }
 
@@ -206,12 +231,15 @@ public class VendaService {
 
         for (ItemVenda item : venda.getItens()) {
             Produto produto = item.getProduto();
-
-            // Abate o estoque mesmo que fique negativo (se a flag permitir, ele ficará ex: -2)
             int estoqueAtual = produto.getQuantidadeEstoque() != null ? produto.getQuantidadeEstoque() : 0;
             produto.setQuantidadeEstoque(estoqueAtual - item.getQuantidade());
             produtoRepository.save(produto);
         }
+
+        // =====================================================================
+        // NOVO: CALCULA COMISSÃO NO MOMENTO DA CONCLUSÃO
+        // =====================================================================
+        aplicarComissaoVendedor(venda);
 
         venda.setStatus(StatusVenda.CONCLUIDA);
         return vendaRepository.save(venda);
@@ -221,14 +249,19 @@ public class VendaService {
     public Venda processarVenda(VendaRequestDTO dto) {
         Venda venda = new Venda();
         venda.setStatus(StatusVenda.CONCLUIDA);
-        return preencherESalvarVenda(venda, dto);
+
+        // Aqui também precisamos preencher o vendedor e calcular a comissão
+        Venda salva = preencherESalvarVenda(venda, dto);
+        aplicarComissaoVendedor(salva);
+
+        return vendaRepository.save(salva);
     }
 
     private void processarVendaAPrazo(Venda venda, Long parceiroId) {
         if (parceiroId == null) throw new RuntimeException("Cliente não informado para venda a prazo.");
 
         Parceiro cliente = parceiroRepository.findById(parceiroId)
-                .orElseThrow(() -> new RuntimeException("Cliente não encontrado: ID " + parceiroId));
+                .orElseThrow(() -> new RuntimeException("Cliente não encontrado."));
 
         BigDecimal saldoDisponivel = cliente.getLimiteCredito().subtract(cliente.getSaldoDevedor());
 
@@ -248,13 +281,13 @@ public class VendaService {
                 .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
 
         if (venda.getStatus() != StatusVenda.AGUARDANDO_PAGAMENTO) {
-            throw new RuntimeException("Apenas pedidos que estão na fila do caixa podem ser devolvidos.");
+            throw new RuntimeException("Apenas pedidos na fila do caixa podem ser devolvidos.");
         }
 
         venda.setStatus(StatusVenda.PEDIDO);
 
         try {
-            auditoriaService.registrar("VENDAS", "DEVOLUCAO", "Pedido #" + vendaId + " devolvido pelo Caixa para o Vendedor.");
+            auditoriaService.registrar("VENDAS", "DEVOLUCAO", "Pedido #" + vendaId + " devolvido pelo Caixa.");
         } catch (Exception e) {}
 
         return vendaRepository.save(venda);

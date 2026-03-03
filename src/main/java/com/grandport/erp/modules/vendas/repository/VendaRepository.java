@@ -35,4 +35,7 @@ public interface VendaRepository extends JpaRepository<Venda, Long> {
            "FROM ItemVenda iv WHERE iv.venda.status = 'CONCLUIDA' " +
            "GROUP BY iv.produto.nome ORDER BY SUM(iv.quantidade * iv.precoUnitario) DESC")
     List<DashboardResumoDTO.TopProdutoDTO> findTop5ProdutosMaisVendidosMes();
+
+    @Query("SELECT v FROM Venda v WHERE v.status = 'CONCLUIDA' AND v.dataHora BETWEEN :inicio AND :fim ORDER BY v.vendedorNome, v.dataHora")
+    List<Venda> buscarVendasParaRelatorio(LocalDateTime inicio, LocalDateTime fim);
 }

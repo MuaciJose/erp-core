@@ -8,7 +8,8 @@ import {
     ChevronDown,
     ChevronRight,
     ShoppingCart,
-    LogOut
+    LogOut,
+    FileText // Importado para manter consistência caso precise no futuro
 } from 'lucide-react';
 
 export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }) => {
@@ -35,7 +36,8 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Ponto de Venda (PDV)', acao: 'pdv' },
                 { titulo: 'Balcão / Central', acao: 'vendas' },
                 { titulo: 'Fila do Caixa', acao: 'fila-caixa' },
-                { titulo: 'Controle de Caixa', acao: 'caixa' }
+                { titulo: 'Controle de Caixa', acao: 'caixa' },
+                { titulo: 'Relatório de Comissões', acao: 'relatorio-comissoes' } // <-- ADICIONADO AQUI
             ]
         },
         {
@@ -45,7 +47,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             submenus: [
                 { titulo: 'Buscar Peças', acao: 'estoque' },
                 { titulo: 'Marcas', acao: 'marcas' },
-                { titulo: 'Ajuste de Estoque', acao: 'ajuste_estoque' }, // <-- NOVA TELA ADICIONADA AQUI
+                { titulo: 'Ajuste de Estoque', acao: 'ajuste_estoque' },
                 { titulo: 'Importar NF-e (XML)', acao: 'compras' },
                 { titulo: 'Previsão de Compras', acao: 'previsao' },
                 { titulo: 'Relatório de Faltas', acao: 'faltas' }

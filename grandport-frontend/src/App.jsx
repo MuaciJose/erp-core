@@ -21,10 +21,12 @@ import { PlanoContas } from './modules/financeiro/PlanoContas';
 import { ConciliacaoBancaria } from './modules/financeiro/ConciliacaoBancaria';
 import { GestaoUsuarios } from './modules/cadastro/GestaoUsuarios';
 import { Auditoria } from './modules/cadastro/Auditoria';
-import { Configuracoes } from './modules/configuracoes/Configuracoes'; // <-- IMPORTAÇÃO DA NOVA TELA AQUI
+import { Configuracoes } from './modules/configuracoes/Configuracoes';
 import { WidgetCalculadora } from './components/WidgetCalculadora';
 import { GestaoVendas } from './modules/vendas/GestaoVendas';
 import { FilaPedidosCaixa } from './modules/vendas/FilaPedidosCaixa';
+// --- NOVA IMPORTAÇÃO ---
+import { RelatorioComissoes } from './modules/vendas/RelatorioComissoes';
 
 
 function App() {
@@ -115,6 +117,8 @@ function App() {
                             {paginaAtiva === 'vendas' && <GestaoVendas />}
                             {paginaAtiva === 'fila-caixa' && <FilaPedidosCaixa setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'caixa' && <ControleCaixa />}
+                            {/* --- NOVA ROTA DE RELATÓRIO --- */}
+                            {paginaAtiva === 'relatorio-comissoes' && <RelatorioComissoes />}
 
                             {/* ESTOQUE E COMPRAS */}
                             {paginaAtiva === 'estoque' && <Produtos />}
@@ -137,7 +141,7 @@ function App() {
                             {/* CADASTROS E CONFIGS */}
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
                             {paginaAtiva === 'auditoria' && <Auditoria />}
-                            {paginaAtiva === 'configuracoes' && <Configuracoes />} {/* <-- ROTA DA TELA ADICIONADA AQUI */}
+                            {paginaAtiva === 'configuracoes' && <Configuracoes />}
                         </>
                     )}
                 </div>

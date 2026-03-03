@@ -23,9 +23,9 @@ public class ErpCoreApplication {
     @Bean
     CommandLineRunner initDatabase(UsuarioRepository repository, PasswordEncoder passwordEncoder) {
         return args -> {
-            // LISTA ATUALIZADA: Agora inclui "pdv" e "ajuste_estoque"
+            // LISTA ATUALIZADA: Agora inclui "relatorio-comissoes"
             List<String> todasPermissoes = Arrays.asList(
-                    "dash", "pdv", "vendas", "orcamentos", "fila-caixa", "caixa",
+                    "dash", "pdv", "vendas", "orcamentos", "fila-caixa", "caixa", "relatorio-comissoes", // <-- ADICIONADO AQUI
                     "estoque", "marcas", "ajuste_estoque", "compras", "previsao", "faltas",
                     "contas-pagar", "contas-receber", "bancos", "conciliacao", "plano-contas", "dre",
                     "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes", "calculadora"

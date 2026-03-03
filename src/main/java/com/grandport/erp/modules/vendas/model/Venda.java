@@ -15,9 +15,9 @@ import java.util.List;
 public class Venda {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     private LocalDateTime dataHora = LocalDateTime.now();
-    
+
     @ManyToOne
     @JoinColumn(name = "cliente_id")
     private Parceiro cliente;
@@ -28,14 +28,17 @@ public class Venda {
 
     private Integer kmVeiculo;
 
+    // Vendedor
+    private Long vendedorId; // NOVO: ID para rastreamento interno e comissão
     private String vendedorNome;
+    private BigDecimal valorComissao = BigDecimal.ZERO; // NOVO: Valor em R$ calculado no fechamento
 
     @Enumerated(EnumType.STRING)
-    private StatusVenda status = StatusVenda.CONCLUIDA; // Padrão para vendas diretas no PDV
+    private StatusVenda status = StatusVenda.CONCLUIDA;
 
     @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ItemVenda> itens = new ArrayList<>();
-    
+
     private BigDecimal desconto = BigDecimal.ZERO;
     private BigDecimal valorSubtotal;
     private BigDecimal valorTotal;
