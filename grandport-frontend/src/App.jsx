@@ -5,7 +5,7 @@ import { Dashboard } from './modules/financeiro/Dashboard';
 import { Pdv } from './modules/vendas/Pdv';
 import { Produtos } from './modules/estoque/Produtos';
 import { Marcas } from './modules/estoque/Marcas';
-import { AjusteEstoque } from './modules/estoque/AjusteEstoque'; // <-- IMPORTAÇÃO ADICIONADA AQUI
+import { AjusteEstoque } from './modules/estoque/AjusteEstoque';
 import { PrevisaoCompras } from './modules/estoque/PrevisaoCompras';
 import { Parceiros } from './modules/cadastro/Parceiros';
 import { ImportarXml } from './modules/compras/ImportarXml';
@@ -21,6 +21,7 @@ import { PlanoContas } from './modules/financeiro/PlanoContas';
 import { ConciliacaoBancaria } from './modules/financeiro/ConciliacaoBancaria';
 import { GestaoUsuarios } from './modules/cadastro/GestaoUsuarios';
 import { Auditoria } from './modules/cadastro/Auditoria';
+import { Configuracoes } from './modules/configuracoes/Configuracoes'; // <-- IMPORTAÇÃO DA NOVA TELA AQUI
 import { WidgetCalculadora } from './components/WidgetCalculadora';
 import { GestaoVendas } from './modules/vendas/GestaoVendas';
 import { FilaPedidosCaixa } from './modules/vendas/FilaPedidosCaixa';
@@ -118,7 +119,7 @@ function App() {
                             {/* ESTOQUE E COMPRAS */}
                             {paginaAtiva === 'estoque' && <Produtos />}
                             {paginaAtiva === 'marcas' && <Marcas />}
-                            {paginaAtiva === 'ajuste_estoque' && <AjusteEstoque />} {/* <-- TELA DE INVENTÁRIO ADICIONADA AQUI */}
+                            {paginaAtiva === 'ajuste_estoque' && <AjusteEstoque />}
                             {paginaAtiva === 'parceiros' && <Parceiros />}
                             {paginaAtiva === 'previsao' && <PrevisaoCompras />}
                             {paginaAtiva === 'compras' && <ImportarXml />}
@@ -136,6 +137,7 @@ function App() {
                             {/* CADASTROS E CONFIGS */}
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
                             {paginaAtiva === 'auditoria' && <Auditoria />}
+                            {paginaAtiva === 'configuracoes' && <Configuracoes />} {/* <-- ROTA DA TELA ADICIONADA AQUI */}
                         </>
                     )}
                 </div>
