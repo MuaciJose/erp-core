@@ -5,12 +5,13 @@ import {
 } from 'lucide-react';
 import api from '../../api/axios';
 import { OrcamentoPedido } from './OrcamentoPedido';
+import { CupomReciboModal } from './CupomReciboModal'; // <-- IMPORTAÇÃO DO NOSSO CUPOM INTELIGENTE
 
 export const GestaoVendas = () => {
     const [telaAtual, setTelaAtual] = useState('LISTA');
     const [busca, setBusca] = useState('');
     const [espelhoAberto, setEspelhoAberto] = useState(null);
-    const [formatoImpressao, setFormatoImpressao] = useState('BOBINA');
+    const [imprimirEspelho, setImprimirEspelho] = useState(false); // Controle para abrir o Modal de Impressão
     const [listaVendas, setListaVendas] = useState([]);
     const [loading, setLoading] = useState(false);
     const [vendaParaEditar, setVendaParaEditar] = useState(null);
@@ -21,15 +22,19 @@ export const GestaoVendas = () => {
             const res = await api.get('/api/vendas');
             const formatadas = res.data.map(v => ({
                 id: v.id,
-                data: v.dataHora,
+                dataHora: v.dataHora,
                 cliente: v.cliente ? v.cliente.nome : 'Consumidor Final',
                 documento: v.cliente ? v.cliente.documento : '',
-                veiculo: v.veiculo ? `${v.veiculo.marca} ${v.veiculo.modelo} (${v.veiculo.placa})` : 'Nenhum',
+                // Ajuste visual para a lista (Mostra Marca/Modelo/Placa se houver)
+                veiculo: v.veiculo ? `${v.veiculo.marca} ${v.veiculo.modelo} ${v.veiculo.placa ? `(${v.veiculo.placa})` : ''}`.trim() : 'Nenhum',
+                // MANTÉM O OBJETO DO VEÍCULO COMPLETO PARA A IMPRESSÃO A4 (Placa e KM)
+                veiculoObj: v.veiculo || null,
                 total: v.valorTotal || 0,
                 subtotal: v.valorSubtotal || 0,
                 desconto: v.desconto || 0,
-                tipo: v.status, // ORCAMENTO, PEDIDO, AGUARDANDO_PAGAMENTO, CONCLUIDA
+                status: v.status, // ORCAMENTO, PEDIDO, AGUARDANDO_PAGAMENTO, CONCLUIDA
                 vendedor: v.vendedorNome || 'Sistema',
+                metodoPagamento: v.pagamentos && v.pagamentos.length > 0 ? v.pagamentos[0].metodo : 'NÃO PAGO',
                 itens: (v.itens || []).map(i => ({
                     produtoId: i.produto?.id,
                     id: i.produto?.id,
@@ -57,8 +62,6 @@ export const GestaoVendas = () => {
         v.veiculo.toLowerCase().includes(busca.toLowerCase())
     );
 
-    const handleImprimirEspelho = () => { window.print(); };
-
     const handleExcluir = async (id) => {
         if (window.confirm("Tem certeza que deseja excluir este registro?")) {
             try {
@@ -74,7 +77,6 @@ export const GestaoVendas = () => {
         setTelaAtual('NOVO');
     };
 
-    // AS 4 FASES DO CICLO DE VENDAS
     const getBadgeStatus = (status) => {
         switch(status) {
             case 'ORCAMENTO':
@@ -155,19 +157,19 @@ export const GestaoVendas = () => {
                                     <tr key={venda.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => setEspelhoAberto(venda)}>
                                         <td className="p-4 pl-6">
                                             <p className="font-black text-slate-800 text-sm">#{venda.id}</p>
-                                            <p className="text-xs font-bold text-slate-400 mt-1 flex items-center gap-1"><Clock size={12}/> {new Date(venda.data).toLocaleDateString('pt-BR')}</p>
+                                            <p className="text-xs font-bold text-slate-400 mt-1 flex items-center gap-1"><Clock size={12}/> {new Date(venda.dataHora).toLocaleDateString('pt-BR')}</p>
                                         </td>
                                         <td className="p-4">
                                             <p className="font-bold text-slate-700 text-sm">{venda.cliente}</p>
                                             <p className="text-xs text-slate-500">{venda.documento}</p>
                                         </td>
                                         <td className="p-4 text-sm font-bold text-slate-600">{venda.veiculo}</td>
-                                        <td className="p-4 text-center">{getBadgeStatus(venda.tipo)}</td>
+                                        <td className="p-4 text-center">{getBadgeStatus(venda.status)}</td>
                                         <td className="p-4 text-right font-black text-slate-800 text-lg">R$ {venda.total.toFixed(2)}</td>
                                         <td className="p-4 text-center pr-6">
                                             <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button onClick={(e) => { e.stopPropagation(); setEspelhoAberto(venda); }} className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors" title="Ver Espelho"><Eye size={16} /></button>
-                                                {venda.tipo !== 'CONCLUIDA' && venda.tipo !== 'AGUARDANDO_PAGAMENTO' ? (
+                                                {venda.status !== 'CONCLUIDA' && venda.status !== 'AGUARDANDO_PAGAMENTO' ? (
                                                     <>
                                                         <button onClick={(e) => { e.stopPropagation(); handleReabrir(venda); }} className="p-2 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded-lg transition-colors" title="Abrir e Editar"><Edit size={16} /></button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleExcluir(venda.id); }} className="p-2 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg transition-colors" title="Excluir"><Trash2 size={16} /></button>
@@ -186,21 +188,19 @@ export const GestaoVendas = () => {
                 </div>
             </div>
 
-            {/* MODAL DE ESPELHO NA TELA (MANTIDO INTACTO) */}
-            {espelhoAberto && (
+            {/* VISUALIZAÇÃO DO ESPELHO NA TELA (MANTIDA) */}
+            {espelhoAberto && !imprimirEspelho && (
                 <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-[150] p-4 print:hidden">
                     <div className="bg-slate-50 rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in relative">
-                        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 flex gap-2 bg-white p-2 rounded-2xl shadow-xl z-50 border border-slate-200">
-                            <button onClick={() => setFormatoImpressao('BOBINA')} className={`px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-all ${formatoImpressao === 'BOBINA' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}><ScrollText size={18} /> Bobina Térmica</button>
-                            <button onClick={() => setFormatoImpressao('A4')} className={`px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-all ${formatoImpressao === 'A4' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}><FileText size={18} /> Folha A4</button>
-                        </div>
-                        <div className="bg-slate-900 p-6 pt-20 flex justify-between items-end text-white border-b-4 border-blue-500">
+                        <div className="bg-slate-900 p-6 flex justify-between items-end text-white border-b-4 border-blue-500">
                             <div>
-                                <h2 className="text-3xl font-black tracking-widest uppercase">ESPELHO DO DOCUMENTO</h2>
-                                <p className="text-blue-300 font-bold mt-1 text-sm">Documento #{espelhoAberto.id} • Emitido em: {new Date(espelhoAberto.data).toLocaleString('pt-BR')}</p>
+                                <h2 className="text-3xl font-black tracking-widest uppercase">REIMPRESSÂO DO DOCUMENTO</h2>
+                                <p className="text-blue-300 font-bold mt-1 text-sm">Documento #{espelhoAberto.id} • Emitido em: {new Date(espelhoAberto.dataHora).toLocaleString('pt-BR')}</p>
                             </div>
                             <div className="flex gap-4">
-                                <button onClick={handleImprimirEspelho} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-black shadow-lg flex items-center gap-2 transition-all transform hover:scale-105"><Printer size={20} /> REIMPRIMIR</button>
+                                <button onClick={() => setImprimirEspelho(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-black shadow-lg flex items-center gap-2 transition-all transform hover:scale-105">
+                                    <Printer size={20} /> IMPRIMIR {espelhoAberto.status === 'ORCAMENTO' ? 'ORÇAMENTO' : 'CUPOM'}
+                                </button>
                                 <button onClick={() => setEspelhoAberto(null)} className="bg-slate-800 hover:bg-slate-700 p-3 rounded-xl transition-colors text-slate-400 hover:text-white"><X size={24} /></button>
                             </div>
                         </div>
@@ -251,107 +251,17 @@ export const GestaoVendas = () => {
                 </div>
             )}
 
-            {/* O CÓDIGO DA IMPRESSORA (MANTIDO INTACTO) */}
-            {espelhoAberto && (
-                <>
-                    <style>{`@media print { body, html, #root, main, div { height: auto !important; min-height: 0 !important; overflow: visible !important; } body * { visibility: hidden; } #area-impressao-vendas, #area-impressao-vendas * { visibility: visible; } #area-impressao-vendas { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; background: white !important; margin: 0 !important; padding: 0 !important; } @page { margin: 0; } }`}</style>
-                    <div id="area-impressao-vendas" className="hidden print:block font-sans bg-white text-black">
-                        {formatoImpressao === 'BOBINA' ? (
-                            <div className="w-[80mm] mx-auto text-xs font-mono p-4">
-                                <div className="text-center mb-4">
-                                    <h2 className="text-lg font-black uppercase">GRANDPORT AUTOPEÇAS</h2>
-                                    <p>CNPJ: 12.345.678/0001-90</p>
-                                    <div className="border-b border-dashed border-black my-2"></div>
-                                    <p className="font-bold uppercase">ESPELHO DE DOCUMENTO</p>
-                                    <p>Nº: {espelhoAberto.id}</p>
-                                    <p>{new Date(espelhoAberto.data).toLocaleString('pt-BR')}</p>
-                                    <div className="border-b border-dashed border-black my-2"></div>
-                                </div>
-                                <div className="mb-4 space-y-1">
-                                    <p><span className="font-bold">Cliente:</span> {espelhoAberto.cliente}</p>
-                                    <p><span className="font-bold">Viatura:</span> {espelhoAberto.veiculo}</p>
-                                    <p><span className="font-bold">Vendedor:</span> {espelhoAberto.vendedor}</p>
-                                </div>
-                                <div className="border-b border-dashed border-black my-2"></div>
-                                <table className="w-full text-left mb-4">
-                                    <thead><tr><th className="pb-1">QTD</th><th className="pb-1">DESCRIÇÃO</th><th className="text-right pb-1">TOTAL</th></tr></thead>
-                                    <tbody>
-                                    {(espelhoAberto.itens || []).map((item, idx) => (
-                                        <tr key={idx}>
-                                            <td className="align-top py-1">{item.qtd}x</td>
-                                            <td className="align-top py-1 pr-2">{item.nome} <br/><span className="text-[10px]">R$ {(item.preco || 0).toFixed(2)}</span></td>
-                                            <td className="align-top text-right py-1">R$ {((item.preco || 0) * (item.qtd || 0)).toFixed(2)}</td>
-                                        </tr>
-                                    ))}
-                                    </tbody>
-                                </table>
-                                <div className="border-b border-dashed border-black my-2"></div>
-                                <div className="space-y-1 mb-4">
-                                    <div className="flex justify-between"><span>Subtotal:</span><span>R$ {(espelhoAberto.subtotal || 0).toFixed(2)}</span></div>
-                                    {espelhoAberto.desconto > 0 && <div className="flex justify-between"><span>Desconto:</span><span>- R$ {espelhoAberto.desconto.toFixed(2)}</span></div>}
-                                    <div className="flex justify-between text-sm font-black mt-2 pt-2 border-t border-dashed border-black">
-                                        <span>TOTAL:</span><span>R$ {(espelhoAberto.total || 0).toFixed(2)}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="w-[210mm] mx-auto p-10 font-sans">
-                                <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
-                                    <div>
-                                        <h1 className="text-4xl font-black uppercase tracking-widest text-black">GRANDPORT</h1>
-                                        <p className="text-sm font-bold uppercase tracking-widest text-gray-600">Auto Peças e Acessórios</p>
-                                        <p className="text-xs mt-2 text-black">CNPJ: 12.345.678/0001-90</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <h2 className="text-2xl font-black uppercase border-2 border-black px-4 py-2 rounded-lg inline-block text-black">ESPELHO DE DOCUMENTO</h2>
-                                        <p className="text-sm font-bold mt-2 text-black">Nº {espelhoAberto.id} • Data: {new Date(espelhoAberto.data).toLocaleDateString('pt-BR')}</p>
-                                    </div>
-                                </div>
-                                <div className="border border-black p-4 mb-6 rounded-lg flex justify-between">
-                                    <div>
-                                        <p className="text-xs font-bold uppercase text-gray-500 mb-1">Dados do Cliente</p>
-                                        <p className="font-black text-lg text-black">{espelhoAberto.cliente}</p>
-                                        <p className="text-sm text-black">CPF/CNPJ: {espelhoAberto.documento}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-xs font-bold uppercase text-gray-500 mb-1">Aplicação / Vendedor</p>
-                                        <p className="font-black text-lg text-black">{espelhoAberto.veiculo}</p>
-                                        <p className="text-sm mt-1 text-black">Vend: {espelhoAberto.vendedor}</p>
-                                    </div>
-                                </div>
-                                <table className="w-full text-left border-collapse mb-6">
-                                    <thead className="border-b-2 border-black">
-                                    <tr>
-                                        <th className="py-2 px-2 text-sm font-black uppercase text-black">Cód</th>
-                                        <th className="py-2 px-2 text-sm font-black uppercase text-black">Descrição da Peça</th>
-                                        <th className="py-2 px-2 text-center text-sm font-black uppercase text-black">Qtd</th>
-                                        <th className="py-2 px-2 text-right text-sm font-black uppercase text-black">Vl. Unit</th>
-                                        <th className="py-2 px-2 text-right text-sm font-black uppercase text-black">Subtotal</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    {(espelhoAberto.itens || []).map((item, idx) => (
-                                        <tr key={idx} className="border-b border-gray-400">
-                                            <td className="py-3 px-2 text-sm font-mono text-black">{item.codigo}</td>
-                                            <td className="py-3 px-2 text-base font-bold text-black">{item.nome}</td>
-                                            <td className="py-3 px-2 text-center font-bold text-black">{item.qtd}</td>
-                                            <td className="py-3 px-2 text-right text-sm text-black">R$ {(item.preco || 0).toFixed(2)}</td>
-                                            <td className="py-3 px-2 text-right font-black text-black">R$ {((item.preco || 0) * (item.qtd || 0)).toFixed(2)}</td>
-                                        </tr>
-                                    ))}
-                                    </tbody>
-                                </table>
-                                <div className="flex justify-end mb-12">
-                                    <div className="w-64">
-                                        <div className="flex justify-between border-b border-gray-400 py-1"><span className="text-sm font-bold text-black">Subtotal:</span><span className="text-sm text-black">R$ {(espelhoAberto.subtotal || 0).toFixed(2)}</span></div>
-                                        <div className="flex justify-between border-b border-gray-400 py-1"><span className="text-sm font-bold text-black">Desconto:</span><span className="text-sm text-black">- R$ {(espelhoAberto.desconto || 0).toFixed(2)}</span></div>
-                                        <div className="flex justify-between mt-2 pt-2 border-t-2 border-black"><span className="text-lg font-black uppercase text-black">Total:</span><span className="text-2xl font-black text-black">R$ {(espelhoAberto.total || 0).toFixed(2)}</span></div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </>
+            {/* CHAMA O MODAL INTELIGENTE DE IMPRESSÃO */}
+            {imprimirEspelho && espelhoAberto && (
+                <CupomReciboModal
+                    pedido={{
+                        ...espelhoAberto,
+                        valorSubtotal: espelhoAberto.subtotal,
+                        valorTotal: espelhoAberto.total,
+                        vendedorNome: espelhoAberto.vendedor
+                    }}
+                    onClose={() => setImprimirEspelho(false)}
+                />
             )}
         </>
     );

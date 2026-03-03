@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { Maximize, Minimize, ShoppingCart, Ban, Lock, Wallet } from 'lucide-react';
+import { Maximize, Minimize, ShoppingCart, Ban, Lock, Wallet, CheckCircle, Printer, PlusCircle } from 'lucide-react';
 import api from '../../api/axios';
 import { ModalFinalizarVenda } from './ModalFinalizarVenda';
 import { BuscaInteligente } from '../../components/BuscaInteligente';
@@ -14,26 +14,36 @@ export const Pdv = ({ setPaginaAtiva }) => {
     const [vendaFinalizada, setVendaFinalizada] = useState(null);
     const [showModalPerdida, setShowModalPerdida] = useState(false);
     const [clienteSelecionado, setClienteSelecionado] = useState(null);
-    
+    const [configLoja, setConfigLoja] = useState(null);
+
     const [caixaStatus, setCaixaStatus] = useState(null);
     const [loadingCaixa, setLoadingCaixa] = useState(true);
 
-    const audioBip = new Audio('/sounds/bip.mp3');
-
-    const verificarCaixa = async () => {
+    const verificarCaixaEConfig = async () => {
         setLoadingCaixa(true);
         try {
-            const res = await api.get('/api/caixa/atual');
-            setCaixaStatus(res.data.status);
+            const resCaixa = await api.get('/api/caixa/atual');
+            setCaixaStatus(resCaixa.data.status);
+
+            // Já carrega a configuração da loja em segundo plano para o cupom não ficar em branco
+            const resConfig = await api.get('/api/configuracoes');
+            setConfigLoja(resConfig.data);
         } catch (err) {
             setCaixaStatus('FECHADO');
+            // Configuração padrão caso a API falhe
+            setConfigLoja({
+                nomeFantasia: 'GRANDPORT AUTOPEÇAS',
+                tamanhoImpressora: '80mm',
+                exibirVendedorCupom: true,
+                mensagemRodape: 'Obrigado pela preferência!'
+            });
         } finally {
             setLoadingCaixa(false);
         }
     };
 
     useEffect(() => {
-        verificarCaixa();
+        verificarCaixaEConfig();
         const handleFSChange = () => setIsFullScreen(!!document.fullscreenElement);
         document.addEventListener('fullscreenchange', handleFSChange);
         return () => document.removeEventListener('fullscreenchange', handleFSChange);
@@ -47,20 +57,34 @@ export const Pdv = ({ setPaginaAtiva }) => {
         }
     };
 
-    useHotkeys('f10', (e) => { e.preventDefault(); if (carrinho.length > 0) setModalAberto(true); }, { preventDefault: true }, [carrinho]);
-    useHotkeys('f9', (e) => { e.preventDefault(); setShowModalPerdida(true); }, { preventDefault: true });
+    useHotkeys('f10', (e) => { e.preventDefault(); if (carrinho.length > 0 && !vendaFinalizada) setModalAberto(true); }, { preventDefault: true }, [carrinho, vendaFinalizada]);
+    useHotkeys('f9', (e) => { e.preventDefault(); if(!vendaFinalizada) setShowModalPerdida(true); }, { preventDefault: true }, [vendaFinalizada]);
 
     useHotkeys('esc', (e) => {
-        if (showModalPerdida) setShowModalPerdida(false);
-        else if (modalAberto) setModalAberto(false);
-        else if (carrinho.length > 0) {
-            setTimeout(() => {
-                if (window.confirm("Deseja limpar todo o carrinho?")) setCarrinho([]);
-            }, 100);
+        if (vendaFinalizada) {
+            // Se apertar ESC na tela de sucesso, começa uma nova venda
+            setCarrinho([]);
+            setClienteSelecionado(null);
+            setVendaFinalizada(null);
+        } else if (showModalPerdida) {
+            setShowModalPerdida(false);
+        } else if (modalAberto) {
+            setModalAberto(false);
+        } else if (carrinho.length > 0) {
+            if (window.confirm("Deseja limpar todo o carrinho?")) setCarrinho([]);
         }
-    }, { preventDefault: true }, [carrinho, modalAberto, showModalPerdida]);
+    }, { preventDefault: true }, [carrinho, modalAberto, showModalPerdida, vendaFinalizada]);
 
-    const tocarBip = () => { audioBip.currentTime = 0; audioBip.play(); };
+    const tocarBip = () => {
+        try {
+            const audioBip = new Audio('/sounds/bip.mp3');
+            audioBip.currentTime = 0;
+            const playPromise = audioBip.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(() => { /* Ignora silenciosamente se der erro */ });
+            }
+        } catch (e) {}
+    };
 
     const adicionarAoCarrinho = (produto, qtd = 1) => {
         tocarBip();
@@ -73,38 +97,55 @@ export const Pdv = ({ setPaginaAtiva }) => {
     };
 
     const calcularTotal = () => {
-        let total = carrinho.reduce((acc, item) => acc + (item.precoVenda * item.qtd), 0);
+        let total = carrinho.reduce((acc, item) => {
+            const precoSeguro = Number(item.precoVenda) || Number(item.preco) || 0;
+            const qtdSegura = Number(item.qtd) || 1;
+            return acc + (precoSeguro * qtdSegura);
+        }, 0);
+
         if (clienteSelecionado?.percentualDesconto > 0) {
             total = total * (1 - clienteSelecionado.percentualDesconto / 100);
         }
-        return total;
+        return isNaN(total) ? 0 : total;
     };
-    
-    const formatCurrency = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    const formatCurrency = (value) => {
+        const valorSeguro = isNaN(Number(value)) ? 0 : Number(value);
+        return valorSeguro.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    };
 
     const finalizarVenda = async (dadosFinalizacao) => {
         const total = calcularTotal();
         const dadosVenda = {
-            itens: carrinho.map(item => ({ produtoId: item.id, quantidade: item.qtd })),
+            status: 'CONCLUIDA',
+            itens: carrinho.map(item => ({
+                produtoId: item.id,
+                quantidade: Number(item.qtd) || 1,
+                precoUnitario: Number(item.precoVenda) || Number(item.preco) || 0
+            })),
             pagamentos: [{ metodo: dadosFinalizacao.metodoPagamento, valor: total }],
             parceiroId: clienteSelecionado ? clienteSelecionado.id : null,
             veiculoId: dadosFinalizacao.veiculoId,
-            desconto: clienteSelecionado?.percentualDesconto > 0 ? (carrinho.reduce((acc, item) => acc + (item.precoVenda * item.qtd), 0) - total) : 0
+            desconto: clienteSelecionado?.percentualDesconto > 0 ? (carrinho.reduce((acc, item) => acc + ((item.precoVenda || item.preco) * item.qtd), 0) - total) : 0
         };
 
         try {
-            const resVenda = await api.post('/api/vendas', dadosVenda);
-            const vendaParaImpressao = { id: resVenda.data.id, total: total, vendedor: 'CAIXA 01', cliente: clienteSelecionado };
+            const resVenda = await api.post('/api/vendas/pedido', dadosVenda);
+            await api.post(`/api/vendas/${resVenda.data.id}/pagar`, dadosVenda.pagamentos);
+
+            const vendaParaImpressao = {
+                id: resVenda.data.id,
+                total: total,
+                vendedor: 'CAIXA 01',
+                cliente: clienteSelecionado,
+                dataHora: new Date().toISOString(),
+                metodoPagamento: dadosFinalizacao.metodoPagamento
+            };
+
+            // Aciona a Tela Verde de Sucesso!
             setVendaFinalizada(vendaParaImpressao);
             setModalAberto(false);
 
-            setTimeout(() => {
-                window.print();
-                setCarrinho([]);
-                setClienteSelecionado(null);
-                setVendaFinalizada(null);
-                alert(`Venda #${resVenda.data.id} finalizada com sucesso!`);
-            }, 500);
         } catch (err) {
             console.error(err);
             alert(`Erro ao finalizar venda: ${err.response?.data?.message || err.message}`);
@@ -122,8 +163,8 @@ export const Pdv = ({ setPaginaAtiva }) => {
                     </div>
                     <h1 className="text-3xl font-black text-slate-800 mb-2">CAIXA BLOQUEADO</h1>
                     <p className="text-slate-500 mb-8 font-medium">Você não pode realizar vendas enquanto o caixa estiver fechado. Abra o caixa para liberar o terminal.</p>
-                    
-                    <button 
+
+                    <button
                         onClick={() => setPaginaAtiva('caixa')}
                         className="w-full bg-slate-900 text-white py-4 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-slate-800 transition-all mb-4"
                     >
@@ -135,10 +176,41 @@ export const Pdv = ({ setPaginaAtiva }) => {
         );
     }
 
+    // =========================================================================================
+    // NOVA TELA DE SUCESSO E IMPRESSÃO
+    // =========================================================================================
+    if (vendaFinalizada) {
+        return (
+            <>
+                {/* TELA VERDE - ESCONDIDA NA IMPRESSÃO (print:hidden) */}
+                <div className="h-screen w-screen bg-green-600 flex flex-col items-center justify-center text-white z-50 fixed inset-0 p-4 print:hidden">
+                    <CheckCircle size={100} className="mb-6 text-green-200 animate-bounce" />
+                    <h1 className="text-5xl md:text-6xl font-black mb-2 tracking-tighter text-center">VENDA APROVADA!</h1>
+                    <p className="text-xl md:text-2xl font-bold text-green-200 mb-12 text-center">
+                        Pedido #{vendaFinalizada.id} registrado com sucesso.
+                    </p>
+
+                    <div className="flex flex-col md:flex-row gap-6">
+                        <button onClick={() => window.print()} className="bg-white text-green-700 px-8 py-5 rounded-2xl font-black text-xl hover:bg-slate-100 shadow-2xl flex items-center justify-center gap-3 transition-transform hover:scale-105 active:scale-95">
+                            <Printer size={32} /> IMPRIMIR RECIBO
+                        </button>
+                        <button onClick={() => {
+                            setCarrinho([]);
+                            setClienteSelecionado(null);
+                            setVendaFinalizada(null);
+                        }} className="bg-green-800 border-2 border-green-500 text-white px-8 py-5 rounded-2xl font-black text-xl hover:bg-green-900 shadow-2xl flex items-center justify-center gap-3 transition-transform hover:scale-105 active:scale-95">
+                            <PlusCircle size={32} /> NOVA VENDA (ESC)
+                        </button>
+                    </div>
+                </div>
+
+                {/* CHAMADA DIRETA DO CUPOM SEM EMBALAGEM DIV, PARA O CSS AGIR LIVREMENTE */}
+                <CupomVenda venda={vendaFinalizada} itens={carrinho} config={configLoja} />
+            </>
+        );
+    }
     return (
         <div className={`flex flex-col h-screen bg-slate-100 ${isFullScreen ? 'p-0' : 'p-4'}`}>
-            {vendaFinalizada && <CupomVenda venda={vendaFinalizada} itens={carrinho} />}
-
             <div className="flex justify-between items-center bg-slate-900 text-white p-4 rounded-t-xl shadow-lg print:hidden">
                 <div className="flex items-center gap-4">
                     <ShoppingCart className="text-blue-400" size={28} />
@@ -170,30 +242,33 @@ export const Pdv = ({ setPaginaAtiva }) => {
                 <div className="flex-1 overflow-y-auto p-0 z-0">
                     <table className="w-full text-left">
                         <thead className="bg-slate-100 text-slate-600 uppercase text-xs font-bold sticky top-0 z-10 shadow-sm">
-                            <tr>
-                                <th className="p-4 w-16 text-center">#</th>
-                                <th className="p-4">Descrição do Produto</th>
-                                <th className="p-4 w-32 text-right">Valor Unit.</th>
-                                <th className="p-4 w-24 text-center">Qtd</th>
-                                <th className="p-4 w-32 text-right">Total</th>
-                            </tr>
+                        <tr>
+                            <th className="p-4 w-16 text-center">#</th>
+                            <th className="p-4">Descrição do Produto</th>
+                            <th className="p-4 w-32 text-right">Valor Unit.</th>
+                            <th className="p-4 w-24 text-center">Qtd</th>
+                            <th className="p-4 w-32 text-right">Total</th>
+                        </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {carrinho.map((item, index) => (
+                        {carrinho.map((item, index) => {
+                            const precoProduto = Number(item.precoVenda) || Number(item.preco) || 0;
+                            return (
                                 <tr key={index} className="hover:bg-blue-50 transition-colors">
                                     <td className="p-4 text-center text-slate-400 font-mono">{index + 1}</td>
                                     <td className="p-4">
                                         <p className="font-bold text-slate-800">{item.nome}</p>
                                         <p className="text-xs text-slate-500 font-mono">{item.sku}</p>
                                     </td>
-                                    <td className="p-4 text-right font-medium text-slate-600">{formatCurrency(item.precoVenda)}</td>
+                                    <td className="p-4 text-right font-medium text-slate-600">{formatCurrency(precoProduto)}</td>
                                     <td className="p-4 text-center font-bold text-slate-800 bg-slate-50 rounded-lg mx-2">{item.qtd}</td>
-                                    <td className="p-4 text-right font-black text-slate-800">{formatCurrency(item.precoVenda * item.qtd)}</td>
+                                    <td className="p-4 text-right font-black text-slate-800">{formatCurrency(precoProduto * item.qtd)}</td>
                                 </tr>
-                            ))}
-                            {carrinho.length === 0 && (
-                                <tr><td colSpan="5" className="p-12 text-center text-slate-400 italic">Caixa livre. Aguardando próximo cliente...</td></tr>
-                            )}
+                            );
+                        })}
+                        {carrinho.length === 0 && (
+                            <tr><td colSpan="5" className="p-12 text-center text-slate-400 italic">Caixa livre. Aguardando próximo cliente...</td></tr>
+                        )}
                         </tbody>
                     </table>
                 </div>
@@ -206,10 +281,10 @@ export const Pdv = ({ setPaginaAtiva }) => {
                         </div>
                         <div>
                             <p className="text-slate-400 text-xs uppercase font-bold">Subtotal</p>
-                            <p className="text-2xl font-bold text-slate-200">{formatCurrency(carrinho.reduce((acc, item) => acc + (item.precoVenda * item.qtd), 0))}</p>
+                            <p className="text-2xl font-bold text-slate-200">{formatCurrency(calcularTotal())}</p>
                         </div>
-                        <button 
-                            onClick={() => setShowModalPerdida(true)} 
+                        <button
+                            onClick={() => setShowModalPerdida(true)}
                             className="ml-8 bg-red-600/20 border border-red-500 text-red-400 px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-red-600/40"
                         >
                             <Ban size={16} /> Venda Perdida (F9)
@@ -228,11 +303,11 @@ export const Pdv = ({ setPaginaAtiva }) => {
             </div>
 
             {modalAberto && (
-                <ModalFinalizarVenda 
-                    totalVenda={calcularTotal()} 
-                    clienteSelecionado={clienteSelecionado} 
-                    onClose={() => setModalAberto(false)} 
-                    onConfirmarVenda={finalizarVenda} 
+                <ModalFinalizarVenda
+                    totalVenda={calcularTotal()}
+                    clienteSelecionado={clienteSelecionado}
+                    onClose={() => setModalAberto(false)}
+                    onConfirmarVenda={finalizarVenda}
                 />
             )}
 
