@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
 import { Printer, Calendar, Users } from 'lucide-react';
+// --- 🚀 IMPORTAÇÃO DO TOAST ---
+import toast from 'react-hot-toast';
 
 export const RelatorioComissoes = () => {
     const [datas, setDatas] = useState({ inicio: '', fim: '' });
@@ -11,7 +13,6 @@ export const RelatorioComissoes = () => {
     const [loading, setLoading] = useState(false);
     const [empresa, setEmpresa] = useState({ nomeFantasia: 'Carregando...', razaoSocial: '', cnpj: '' });
 
-    // Busca os dados da empresa e a lista de usuários assim que a tela abre
     useEffect(() => {
         const carregarDadosIniciais = async () => {
             try {
@@ -23,6 +24,7 @@ export const RelatorioComissoes = () => {
                 setEquipe(resEquipe.data);
             } catch (error) {
                 console.error("Erro ao carregar dados iniciais", error);
+                toast.error("Erro ao carregar dados da empresa/equipe.");
             }
         };
         carregarDadosIniciais();
@@ -30,13 +32,13 @@ export const RelatorioComissoes = () => {
 
     const gerarRelatorio = async () => {
         if (!datas.inicio || !datas.fim) {
-            alert("Por favor, selecione a data de início e fim antes de gerar o relatório.");
+            toast.error("Selecione o período de início e fim.");
             return;
         }
 
+        const idToast = toast.loading("Buscando comissões no servidor...");
         setLoading(true);
         try {
-            // URL CORRIGIDA AQUI: /api/vendas/relatorios/comissoes
             let url = `/api/vendas/relatorios/comissoes?inicio=${datas.inicio}&fim=${datas.fim}`;
 
             if (vendedorSelecionado) {
@@ -45,9 +47,16 @@ export const RelatorioComissoes = () => {
 
             const res = await api.get(url);
             setDados(res.data);
+
+            if (res.data.length === 0) {
+                toast.dismiss(idToast);
+                toast("Nenhum registro encontrado para este período.", { icon: 'ℹ️' });
+            } else {
+                toast.success("Relatório gerado com sucesso!", { id: idToast });
+            }
         } catch (error) {
-            alert("Erro ao gerar dados do relatório. Verifique se o servidor está rodando.");
             console.error(error);
+            toast.error("Erro ao buscar dados. Verifique sua conexão.", { id: idToast });
         } finally {
             setLoading(false);
         }

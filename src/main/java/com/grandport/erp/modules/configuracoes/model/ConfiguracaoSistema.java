@@ -64,4 +64,11 @@ public class ConfiguracaoSistema {
     private String tipoCertificado = "A1";
 
     private String senhaCertificado = "";
+
+    // Dentro da classe ConfiguracaoSistema:
+    private String logradouro;
+    private String numero;
+    private String bairro;
+    private String cidade;
+    private String uf;
 }

@@ -7,6 +7,9 @@ import { BuscaInteligente } from '../../components/BuscaInteligente';
 import { CupomVenda } from './CupomVenda';
 import { BarraClientePdv } from '../../components/BarraClientePdv';
 
+// --- 🚀 IMPORTAÇÃO DO TOAST ---
+import toast from 'react-hot-toast';
+
 export const Pdv = ({ setPaginaAtiva }) => {
     const [carrinho, setCarrinho] = useState([]);
     const [modalAberto, setModalAberto] = useState(false);
@@ -25,12 +28,10 @@ export const Pdv = ({ setPaginaAtiva }) => {
             const resCaixa = await api.get('/api/caixa/atual');
             setCaixaStatus(resCaixa.data.status);
 
-            // Já carrega a configuração da loja em segundo plano para o cupom não ficar em branco
             const resConfig = await api.get('/api/configuracoes');
             setConfigLoja(resConfig.data);
         } catch (err) {
             setCaixaStatus('FECHADO');
-            // Configuração padrão caso a API falhe
             setConfigLoja({
                 nomeFantasia: 'GRANDPORT AUTOPEÇAS',
                 tamanhoImpressora: '80mm',
@@ -62,7 +63,6 @@ export const Pdv = ({ setPaginaAtiva }) => {
 
     useHotkeys('esc', (e) => {
         if (vendaFinalizada) {
-            // Se apertar ESC na tela de sucesso, começa uma nova venda
             setCarrinho([]);
             setClienteSelecionado(null);
             setVendaFinalizada(null);
@@ -81,7 +81,7 @@ export const Pdv = ({ setPaginaAtiva }) => {
             audioBip.currentTime = 0;
             const playPromise = audioBip.play();
             if (playPromise !== undefined) {
-                playPromise.catch(() => { /* Ignora silenciosamente se der erro */ });
+                playPromise.catch(() => { });
             }
         } catch (e) {}
     };
@@ -94,6 +94,8 @@ export const Pdv = ({ setPaginaAtiva }) => {
         } else {
             setCarrinho(prev => [...prev, { ...produto, qtd: qtd }]);
         }
+        // Feedback ao adicionar item
+        toast.success(`${produto.nome} adicionado ao carrinho!`, { position: 'bottom-left' });
     };
 
     const calcularTotal = () => {
@@ -117,7 +119,9 @@ export const Pdv = ({ setPaginaAtiva }) => {
     const finalizarVenda = async (dadosFinalizacao) => {
         const total = calcularTotal();
 
-        // PACOTE DE DADOS CORRIGIDO! Agora envia os itens para o Java
+        // 🎯 Inicia o Toast de carregamento
+        const idVendaToast = toast.loading("Processando venda e estoque...");
+
         const dadosVenda = {
             status: 'CONCLUIDA',
             itens: carrinho.map(item => ({
@@ -132,20 +136,20 @@ export const Pdv = ({ setPaginaAtiva }) => {
         };
 
         try {
-            // 1. Salva a Venda
             const resVenda = await api.post('/api/vendas/pedido', dadosVenda);
             await api.post(`/api/vendas/${resVenda.data.id}/pagar`, dadosVenda.pagamentos);
 
-            // ==============================================================
-            // 🚀 O DISPARO DO WHATSAPP (Roda em segundo plano)
-            // ==============================================================
+            // ✅ Sucesso na Venda
+            toast.success("Venda finalizada com sucesso!", { id: idVendaToast });
+
             if (clienteSelecionado && clienteSelecionado.telefone) {
-                // Não precisa de 'await' aqui para não travar a tela do caixa!
                 api.post(`/api/vendas/${resVenda.data.id}/whatsapp`)
-                    .then(() => console.log("WhatsApp enviado com sucesso!"))
-                    .catch((err) => console.error("Falha ao enviar o zap:", err));
+                    .then(() => toast.success("Recibo enviado por WhatsApp!"))
+                    .catch((err) => {
+                        console.error("Falha no zap:", err);
+                        toast.error("Venda salva, mas WhatsApp falhou.");
+                    });
             }
-            // ==============================================================
 
             const vendaParaImpressao = {
                 id: resVenda.data.id,
@@ -156,18 +160,18 @@ export const Pdv = ({ setPaginaAtiva }) => {
                 metodoPagamento: dadosFinalizacao.metodoPagamento
             };
 
-            // 2. Aciona a Tela Verde de Sucesso!
             setVendaFinalizada(vendaParaImpressao);
             setModalAberto(false);
 
-            // 3. Imprime o Recibo Físico
             setTimeout(() => {
                 window.print();
             }, 500);
 
         } catch (err) {
             console.error(err);
-            alert(`Erro ao finalizar venda: ${err.response?.data?.message || err.message}`);
+            const msgErro = err.response?.data?.message || err.message;
+            // ❌ Erro na Venda
+            toast.error(`Erro ao finalizar: ${msgErro}`, { id: idVendaToast, duration: 5000 });
         }
     };
 
@@ -195,13 +199,9 @@ export const Pdv = ({ setPaginaAtiva }) => {
         );
     }
 
-    // =========================================================================================
-    // NOVA TELA DE SUCESSO E IMPRESSÃO
-    // =========================================================================================
     if (vendaFinalizada) {
         return (
             <>
-                {/* TELA VERDE - ESCONDIDA NA IMPRESSÃO (print:hidden) */}
                 <div className="h-screen w-screen bg-green-600 flex flex-col items-center justify-center text-white z-50 fixed inset-0 p-4 print:hidden">
                     <CheckCircle size={100} className="mb-6 text-green-200 animate-bounce" />
                     <h1 className="text-5xl md:text-6xl font-black mb-2 tracking-tighter text-center">VENDA APROVADA!</h1>
@@ -222,12 +222,11 @@ export const Pdv = ({ setPaginaAtiva }) => {
                         </button>
                     </div>
                 </div>
-
-                {/* CHAMADA DIRETA DO CUPOM SEM EMBALAGEM DIV, PARA O CSS AGIR LIVREMENTE */}
                 <CupomVenda venda={vendaFinalizada} itens={carrinho} config={configLoja} />
             </>
         );
     }
+
     return (
         <div className={`flex flex-col h-screen bg-slate-100 ${isFullScreen ? 'p-0' : 'p-4'}`}>
             <div className="flex justify-between items-center bg-slate-900 text-white p-4 rounded-t-xl shadow-lg print:hidden">
@@ -339,10 +338,10 @@ export const Pdv = ({ setPaginaAtiva }) => {
                             <button onClick={() => setShowModalPerdida(false)} className="flex-1 py-3 bg-gray-200 rounded-xl font-bold">CANCELAR</button>
                             <button onClick={async () => {
                                 const desc = document.getElementById('inputPerdida').value;
-                                if (!desc) return alert("Descreva a peça que o cliente procurou.");
+                                if (!desc) return toast.error("Descreva a peça!");
                                 await api.post('/api/vendas-perdidas', { descricaoPeca: desc });
                                 setShowModalPerdida(false);
-                                alert("Registrado! O gestor será avisado.");
+                                toast.success("Registrado! O gestor será avisado.");
                             }} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold">CONFIRMAR</button>
                         </div>
                     </div>

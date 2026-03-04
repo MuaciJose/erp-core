@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from './api/axios';
+
+// --- IMPORTAÇÃO DO TOAST ---
+import { Toaster } from 'react-hot-toast';
+
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './modules/financeiro/Dashboard';
 import { Pdv } from './modules/vendas/Pdv';
@@ -25,7 +29,6 @@ import { Configuracoes } from './modules/configuracoes/Configuracoes';
 import { WidgetCalculadora } from './components/WidgetCalculadora';
 import { GestaoVendas } from './modules/vendas/GestaoVendas';
 import { FilaPedidosCaixa } from './modules/vendas/FilaPedidosCaixa';
-// --- NOVA IMPORTAÇÃO ---
 import { RelatorioComissoes } from './modules/vendas/RelatorioComissoes';
 
 
@@ -93,6 +96,27 @@ function App() {
     return (
         <div className="flex h-screen w-screen bg-slate-50 overflow-hidden font-sans">
 
+            {/* 🚀 TOASTER GLOBAL: Configurado para aparecer no topo direito com estilo moderno */}
+            <Toaster
+                position="top-right"
+                reverseOrder={false}
+                toastOptions={{
+                    duration: 4000,
+                    style: {
+                        background: '#1e293b', // Slate 800
+                        color: '#fff',
+                        borderRadius: '12px',
+                        fontWeight: 'bold'
+                    },
+                    success: {
+                        iconTheme: { primary: '#22c55e', secondary: '#fff' }
+                    },
+                    error: {
+                        iconTheme: { primary: '#ef4444', secondary: '#fff' }
+                    }
+                }}
+            />
+
             {!isFullScreen && (
                 <Sidebar
                     paginaAtiva={paginaAtiva}
@@ -111,16 +135,12 @@ function App() {
                         </div>
                     ) : (
                         <>
-                            {/* VENDAS E FRENTE DE LOJA */}
                             {paginaAtiva === 'dash' && <Dashboard setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'pdv' && <Pdv setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'vendas' && <GestaoVendas />}
                             {paginaAtiva === 'fila-caixa' && <FilaPedidosCaixa setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'caixa' && <ControleCaixa />}
-                            {/* --- NOVA ROTA DE RELATÓRIO --- */}
                             {paginaAtiva === 'relatorio-comissoes' && <RelatorioComissoes />}
-
-                            {/* ESTOQUE E COMPRAS */}
                             {paginaAtiva === 'estoque' && <Produtos />}
                             {paginaAtiva === 'marcas' && <Marcas />}
                             {paginaAtiva === 'ajuste_estoque' && <AjusteEstoque />}
@@ -129,16 +149,12 @@ function App() {
                             {paginaAtiva === 'compras' && <ImportarXml />}
                             {paginaAtiva === 'fiscal' && <CargaNcm />}
                             {paginaAtiva === 'faltas' && <RelatorioFaltas />}
-
-                            {/* FINANCEIRO E ADMINISTRATIVO */}
                             {paginaAtiva === 'contas-receber' && <ContasReceber />}
                             {paginaAtiva === 'contas-pagar' && <ContasPagar />}
                             {paginaAtiva === 'dre' && <FluxoCaixaDre />}
                             {paginaAtiva === 'bancos' && <ContasBancarias />}
                             {paginaAtiva === 'plano-contas' && <PlanoContas />}
                             {paginaAtiva === 'conciliacao' && <ConciliacaoBancaria />}
-
-                            {/* CADASTROS E CONFIGS */}
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
                             {paginaAtiva === 'auditoria' && <Auditoria />}
                             {paginaAtiva === 'configuracoes' && <Configuracoes />}
