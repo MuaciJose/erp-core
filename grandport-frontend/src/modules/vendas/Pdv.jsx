@@ -142,9 +142,14 @@ export const Pdv = ({ setPaginaAtiva }) => {
                 metodoPagamento: dadosFinalizacao.metodoPagamento
             };
 
-            // Aciona a Tela Verde de Sucesso!
+            // 1. Aciona a Tela Verde de Sucesso!
             setVendaFinalizada(vendaParaImpressao);
             setModalAberto(false);
+
+            // 2. GATILHO MÁGICO: Dispara a impressora automaticamente 0.5s após a tela verde aparecer
+            setTimeout(() => {
+                window.print();
+            }, 500);
 
         } catch (err) {
             console.error(err);
