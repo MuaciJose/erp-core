@@ -116,6 +116,8 @@ export const Pdv = ({ setPaginaAtiva }) => {
 
     const finalizarVenda = async (dadosFinalizacao) => {
         const total = calcularTotal();
+
+        // PACOTE DE DADOS CORRIGIDO! Agora envia os itens para o Java
         const dadosVenda = {
             status: 'CONCLUIDA',
             itens: carrinho.map(item => ({
@@ -130,8 +132,20 @@ export const Pdv = ({ setPaginaAtiva }) => {
         };
 
         try {
+            // 1. Salva a Venda
             const resVenda = await api.post('/api/vendas/pedido', dadosVenda);
             await api.post(`/api/vendas/${resVenda.data.id}/pagar`, dadosVenda.pagamentos);
+
+            // ==============================================================
+            // 🚀 O DISPARO DO WHATSAPP (Roda em segundo plano)
+            // ==============================================================
+            if (clienteSelecionado && clienteSelecionado.telefone) {
+                // Não precisa de 'await' aqui para não travar a tela do caixa!
+                api.post(`/api/vendas/${resVenda.data.id}/whatsapp`)
+                    .then(() => console.log("WhatsApp enviado com sucesso!"))
+                    .catch((err) => console.error("Falha ao enviar o zap:", err));
+            }
+            // ==============================================================
 
             const vendaParaImpressao = {
                 id: resVenda.data.id,
@@ -142,11 +156,11 @@ export const Pdv = ({ setPaginaAtiva }) => {
                 metodoPagamento: dadosFinalizacao.metodoPagamento
             };
 
-            // 1. Aciona a Tela Verde de Sucesso!
+            // 2. Aciona a Tela Verde de Sucesso!
             setVendaFinalizada(vendaParaImpressao);
             setModalAberto(false);
 
-            // 2. GATILHO MÁGICO: Dispara a impressora automaticamente 0.5s após a tela verde aparecer
+            // 3. Imprime o Recibo Físico
             setTimeout(() => {
                 window.print();
             }, 500);

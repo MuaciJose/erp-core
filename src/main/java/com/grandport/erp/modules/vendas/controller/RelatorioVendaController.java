@@ -3,11 +3,13 @@ package com.grandport.erp.modules.vendas.controller;
 import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import com.grandport.erp.modules.vendas.service.RelatorioService;
+import com.grandport.erp.modules.vendas.service.WhatsAppService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -37,6 +39,22 @@ public class RelatorioVendaController {
         headers.setContentDispositionFormData("inline", "venda_" + id + ".pdf");
 
         return new ResponseEntity<>(pdf, headers, HttpStatus.OK);
+    }
+
+    @Autowired
+    private WhatsAppService whatsAppService;
+
+    // NOVO ENDPOINT: /api/vendas/{id}/whatsapp
+    @PostMapping("/{id}/whatsapp")
+    // 👉 ADICIONE ESTA LINHA ABAIXO PARA LIBERAR O ACESSO (Ajuste a ROLE se necessário, ex: hasAnyRole('ADMIN', 'CAIXA'))
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'CAIXA')")
+    public ResponseEntity<String> enviarReciboWhatsApp(@PathVariable Long id) {
+        try {
+            whatsAppService.enviarReciboPdfPorWhatsApp(id);
+            return ResponseEntity.ok("Recibo enviado para o WhatsApp do cliente com sucesso!");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     // =========================================================================

@@ -1,9 +1,9 @@
 package com.grandport.erp.modules.vendas.service;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
-import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema; // NOVO
-import com.grandport.erp.modules.configuracoes.model.VendedorComissao;   // NOVO
-import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService; // NOVO
+import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
+import com.grandport.erp.modules.configuracoes.model.VendedorComissao;
+import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
 import com.grandport.erp.modules.estoque.model.Produto;
 import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
 import com.grandport.erp.modules.financeiro.service.CaixaService;
@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode; // NOVO
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
@@ -37,7 +37,7 @@ public class VendaService {
     @Autowired private VeiculoRepository veiculoRepository;
     @Autowired private CaixaService caixaService;
     @Autowired private AuditoriaService auditoriaService;
-    @Autowired private ConfiguracaoService configService; // NOVO: Injetado para pegar as regras de comissão
+    @Autowired private ConfiguracaoService configService;
 
     // =========================================================================
     // MÉTODO AUXILIAR: CALCULA E GRAVA A COMISSÃO (CONGELA O VALOR)
@@ -66,10 +66,17 @@ public class VendaService {
         }
     }
 
+    // =========================================================================
+    // CORREÇÃO: BLINDAGEM CONTRA NULLPOINTER EXCEPTION NO ESTOQUE
+    // =========================================================================
     private void validarEstoque(VendaRequestDTO dto) {
+        if (dto.itens() == null || dto.itens().isEmpty()) {
+            throw new RuntimeException("O carrinho de compras está vazio. Adicione itens para finalizar a venda.");
+        }
+
         for (ItemVendaDTO itemDTO : dto.itens()) {
             Produto produto = produtoRepository.findById(itemDTO.produtoId())
-                    .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
+                    .orElseThrow(() -> new RuntimeException("Produto não encontrado no estoque"));
 
             if (Boolean.TRUE.equals(produto.getPermitirEstoqueNegativo())) {
                 continue;
@@ -148,11 +155,14 @@ public class VendaService {
         try { auditoriaService.registrar("VENDAS", "EXCLUSAO", "Documento #" + id + " excluído com sucesso."); } catch(Exception e){}
     }
 
+    // =========================================================================
+    // CORREÇÃO: BLINDAGEM CONTRA NULLPOINTER EXCEPTION NO SALVAMENTO
+    // =========================================================================
     private Venda preencherESalvarVenda(Venda venda, VendaRequestDTO dto) {
         try {
             Usuario vendedor = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
             venda.setVendedorNome(vendedor.getNomeCompleto());
-            venda.setVendedorId(vendedor.getId()); // NOVO: Vincula o ID do vendedor logado
+            venda.setVendedorId(vendedor.getId());
         } catch (Exception e) {
             venda.setVendedorNome("Balcão");
             venda.setVendedorId(null);
@@ -178,15 +188,19 @@ public class VendaService {
         }
 
         BigDecimal subtotal = BigDecimal.ZERO;
-        for (ItemVendaDTO itemDTO : dto.itens()) {
-            Produto produto = produtoRepository.findById(itemDTO.produtoId())
-                    .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
 
-            ItemVenda item = new ItemVenda(venda, produto, itemDTO.quantidade(),
-                    itemDTO.precoUnitario() != null ? itemDTO.precoUnitario() : produto.getPrecoVenda());
+        // Proteção aqui: Só tenta ler a lista se ela não for nula!
+        if (dto.itens() != null) {
+            for (ItemVendaDTO itemDTO : dto.itens()) {
+                Produto produto = produtoRepository.findById(itemDTO.produtoId())
+                        .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
 
-            venda.getItens().add(item);
-            subtotal = subtotal.add(item.getPrecoUnitario().multiply(BigDecimal.valueOf(item.getQuantidade())));
+                ItemVenda item = new ItemVenda(venda, produto, itemDTO.quantidade(),
+                        itemDTO.precoUnitario() != null ? itemDTO.precoUnitario() : produto.getPrecoVenda());
+
+                venda.getItens().add(item);
+                subtotal = subtotal.add(item.getPrecoUnitario().multiply(BigDecimal.valueOf(item.getQuantidade())));
+            }
         }
 
         venda.setValorSubtotal(subtotal);
@@ -236,9 +250,6 @@ public class VendaService {
             produtoRepository.save(produto);
         }
 
-        // =====================================================================
-        // NOVO: CALCULA COMISSÃO NO MOMENTO DA CONCLUSÃO
-        // =====================================================================
         aplicarComissaoVendedor(venda);
 
         venda.setStatus(StatusVenda.CONCLUIDA);
@@ -250,7 +261,6 @@ public class VendaService {
         Venda venda = new Venda();
         venda.setStatus(StatusVenda.CONCLUIDA);
 
-        // Aqui também precisamos preencher o vendedor e calcular a comissão
         Venda salva = preencherESalvarVenda(venda, dto);
         aplicarComissaoVendedor(salva);
 

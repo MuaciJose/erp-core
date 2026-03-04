@@ -46,8 +46,6 @@ public class SecurityFilter extends OncePerRequestFilter {
                 }
             } catch (Exception e) {
                 // Ignora o erro do token expirado silenciosamente.
-                // Se a rota precisar de autenticação, o Spring Security bloqueia lá na frente.
-                // Se for a rota /auth/login, a requisição passa limpa.
                 System.out.println("Token ignorado (provavelmente expirado ou inválido).");
             }
         }
