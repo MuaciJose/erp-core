@@ -5,391 +5,208 @@ import {
     Trash2, ArrowRight, Tag, Percent, DollarSign, Save, FolderOpen, Car, X, Gauge, Phone, UserPlus, RefreshCw, AlertTriangle, Info
 } from 'lucide-react';
 
+import toast from 'react-hot-toast';
+
 export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
-    // ESTADOS GERAIS
     const [modo, setModo] = useState('ORCAMENTO');
     const [itens, setItens] = useState([]);
     const [orcamentoId, setOrcamentoId] = useState(null);
 
-    // ESTADOS DO CLIENTE E VEÍCULO
     const [buscaCliente, setBuscaCliente] = useState('');
     const [clienteSelecionado, setClienteSelecionado] = useState(null);
     const [resultadosClientes, setResultadosClientes] = useState([]);
     const [veiculoSelecionado, setVeiculoSelecionado] = useState('');
 
-    // ESTADO DO CADASTRO RÁPIDO
-    const [modalNovoClienteAberto, setModalNovoClienteAberto] = useState(false);
-    const [novoCliente, setNovoCliente] = useState({
-        nome: '', documento: '', telefone: '', placa: '', marca: '', modelo: '', ano: '', km: ''
+    const [empresaConfig, setEmpresaConfig] = useState({
+        nomeFantasia: '', razaoSocial: '', enderecoString: '', cnpj: '', telefone: '', mensagemRodape: ''
     });
 
-    // ESTADOS DE PEÇAS E NAVEGAÇÃO
     const [buscaPeca, setBuscaPeca] = useState('');
     const [resultadosPecas, setResultadosPecas] = useState([]);
     const [indexFocadoPeca, setIndexFocadoPeca] = useState(-1);
     const inputPecaRef = useRef(null);
 
-    // ESTADOS FINANCEIROS
     const [descontoTipo, setDescontoTipo] = useState('VALOR');
     const [descontoInput, setDescontoInput] = useState('');
     const [modalListaAberto, setModalListaAberto] = useState(false);
     const [orcamentosSalvos, setOrcamentosSalvos] = useState([]);
+    const [modalNovoClienteAberto, setModalNovoClienteAberto] = useState(false);
+    const [novoCliente, setNovoCliente] = useState({ nome: '', documento: '', telefone: '', placa: '', marca: '', modelo: '', ano: '', km: '' });
 
-    // ESTADOS DE AUTO-SAVE E NOTIFICAÇÕES
-    const [avisoRascunho, setAvisoRascunho] = useState(false);
-    const [rascunhoCarregado, setRascunhoCarregado] = useState(false);
-    const [notificacao, setNotificacao] = useState(null);
-
-    // =================================================================================
-    // NOTIFICAÇÕES
-    // =================================================================================
-    const showToast = (tipo, titulo, mensagem) => {
-        setNotificacao({ tipo, titulo, mensagem });
-        setTimeout(() => setNotificacao(null), 4000);
+    const limparCliente = () => {
+        setClienteSelecionado(null);
+        setBuscaCliente('');
+        setVeiculoSelecionado('');
     };
 
-    // =================================================================================
-    // FUNÇÃO DE SINCRONIZAÇÃO DE ESTOQUE (CORREÇÃO PARA ESTORNO DO CAIXA)
-    // =================================================================================
-    const sincronizarEstoques = async (itensParaSincronizar) => {
-        setItens(itensParaSincronizar); // Atualiza logo para não travar a tela
+    useEffect(() => {
+        if (orcamentoParaEditar) {
+            setOrcamentoId(orcamentoParaEditar.id);
+            setModo(orcamentoParaEditar.status || 'ORCAMENTO');
 
-        const promessas = itensParaSincronizar.map(async (item) => {
-            try {
-                const idProd = item.produtoId || item.id;
-                // Exige a rota GET /api/produtos/{id} no Controller Java
-                const res = await api.get(`/api/produtos/${idProd}`);
-                return {
-                    ...item,
-                    estoqueDisponivel: res.data.quantidadeEstoque ?? item.estoqueDisponivel
-                };
-            } catch (e) {
-                console.error(`Erro ao sincronizar estoque da peça ID: ${item.id}`, e);
-                return item;
-            }
+            const itensMapeados = (orcamentoParaEditar.itens || []).map(i => ({
+                id: i.produto?.id || i.id,
+                produtoId: i.produto?.id || i.id,
+                codigo: i.produto?.sku || i.codigo || '---',
+                nome: i.produto?.nome || i.nome,
+                qtd: i.quantidade || i.qtd || 1,
+                preco: i.precoUnitario || i.preco || 0,
+                estoqueDisponivel: i.produto?.quantidadeEstoque ?? 0
+            }));
+
+            setItens(itensMapeados);
+            setDescontoInput(orcamentoParaEditar.desconto?.toString() || '');
+
+            const restaurarDadosCliente = async () => {
+                const termoBusca = orcamentoParaEditar.cliente?.nome || orcamentoParaEditar.cliente;
+                if (termoBusca && termoBusca !== 'Consumidor Final') {
+                    try {
+                        const res = await api.get(`/api/parceiros?busca=${termoBusca}`);
+                        const clienteFull = res.data.find(c => c.nome === termoBusca);
+                        if (clienteFull) {
+                            setClienteSelecionado(clienteFull);
+                            setBuscaCliente(clienteFull.nome);
+                            const resV = await api.get(`/api/veiculos/cliente/${clienteFull.id}`);
+                            setClienteSelecionado(prev => ({ ...prev, veiculos: resV.data || [] }));
+                            if (orcamentoParaEditar.veiculo?.id) setVeiculoSelecionado(orcamentoParaEditar.veiculo.id);
+                        }
+                    } catch (e) { console.error(e); }
+                }
+            };
+            restaurarDadosCliente();
+        }
+    }, [orcamentoParaEditar]);
+
+    // =================================================================================
+    // 🚀 BUSCA CONFIGURAÇÃO (Lendo o campo 'endereco' completo em String)
+    // =================================================================================
+    useEffect(() => {
+        api.get('/api/configuracoes')
+            .then(res => {
+                if (res.data) {
+                    const data = Array.isArray(res.data) ? res.data[0] : res.data;
+
+                    setEmpresaConfig({
+                        nomeFantasia: data?.nomeFantasia || 'GRANDPORT ERP',
+                        razaoSocial: data?.razaoSocial || '',
+                        // Pega o endereço gigante que o Java manda e salva aqui
+                        enderecoString: data?.endereco || '',
+                        cnpj: data?.cnpj || '',
+                        telefone: data?.telefone || '',
+                        mensagemRodape: data?.mensagemRodape || 'Orçamento válido por 5 dias.'
+                    });
+                }
+            })
+            .catch(err => console.error("Erro ao buscar configs", err));
+    }, []);
+
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (buscaCliente.length > 2 && !clienteSelecionado) {
+                try {
+                    const res = await api.get(`/api/parceiros?busca=${buscaCliente}`);
+                    setResultadosClientes(res.data.filter(p => p.tipo === 'CLIENTE' || p.tipo === 'AMBOS'));
+                } catch (e) { setResultadosClientes([]); }
+            } else setResultadosClientes([]);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [buscaCliente, clienteSelecionado]);
+
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (buscaPeca.length > 1) {
+                try {
+                    const res = await api.get(`/api/produtos?busca=${buscaPeca}`);
+                    setResultadosPecas(res.data);
+                    setIndexFocadoPeca(0);
+                } catch (e) { setResultadosPecas([]); }
+            } else { setResultadosPecas([]); setIndexFocadoPeca(-1); }
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [buscaPeca]);
+
+    const selecionarCliente = (cliente) => {
+        setClienteSelecionado(cliente);
+        setBuscaCliente(cliente.nome);
+        setResultadosClientes([]);
+        api.get(`/api/veiculos/cliente/${cliente.id}`).then(res => {
+            setClienteSelecionado(prev => ({ ...prev, veiculos: res.data || [] }));
+            if(res.data?.length === 1) setVeiculoSelecionado(res.data[0].id);
         });
-
-        const itensAtualizados = await Promise.all(promessas);
-        setItens(itensAtualizados);
     };
 
-    // =================================================================================
-    // VALIDAÇÃO DE ESTOQUE (IMPEDE AVANÇAR SE FALTAR PEÇA)
-    // =================================================================================
+    const adicionarItem = (peca) => {
+        const existe = itens.find(i => i.id === peca.id || i.produtoId === peca.id);
+        if (existe) {
+            setItens(itens.map(i => (i.id === peca.id || i.produtoId === peca.id) ? { ...i, qtd: i.qtd + 1 } : i));
+        } else {
+            setItens([...itens, { produtoId: peca.id, id: peca.id, codigo: peca.sku, nome: peca.nome, qtd: 1, preco: peca.precoVenda || 0, estoqueDisponivel: peca.quantidadeEstoque || 0 }]);
+        }
+        toast.success("Item adicionado");
+        setBuscaPeca(''); setResultadosPecas([]); inputPecaRef.current.focus();
+    };
+
+    const subtotal = itens.reduce((acc, item) => acc + ((item.preco || 0) * (item.qtd || 0)), 0);
+    let valorDescontoReal = descontoTipo === 'VALOR' ? (parseFloat(descontoInput) || 0) : subtotal * ((parseFloat(descontoInput) || 0) / 100);
+    const totalFinal = Math.max(0, subtotal - valorDescontoReal);
+
     const validarEstoqueNoFront = () => {
-        const itensSemEstoque = itens.filter(item => {
-            const disponivel = item.estoqueDisponivel ?? item.quantidadeEstoque ?? 0;
-            return item.qtd > disponivel;
-        });
-
+        const itensSemEstoque = itens.filter(item => item.qtd > (item.estoqueDisponivel ?? 0));
         if (itensSemEstoque.length > 0) {
-            const listaNomes = itensSemEstoque.map(i => {
-                const disponivel = i.estoqueDisponivel ?? i.quantidadeEstoque ?? 0;
-                return `• ${i.nome} (Pedido: ${i.qtd} | No Estoque: ${disponivel})`;
-            }).join('\n');
-
-            showToast('erro', 'Estoque Insuficiente', `Os seguintes itens excedem a quantidade disponível:\n\n${listaNomes}\n\nAjuste as quantidades antes de prosseguir.`);
+            const listaNomes = itensSemEstoque.map(i => `• ${i.nome} (Pedido: ${i.qtd} | Estoque: ${i.estoqueDisponivel ?? 0})`).join('\n');
+            toast.error(`Estoque Insuficiente:\n${listaNomes}`, { duration: 6000, style: { minWidth: '350px' } });
             return false;
         }
         return true;
     };
 
-    // =================================================================================
-    // RECUPERAÇÃO DO RASCUNHO E AUTO-SAVE
-    // =================================================================================
-    useEffect(() => {
-        if (!orcamentoParaEditar) {
-            const rascunhoSalvo = localStorage.getItem('RASCUNHO_BALCAO');
-            if (rascunhoSalvo) {
-                try {
-                    const dados = JSON.parse(rascunhoSalvo);
-                    if (dados.clienteSelecionado || dados.itens?.length > 0 || dados.buscaCliente) {
-                        setModo(dados.modo || 'ORCAMENTO');
-                        setItens(dados.itens || []);
-                        setBuscaCliente(dados.buscaCliente || '');
-                        if (dados.clienteSelecionado) setClienteSelecionado(dados.clienteSelecionado);
-                        setVeiculoSelecionado(dados.veiculoSelecionado || '');
-                        setDescontoTipo(dados.descontoTipo || 'VALOR');
-                        setDescontoInput(dados.descontoInput || '');
-                        setAvisoRascunho(true);
-                        setTimeout(() => setAvisoRascunho(false), 5000);
-                    }
-                } catch (e) { console.error("Erro ao ler rascunho", e); }
-            }
-        }
-        setRascunhoCarregado(true);
-    }, [orcamentoParaEditar]);
-
-    useEffect(() => {
-        if (rascunhoCarregado && !orcamentoId) {
-            if (clienteSelecionado || itens.length > 0 || descontoInput || buscaCliente.length > 0) {
-                const rascunho = { modo, itens, clienteSelecionado, veiculoSelecionado, descontoTipo, descontoInput, buscaCliente };
-                localStorage.setItem('RASCUNHO_BALCAO', JSON.stringify(rascunho));
-            } else {
-                localStorage.removeItem('RASCUNHO_BALCAO');
-            }
-        }
-    }, [modo, itens, clienteSelecionado, veiculoSelecionado, descontoTipo, descontoInput, buscaCliente, orcamentoId, rascunhoCarregado]);
-
-    // =================================================================================
-    // CARREGA ORÇAMENTO (QUANDO VEM POR PROPS)
-    // =================================================================================
-    useEffect(() => {
-        if (orcamentoParaEditar) {
-            setOrcamentoId(orcamentoParaEditar.id);
-            setModo(orcamentoParaEditar.tipo === 'PEDIDO' ? 'PEDIDO' : 'ORCAMENTO');
-
-            const itensFormatados = (orcamentoParaEditar.itens || []).map(item => ({
-                produtoId: item.produto?.id || item.produtoId,
-                id: item.produto?.id || item.id,
-                codigo: item.produto?.sku || item.codigo,
-                nome: item.produto?.nome || item.nome,
-                qtd: item.quantidade || item.qtd,
-                preco: item.precoUnitario || item.preco,
-                estoqueDisponivel: item.produto?.quantidadeEstoque ?? item.quantidadeEstoque ?? 0
-            }));
-
-            sincronizarEstoques(itensFormatados);
-            setDescontoInput(orcamentoParaEditar.desconto?.toString() || '');
-
-            const restaurarCliente = async () => {
-                if(orcamentoParaEditar.cliente && orcamentoParaEditar.cliente !== 'Consumidor Final') {
-                    try {
-                        const res = await api.get(`/api/parceiros?busca=${orcamentoParaEditar.cliente}`);
-                        const cliente = res.data.find(c => c.nome === orcamentoParaEditar.cliente);
-                        if (cliente) selecionarCliente(cliente);
-                    } catch (e) { console.error(e); }
-                }
-            };
-            restaurarCliente();
-        }
-    }, [orcamentoParaEditar]);
-
-    // =================================================================================
-    // BUSCA DE CLIENTES
-    // =================================================================================
-    useEffect(() => {
-        const delayDebounceFn = setTimeout(async () => {
-            if (buscaCliente.length > 2 && !clienteSelecionado) {
-                try {
-                    const res = await api.get(`/api/parceiros?busca=${buscaCliente}`);
-                    if (Array.isArray(res.data)) setResultadosClientes(res.data.filter(p => p.tipo === 'CLIENTE' || p.tipo === 'AMBOS'));
-                } catch (error) { setResultadosClientes([]); }
-            } else setResultadosClientes([]);
-        }, 300);
-        return () => clearTimeout(delayDebounceFn);
-    }, [buscaCliente, clienteSelecionado]);
-
-    const selecionarCliente = async (cliente) => {
-        setClienteSelecionado(cliente);
-        setBuscaCliente(cliente.nome);
-        setResultadosClientes([]);
-        try {
-            const res = await api.get(`/api/veiculos/cliente/${cliente.id}`);
-            setClienteSelecionado(prev => ({ ...prev, veiculos: res.data || [] }));
-            if(res.data && res.data.length === 1) setVeiculoSelecionado(res.data[0].id);
-        } catch (error) { setClienteSelecionado(prev => ({ ...prev, veiculos: [] })); }
-        inputPecaRef.current?.focus();
-    };
-
-    const limparCliente = () => { setClienteSelecionado(null); setBuscaCliente(''); setVeiculoSelecionado(''); };
-
-    const atualizarKmVeiculo = (novoKm) => {
-        if(!clienteSelecionado || !veiculoSelecionado) return;
-        const novosVeiculos = clienteSelecionado.veiculos.map(v => {
-            if (v.id == veiculoSelecionado) return { ...v, km: parseInt(novoKm) || 0 };
-            return v;
-        });
-        setClienteSelecionado(prev => ({ ...prev, veiculos: novosVeiculos }));
-    };
-
-    const salvarNovoClienteRapido = async () => {
-        if (!novoCliente.nome) return showToast('aviso', 'Atenção', 'O Nome do cliente é obrigatório!');
-        try {
-            const resCliente = await api.post('/api/parceiros', {
-                nome: novoCliente.nome, documento: novoCliente.documento, telefone: novoCliente.telefone, tipo: 'CLIENTE'
-            });
-            let veiculosDoCliente = [];
-            if (novoCliente.modelo && novoCliente.placa) {
-                const resVeiculo = await api.post('/api/veiculos', {
-                    parceiro: { id: resCliente.data.id }, placa: novoCliente.placa, marca: novoCliente.marca, modelo: novoCliente.modelo, ano: novoCliente.ano, km: parseInt(novoCliente.km) || 0
-                });
-                veiculosDoCliente = [resVeiculo.data];
-            }
-            const clienteCompleto = { ...resCliente.data, veiculos: veiculosDoCliente };
-            setClienteSelecionado(clienteCompleto);
-            setBuscaCliente(clienteCompleto.nome);
-            if (veiculosDoCliente.length > 0) setVeiculoSelecionado(veiculosDoCliente[0].id);
-            setModalNovoClienteAberto(false);
-            setNovoCliente({ nome: '', documento: '', telefone: '', placa: '', marca: '', modelo: '', ano: '', km: '' });
-            showToast('sucesso', 'Concluído', 'Cliente cadastrado com sucesso!');
-            inputPecaRef.current?.focus();
-        } catch (error) {
-            showToast('erro', 'Erro no Cadastro', 'Ocorreu uma falha ao tentar cadastrar o cliente rápido.');
-        }
-    };
-
-    // =================================================================================
-    // BUSCA DE PEÇAS E CONTROLE DE TECLADO (CORRIGIDO)
-    // =================================================================================
-    useEffect(() => {
-        const delayDebounceFn = setTimeout(async () => {
-            if (buscaPeca.length > 1) {
-                try {
-                    const res = await api.get(`/api/produtos?busca=${buscaPeca}`);
-                    if (Array.isArray(res.data)) {
-                        setResultadosPecas(res.data);
-                        setIndexFocadoPeca(0);
-                    }
-                } catch (error) { setResultadosPecas([]); }
-            } else { setResultadosPecas([]); setIndexFocadoPeca(-1); }
-        }, 300);
-        return () => clearTimeout(delayDebounceFn);
-    }, [buscaPeca]);
-
-    // A FUNÇÃO QUE FALTAVA
-    const handleKeyDownPeca = (e) => {
-        if (resultadosPecas.length > 0) {
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                setIndexFocadoPeca(prev => (prev < resultadosPecas.length - 1 ? prev + 1 : prev));
-            }
-            else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setIndexFocadoPeca(prev => (prev > 0 ? prev - 1 : 0));
-            }
-            else if (e.key === 'Enter') {
-                e.preventDefault();
-                if (indexFocadoPeca >= 0 && indexFocadoPeca < resultadosPecas.length) {
-                    adicionarItem(resultadosPecas[indexFocadoPeca]);
-                }
-            }
-        }
-    };
-
-    const adicionarItem = (peca) => {
-        const itemExistente = itens.find(i => i.id === peca.id || i.produtoId === peca.id);
-        const estoqueReal = peca.quantidadeEstoque ?? peca.estoqueDisponivel ?? 0;
-
-        if (itemExistente) setItens(itens.map(i => (i.id === peca.id || i.produtoId === peca.id) ? { ...i, qtd: i.qtd + 1 } : i));
-        else setItens(prev => [...prev, {
-            produtoId: peca.id,
-            id: peca.id,
-            codigo: peca.sku,
-            nome: peca.nome,
-            qtd: 1,
-            preco: peca.precoVenda || 0,
-            estoqueDisponivel: estoqueReal
-        }]);
-        setBuscaPeca(''); setResultadosPecas([]); inputPecaRef.current.focus();
-    };
-
-    const removerItem = (id) => setItens(itens.filter(i => (i.id !== id && i.produtoId !== id)));
-    const alterarQuantidade = (id, novaQtd) => { if (novaQtd < 1) return; setItens(itens.map(i => (i.id === id || i.produtoId === id) ? { ...i, qtd: novaQtd } : i)); };
-
-    const subtotal = itens.reduce((acc, item) => acc + ((item.preco || 0) * (item.qtd || 0)), 0);
-    let valorDescontoReal = descontoTipo === 'VALOR' ? (parseFloat(descontoInput) || 0) : subtotal * ((parseFloat(descontoInput) || 0) / 100);
-    if (valorDescontoReal > subtotal) valorDescontoReal = subtotal;
-    const totalFinal = subtotal - valorDescontoReal;
-
-    // =================================================================================
-    // SALVAR / ENVIAR AO CAIXA
-    // =================================================================================
     const processarVendaAPI = async (statusDesejado) => {
-        if (itens.length === 0) return showToast('aviso', 'Documento Vazio', 'Não é possível guardar um documento sem itens.');
+        if (itens.length === 0) return toast.error("O documento não possui itens.");
 
-        if (statusDesejado === 'PEDIDO' || statusDesejado === 'AGUARDANDO_PAGAMENTO') {
-            if (!validarEstoqueNoFront()) return;
-        }
+        const statusFinal = (statusDesejado === 'ORCAMENTO' && modo === 'PEDIDO') ? 'PEDIDO' : statusDesejado;
+        if ((statusFinal === 'PEDIDO' || statusFinal === 'AGUARDANDO_PAGAMENTO') && !validarEstoqueNoFront()) return;
 
-        const kmAtual = veiculoSelecionado && clienteSelecionado ? clienteSelecionado.veiculos.find(v => v.id == veiculoSelecionado)?.km : null;
+        const loadId = toast.loading(statusFinal === 'PEDIDO' ? "Salvando pedido..." : "Salvando rascunho...");
 
         const payload = {
             id: orcamentoId,
-            status: statusDesejado,
-            itens: itens.map(item => ({ produtoId: item.produtoId || item.id, quantidade: item.qtd, precoUnitario: item.preco })),
+            status: statusFinal,
+            itens: itens.map(i => ({ produtoId: i.produtoId || i.id, quantidade: i.qtd, precoUnitario: i.preco })),
             desconto: valorDescontoReal,
-            parceiroId: clienteSelecionado ? clienteSelecionado.id : null,
-            veiculoId: veiculoSelecionado ? parseInt(veiculoSelecionado) : null,
-            kmVeiculo: kmAtual
+            parceiroId: clienteSelecionado?.id || null,
+            veiculoId: veiculoSelecionado ? parseInt(veiculoSelecionado) : null
         };
 
         try {
             if (orcamentoId) {
                 await api.put(`/api/vendas/orcamento/${orcamentoId}`, payload);
-                if (statusDesejado === 'AGUARDANDO_PAGAMENTO') {
-                    showToast('sucesso', 'Sucesso!', 'Documento enviado para a Fila do Caixa.');
-                    limparEcra();
-                    if (onVoltar) setTimeout(() => onVoltar(), 1500);
-                    return;
-                } else if (statusDesejado === 'PEDIDO') {
-                    showToast('sucesso', 'Aprovado', 'Promovido a Pedido Oficial com sucesso!');
-                    setModo('PEDIDO');
-                } else {
-                    showToast('sucesso', 'Salvo', 'Orçamento atualizado com sucesso!');
-                    setModo('ORCAMENTO');
-                }
             } else {
-                const rota = statusDesejado === 'PEDIDO' ? '/api/vendas/pedido' : '/api/vendas/orcamento';
-                const resposta = await api.post(rota, payload);
-                setOrcamentoId(resposta.data.id);
-
-                if (statusDesejado === 'AGUARDANDO_PAGAMENTO') {
-                    showToast('sucesso', 'Sucesso!', 'Documento enviado para a Fila do Caixa.');
-                    limparEcra();
-                    if (onVoltar) setTimeout(() => onVoltar(), 1500);
-                    return;
-                } else if (statusDesejado === 'PEDIDO') {
-                    showToast('sucesso', 'Aprovado', 'Pedido Oficial criado com sucesso!');
-                    setModo('PEDIDO');
-                } else {
-                    showToast('sucesso', 'Salvo', 'Orçamento guardado com sucesso!');
-                    setModo('ORCAMENTO');
-                }
+                const rota = statusFinal === 'PEDIDO' ? '/api/vendas/pedido' : '/api/vendas/orcamento';
+                const res = await api.post(rota, payload);
+                setOrcamentoId(res.data.id);
             }
-            localStorage.removeItem('RASCUNHO_BALCAO');
-        } catch (error) {
-            console.error(error);
-            const msgErro = error.response?.data?.message || "Ocorreu uma falha no servidor.";
-            showToast('erro', 'Falha na Operação', msgErro);
+
+            toast.success(statusFinal === 'PEDIDO' ? "Pedido salvo!" : "Orçamento guardado!", { id: loadId });
+
+            if (statusFinal === 'AGUARDANDO_PAGAMENTO') {
+                limparEcra();
+                if (onVoltar) onVoltar();
+            } else {
+                setModo(statusFinal);
+            }
+        } catch (e) {
+            const msgServidor = e.response?.data?.message || e.response?.data || "Erro no servidor.";
+            if (msgServidor.includes("Estoque insuficiente")) {
+                toast.error(msgServidor, { id: loadId, duration: 6000, style: { border: '2px solid #ef4444', fontWeight: 'bold' } });
+            } else {
+                toast.error("Falha ao salvar: " + msgServidor, { id: loadId });
+            }
         }
     };
 
-    // =================================================================================
-    // CARREGAR LISTA DE ORÇAMENTOS GUARDADOS
-    // =================================================================================
-    useEffect(() => {
-        if (modalListaAberto) {
-            const carregarOrcamentos = async () => {
-                try {
-                    const res = await api.get('/api/vendas/orcamentos');
-                    const orcamentosFormatados = res.data.map(orc => ({
-                        id: orc.id,
-                        data: orc.dataHora,
-                        cliente: orc.cliente ? orc.cliente.nome : 'Cliente Avulso',
-                        clienteObj: orc.cliente,
-                        veiculo: orc.veiculo ? orc.veiculo.modelo : 'Nenhum',
-                        veiculoId: orc.veiculo ? orc.veiculo.id : null,
-                        valor: orc.valorTotal || 0,
-                        status: orc.status,
-                        itens: (orc.itens || []).map(item => ({
-                            produtoId: item.produto?.id,
-                            id: item.produto?.id,
-                            codigo: item.produto?.sku,
-                            nome: item.produto?.nome,
-                            qtd: item.quantidade || 0,
-                            preco: item.precoUnitario || 0,
-                            estoqueDisponivel: item.produto?.quantidadeEstoque ?? 0
-                        }))
-                    }));
-                    setOrcamentosSalvos(orcamentosFormatados);
-                } catch (error) {
-                    console.error("Erro ao carregar orçamentos", error);
-                }
-            };
-            carregarOrcamentos();
-        }
-    }, [modalListaAberto]);
+    const limparEcra = () => {
+        setItens([]); limparCliente(); setModo('ORCAMENTO'); setOrcamentoId(null);
+    };
 
     const carregarOrcamentoLocal = async (orcamento) => {
         setOrcamentoId(orcamento.id);
@@ -397,354 +214,244 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         if (orcamento.clienteObj) selecionarCliente(orcamento.clienteObj);
         else limparCliente();
 
-        // Garante a sincronização dos itens ao abrir do Modal
-        await sincronizarEstoques(orcamento.itens);
+        setItens(orcamento.itens || []);
         setModalListaAberto(false);
+        toast.success(`Documento #${orcamento.id} reaberto.`);
     };
 
-    const limparEcra = () => {
-        setItens([]); limparCliente(); setBuscaPeca(''); setDescontoInput('');
-        setModo('ORCAMENTO'); setOrcamentoId(null);
-        localStorage.removeItem('RASCUNHO_BALCAO');
-    };
+    useEffect(() => {
+        if (modalListaAberto) {
+            api.get('/api/vendas/orcamentos')
+                .then(res => {
+                    const formatados = res.data.map(orc => ({
+                        id: orc.id, data: orc.dataHora, cliente: orc.cliente ? orc.cliente.nome : 'Cliente Avulso', clienteObj: orc.cliente,
+                        veiculo: orc.veiculo ? orc.veiculo.modelo : 'Nenhum', veiculoId: orc.veiculo?.id, valor: orc.valorTotal || 0, status: orc.status,
+                        itens: (orc.itens || []).map(i => ({ produtoId: i.produto?.id, id: i.produto?.id, codigo: i.produto?.sku, nome: i.produto?.nome, qtd: i.quantidade || 0, preco: i.precoUnitario || 0, estoqueDisponivel: i.produto?.quantidadeEstoque ?? 0 }))
+                    }));
+                    setOrcamentosSalvos(formatados);
+                })
+                .catch(() => toast.error("Erro ao carregar lista."));
+        }
+    }, [modalListaAberto]);
 
-    const handleImprimir = () => {
-        if (itens.length === 0) return showToast('aviso', 'Impressão Inválida', 'Adicione peças ao orçamento antes de imprimir.');
-        window.print();
-    };
-
-    const veiculoDetalhado = clienteSelecionado && clienteSelecionado.veiculos && veiculoSelecionado
-        ? clienteSelecionado.veiculos.find(v => v.id == veiculoSelecionado) : null;
+    const veiculoDetalhado = clienteSelecionado?.veiculos?.find(v => v.id == veiculoSelecionado);
 
     return (
         <div className="flex flex-col h-full bg-white relative z-[15]">
-
-            {/* NOTIFICAÇÃO PROFISSIONAL FLUTUANTE */}
-            {notificacao && (
-                <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-[9999] animate-fade-in print:hidden w-full max-w-lg px-4">
-                    <div className={`p-4 rounded-2xl shadow-2xl flex items-start gap-4 border-l-4 ${
-                        notificacao.tipo === 'sucesso' ? 'bg-green-50 border-green-500 text-green-800' :
-                            notificacao.tipo === 'erro' ? 'bg-red-50 border-red-500 text-red-800' :
-                                'bg-orange-50 border-orange-500 text-orange-800'
-                    }`}>
-                        <div className="mt-1">
-                            {notificacao.tipo === 'sucesso' && <CheckCircle size={24} />}
-                            {notificacao.tipo === 'erro' && <AlertTriangle size={24} />}
-                            {notificacao.tipo === 'aviso' && <Info size={24} />}
-                        </div>
-                        <div className="flex-1">
-                            <h4 className="font-black text-lg">{notificacao.titulo}</h4>
-                            <p className="text-sm font-medium mt-1 whitespace-pre-line leading-relaxed">{notificacao.mensagem}</p>
-                        </div>
-                        <button onClick={() => setNotificacao(null)} className="text-slate-400 hover:text-slate-700 transition-colors p-1"><X size={20}/></button>
-                    </div>
-                </div>
-            )}
-
             <div className="p-8 max-w-7xl mx-auto flex flex-col h-full animate-fade-in relative print:hidden">
 
-                {avisoRascunho && (
-                    <div className="bg-green-100 border border-green-300 text-green-800 px-4 py-3 rounded-xl flex items-center gap-3 mb-4 animate-bounce">
-                        <RefreshCw size={20} />
-                        <div><p className="font-black text-sm">Rascunho Restaurado Automaticamente</p><p className="text-xs">O sistema recuperou os dados perdidos da sua última edição.</p></div>
-                    </div>
-                )}
-
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 mb-6 z-40">
-                    <div className="flex flex-col lg:flex-row justify-between gap-4 mb-4 items-start lg:items-center border-b border-slate-100 pb-4">
-
-                        <div className="bg-slate-100 p-1 rounded-xl flex font-black text-sm uppercase tracking-widest w-max border border-slate-200">
-                            <div className={`px-4 py-2 rounded-lg transition-all ${modo === 'ORCAMENTO' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 opacity-60'}`}>
-                                1. Orçamento
-                            </div>
-                            <div className={`px-4 py-2 rounded-lg transition-all ${modo === 'PEDIDO' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 opacity-60'}`}>
-                                2. Pedido Oficial
-                            </div>
+                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-blue-600 text-white p-2 rounded-xl"><FileText size={24}/></div>
+                            <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">{modo} #{orcamentoId || 'NOVO'}</h1>
                         </div>
-
                         <div className="flex gap-2">
-                            <button onClick={limparEcra} className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-xl flex items-center justify-center gap-2 font-black transition-colors" title="Apagar Rascunho e Começar do Zero">
-                                <Trash2 size={16} /> LIMPAR TELA
-                            </button>
-                            {!orcamentoParaEditar && (
-                                <button onClick={() => setModalListaAberto(true)} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-slate-800 transition-all shadow-md">
-                                    <FolderOpen size={16} /> REABRIR GUARDADOS
-                                </button>
-                            )}
+                            <button onClick={limparEcra} className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-black border border-red-100"><Trash2 size={18} /></button>
+                            <button onClick={() => setModalListaAberto(true)} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-black shadow-lg"><FolderOpen size={18} /> GUARDADOS</button>
                         </div>
                     </div>
 
-                    <div className="flex flex-col md:flex-row gap-4 relative">
-                        <div className="flex-1 flex gap-2">
-                            <div className="relative flex-1">
-                                <User className="absolute left-3 top-3 text-slate-400" size={18} />
-                                <input type="text" placeholder="Nome ou CPF do Cliente..." value={buscaCliente} onChange={(e) => setBuscaCliente(e.target.value)} disabled={clienteSelecionado !== null} className="w-full pl-10 pr-10 py-3 border-2 rounded-xl font-bold outline-none focus:border-blue-500 text-slate-700 bg-slate-50" />
-                                {clienteSelecionado && <button onClick={limparCliente} className="absolute right-3 top-3.5 text-blue-400 hover:text-red-500"><X size={16}/></button>}
-                                {resultadosClientes.length > 0 && !clienteSelecionado && (
-                                    <div className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden z-50">
-                                        {resultadosClientes.map(c => (
-                                            <div key={c.id} onClick={() => selecionarCliente(c)} className="p-3 hover:bg-slate-50 border-b cursor-pointer flex justify-between"><span className="font-bold text-slate-700">{c.nome}</span><span className="text-xs text-slate-400">{c.documento}</span></div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            {!clienteSelecionado && (
-                                <button onClick={() => setModalNovoClienteAberto(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-4 rounded-xl flex items-center justify-center gap-2 font-black transition-colors" title="Cadastrar Novo Cliente">
-                                    <UserPlus size={20} /> <span className="hidden lg:block">NOVO</span>
-                                </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="relative">
+                            <User className="absolute left-3 top-3 text-slate-400" size={20} />
+                            <input type="text" placeholder="Pesquisar Cliente..." value={buscaCliente} onChange={(e) => setBuscaCliente(e.target.value)} disabled={!!clienteSelecionado} className="w-full pl-10 pr-10 py-3 border-2 rounded-xl font-bold focus:border-blue-500 bg-slate-50 outline-none transition-all" />
+                            {clienteSelecionado && <button onClick={limparCliente} className="absolute right-3 top-3 text-red-400"><X size={20}/></button>}
+                            {resultadosClientes.length > 0 && !clienteSelecionado && (
+                                <div className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden">
+                                    {resultadosClientes.map(c => <div key={c.id} onClick={() => selecionarCliente(c)} className="p-4 hover:bg-blue-50 cursor-pointer border-b font-bold text-slate-700">{c.nome}</div>)}
+                                </div>
                             )}
                         </div>
-
-                        <div className="flex-1 relative">
-                            <Car className="absolute left-3 top-3 text-slate-400" size={18} />
-                            <select value={veiculoSelecionado} onChange={(e) => setVeiculoSelecionado(e.target.value)} disabled={!clienteSelecionado} className="w-full pl-10 pr-4 py-3 border-2 rounded-xl font-bold outline-none appearance-none bg-slate-50">
+                        <div className="relative">
+                            <Car className="absolute left-3 top-3 text-slate-400" size={20} />
+                            <select value={veiculoSelecionado} onChange={(e) => setVeiculoSelecionado(e.target.value)} disabled={!clienteSelecionado} className="w-full pl-10 pr-4 py-3 border-2 rounded-xl font-bold bg-slate-50 outline-none appearance-none focus:border-blue-500 transition-all">
                                 <option value="">Selecione o Veículo...</option>
-                                {clienteSelecionado?.veiculos?.map(v => (<option key={v.id} value={v.id}>{v.marca} {v.modelo} ({v.placa})</option>))}
+                                {clienteSelecionado?.veiculos?.map(v => <option key={v.id} value={v.id}>{v.marca} {v.modelo} - {v.placa}</option>)}
                             </select>
                         </div>
                     </div>
-
-                    {clienteSelecionado && (
-                        <div className="mt-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col md:flex-row gap-6 animate-fade-in shadow-inner">
-                            <div className="flex-1">
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1"><User size={12}/> Ficha do Cliente</h4>
-                                <p className="font-black text-slate-800 text-lg">{clienteSelecionado.nome}</p>
-                                <div className="flex gap-4 mt-2">
-                                    <p className="text-xs text-slate-500 font-medium flex items-center gap-1"><FileText size={12}/> {clienteSelecionado.documento || 'S/ Doc.'}</p>
-                                    <p className="text-xs text-slate-500 font-medium flex items-center gap-1"><Phone size={12}/> {clienteSelecionado.telefone || 'S/ Tel.'}</p>
-                                </div>
-                            </div>
-                            <div className="hidden md:block w-px bg-slate-200"></div>
-                            <div className="flex-1">
-                                {veiculoDetalhado ? (
-                                    <div>
-                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1"><Car size={12}/> Veículo em Atendimento</h4>
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <p className="font-black text-slate-800 text-sm uppercase">{veiculoDetalhado.marca} {veiculoDetalhado.modelo} {veiculoDetalhado.ano ? `(${veiculoDetalhado.ano})` : ''}</p>
-                                                <p className="text-xs font-bold text-slate-500 mt-1 bg-slate-200 inline-block px-2 py-1 rounded border border-slate-300">Placa: <span className="font-mono text-slate-700 uppercase">{veiculoDetalhado.placa}</span></p>
-                                            </div>
-                                            <div className="text-right bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                                                <p className="text-[10px] uppercase font-black tracking-widest text-blue-500 mb-1">KM Atual</p>
-                                                <div className="flex items-center gap-2">
-                                                    <Gauge size={16} className="text-slate-400"/>
-                                                    <input type="number" value={veiculoDetalhado.km || ''} onChange={(e) => atualizarKmVeiculo(e.target.value)} className="w-24 p-1 border-b-2 border-slate-300 text-right font-black text-slate-700 text-sm outline-none focus:border-blue-500 bg-transparent transition-colors" placeholder="Ex: 50000" />
-                                                    <span className="text-xs font-bold text-slate-400">km</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-70"><Car size={24} className="mb-2"/><p className="text-xs font-bold uppercase tracking-widest">Venda de Balcão (Sem Veículo)</p></div>
-                                )}
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 <div className="relative mb-6 z-30">
                     <Search className="absolute left-4 top-4 text-slate-400" size={24} />
-                    <input ref={inputPecaRef} type="text" value={buscaPeca} onChange={(e) => setBuscaPeca(e.target.value)} onKeyDown={handleKeyDownPeca} placeholder="Buscar por Código, Referência ou Descrição..." className="w-full pl-14 pr-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-lg font-black text-slate-800 shadow-sm focus:border-blue-600 outline-none" />
+                    <input ref={inputPecaRef} type="text" value={buscaPeca} onChange={(e) => setBuscaPeca(e.target.value)} onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown') { e.preventDefault(); setIndexFocadoPeca(p => Math.min(resultadosPecas.length - 1, p + 1)); }
+                        else if (e.key === 'ArrowUp') { e.preventDefault(); setIndexFocadoPeca(p => Math.max(0, p - 1)); }
+                        else if (e.key === 'Enter' && resultadosPecas[indexFocadoPeca]) { adicionarItem(resultadosPecas[indexFocadoPeca]); }
+                    }} placeholder="Adicionar peça ao balcão..." className="w-full pl-14 pr-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-lg font-black shadow-sm focus:border-blue-600 outline-none transition-all" />
                     {resultadosPecas.length > 0 && (
-                        <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
-                            {resultadosPecas.map((peca, index) => (
-                                <div key={peca.id} onClick={() => adicionarItem(peca)} className={`flex justify-between items-center p-4 cursor-pointer border-b hover:bg-slate-50`}>
-                                    <div className="flex items-center gap-4">
-                                        <div>
-                                            <p className="font-bold text-slate-800">{peca.nome}</p>
-                                            <p className="text-xs font-mono text-slate-500">{peca.sku}</p>
-                                            <p className="text-[10px] font-bold text-blue-500 uppercase mt-1">Disp: {peca.quantidadeEstoque ?? 0}</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right"><p className="font-black text-blue-700">R$ {(peca.precoVenda || 0).toFixed(2)}</p></div>
+                        <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border z-50 max-h-60 overflow-y-auto">
+                            {resultadosPecas.map((peca, idx) => (
+                                <div key={peca.id} onClick={() => adicionarItem(peca)} className={`p-4 border-b flex justify-between cursor-pointer transition-colors ${idx === indexFocadoPeca ? 'bg-blue-600 text-white' : 'hover:bg-slate-50'}`}>
+                                    <div><p className="font-bold">{peca.nome}</p><p className={`text-xs ${idx === indexFocadoPeca ? 'text-blue-100' : 'text-slate-400'}`}>{peca.sku}</p></div>
+                                    <p className="font-black">R$ {(peca.precoVenda || 0).toFixed(2)}</p>
                                 </div>
                             ))}
                         </div>
                     )}
                 </div>
 
-                <div className="flex-1 bg-white rounded-t-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col z-10">
-                    <div className="overflow-y-auto flex-1 custom-scrollbar">
-                        <table className="w-full text-left border-collapse">
-                            <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-black tracking-widest sticky top-0">
-                            <tr><th className="p-4 pl-6">Código</th><th className="p-4">Descrição</th><th className="p-4 text-center">Qtd</th><th className="p-4 text-right">Unitário</th><th className="p-4 text-right pr-6">Subtotal</th><th className="p-4"></th></tr>
+                <div className="flex-1 bg-white rounded-t-3xl border border-slate-200 overflow-hidden flex flex-col z-10">
+                    <div className="overflow-y-auto flex-1">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 sticky top-0 shadow-sm">
+                            <tr><th className="p-4">Cód. SKU</th><th className="p-4">Descrição</th><th className="p-4 text-center">Qtd</th><th className="p-4 text-right pr-6">Subtotal</th><th className="p-4"></th></tr>
                             </thead>
-                            <tbody>
-                            {itens.map((item) => {
-                                const disponivel = item.estoqueDisponivel ?? item.quantidadeEstoque ?? 0;
-                                const faltaEstoque = item.qtd > disponivel;
-
-                                return (
-                                    <tr key={item.id || item.produtoId} className={`border-b hover:bg-slate-50 ${faltaEstoque ? 'bg-red-50' : ''}`}>
-                                        <td className="p-4 pl-6 font-mono text-xs text-slate-500">{item.codigo}</td>
-                                        <td className="p-4 font-bold text-slate-800 text-sm">
-                                            <div>
-                                                <p>{item.nome}</p>
-                                                {faltaEstoque && (
-                                                    <span className="text-[10px] font-black text-red-600 flex items-center gap-1 uppercase tracking-tighter">
-                                                        <AlertTriangle size={10}/> Falta Estoque (Disponível: {disponivel})
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <input type="number" value={item.qtd} onChange={(e) => alterarQuantidade(item.id || item.produtoId, parseInt(e.target.value) || 1)} className={`w-16 p-2 text-center font-black bg-white border-2 rounded-lg outline-none ${faltaEstoque ? 'border-red-500 bg-red-100' : 'border-slate-200'}`} />
-                                        </td>
-                                        <td className="p-4 text-right font-bold text-slate-600 text-sm">R$ {(item.preco || 0).toFixed(2)}</td>
-                                        <td className="p-4 pr-6 text-right font-black text-blue-700">R$ {((item.preco || 0) * (item.qtd || 0)).toFixed(2)}</td>
-                                        <td className="p-4 text-center"><button onClick={() => removerItem(item.id || item.produtoId)} className="text-red-400 hover:bg-red-50 p-2 rounded-lg"><Trash2 size={16} /></button></td>
-                                    </tr>
-                                );
-                            })}
+                            <tbody className="divide-y divide-slate-100">
+                            {itens.map((item) => (
+                                <tr key={item.id} className="hover:bg-slate-50 border-b">
+                                    <td className="p-4 font-mono text-xs">{item.codigo}</td>
+                                    <td className="p-4 font-bold text-slate-800 text-sm">{item.nome}</td>
+                                    <td className="p-4 text-center">
+                                        <input type="number" value={item.qtd} onChange={(e) => setItens(itens.map(i => i.id === item.id ? { ...i, qtd: Math.max(1, parseInt(e.target.value) || 1) } : i))} className="w-16 p-2 text-center font-black border-2 border-slate-100 rounded-lg outline-none focus:border-blue-500" />
+                                    </td>
+                                    <td className="p-4 text-right font-black text-blue-700 pr-6">R$ {(item.preco * item.qtd).toFixed(2)}</td>
+                                    <td className="p-4 text-center"><button onClick={() => setItens(itens.filter(i => i.id !== item.id))} className="text-slate-300 hover:text-red-500 p-2 transition-colors"><Trash2 size={18} /></button></td>
+                                </tr>
+                            ))}
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <div className="bg-slate-900 text-white rounded-b-3xl border-t-4 border-blue-500 shadow-2xl flex flex-col md:flex-row justify-between p-6 z-20 relative">
-                    <div className="flex flex-col justify-end gap-3 mb-4 md:mb-0">
-                        {modo === 'ORCAMENTO' ? (
-                            <>
-                                <button onClick={() => processarVendaAPI('ORCAMENTO')} className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors">
-                                    <Save size={18} /> {orcamentoId ? 'ATUALIZAR ORÇAMENTO' : 'GUARDAR RASCUNHO'}
-                                </button>
+                <div className="bg-slate-900 text-white rounded-b-3xl border-t-4 border-blue-500 p-6 flex flex-col md:flex-row justify-between items-center shadow-2xl">
+                    <div className="flex gap-3">
+                        <button onClick={() => processarVendaAPI(modo === 'PEDIDO' ? 'PEDIDO' : 'ORCAMENTO')} className="px-6 py-4 bg-slate-800 hover:bg-slate-700 font-black rounded-2xl border border-slate-700 transition-all">
+                            {modo === 'PEDIDO' ? 'SALVAR ALTERAÇÕES' : 'SALVAR RASCUNHO'}
+                        </button>
 
-                                <div className="flex gap-2">
-                                    <button onClick={handleImprimir} className="px-6 py-4 bg-slate-100 text-slate-800 font-black rounded-xl flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors"><Printer size={20} /> IMPRIMIR</button>
-                                    <button onClick={() => processarVendaAPI('PEDIDO')} disabled={itens.length === 0} className="flex-1 px-6 py-4 bg-orange-500 text-white font-black rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-orange-400 transition-colors">
-                                        AVANÇAR PARA PEDIDO <ArrowRight size={20} />
-                                    </button>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="flex gap-2">
-                                    <button onClick={() => processarVendaAPI('PEDIDO')} className="flex-1 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors">
-                                        <Save size={18} /> ATUALIZAR PEÇAS
-                                    </button>
-                                    <button onClick={handleImprimir} className="px-6 py-3 bg-slate-100 text-slate-800 font-black rounded-xl flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors"><Printer size={20} /></button>
-                                </div>
-                                <button onClick={() => processarVendaAPI('AGUARDANDO_PAGAMENTO')} disabled={itens.length === 0} className="px-8 py-5 bg-purple-600 text-white font-black text-lg rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-purple-500 transition-colors shadow-lg shadow-purple-500/20">
-                                    <CheckCircle size={24} /> ENVIAR PARA O CAIXA
-                                </button>
-                            </>
+                        <button onClick={() => window.print()} className="px-6 py-4 bg-white text-slate-900 font-black rounded-2xl flex items-center gap-2 shadow-xl hover:bg-slate-100 transition-all"><Printer size={20}/> IMPRIMIR</button>
+
+                        {modo === 'ORCAMENTO' && (
+                            <button onClick={() => processarVendaAPI('PEDIDO')} className="px-6 py-4 bg-orange-500 text-white font-black rounded-2xl flex items-center gap-2 shadow-orange-500/20 hover:bg-orange-600 transition-all">
+                                CONVERTER PRA PEDIDO <ArrowRight size={20}/>
+                            </button>
                         )}
-                    </div>
 
-                    <div className="w-full md:w-[400px] bg-slate-800 p-5 rounded-2xl flex flex-col gap-3">
-                        <div className="flex justify-between font-bold text-sm"><span>Subtotal:</span><span>R$ {subtotal.toFixed(2)}</span></div>
-                        <div className="flex justify-between items-center border-b border-dashed border-slate-600 pb-3">
-                            <span className="text-sm font-bold text-slate-300 flex items-center gap-2"><Tag size={14} className="text-orange-400"/> Desconto:</span>
-                            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-700">
-                                <button onClick={() => {setDescontoTipo(descontoTipo === 'VALOR' ? 'PERCENTUAL' : 'VALOR'); setDescontoInput('');}} className="p-1.5 bg-slate-800 rounded text-slate-400 hover:text-white">
-                                    {descontoTipo === 'VALOR' ? <DollarSign size={14} /> : <Percent size={14} />}
-                                </button>
-                                <input type="number" placeholder="0.00" value={descontoInput} onChange={(e) => setDescontoInput(e.target.value)} className="w-20 bg-transparent text-right font-black text-orange-400 outline-none pr-2" />
-                            </div>
-                        </div>
-                        <div className="flex justify-between items-end pt-1 mt-2">
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{modo === 'ORCAMENTO' ? 'Total Cotação' : 'Total a Pagar'}</span>
-                            <h2 className="text-4xl font-black text-green-400">R$ {totalFinal.toFixed(2)}</h2>
-                        </div>
+                        {modo === 'PEDIDO' && <button onClick={() => processarVendaAPI('AGUARDANDO_PAGAMENTO')} className="px-8 py-4 bg-green-600 font-black rounded-2xl animate-pulse hover:bg-green-700">ENVIAR AO CAIXA</button>}
+                    </div>
+                    <div className="text-right">
+                        <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Valor Líquido Final</span>
+                        <h2 className="text-5xl font-black text-green-400 tracking-tighter">R$ {totalFinal.toFixed(2)}</h2>
                     </div>
                 </div>
             </div>
 
-            {/* MODAL DE ORÇAMENTOS SALVOS */}
-            {modalListaAberto && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in print:hidden">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[80vh]">
-                        <div className="bg-slate-900 p-6 flex justify-between items-center text-white">
-                            <h2 className="text-xl font-black tracking-widest flex items-center gap-2"><FolderOpen /> ORÇAMENTOS GUARDADOS</h2>
-                            <button onClick={() => setModalListaAberto(false)} className="hover:text-red-400"><X size={24}/></button>
+            {/* ========================================================================================= */}
+            {/* 🎯 ÁREA DE IMPRESSÃO A4 (COM ENDEREÇO EM BLOCO PRE-LINE) */}
+            {/* ========================================================================================= */}
+            <div className="hidden print:block fixed inset-0 w-full h-full bg-white z-[99999] p-0 text-black">
+                <div className="w-full max-w-[210mm] mx-auto p-6 font-sans text-slate-900">
+
+                    <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
+                        <div className="flex-1">
+                            <h1 className="text-xl font-black uppercase leading-none mb-1">{empresaConfig.nomeFantasia}</h1>
+                            <p className="text-[9px] font-bold text-slate-600 uppercase mb-2">{empresaConfig.razaoSocial}</p>
+
+                            <div className="text-[9.5px] leading-tight font-medium text-slate-700">
+                                {/* O segredo está no whitespace-pre-line, ele respeita as quebras \n do Java! */}
+                                {empresaConfig.enderecoString && (
+                                    <div className="whitespace-pre-line mb-1 uppercase font-bold text-slate-600">
+                                        {empresaConfig.enderecoString}
+                                    </div>
+                                )}
+
+                                <p className="mt-1">
+                                    {empresaConfig.cnpj && `CNPJ: ${empresaConfig.cnpj}`}
+                                    {empresaConfig.cnpj && empresaConfig.telefone && ' | '}
+                                    {empresaConfig.telefone && <span className="font-bold">WhatsApp/Tel: {empresaConfig.telefone}</span>}
+                                </p>
+                            </div>
                         </div>
-                        <div className="overflow-y-auto p-6 bg-slate-50 flex-1">
-                            {orcamentosSalvos.length === 0 ? (
-                                <div className="text-center py-10 font-bold text-slate-400">Nenhum orçamento pendente.</div>
+                        <div className="text-right flex flex-col items-end">
+                            <div className="bg-black text-white px-3 py-1.5 rounded mb-1">
+                                <h2 className="text-md font-black uppercase leading-none">{modo}</h2>
+                            </div>
+                            <p className="text-[9px] font-black uppercase">Nº DOC: <span className="text-blue-700">{orcamentoId || 'PROVISÓRIO'}</span></p>
+                            <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">Emissão: {new Date().toLocaleDateString('pt-BR')}</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-5 border border-black rounded mb-3 text-[9px]">
+                        <div className="col-span-3 p-1.5 border-r border-black">
+                            <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Identificação do Cliente</p>
+                            <p className="font-black uppercase truncate">{clienteSelecionado?.nome || 'CLIENTE NÃO IDENTIFICADO'}</p>
+                            <p className="font-bold">DOC: {clienteSelecionado?.documento || '---'} | TEL: {clienteSelecionado?.telefone || '---'}</p>
+                        </div>
+                        <div className="col-span-2 p-1.5 bg-slate-50">
+                            <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Veículo em Atendimento</p>
+                            {veiculoDetalhado ? (
+                                <>
+                                    <p className="font-black uppercase truncate">{veiculoDetalhado.marca} {veiculoDetalhado.modelo}</p>
+                                    <p className="font-bold uppercase">PLACA: {veiculoDetalhado.placa} | KM: {veiculoDetalhado.km}</p>
+                                </>
                             ) : (
-                                <div className="grid gap-4">
-                                    {orcamentosSalvos.map(orc => (
-                                        <div key={orc.id} onClick={() => carregarOrcamentoLocal(orc)} className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-center hover:shadow-md transition-shadow cursor-pointer">
-                                            <div>
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <span className="bg-blue-100 text-blue-700 font-black text-[10px] px-2 py-1 rounded uppercase tracking-widest">#{orc.id}</span>
-                                                    <span className="text-xs text-slate-400 font-bold">{new Date(orc.data).toLocaleString('pt-BR')}</span>
-                                                </div>
-                                                <p className="font-bold text-slate-800 text-lg flex items-center gap-2"><User size={16} className="text-slate-400"/> {orc.cliente}</p>
-                                                <p className="text-xs font-bold text-slate-500 flex items-center gap-2 mt-1"><Car size={14} className="text-slate-400"/> Veículo: {orc.veiculo}</p>
-                                            </div>
-                                            <div className="flex items-center gap-6 mt-4 md:mt-0">
-                                                <div className="text-right">
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Valor Total</p>
-                                                    <p className="font-black text-xl text-slate-800">R$ {(orc.valor || 0).toFixed(2)}</p>
-                                                </div>
-                                                <button className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors shadow-lg">
-                                                    REABRIR
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                <p className="font-bold italic text-slate-400 text-center py-2">VENDA BALCÃO</p>
                             )}
                         </div>
                     </div>
-                </div>
-            )}
 
-            {/* MODAL: CADASTRO RÁPIDO DE CLIENTE */}
-            {modalNovoClienteAberto && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 print:hidden">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
-                        <div className="bg-slate-900 p-6 flex justify-between items-center text-white">
-                            <h2 className="font-black tracking-widest flex items-center gap-2"><UserPlus /> CADASTRO RÁPIDO</h2>
-                            <button onClick={() => setModalNovoClienteAberto(false)} className="hover:text-red-400"><X size={24}/></button>
-                        </div>
-                        <div className="p-6 space-y-4 bg-slate-50">
-                            <div><label className="text-xs font-bold text-slate-500 uppercase">Nome do Cliente *</label><input type="text" value={novoCliente.nome} onChange={e => setNovoCliente({...novoCliente, nome: e.target.value})} className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none mt-1" placeholder="Ex: João da Silva"/></div>
-                            <div className="flex gap-4">
-                                <div className="flex-1"><label className="text-xs font-bold text-slate-500 uppercase">CPF/CNPJ</label><input type="text" value={novoCliente.documento} onChange={e => setNovoCliente({...novoCliente, documento: e.target.value})} className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none mt-1" /></div>
-                                <div className="flex-1"><label className="text-xs font-bold text-slate-500 uppercase">Telefone</label><input type="text" value={novoCliente.telefone} onChange={e => setNovoCliente({...novoCliente, telefone: e.target.value})} className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none mt-1" /></div>
-                            </div>
-                            <div className="border-t border-slate-200 my-4 pt-4">
-                                <p className="text-xs font-black uppercase text-slate-400 mb-3 flex items-center gap-2"><Car size={14}/> Veículo (Opcional)</p>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><input type="text" placeholder="Placa (Ex: ABC-1234)" value={novoCliente.placa} onChange={e => setNovoCliente({...novoCliente, placa: e.target.value})} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase focus:border-blue-500 outline-none" /></div>
-                                    <div><input type="text" placeholder="Marca (Ex: Fiat)" value={novoCliente.marca} onChange={e => setNovoCliente({...novoCliente, marca: e.target.value})} className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none" /></div>
-                                    <div><input type="text" placeholder="Modelo (Ex: Uno)" value={novoCliente.modelo} onChange={e => setNovoCliente({...novoCliente, modelo: e.target.value})} className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none" /></div>
-                                    <div><input type="number" placeholder="KM Atual" value={novoCliente.km} onChange={e => setNovoCliente({...novoCliente, km: e.target.value})} className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none" /></div>
-                                </div>
-                            </div>
-                            <button onClick={salvarNovoClienteRapido} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg mt-4 transition-colors">SALVAR E USAR NA VENDA</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* O IMPRESSO INVISÍVEL */}
-            <div className="hidden print:block fixed inset-0 w-full h-full bg-white z-[99999] m-0 p-0 text-black font-sans">
-                <div className="w-[210mm] mx-auto p-10 font-sans">
-                    <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
-                        <div><h1 className="text-3xl font-black uppercase">GRANDPORT</h1><p className="text-sm font-bold">Auto Peças e Acessórios</p></div>
-                        <div className="text-right"><h2 className="text-2xl font-black uppercase border-2 border-black px-4 py-2 rounded-lg inline-block">{modo}</h2><p className="text-sm font-bold mt-2">Data: {new Date().toLocaleDateString('pt-BR')}</p></div>
-                    </div>
-                    <div className="border border-black p-4 mb-6 rounded-lg flex justify-between">
-                        <div><p className="text-xs font-bold uppercase text-gray-500 mb-1">Dados do Cliente</p><p className="font-black text-lg">{clienteSelecionado ? clienteSelecionado.nome : 'Cliente Avulso'}</p></div>
-                        {veiculoDetalhado && (<div className="text-right"><p className="text-xs font-bold uppercase text-gray-500 mb-1">Veículo / Aplicação</p><p className="font-black text-lg">{veiculoDetalhado.marca} {veiculoDetalhado.modelo}</p><p className="text-sm font-bold">Placa: {veiculoDetalhado.placa} | KM: {veiculoDetalhado.km}</p></div>)}
-                    </div>
-                    <table className="w-full text-left border-collapse mb-6">
-                        <thead className="border-b-2 border-black"><tr><th className="py-2 text-xs font-black uppercase">Cód</th><th className="py-2 text-xs font-black uppercase">Descrição</th><th className="py-2 text-center text-xs font-black uppercase">Qtd</th><th className="py-2 text-right text-xs font-black uppercase">Vl. Unit</th><th className="py-2 text-right text-xs font-black uppercase">Total</th></tr></thead>
-                        <tbody>
+                    <table className="w-full mb-6 border-collapse">
+                        <thead>
+                        <tr className="bg-slate-100 border-y border-black">
+                            <th className="p-1 text-left text-[8px] font-black uppercase w-16">Cód.</th>
+                            <th className="p-1 text-left text-[8px] font-black uppercase">Descrição das Peças / Serviços</th>
+                            <th className="p-1 text-center text-[8px] font-black uppercase w-12">Qtd</th>
+                            <th className="p-1 text-right text-[8px] font-black uppercase w-20">Unitário</th>
+                            <th className="p-1 text-right text-[8px] font-black uppercase w-20">Subtotal</th>
+                        </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
                         {itens.map((item, index) => (
-                            <tr key={index} className="border-b border-gray-300">
-                                <td className="py-2 text-xs font-mono">{item.codigo}</td><td className="py-2 text-sm font-bold">{item.nome}</td><td className="py-2 text-center font-bold">{item.qtd}</td><td className="py-2 text-right text-sm">R$ {(item.preco || 0).toFixed(2)}</td><td className="py-2 text-right font-black">R$ {((item.preco || 0) * (item.qtd || 0)).toFixed(2)}</td>
+                            <tr key={index} className={`border-b border-slate-50 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                                <td className="p-1 text-[8.5px] font-mono text-slate-500">{item.codigo}</td>
+                                <td className="p-1 text-[9px] font-bold uppercase">{item.nome}</td>
+                                <td className="p-1 text-center text-[9px] font-bold">{item.qtd}</td>
+                                <td className="p-1 text-right text-[9px]">{item.preco.toFixed(2)}</td>
+                                <td className="p-1 text-right text-[9px] font-black">{(item.preco * item.qtd).toFixed(2)}</td>
                             </tr>
                         ))}
                         </tbody>
                     </table>
-                    <div className="flex justify-end mb-12"><div className="w-64"><div className="flex justify-between border-t-2 border-black mt-2 pt-2"><span className="text-lg font-black uppercase">Total:</span><span className="text-2xl font-black">R$ {totalFinal.toFixed(2)}</span></div></div></div>
+
+                    <div className="flex justify-between items-start mt-4">
+                        <div className="w-2/3 pr-10">
+                            <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Termos e Condições</p>
+                            <p className="text-[8.5px] text-slate-600 border-l-2 border-slate-200 pl-2">
+                                {empresaConfig.mensagemRodape || 'Orçamento sujeito a alteração de preços após validade. Peças sob disponibilidade.'}
+                            </p>
+                        </div>
+                        <div className="w-1/3 space-y-1">
+                            <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                                <span>SUBTOTAL BRUTO:</span><span>R$ {subtotal.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-[10px] font-black text-orange-600">
+                                <span>DESCONTO:</span><span>- R$ {valorDescontoReal.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between border-t-2 border-black pt-1 mt-1">
+                                <span className="text-[11px] font-black uppercase">TOTAL LÍQUIDO:</span>
+                                <span className="text-[18px] font-black">R$ {totalFinal.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-20 grid grid-cols-2 gap-16 px-4">
+                        <div className="border-t border-black text-center pt-1"><p className="text-[7.5px] font-black uppercase">Assinatura do Cliente</p></div>
+                        <div className="border-t border-black text-center pt-1"><p className="text-[7.5px] font-black uppercase text-slate-400">Emissor: {empresaConfig.nomeFantasia}</p></div>
+                    </div>
                 </div>
             </div>
-            <style>{`@media print { body * { visibility: hidden; } .print\\:block { visibility: visible !important; } .print\\:block * { visibility: visible; } html, body { height: 100vh !important; background: white !important; overflow: visible !important; margin: 0; padding: 0; } }`}</style>
+
+            <style>{`
+                @media print {
+                    @page { size: A4 portrait; margin: 0.3cm; }
+                    body { margin: 0; padding: 0; background: white !important; }
+                    .print\\:hidden { display: none !important; }
+                    .print\\:block, .print\\:block * { visibility: visible !important; }
+                    html, body { overflow: visible !important; height: auto !important; }
+                }
+            `}</style>
         </div>
     );
 };
