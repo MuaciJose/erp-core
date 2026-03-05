@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
 import {
     Search, FileText, Printer, CheckCircle, Package, User,
-    Trash2, ArrowRight, Tag, Percent, DollarSign, Save, FolderOpen, Car, X, Gauge, Phone, UserPlus, RefreshCw, AlertTriangle, Info
+    Trash2, ArrowRight, Tag, Percent, DollarSign, Save, FolderOpen, Car, X, Gauge, Phone, UserPlus, RefreshCw, AlertTriangle, Info, MessageCircle, XCircle
 } from 'lucide-react';
 
 import toast from 'react-hot-toast';
@@ -30,8 +30,11 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     const [descontoInput, setDescontoInput] = useState('');
     const [modalListaAberto, setModalListaAberto] = useState(false);
     const [orcamentosSalvos, setOrcamentosSalvos] = useState([]);
-    const [modalNovoClienteAberto, setModalNovoClienteAberto] = useState(false);
-    const [novoCliente, setNovoCliente] = useState({ nome: '', documento: '', telefone: '', placa: '', marca: '', modelo: '', ano: '', km: '' });
+
+    // Estados da Venda Perdida
+    const [modalVendaPerdidaAberto, setModalVendaPerdidaAberto] = useState(false);
+    const [motivoVendaPerdida, setMotivoVendaPerdida] = useState('');
+    const [observacaoVendaPerdida, setObservacaoVendaPerdida] = useState('');
 
     const limparCliente = () => {
         setClienteSelecionado(null);
@@ -77,19 +80,14 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         }
     }, [orcamentoParaEditar]);
 
-    // =================================================================================
-    // 🚀 BUSCA CONFIGURAÇÃO (Lendo o campo 'endereco' completo em String)
-    // =================================================================================
     useEffect(() => {
         api.get('/api/configuracoes')
             .then(res => {
                 if (res.data) {
                     const data = Array.isArray(res.data) ? res.data[0] : res.data;
-
                     setEmpresaConfig({
                         nomeFantasia: data?.nomeFantasia || 'GRANDPORT ERP',
                         razaoSocial: data?.razaoSocial || '',
-                        // Pega o endereço gigante que o Java manda e salva aqui
                         enderecoString: data?.endereco || '',
                         cnpj: data?.cnpj || '',
                         telefone: data?.telefone || '',
@@ -140,7 +138,10 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         if (existe) {
             setItens(itens.map(i => (i.id === peca.id || i.produtoId === peca.id) ? { ...i, qtd: i.qtd + 1 } : i));
         } else {
-            setItens([...itens, { produtoId: peca.id, id: peca.id, codigo: peca.sku, nome: peca.nome, qtd: 1, preco: peca.precoVenda || 0, estoqueDisponivel: peca.quantidadeEstoque || 0 }]);
+            setItens([...itens, {
+                produtoId: peca.id, id: peca.id, codigo: peca.sku, nome: peca.nome,
+                qtd: 1, preco: peca.precoVenda || 0, estoqueDisponivel: peca.quantidadeEstoque || 0
+            }]);
         }
         toast.success("Item adicionado");
         setBuscaPeca(''); setResultadosPecas([]); inputPecaRef.current.focus();
@@ -150,23 +151,39 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     let valorDescontoReal = descontoTipo === 'VALOR' ? (parseFloat(descontoInput) || 0) : subtotal * ((parseFloat(descontoInput) || 0) / 100);
     const totalFinal = Math.max(0, subtotal - valorDescontoReal);
 
-    const validarEstoqueNoFront = () => {
-        const itensSemEstoque = itens.filter(item => item.qtd > (item.estoqueDisponivel ?? 0));
-        if (itensSemEstoque.length > 0) {
-            const listaNomes = itensSemEstoque.map(i => `• ${i.nome} (Pedido: ${i.qtd} | Estoque: ${i.estoqueDisponivel ?? 0})`).join('\n');
-            toast.error(`Estoque Insuficiente:\n${listaNomes}`, { duration: 6000, style: { minWidth: '350px' } });
-            return false;
+    // =================================================================================
+    // 🚀 ENVIO DIRETO VIA API DE WHATSAPP DO BACKEND (COM PDF)
+    // =================================================================================
+    const acionarWhatsApp = async () => {
+        if (!orcamentoId) {
+            toast.error("Salve o rascunho ou pedido antes de enviar pelo WhatsApp!");
+            return;
         }
-        return true;
+
+        if (!clienteSelecionado || !clienteSelecionado.telefone) {
+            toast.error("O cliente selecionado não possui um número de telefone cadastrado.");
+            return;
+        }
+
+        const loadId = toast.loading("Gerando PDF e enviando via WhatsApp API...");
+
+        try {
+            await api.post(`/api/vendas/${orcamentoId}/enviar-whatsapp`);
+            toast.success("PDF enviado com sucesso para o cliente!", { id: loadId });
+        } catch (e) {
+            const msgErro = e.response?.data?.message || e.response?.data || "Verifique se a API do WhatsApp está conectada.";
+            toast.error("Falha no envio: " + msgErro, { id: loadId });
+        }
     };
 
+    // =================================================================================
+    // PROCESSAMENTO DE API
+    // =================================================================================
     const processarVendaAPI = async (statusDesejado) => {
         if (itens.length === 0) return toast.error("O documento não possui itens.");
 
         const statusFinal = (statusDesejado === 'ORCAMENTO' && modo === 'PEDIDO') ? 'PEDIDO' : statusDesejado;
-        if ((statusFinal === 'PEDIDO' || statusFinal === 'AGUARDANDO_PAGAMENTO') && !validarEstoqueNoFront()) return;
-
-        const loadId = toast.loading(statusFinal === 'PEDIDO' ? "Salvando pedido..." : "Salvando rascunho...");
+        const loadId = toast.loading(statusFinal === 'PEDIDO' ? "Salvando pedido..." : "Processando...");
 
         const payload = {
             id: orcamentoId,
@@ -181,12 +198,11 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
             if (orcamentoId) {
                 await api.put(`/api/vendas/orcamento/${orcamentoId}`, payload);
             } else {
-                const rota = statusFinal === 'PEDIDO' ? '/api/vendas/pedido' : '/api/vendas/orcamento';
-                const res = await api.post(rota, payload);
+                const res = await api.post(statusFinal === 'PEDIDO' ? '/api/vendas/pedido' : '/api/vendas/orcamento', payload);
                 setOrcamentoId(res.data.id);
             }
 
-            toast.success(statusFinal === 'PEDIDO' ? "Pedido salvo!" : "Orçamento guardado!", { id: loadId });
+            toast.success(statusFinal === 'PEDIDO' ? "Pedido salvo!" : "Operação concluída!", { id: loadId });
 
             if (statusFinal === 'AGUARDANDO_PAGAMENTO') {
                 limparEcra();
@@ -199,8 +215,41 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
             if (msgServidor.includes("Estoque insuficiente")) {
                 toast.error(msgServidor, { id: loadId, duration: 6000, style: { border: '2px solid #ef4444', fontWeight: 'bold' } });
             } else {
-                toast.error("Falha ao salvar: " + msgServidor, { id: loadId });
+                toast.error("Falha ao processar: " + msgServidor, { id: loadId });
             }
+        }
+    };
+
+    // =================================================================================
+    // 🚀 REGISTRAR VENDA PERDIDA
+    // =================================================================================
+    const registrarVendaPerdida = async () => {
+        if (itens.length === 0 && !buscaPeca) return toast.error("Adicione itens ou busque uma peça para registrar a perda.");
+        if (!motivoVendaPerdida) return toast.error("Selecione o motivo da perda.");
+
+        const loadId = toast.loading("Registrando venda perdida...");
+
+        const payload = {
+            parceiroId: clienteSelecionado?.id || null,
+            veiculoId: veiculoSelecionado ? parseInt(veiculoSelecionado) : null,
+            motivo: motivoVendaPerdida,
+            observacoes: observacaoVendaPerdida,
+            valorTotal: totalFinal,
+            termoBuscado: itens.length === 0 ? buscaPeca : null,
+            itens: itens.map(i => ({ produtoId: i.produtoId || i.id, quantidade: i.qtd, precoUnitario: i.preco }))
+        };
+
+        try {
+            await api.post('/api/vendas-perdidas', payload);
+            toast.success("Venda perdida registrada para análise!", { id: loadId });
+
+            setModalVendaPerdidaAberto(false);
+            setMotivoVendaPerdida('');
+            setObservacaoVendaPerdida('');
+            limparEcra();
+
+        } catch (e) {
+            toast.error("Erro ao registrar venda perdida.", { id: loadId });
         }
     };
 
@@ -246,9 +295,13 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                             <div className="bg-blue-600 text-white p-2 rounded-xl"><FileText size={24}/></div>
                             <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">{modo} #{orcamentoId || 'NOVO'}</h1>
                         </div>
-                        <div className="flex gap-2">
-                            <button onClick={limparEcra} className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-black border border-red-100"><Trash2 size={18} /></button>
-                            <button onClick={() => setModalListaAberto(true)} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-black shadow-lg"><FolderOpen size={18} /> GUARDADOS</button>
+
+                        <div className="flex flex-wrap gap-2">
+                            <button onClick={() => setModalVendaPerdidaAberto(true)} className="bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-xl font-black flex items-center gap-2 border border-red-200 transition-colors shadow-sm" title="Registrar que o cliente desistiu da compra">
+                                <XCircle size={16} /> VENDA PERDIDA
+                            </button>
+                            <button onClick={limparEcra} className="bg-slate-100 text-slate-600 hover:bg-slate-200 px-4 py-2 rounded-xl font-black border border-slate-200 transition-colors" title="Apagar tela"><Trash2 size={16} /> LIMPAR</button>
+                            <button onClick={() => setModalListaAberto(true)} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-black shadow-lg"><FolderOpen size={16} /> GUARDADOS</button>
                         </div>
                     </div>
 
@@ -279,13 +332,22 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                         if (e.key === 'ArrowDown') { e.preventDefault(); setIndexFocadoPeca(p => Math.min(resultadosPecas.length - 1, p + 1)); }
                         else if (e.key === 'ArrowUp') { e.preventDefault(); setIndexFocadoPeca(p => Math.max(0, p - 1)); }
                         else if (e.key === 'Enter' && resultadosPecas[indexFocadoPeca]) { adicionarItem(resultadosPecas[indexFocadoPeca]); }
-                    }} placeholder="Adicionar peça ao balcão..." className="w-full pl-14 pr-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-lg font-black shadow-sm focus:border-blue-600 outline-none transition-all" />
+                    }} placeholder="Pesquisar peça para adicionar..." className="w-full pl-14 pr-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-lg font-black shadow-sm focus:border-blue-600 outline-none transition-all" />
+
                     {resultadosPecas.length > 0 && (
-                        <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border z-50 max-h-60 overflow-y-auto">
+                        <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 max-h-72 overflow-y-auto">
                             {resultadosPecas.map((peca, idx) => (
-                                <div key={peca.id} onClick={() => adicionarItem(peca)} className={`p-4 border-b flex justify-between cursor-pointer transition-colors ${idx === indexFocadoPeca ? 'bg-blue-600 text-white' : 'hover:bg-slate-50'}`}>
-                                    <div><p className="font-bold">{peca.nome}</p><p className={`text-xs ${idx === indexFocadoPeca ? 'text-blue-100' : 'text-slate-400'}`}>{peca.sku}</p></div>
-                                    <p className="font-black">R$ {(peca.precoVenda || 0).toFixed(2)}</p>
+                                <div key={peca.id} onClick={() => adicionarItem(peca)} className={`p-4 border-b flex justify-between items-center cursor-pointer transition-colors ${idx === indexFocadoPeca ? 'bg-blue-600 text-white' : 'hover:bg-slate-50'}`}>
+                                    <div>
+                                        <p className="font-bold text-lg leading-tight">{peca.nome}</p>
+                                        <div className="flex items-center gap-3 mt-1">
+                                            <p className={`text-xs font-mono ${idx === indexFocadoPeca ? 'text-blue-200' : 'text-slate-500'}`}>{peca.sku}</p>
+                                            <span className={`text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-widest ${idx === indexFocadoPeca ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                                ESTOQUE: {peca.quantidadeEstoque ?? 0}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <p className="font-black text-xl">R$ {(peca.precoVenda || 0).toFixed(2)}</p>
                                 </div>
                             ))}
                         </div>
@@ -299,39 +361,58 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                             <tr><th className="p-4">Cód. SKU</th><th className="p-4">Descrição</th><th className="p-4 text-center">Qtd</th><th className="p-4 text-right pr-6">Subtotal</th><th className="p-4"></th></tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                            {itens.map((item) => (
-                                <tr key={item.id} className="hover:bg-slate-50 border-b">
-                                    <td className="p-4 font-mono text-xs">{item.codigo}</td>
-                                    <td className="p-4 font-bold text-slate-800 text-sm">{item.nome}</td>
-                                    <td className="p-4 text-center">
-                                        <input type="number" value={item.qtd} onChange={(e) => setItens(itens.map(i => i.id === item.id ? { ...i, qtd: Math.max(1, parseInt(e.target.value) || 1) } : i))} className="w-16 p-2 text-center font-black border-2 border-slate-100 rounded-lg outline-none focus:border-blue-500" />
-                                    </td>
-                                    <td className="p-4 text-right font-black text-blue-700 pr-6">R$ {(item.preco * item.qtd).toFixed(2)}</td>
-                                    <td className="p-4 text-center"><button onClick={() => setItens(itens.filter(i => i.id !== item.id))} className="text-slate-300 hover:text-red-500 p-2 transition-colors"><Trash2 size={18} /></button></td>
-                                </tr>
-                            ))}
+                            {itens.map((item) => {
+                                const disponivel = item.estoqueDisponivel ?? 0;
+                                const faltaEstoque = item.qtd > disponivel;
+
+                                return (
+                                    <tr key={item.id} className={`hover:bg-slate-50 border-b ${faltaEstoque ? 'bg-red-50/50' : ''}`}>
+                                        <td className="p-4 font-mono text-xs">{item.codigo}</td>
+                                        <td className="p-4 font-bold text-slate-800 text-sm">
+                                            <div>
+                                                <p>{item.nome}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Disponível: {disponivel}</p>
+                                                {faltaEstoque && <span className="text-[10px] font-black text-red-600 flex items-center gap-1 uppercase tracking-tighter mt-1"><AlertTriangle size={10}/> Faltam {item.qtd - disponivel}</span>}
+                                            </div>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <input type="number" value={item.qtd} onChange={(e) => setItens(itens.map(i => i.id === item.id ? { ...i, qtd: Math.max(1, parseInt(e.target.value) || 1) } : i))} className={`w-16 p-2 text-center font-black bg-white border-2 rounded-lg outline-none ${faltaEstoque ? 'border-red-500 bg-red-100 text-red-700' : 'border-slate-100 focus:border-blue-500'}`} />
+                                        </td>
+                                        <td className="p-4 text-right font-black text-blue-700 pr-6">R$ {(item.preco * item.qtd).toFixed(2)}</td>
+                                        <td className="p-4 text-center"><button onClick={() => setItens(itens.filter(i => i.id !== item.id))} className="text-slate-300 hover:text-red-500 p-2 transition-colors"><Trash2 size={18} /></button></td>
+                                    </tr>
+                                );
+                            })}
                             </tbody>
                         </table>
                     </div>
                 </div>
 
                 <div className="bg-slate-900 text-white rounded-b-3xl border-t-4 border-blue-500 p-6 flex flex-col md:flex-row justify-between items-center shadow-2xl">
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3 mb-6 md:mb-0 justify-center md:justify-start">
+
                         <button onClick={() => processarVendaAPI(modo === 'PEDIDO' ? 'PEDIDO' : 'ORCAMENTO')} className="px-6 py-4 bg-slate-800 hover:bg-slate-700 font-black rounded-2xl border border-slate-700 transition-all">
                             {modo === 'PEDIDO' ? 'SALVAR ALTERAÇÕES' : 'SALVAR RASCUNHO'}
                         </button>
 
-                        <button onClick={() => window.print()} className="px-6 py-4 bg-white text-slate-900 font-black rounded-2xl flex items-center gap-2 shadow-xl hover:bg-slate-100 transition-all"><Printer size={20}/> IMPRIMIR</button>
+                        <button onClick={() => window.print()} className="px-6 py-4 bg-white text-slate-900 font-black rounded-2xl flex items-center gap-2 shadow-xl hover:bg-slate-100 transition-all">
+                            <Printer size={20}/> IMPRIMIR
+                        </button>
+
+                        <button onClick={acionarWhatsApp} className="px-6 py-4 bg-green-500 text-white font-black rounded-2xl flex items-center gap-2 shadow-xl hover:bg-green-600 transition-all">
+                            <MessageCircle size={20}/> WHATSAPP
+                        </button>
 
                         {modo === 'ORCAMENTO' && (
                             <button onClick={() => processarVendaAPI('PEDIDO')} className="px-6 py-4 bg-orange-500 text-white font-black rounded-2xl flex items-center gap-2 shadow-orange-500/20 hover:bg-orange-600 transition-all">
-                                CONVERTER PRA PEDIDO <ArrowRight size={20}/>
+                                CONVERTER <ArrowRight size={20}/>
                             </button>
                         )}
 
-                        {modo === 'PEDIDO' && <button onClick={() => processarVendaAPI('AGUARDANDO_PAGAMENTO')} className="px-8 py-4 bg-green-600 font-black rounded-2xl animate-pulse hover:bg-green-700">ENVIAR AO CAIXA</button>}
+                        {modo === 'PEDIDO' && <button onClick={() => processarVendaAPI('AGUARDANDO_PAGAMENTO')} className="px-8 py-4 bg-purple-600 font-black rounded-2xl animate-pulse hover:bg-purple-700 shadow-purple-500/30 shadow-lg">ENVIAR CAIXA</button>}
                     </div>
-                    <div className="text-right">
+
+                    <div className="w-full md:w-auto text-right bg-slate-800 p-4 rounded-2xl md:bg-transparent md:p-0">
                         <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Valor Líquido Final</span>
                         <h2 className="text-5xl font-black text-green-400 tracking-tighter">R$ {totalFinal.toFixed(2)}</h2>
                     </div>
@@ -339,7 +420,61 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
             </div>
 
             {/* ========================================================================================= */}
-            {/* 🎯 ÁREA DE IMPRESSÃO A4 (COM ENDEREÇO EM BLOCO PRE-LINE) */}
+            {/* 🚀 MODAL DE VENDA PERDIDA */}
+            {/* ========================================================================================= */}
+            {modalVendaPerdidaAberto && (
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 print:hidden">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
+                        <div className="bg-red-600 p-6 flex justify-between items-center text-white">
+                            <h2 className="font-black tracking-widest flex items-center gap-2"><XCircle /> REGISTRAR PERDA</h2>
+                            <button onClick={() => setModalVendaPerdidaAberto(false)} className="hover:text-red-200 transition-colors"><X size={24}/></button>
+                        </div>
+                        <div className="p-6 space-y-5 bg-slate-50">
+                            <p className="text-sm text-slate-600 font-medium">
+                                Por que o cliente desistiu da compra? Este registro é essencial para melhorarmos nossos preços e estoques.
+                            </p>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase">Motivo Principal *</label>
+                                <select
+                                    value={motivoVendaPerdida}
+                                    onChange={(e) => setMotivoVendaPerdida(e.target.value)}
+                                    className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-red-500 outline-none mt-1 bg-white shadow-sm"
+                                >
+                                    <option value="">Selecione um motivo...</option>
+                                    <option value="PRECO">Preço Alto / Sem Desconto</option>
+                                    <option value="ESTOQUE">Falta de Estoque</option>
+                                    <option value="CONCORRENCIA">Fechou com a Concorrência</option>
+                                    <option value="PRAZO">Prazo de Entrega muito longo</option>
+                                    <option value="NAO_ENCONTRADO">Peça não encontrada no sistema</option>
+                                    <option value="OUTROS">Outros Motivos</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase">Observações (Opcional)</label>
+                                <textarea
+                                    value={observacaoVendaPerdida}
+                                    onChange={(e) => setObservacaoVendaPerdida(e.target.value)}
+                                    rows="3"
+                                    className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-red-500 outline-none mt-1 bg-white shadow-sm"
+                                    placeholder="Ex: Cliente achou a peça 20 reais mais barata na loja X..."
+                                />
+                            </div>
+
+                            <button
+                                onClick={registrarVendaPerdida}
+                                className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-xl shadow-lg mt-2 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <XCircle size={20} /> CONFIRMAR PERDA DE VENDA
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================================================= */}
+            {/* 🎯 ÁREA DE IMPRESSÃO A4 (INVISÍVEL) */}
             {/* ========================================================================================= */}
             <div className="hidden print:block fixed inset-0 w-full h-full bg-white z-[99999] p-0 text-black">
                 <div className="w-full max-w-[210mm] mx-auto p-6 font-sans text-slate-900">
@@ -350,7 +485,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                             <p className="text-[9px] font-bold text-slate-600 uppercase mb-2">{empresaConfig.razaoSocial}</p>
 
                             <div className="text-[9.5px] leading-tight font-medium text-slate-700">
-                                {/* O segredo está no whitespace-pre-line, ele respeita as quebras \n do Java! */}
                                 {empresaConfig.enderecoString && (
                                     <div className="whitespace-pre-line mb-1 uppercase font-bold text-slate-600">
                                         {empresaConfig.enderecoString}
@@ -442,6 +576,45 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                     </div>
                 </div>
             </div>
+
+            {/* MODAL DE ORÇAMENTOS SALVOS */}
+            {modalListaAberto && (
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in print:hidden">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[80vh]">
+                        <div className="bg-slate-900 p-6 flex justify-between items-center text-white">
+                            <h2 className="text-xl font-black tracking-widest flex items-center gap-2"><FolderOpen /> ORÇAMENTOS PENDENTES</h2>
+                            <button onClick={() => setModalListaAberto(false)} className="hover:text-red-400"><X size={24}/></button>
+                        </div>
+                        <div className="overflow-y-auto p-6 bg-slate-50 flex-1">
+                            {orcamentosSalvos.length === 0 ? (
+                                <div className="text-center py-10 font-bold text-slate-400">Nenhum orçamento encontrado.</div>
+                            ) : (
+                                <div className="grid gap-4">
+                                    {orcamentosSalvos.map(orc => (
+                                        <div key={orc.id} onClick={() => carregarOrcamentoLocal(orc)} className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-center hover:shadow-md transition-shadow cursor-pointer">
+                                            <div>
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <span className={`font-black text-[10px] px-2 py-1 rounded uppercase tracking-widest ${orc.status === 'PEDIDO' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{orc.status} #{orc.id}</span>
+                                                    <span className="text-xs text-slate-400 font-bold">{new Date(orc.data).toLocaleString('pt-BR')}</span>
+                                                </div>
+                                                <p className="font-bold text-slate-800 text-lg flex items-center gap-2"><User size={16} className="text-slate-400"/> {orc.cliente}</p>
+                                                <p className="text-xs font-bold text-slate-500 flex items-center gap-2 mt-1"><Car size={14} className="text-slate-400"/> Veículo: {orc.veiculo}</p>
+                                            </div>
+                                            <div className="flex items-center gap-6 mt-4 md:mt-0">
+                                                <div className="text-right">
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Valor Total</p>
+                                                    <p className="font-black text-xl text-slate-800">R$ {(orc.valor || 0).toFixed(2)}</p>
+                                                </div>
+                                                <button className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors shadow-lg">REABRIR</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <style>{`
                 @media print {

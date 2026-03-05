@@ -6,9 +6,11 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
+import org.springframework.jdbc.core.JdbcTemplate; // IMPORTANTE PARA O RESET DO BANCO
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional; // IMPORTANTE PARA SEGURANÇA NO RESET
 
 import java.io.File;
 import java.io.IOException;
@@ -30,7 +32,19 @@ public class ConfiguracaoService {
     @Autowired
     private TaskScheduler taskScheduler;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate; // INJETADO PARA EXECUTAR COMANDOS SQL DIRETOS
+
     private ScheduledFuture<?> tarefaAgendada;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.datasource.username}")
+    private String dbUserProp;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.datasource.password}")
+    private String dbPassProp;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.datasource.url}")
+    private String dbUrlProp;
 
     @PostConstruct
     public void init() {
@@ -68,6 +82,25 @@ public class ConfiguracaoService {
     }
 
     // =======================================================================
+    // 💣 ZONA DE PERIGO: RESETAR BANCO DE DADOS (PostgreSQL)
+    // =======================================================================
+    @Transactional
+    public void resetarBancoDeDados() {
+        try {
+            // O comando TRUNCATE com RESTART IDENTITY zera as tabelas e volta o ID (PK) para 1.
+            // O CASCADE garante que ele force a limpeza mesmo havendo chaves estrangeiras (ex: ItemVenda preso numa Venda).
+            // ATENÇÃO: Tabelas 'usuario' e 'configuracao_sistema' ficam de fora para não perder o login.
+            String sql = "TRUNCATE TABLE item_venda, pagamento_venda, venda, produto, veiculo, parceiro RESTART IDENTITY CASCADE;";
+
+            jdbcTemplate.execute(sql);
+
+            System.out.println("✅ Banco de dados resetado com sucesso! (Tabelas limpas e IDs zerados)");
+        } catch (Exception e) {
+            throw new RuntimeException("Falha crítica ao resetar o banco de dados: " + e.getMessage());
+        }
+    }
+
+    // =======================================================================
     // LÓGICA DE REAGENDAMENTO DINÂMICO
     // =======================================================================
     public void reagendarBackup() {
@@ -97,9 +130,15 @@ public class ConfiguracaoService {
 
     public Resource gerarArquivoBackup() {
         try {
-            String dbName = "grandport";
-            String dbUser = "postgres";
-            String dbPass = "123456";
+            // Extrai o nome do banco de dados de dentro da URL (ex: jdbc:postgresql://localhost:5432/grandport)
+            String dbName = dbUrlProp.substring(dbUrlProp.lastIndexOf("/") + 1);
+            if (dbName.contains("?")) {
+                dbName = dbName.split("\\?")[0]; // Remove parâmetros caso existam
+            }
+
+            // Usa as variáveis puxadas do application.properties
+            String dbUser = dbUserProp;
+            String dbPass = dbPassProp;
 
             boolean isWindows = System.getProperty("os.name").toLowerCase().startsWith("windows");
             String comando = isWindows ? "pg_dump.exe" : "pg_dump";
@@ -158,6 +197,6 @@ public class ConfiguracaoService {
     }
 
     public void limparLogsTecnicos() {
-        System.out.println("### SISTEMA: Logs limpos.");
+        System.out.println("### SISTEMA: Logs limpos e Cache esvaziado.");
     }
 }

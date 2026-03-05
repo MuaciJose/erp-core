@@ -40,14 +40,12 @@ public class VendaService {
     @Autowired private ConfiguracaoService configService;
 
     // =========================================================================
-    // MÉTODO AUXILIAR: CALCULA E GRAVA A COMISSÃO (CONGELA O VALOR)
+    // MÉTODO AUXILIAR: COMISSÃO
     // =========================================================================
     private void aplicarComissaoVendedor(Venda venda) {
         if (venda.getVendedorId() == null) return;
 
         ConfiguracaoSistema configs = configService.obterConfiguracao();
-
-        // Busca a porcentagem definida para este vendedor nas configurações
         BigDecimal percentual = configs.getVendedores().stream()
                 .filter(v -> v.getUsuarioId().equals(venda.getVendedorId()))
                 .map(VendedorComissao::getComissao)
@@ -55,11 +53,9 @@ public class VendaService {
                 .orElse(BigDecimal.ZERO);
 
         if (percentual.compareTo(BigDecimal.ZERO) > 0) {
-            // Cálculo: (ValorTotal * Percentual) / 100
             BigDecimal valorCalculado = venda.getValorTotal()
                     .multiply(percentual)
                     .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
-
             venda.setValorComissao(valorCalculado);
         } else {
             venda.setValorComissao(BigDecimal.ZERO);
@@ -67,11 +63,29 @@ public class VendaService {
     }
 
     // =========================================================================
-    // CORREÇÃO: BLINDAGEM CONTRA NULLPOINTER EXCEPTION NO ESTOQUE
+    // 🔄 MÉTODOS DE ESTOQUE IMEDIATO (TIRA E PÕE DA PRATELEIRA VIRTUAL)
     // =========================================================================
-    private void validarEstoque(VendaRequestDTO dto) {
+    private void baixarEstoque(Venda venda) {
+        for (ItemVenda item : venda.getItens()) {
+            Produto p = item.getProduto();
+            int qtdAtual = p.getQuantidadeEstoque() != null ? p.getQuantidadeEstoque() : 0;
+            p.setQuantidadeEstoque(qtdAtual - item.getQuantidade());
+            produtoRepository.save(p);
+        }
+    }
+
+    private void devolverEstoque(Venda venda) {
+        for (ItemVenda item : venda.getItens()) {
+            Produto p = item.getProduto();
+            int qtdAtual = p.getQuantidadeEstoque() != null ? p.getQuantidadeEstoque() : 0;
+            p.setQuantidadeEstoque(qtdAtual + item.getQuantidade());
+            produtoRepository.save(p);
+        }
+    }
+
+    private void validarEstoqueFisico(VendaRequestDTO dto) {
         if (dto.itens() == null || dto.itens().isEmpty()) {
-            throw new RuntimeException("O carrinho de compras está vazio. Adicione itens para finalizar a venda.");
+            throw new RuntimeException("O carrinho de compras está vazio.");
         }
 
         for (ItemVendaDTO itemDTO : dto.itens()) {
@@ -82,29 +96,37 @@ public class VendaService {
                 continue;
             }
 
-            int estoqueDisponivel = produto.getQuantidadeEstoque() != null ? produto.getQuantidadeEstoque() : 0;
+            int estoqueFisico = produto.getQuantidadeEstoque() != null ? produto.getQuantidadeEstoque() : 0;
 
-            if (estoqueDisponivel < itemDTO.quantidade()) {
+            if (estoqueFisico < itemDTO.quantidade()) {
                 throw new RuntimeException("Estoque insuficiente da peça: " + produto.getNome()
-                        + " (Faltam " + (itemDTO.quantidade() - estoqueDisponivel)
-                        + " unidades. Disponível: " + estoqueDisponivel + ")");
+                        + " (Faltam " + (itemDTO.quantidade() - estoqueFisico)
+                        + " unidades. Disponível: " + estoqueFisico + ")");
             }
         }
     }
 
+    // =========================================================================
+    // CRIAÇÃO E EDIÇÃO DE DOCUMENTOS
+    // =========================================================================
     @Transactional
     public Venda salvarOrcamento(VendaRequestDTO dto) {
         Venda venda = new Venda();
         venda.setStatus(StatusVenda.ORCAMENTO);
-        return preencherESalvarVenda(venda, dto);
+        return preencherESalvarVenda(venda, dto); // Orçamento NÃO mexe no estoque
     }
 
     @Transactional
     public Venda criarPedido(VendaRequestDTO dto) {
-        validarEstoque(dto);
+        validarEstoqueFisico(dto);
+
         Venda venda = new Venda();
         venda.setStatus(StatusVenda.AGUARDANDO_PAGAMENTO);
-        return preencherESalvarVenda(venda, dto);
+        Venda salva = preencherESalvarVenda(venda, dto);
+
+        // 🚀 Tira do estoque na hora!
+        baixarEstoque(salva);
+        return salva;
     }
 
     @Transactional
@@ -124,18 +146,30 @@ public class VendaService {
             throw new RuntimeException("Operação Negada: Um Pedido Oficial não pode ser revertido para Orçamento.");
         }
 
-        if (dto.status() == StatusVenda.PEDIDO || dto.status() == StatusVenda.AGUARDANDO_PAGAMENTO) {
-            validarEstoque(dto);
+        StatusVenda statusAntigo = venda.getStatus();
+        StatusVenda statusNovo = dto.status() != null ? dto.status() : statusAntigo;
+
+        // 1. DEVOLVE: Se já era um pedido, devolve as peças temporariamente pra recalcular
+        if (statusAntigo == StatusVenda.PEDIDO || statusAntigo == StatusVenda.AGUARDANDO_PAGAMENTO) {
+            devolverEstoque(venda);
         }
 
-        if (dto.status() != null) {
-            venda.setStatus(dto.status());
+        // 2. VALIDA as novas quantidades desejadas
+        if (statusNovo == StatusVenda.PEDIDO || statusNovo == StatusVenda.AGUARDANDO_PAGAMENTO) {
+            validarEstoqueFisico(dto);
         }
 
-        venda.getItens().clear();
-        Venda salva = preencherESalvarVenda(venda, dto);
+        venda.setStatus(statusNovo);
+        venda.getItens().clear(); // Limpa itens velhos
 
-        if (venda.getStatus() == StatusVenda.AGUARDANDO_PAGAMENTO && dto.status() == StatusVenda.AGUARDANDO_PAGAMENTO) {
+        Venda salva = preencherESalvarVenda(venda, dto); // Salva nova lista
+
+        // 3. PUXA: Se continuar sendo pedido, tira do estoque de novo
+        if (statusNovo == StatusVenda.PEDIDO || statusNovo == StatusVenda.AGUARDANDO_PAGAMENTO) {
+            baixarEstoque(salva);
+        }
+
+        if (statusAntigo == StatusVenda.AGUARDANDO_PAGAMENTO && statusNovo == StatusVenda.AGUARDANDO_PAGAMENTO) {
             try { auditoriaService.registrar("VENDAS", "CONVERSAO", "Documento #" + salva.getId() + " enviado para o Caixa."); } catch(Exception e){}
         }
 
@@ -151,12 +185,17 @@ public class VendaService {
             throw new RuntimeException("Operação Negada: Vendas faturadas não podem ser excluídas.");
         }
 
+        // Se deletou um pedido que já tinha tirado peças, devolve pra prateleira!
+        if (venda.getStatus() == StatusVenda.PEDIDO || venda.getStatus() == StatusVenda.AGUARDANDO_PAGAMENTO) {
+            devolverEstoque(venda);
+        }
+
         vendaRepository.delete(venda);
         try { auditoriaService.registrar("VENDAS", "EXCLUSAO", "Documento #" + id + " excluído com sucesso."); } catch(Exception e){}
     }
 
     // =========================================================================
-    // CORREÇÃO: BLINDAGEM CONTRA NULLPOINTER EXCEPTION NO SALVAMENTO
+    // PREENCHE E SALVA A ESTRUTURA NO BANCO
     // =========================================================================
     private Venda preencherESalvarVenda(Venda venda, VendaRequestDTO dto) {
         try {
@@ -168,17 +207,8 @@ public class VendaService {
             venda.setVendedorId(null);
         }
 
-        if (dto.parceiroId() != null) {
-            venda.setCliente(parceiroRepository.findById(dto.parceiroId()).orElse(null));
-        } else {
-            venda.setCliente(null);
-        }
-
-        if (dto.veiculoId() != null) {
-            venda.setVeiculo(veiculoRepository.findById(dto.veiculoId()).orElse(null));
-        } else {
-            venda.setVeiculo(null);
-        }
+        venda.setCliente(dto.parceiroId() != null ? parceiroRepository.findById(dto.parceiroId()).orElse(null) : null);
+        venda.setVeiculo(dto.veiculoId() != null ? veiculoRepository.findById(dto.veiculoId()).orElse(null) : null);
 
         if (dto.kmVeiculo() != null && venda.getVeiculo() != null) {
             venda.setKmVeiculo(dto.kmVeiculo());
@@ -189,7 +219,6 @@ public class VendaService {
 
         BigDecimal subtotal = BigDecimal.ZERO;
 
-        // Proteção aqui: Só tenta ler a lista se ela não for nula!
         if (dto.itens() != null) {
             for (ItemVendaDTO itemDTO : dto.itens()) {
                 Produto produto = produtoRepository.findById(itemDTO.produtoId())
@@ -210,6 +239,9 @@ public class VendaService {
         return vendaRepository.save(venda);
     }
 
+    // =========================================================================
+    // CAIXA E FINANCEIRO
+    // =========================================================================
     @Transactional
     public Venda finalizarPagamentoPedido(Long vendaId, List<PagamentoVendaDTO> pagamentos) {
         Venda venda = vendaRepository.findById(vendaId).orElseThrow();
@@ -218,15 +250,7 @@ public class VendaService {
             throw new RuntimeException("Este pedido já foi faturado!");
         }
 
-        for (ItemVenda item : venda.getItens()) {
-            Produto produto = item.getProduto();
-            if (Boolean.TRUE.equals(produto.getPermitirEstoqueNegativo())) continue;
-
-            int estoqueDisponivel = produto.getQuantidadeEstoque() != null ? produto.getQuantidadeEstoque() : 0;
-            if (estoqueDisponivel < item.getQuantidade()) {
-                throw new RuntimeException("Estoque insuficiente de " + produto.getNome());
-            }
-        }
+        // ⚠️ As peças já foram baixadas do estoque na fase de Pedido, então não descontamos de novo aqui!
 
         for (PagamentoVendaDTO pagDTO : pagamentos) {
             PagamentoVenda pagamento = new PagamentoVenda();
@@ -243,13 +267,6 @@ public class VendaService {
             }
         }
 
-        for (ItemVenda item : venda.getItens()) {
-            Produto produto = item.getProduto();
-            int estoqueAtual = produto.getQuantidadeEstoque() != null ? produto.getQuantidadeEstoque() : 0;
-            produto.setQuantidadeEstoque(estoqueAtual - item.getQuantidade());
-            produtoRepository.save(produto);
-        }
-
         aplicarComissaoVendedor(venda);
 
         venda.setStatus(StatusVenda.CONCLUIDA);
@@ -258,10 +275,14 @@ public class VendaService {
 
     @Transactional
     public Venda processarVenda(VendaRequestDTO dto) {
+        validarEstoqueFisico(dto);
         Venda venda = new Venda();
         venda.setStatus(StatusVenda.CONCLUIDA);
 
         Venda salva = preencherESalvarVenda(venda, dto);
+
+        // Venda direta precisa baixar o estoque
+        baixarEstoque(salva);
         aplicarComissaoVendedor(salva);
 
         return vendaRepository.save(salva);
@@ -294,6 +315,7 @@ public class VendaService {
             throw new RuntimeException("Apenas pedidos na fila do caixa podem ser devolvidos.");
         }
 
+        // Ele volta para PEDIDO, então não devolvemos ao estoque (continua retido pro vendedor)
         venda.setStatus(StatusVenda.PEDIDO);
 
         try {

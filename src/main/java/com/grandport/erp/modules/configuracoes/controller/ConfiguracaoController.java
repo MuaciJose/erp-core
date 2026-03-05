@@ -27,7 +27,7 @@ public class ConfiguracaoController {
     }
 
     // =======================================================================
-    // NOVO: ENDPOINT PARA GERAR BACKUP DO BANCO DE DADOS
+    // ENDPOINT PARA GERAR BACKUP DO BANCO DE DADOS
     // =======================================================================
     @GetMapping("/backup")
     public ResponseEntity<Resource> gerarBackup() {
@@ -42,11 +42,21 @@ public class ConfiguracaoController {
     }
 
     // =======================================================================
-    // NOVO: ENDPOINT PARA LIMPAR LOGS DO SISTEMA
+    // ENDPOINT PARA LIMPAR LOGS DO SISTEMA
     // =======================================================================
     @PostMapping("/limpar-logs")
     public ResponseEntity<Void> limparLogs() {
         service.limparLogsTecnicos();
+        return ResponseEntity.ok().build();
+    }
+
+    // =======================================================================
+    // 🚀 NOVO: ENDPOINT PARA RESETAR O BANCO DE DADOS (ZONA DE PERIGO)
+    // =======================================================================
+    @DeleteMapping("/resetar-banco")
+    public ResponseEntity<Void> resetarBancoDeDados() {
+        // Isso chamará a função do seu service que dá o "TRUNCATE" nas tabelas
+        service.resetarBancoDeDados();
         return ResponseEntity.ok().build();
     }
 }

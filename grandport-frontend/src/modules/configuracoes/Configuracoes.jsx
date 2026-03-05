@@ -2,17 +2,16 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
 import {
     Settings, Building2, Printer, Sliders, Save, CheckCircle,
-    AlertTriangle, Info, X, Store, FileText, Percent, ShieldAlert, Search, Loader2, Camera, Plus,
-    Database, Download, Trash2, ShieldCheck, Clock, Users, Trash, MapPin,
-    Plug, Smartphone, UploadCloud
+    AlertTriangle, Info, X, Store, Percent, Search, Loader2, Camera, Plus,
+    Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export const Configuracoes = () => {
     const [abaAtiva, setAbaAtiva] = useState('EMPRESA');
     const [loading, setLoading] = useState(true);
     const [salvando, setSalvando] = useState(false);
     const [buscandoCnpj, setBuscandoCnpj] = useState(false);
-    const [notificacao, setNotificacao] = useState(null);
 
     const [config, setConfig] = useState({
         nomeFantasia: '',
@@ -21,13 +20,11 @@ export const Configuracoes = () => {
         inscricaoEstadual: '',
         telefone: '',
         email: '',
-        // --- CAMPOS ATUALIZADOS PARA O BACKEND ---
         logradouro: '',
         numero: '',
         bairro: '',
         cidade: '',
         uf: '',
-        // -----------------------------------------
         logoBase64: '',
         tamanhoImpressora: '80mm',
         mensagemRodape: '',
@@ -45,11 +42,6 @@ export const Configuracoes = () => {
     const [usuariosEquipe, setUsuariosEquipe] = useState([]);
     const [arquivoCertificado, setArquivoCertificado] = useState(null);
 
-    const showToast = (tipo, titulo, mensagem) => {
-        setNotificacao({ tipo, titulo, mensagem });
-        setTimeout(() => setNotificacao(null), 4000);
-    };
-
     const carregarDados = async () => {
         setLoading(true);
         try {
@@ -57,10 +49,31 @@ export const Configuracoes = () => {
                 api.get('/api/configuracoes'),
                 api.get('/api/usuarios')
             ]);
-            setConfig(prev => ({ ...prev, ...resConfig.data }));
-            setUsuariosEquipe(resUsuarios.data);
+
+            const data = Array.isArray(resConfig.data) ? resConfig.data[0] : resConfig.data;
+
+            if (data) {
+                setConfig(prev => ({
+                    ...prev,
+                    ...data,
+                    logradouro: data.logradouro || '',
+                    numero: data.numero || '',
+                    bairro: data.bairro || '',
+                    cidade: data.cidade || '',
+                    uf: data.uf || '',
+                    telefone: data.telefone || '',
+                    email: data.email || '',
+                    cnpj: data.cnpj || '',
+                    razaoSocial: data.razaoSocial || '',
+                    nomeFantasia: data.nomeFantasia || '',
+                    whatsappToken: data.whatsappToken || '',
+                    tamanhoImpressora: data.tamanhoImpressora || '80mm',
+                    mensagemRodape: data.mensagemRodape || ''
+                }));
+            }
+            setUsuariosEquipe(resUsuarios.data || []);
         } catch (error) {
-            showToast('erro', 'Falha de Sincronização', 'Erro ao carregar configurações.');
+            toast.error('Erro ao carregar configurações do servidor.');
         } finally {
             setLoading(false);
         }
@@ -95,14 +108,18 @@ export const Configuracoes = () => {
 
     const buscarCNPJ = async () => {
         const cnpjLimpo = config.cnpj.replace(/\D/g, '');
-        if (cnpjLimpo.length !== 14) return showToast('aviso', 'CNPJ Inválido', 'Digite os 14 números.');
+        if (cnpjLimpo.length !== 14) {
+            return toast.error('CNPJ Inválido: Digite os 14 números.');
+        }
+
         setBuscandoCnpj(true);
+        const loadId = toast.loading('Buscando dados na Receita Federal...');
+
         try {
             const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
             if (!response.ok) throw new Error('Erro');
             const data = await response.json();
 
-            // 🚀 MAPEAMENTO INTELIGENTE DOS CAMPOS
             setConfig(prev => ({
                 ...prev,
                 razaoSocial: data.razao_social || prev.razaoSocial,
@@ -115,9 +132,9 @@ export const Configuracoes = () => {
                 cidade: data.municipio || '',
                 uf: data.uf || ''
             }));
-            showToast('sucesso', 'Dados Encontrados', 'Endereço e dados da empresa atualizados!');
+            toast.success('Endereço e dados da empresa atualizados!', { id: loadId });
         } catch (error) {
-            showToast('erro', 'Falha na Busca', 'Não foi possível encontrar os dados para este CNPJ.');
+            toast.error('Não foi possível encontrar os dados para este CNPJ.', { id: loadId });
         } finally {
             setBuscandoCnpj(false);
         }
@@ -125,14 +142,69 @@ export const Configuracoes = () => {
 
     const salvarConfiguracoes = async () => {
         setSalvando(true);
+        const loadId = toast.loading('Salvando configurações...');
+
         try {
             const res = await api.put('/api/configuracoes', config);
-            setConfig(prev => ({ ...prev, ...res.data }));
-            showToast('sucesso', 'Configurações Salvas', 'Dados aplicados com sucesso!');
+            const data = Array.isArray(res.data) ? res.data[0] : res.data;
+            setConfig(prev => ({ ...prev, ...data }));
+            toast.success('Configurações salvas com sucesso!', { id: loadId });
         } catch (error) {
-            showToast('erro', 'Erro ao Salvar', 'Verifique a conexão com o servidor.');
+            toast.error('Erro ao salvar. Verifique a conexão com o servidor.', { id: loadId });
         } finally {
             setSalvando(false);
+        }
+    };
+
+    // =========================================================================
+    // 🚀 NOVAS FUNÇÕES DA ABA DE SISTEMA
+    // =========================================================================
+    const fazerBackup = async () => {
+        const loadId = toast.loading('Gerando backup do banco de dados... Isto pode demorar alguns segundos.');
+        try {
+            const response = await api.get('/api/configuracoes/backup', { responseType: 'blob' });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+
+            const dataHoje = new Date().toISOString().split('T')[0];
+            link.setAttribute('download', `backup_grandport_${dataHoje}.sql`);
+
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+
+            toast.success('Backup descarregado com sucesso!', { id: loadId });
+        } catch (error) {
+            toast.error('Erro ao gerar o backup. Verifique o servidor.', { id: loadId });
+        }
+    };
+
+    const limparLogsCache = async () => {
+        const loadId = toast.loading('Limpando cache e arquivos temporários...');
+        try {
+            await api.post('/api/configuracoes/limpar-logs');
+            toast.success('Limpeza de sistema concluída!', { id: loadId });
+        } catch (error) {
+            toast.error('Erro ao limpar logs.', { id: loadId });
+        }
+    };
+
+    const limparBancoDeDados = async () => {
+        const confirmacao = window.confirm(
+            "⚠️ ATENÇÃO EXTREMA ⚠️\n\nIsso irá APAGAR TODOS os Produtos, Clientes, Vendas e Orçamentos do banco de dados.\nEssa ação é irreversível.\n\nTem certeza absoluta que deseja resetar o sistema?"
+        );
+
+        if (confirmacao) {
+            const loadId = toast.loading('Resetando banco de dados. Por favor, aguarde...');
+            try {
+                await api.delete('/api/configuracoes/resetar-banco'); // Rota corrigida para bater com o Java
+                toast.success('O banco de dados foi limpo com sucesso!', { id: loadId });
+                setTimeout(() => window.location.reload(), 2000);
+            } catch (error) {
+                toast.error('Erro ao limpar o banco de dados. Verifique a conexão com o servidor.', { id: loadId });
+            }
         }
     };
 
@@ -140,20 +212,6 @@ export const Configuracoes = () => {
 
     return (
         <div className="p-8 max-w-6xl mx-auto animate-fade-in relative flex flex-col h-full">
-
-            {/* NOTIFICAÇÃO (TOAST) */}
-            {notificacao && (
-                <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-[9999] animate-fade-in w-full max-w-md px-4">
-                    <div className={`p-4 rounded-2xl shadow-2xl flex items-start gap-4 border-l-4 ${notificacao.tipo === 'sucesso' ? 'bg-green-50 border-green-500 text-green-800' : notificacao.tipo === 'erro' ? 'bg-red-50 border-red-500 text-red-800' : 'bg-orange-50 border-orange-500 text-orange-800'}`}>
-                        <div className="mt-1">{notificacao.tipo === 'sucesso' ? <CheckCircle size={24}/> : notificacao.tipo === 'erro' ? <AlertTriangle size={24}/> : <Info size={24}/>}</div>
-                        <div className="flex-1">
-                            <h4 className="font-black text-lg">{notificacao.titulo}</h4>
-                            <p className="text-sm font-medium mt-1">{notificacao.mensagem}</p>
-                        </div>
-                        <button onClick={() => setNotificacao(null)} className="text-slate-400 hover:text-slate-700 p-1"><X size={20}/></button>
-                    </div>
-                </div>
-            )}
 
             <div className="mb-8 flex justify-between items-end">
                 <div>
@@ -177,11 +235,12 @@ export const Configuracoes = () => {
                 </div>
 
                 <div className="flex-1 bg-white p-8 rounded-3xl shadow-sm border border-slate-200 min-h-[500px]">
+
+                    {/* ABA: DADOS DA EMPRESA */}
                     {abaAtiva === 'EMPRESA' && (
                         <div className="space-y-6 animate-fade-in">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><Store className="text-blue-500" /> Identidade e Endereço</h2>
 
-                            {/* LOGO */}
                             <div className="flex flex-col md:flex-row items-center gap-8 bg-blue-50 p-6 rounded-3xl border-2 border-dashed border-blue-200">
                                 <div className="relative group">
                                     {config.logoBase64 ? <img src={config.logoBase64} alt="Logo" className="w-32 h-32 object-contain bg-white rounded-2xl shadow-md border-2 border-white" /> : <div className="w-32 h-32 bg-slate-200 rounded-2xl flex items-center justify-center text-slate-400"><Plus size={40} /></div>}
@@ -194,7 +253,6 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            {/* DADOS BÁSICOS */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="text-xs font-black text-blue-600 uppercase">CNPJ (Auto-Busca)</label>
@@ -213,45 +271,44 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            {/* 🚀 NOVO GRID DE ENDEREÇO ESTRUTURADO */}
                             <h3 className="text-sm font-black text-slate-400 uppercase flex items-center gap-2 mt-8"><MapPin size={16}/> Localização</h3>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
                                 <div className="md:col-span-3">
                                     <label className="text-[10px] font-black text-slate-400 uppercase">Logradouro (Rua/Av)</label>
-                                    <input type="text" name="logradouro" value={config.logradouro || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none" />
+                                    <input type="text" name="logradouro" value={config.logradouro || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-400 uppercase">Nº</label>
-                                    <input type="text" name="numero" value={config.numero || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none" />
+                                    <input type="text" name="numero" value={config.numero || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" />
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase">Bairro</label>
-                                    <input type="text" name="bairro" value={config.bairro || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none" />
+                                    <input type="text" name="bairro" value={config.bairro || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-400 uppercase">Cidade</label>
-                                    <input type="text" name="cidade" value={config.cidade || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none" />
+                                    <input type="text" name="cidade" value={config.cidade || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-400 uppercase">UF</label>
-                                    <input type="text" name="uf" value={config.uf || ''} onChange={handleChange} maxLength="2" className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold text-center outline-none" />
+                                    <input type="text" name="uf" value={config.uf || ''} onChange={handleChange} maxLength="2" className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold text-center outline-none focus:border-blue-500" />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase">WhatsApp de Contato</label>
-                                    <input type="text" name="telefone" value={config.telefone || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold outline-none" />
+                                    <input type="text" name="telefone" value={config.telefone || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold outline-none focus:border-blue-500" />
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase">E-mail</label>
-                                    <input type="email" name="email" value={config.email || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold outline-none" />
+                                    <input type="email" name="email" value={config.email || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold outline-none focus:border-blue-500" />
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* ... (Demais abas VENDEDORES, IMPRESSAO, REGRAS, INTEGRACOES, SISTEMA permanecem as mesmas que você enviou) ... */}
+                    {/* ABA: VENDEDORES */}
                     {abaAtiva === 'VENDEDORES' && (
                         <div className="space-y-6 animate-fade-in">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-4 border-b pb-4"><Users className="text-blue-500" /> Parametrização de Equipe</h2>
@@ -270,7 +327,10 @@ export const Configuracoes = () => {
                                             </div>
                                             <div className="flex flex-col items-end gap-1">
                                                 <label className="text-[10px] font-bold text-slate-400 uppercase">Comissão (%)</label>
-                                                <div className="relative"><input type="number" step="0.1" value={configVendedor?.comissao || 0} onChange={(e) => handleComissaoChange(membro.id, e.target.value)} className="w-24 p-2 bg-slate-50 border-2 border-slate-200 rounded-lg font-black text-center text-blue-600 outline-none"/><Percent size={12} className="absolute right-2 top-3 text-slate-300" /></div>
+                                                <div className="relative">
+                                                    <input type="number" step="0.1" value={configVendedor?.comissao || 0} onChange={(e) => handleComissaoChange(membro.id, e.target.value)} className="w-24 p-2 bg-slate-50 border-2 border-slate-200 rounded-lg font-black text-center text-blue-600 outline-none focus:border-blue-500"/>
+                                                    <Percent size={12} className="absolute right-2 top-3 text-slate-400" />
+                                                </div>
                                             </div>
                                         </div>
                                     );
@@ -279,7 +339,170 @@ export const Configuracoes = () => {
                         </div>
                     )}
 
-                    {/* ... (Manter as outras abas conforme o seu código original) ... */}
+                    {/* ABA: IMPRESSÃO */}
+                    {abaAtiva === 'IMPRESSAO' && (
+                        <div className="space-y-6 animate-fade-in">
+                            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><Printer className="text-blue-500" /> Configurações de Impressão</h2>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Tamanho Padrão do Papel (PDV)</label>
+                                    <select name="tamanhoImpressora" value={config.tamanhoImpressora || '80mm'} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none">
+                                        <option value="80mm">Bobina 80mm</option>
+                                        <option value="58mm">Bobina 58mm</option>
+                                        <option value="A4">Folha A4</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center mt-6">
+                                    <input type="checkbox" id="exibirVendedorCupom" name="exibirVendedorCupom" checked={config.exibirVendedorCupom || false} onChange={handleChange} className="w-6 h-6 accent-blue-600 rounded cursor-pointer" />
+                                    <label htmlFor="exibirVendedorCupom" className="ml-3 font-bold text-slate-700 cursor-pointer">Exibir nome do vendedor no documento impresso</label>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Mensagem Padrão no Rodapé (Garantia/Agradecimento)</label>
+                                    <textarea name="mensagemRodape" value={config.mensagemRodape || ''} onChange={handleChange} rows="3" className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="Ex: Orçamento sujeito a alteração de preços após validade."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ABA: REGRAS */}
+                    {abaAtiva === 'REGRAS' && (
+                        <div className="space-y-6 animate-fade-in">
+                            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><Sliders className="text-blue-500" /> Regras de Negócio</h2>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Desconto Máximo Permitido (%)</label>
+                                    <input type="number" step="0.1" name="descontoMaximoPermitido" value={config.descontoMaximoPermitido || 0} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-blue-700 focus:border-blue-500 outline-none" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Validade do Orçamento (Dias)</label>
+                                    <input type="number" name="diasValidadeOrcamento" value={config.diasValidadeOrcamento || 5} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none" />
+                                </div>
+
+                                <div className="md:col-span-2 mt-4 p-5 bg-orange-50 border-2 border-orange-200 rounded-2xl flex items-start gap-4">
+                                    <input type="checkbox" id="permitirEstoqueNegativoGlobal" name="permitirEstoqueNegativoGlobal" checked={config.permitirEstoqueNegativoGlobal || false} onChange={handleChange} className="w-6 h-6 accent-orange-600 mt-1 cursor-pointer" />
+                                    <div>
+                                        <label htmlFor="permitirEstoqueNegativoGlobal" className="font-black text-orange-900 text-lg cursor-pointer block">Permitir Estoque Negativo Global</label>
+                                        <p className="text-sm text-orange-800 font-medium mt-1">Se marcado, o sistema não bloqueará vendas de produtos que constam com estoque zero no sistema. Útil se você faz vendas sem dar entrada em nota primeiro.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ABA: INTEGRAÇÕES */}
+                    {abaAtiva === 'INTEGRACOES' && (
+                        <div className="space-y-6 animate-fade-in">
+                            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><Plug className="text-blue-500" /> Integrações e APIs</h2>
+
+                            <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl shadow-sm">
+                                <h3 className="font-black text-slate-800 flex items-center gap-2 mb-4"><Smartphone className="text-green-500" /> WhatsApp API</h3>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Token de Autenticação (Global)</label>
+                                    <input type="text" name="whatsappToken" value={config.whatsappToken || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-mono text-sm focus:border-green-500 outline-none" placeholder="Ex: tk_f4928b9283..." />
+                                    <p className="text-xs text-slate-500 mt-2 font-medium">Este token protege a sua API de envios e será usado para disparar os PDFs de Orçamentos e Pedidos diretamente pelo backend.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ABA: SISTEMA */}
+                    {abaAtiva === 'SISTEMA' && (
+                        <div className="space-y-6 animate-fade-in">
+                            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4">
+                                <Database className="text-blue-500" /> Sistema e Segurança
+                            </h2>
+
+                            {/* ROTINAS DE BANCO DE DADOS E BACKUP */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl">
+                                    <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-4"><Clock size={18} className="text-slate-400"/> Rotinas Automáticas</h3>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Horário do Backup Automático</label>
+                                    <input type="time" name="horarioBackupAuto" value={config.horarioBackupAuto || '03:00'} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none transition-all" />
+                                    <p className="text-[10px] text-slate-400 mt-2 font-medium">O sistema fará uma cópia de segurança diária neste horário.</p>
+                                </div>
+
+                                <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl flex flex-col justify-center">
+                                    <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-4"><Database size={18} className="text-slate-400"/> Manutenção de Dados</h3>
+                                    <div className="flex gap-2">
+                                        {/* 🚀 BOTÃO DE BACKUP ATIVADO AQUI */}
+                                        <button onClick={fazerBackup} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm" title="Baixar cópia do Banco de Dados">
+                                            <Download size={18} /> FAZER BACKUP AGORA
+                                        </button>
+
+                                        {/* 🚀 BOTÃO DE LIXEIRA (LOGS) ATIVADO AQUI */}
+                                        <button onClick={limparLogsCache} className="bg-red-100 hover:bg-red-200 text-red-600 font-bold px-4 py-3 rounded-xl flex items-center justify-center transition-colors" title="Limpar cache e arquivos temporários">
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-3 font-medium text-center">Recomendamos fazer o download do backup 1x por semana.</p>
+                                </div>
+                            </div>
+
+                            {/* CERTIFICADO DIGITAL FISCAL */}
+                            <div className="mt-8 p-6 bg-blue-50 border-2 border-blue-200 rounded-3xl shadow-inner">
+                                <h3 className="font-black text-blue-900 flex items-center gap-2 mb-4"><ShieldCheck className="text-blue-600" /> Certificado Digital (NFe/NFCe)</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-xs font-bold text-blue-700 uppercase">Tipo do Certificado</label>
+                                        <select name="tipoCertificado" value={config.tipoCertificado || 'A1'} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-blue-200 rounded-xl font-bold focus:border-blue-500 outline-none">
+                                            <option value="A1">A1 (Arquivo Digital .pfx / .p12)</option>
+                                            <option value="A3">A3 (Cartão Físico / Token)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-blue-700 uppercase">Senha do Certificado</label>
+                                        <input type="password" name="senhaCertificado" value={config.senhaCertificado || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-blue-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="••••••••" />
+                                    </div>
+
+                                    {/* UPLOAD DO ARQUIVO A1 */}
+                                    {config.tipoCertificado === 'A1' && (
+                                        <div className="md:col-span-2">
+                                            <label className="text-xs font-bold text-blue-700 uppercase">Arquivo do Certificado (Upload)</label>
+                                            <div className="mt-1 flex items-center gap-4 p-4 bg-white border-2 border-dashed border-blue-300 rounded-xl transition-all hover:border-blue-500">
+                                                <div className="bg-blue-100 p-3 rounded-lg text-blue-600">
+                                                    <UploadCloud size={24} />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-bold text-slate-700">
+                                                        {arquivoCertificado ? arquivoCertificado.name : 'Nenhum arquivo selecionado'}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500">Selecione o arquivo do seu certificado (formato .pfx ou .p12)</p>
+                                                </div>
+                                                <label className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold cursor-pointer transition-colors shadow-md">
+                                                    PROCURAR
+                                                    <input type="file" className="hidden" accept=".pfx,.p12" onChange={(e) => setArquivoCertificado(e.target.files[0])} />
+                                                </label>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* ⚠️ ZONA DE PERIGO (LIMPAR BANCO) */}
+                            <div className="mt-8 p-6 border-2 border-red-500 bg-red-50 rounded-3xl relative overflow-hidden">
+                                <div className="absolute -right-4 -top-4 opacity-10">
+                                    <AlertTriangle size={150} className="text-red-600" />
+                                </div>
+                                <h3 className="font-black text-red-700 flex items-center gap-2 mb-2 relative z-10">
+                                    <Bomb size={24} /> ZONA DE PERIGO
+                                </h3>
+                                <p className="text-sm text-red-900 font-medium mb-6 relative z-10">
+                                    Ações nesta área são irreversíveis. Utilize apenas em ambiente de teste ou antes de colocar o sistema em produção oficial para os clientes.
+                                </p>
+                                {/* 🚀 BOTÃO DE RESETAR BANCO ATIVADO AQUI */}
+                                <button
+                                    onClick={limparBancoDeDados}
+                                    className="bg-red-600 hover:bg-red-700 text-white font-black px-6 py-4 rounded-xl flex items-center gap-3 transition-colors shadow-lg relative z-10"
+                                >
+                                    <AlertTriangle size={20} /> RESETAR E LIMPAR BANCO DE DADOS
+                                </button>
+                            </div>
+
+                        </div>
+                    )}
+
                 </div>
             </div>
         </div>
