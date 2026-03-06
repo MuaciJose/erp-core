@@ -28,19 +28,27 @@ public class WhatsAppService {
     @Autowired
     private VendaRepository vendaRepository;
 
-    // URL da sua Evolution API (Geralmente roda na porta 8081)
-    // Depois podemos colocar isso no banco de dados ou no application.properties
-    private final String EVOLUTION_API_URL = "http://localhost:8081";
     private final String INSTANCIA = "GrandPort"; // O nome da instância que você criar lá
 
     public void enviarReciboPdfPorWhatsApp(Long vendaId) {
 
-        // 1. Busca as configurações para pegar o Token e o Nome da Empresa
+        // 1. Busca as configurações para pegar o Token, URL e o Nome da Empresa
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
         String token = config.getWhatsappToken();
+        String apiUrl = config.getWhatsappApiUrl();
 
         if (token == null || token.trim().isEmpty()) {
             throw new RuntimeException("Token do WhatsApp não configurado. Acesse as Configurações do sistema.");
+        }
+
+        // 🚀 TRAVA DE SEGURANÇA: Se estiver vazio, usa o Docker local padrão
+        if (apiUrl == null || apiUrl.trim().isEmpty()) {
+            apiUrl = "http://localhost:8081";
+        }
+
+        // 🚀 TRAVA DE SEGURANÇA: Remove a barra no final caso o cliente tenha digitado errado
+        if (apiUrl.endsWith("/")) {
+            apiUrl = apiUrl.substring(0, apiUrl.length() - 1);
         }
 
         // 2. Busca a Venda para saber quem é o cliente
@@ -64,8 +72,8 @@ public class WhatsAppService {
         byte[] pdfBytes = relatorioService.gerarPdfVenda(vendaId);
         String pdfBase64 = Base64.getEncoder().encodeToString(pdfBytes); // A mágica acontece aqui!
 
-        // 4. MONTA A MENSAGEM NO PADRÃO DA EVOLUTION API
-        String urlEnvio = EVOLUTION_API_URL + "/message/sendMedia/" + INSTANCIA;
+        // 4. MONTA A MENSAGEM NO PADRÃO DA EVOLUTION API (Usando a URL Dinâmica)
+        String urlEnvio = apiUrl + "/message/sendMedia/" + INSTANCIA;
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("number", telefoneDestino);
@@ -96,7 +104,55 @@ public class WhatsAppService {
             System.out.println("WhatsApp enviado com sucesso! Status: " + response.getStatusCode());
         } catch (Exception e) {
             System.err.println("Erro ao enviar WhatsApp: " + e.getMessage());
-            throw new RuntimeException("Falha na comunicação com o WhatsApp.");
+            throw new RuntimeException("Falha na comunicação com a API do WhatsApp. Verifique a URL e o Token nas configurações.");
+        }
+    }
+
+    // ... [Seu código existente do enviarReciboPdfPorWhatsApp] ...
+
+    // =========================================================================
+    // 🚀 NOVO: PUXAR O QR CODE DA EVOLUTION API PARA A TELA DO REACT
+    // =========================================================================
+    public Map<String, Object> solicitarQrCodeConexao() {
+
+        // Pega URL e Token salvos pelo cliente (ou admin)
+        ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
+        String url = config.getWhatsappApiUrl();
+        String token = config.getWhatsappToken();
+
+        if (token == null || token.isEmpty()) {
+            throw new RuntimeException("Token não configurado.");
+        }
+
+        if (url == null || url.isEmpty()) {
+            url = "http://localhost:8081";
+        }
+        if (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+
+        // A rota da Evolution API que retorna o QR Code daquela instância específica
+        String endpoint = url + "/instance/connect/" + INSTANCIA;
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("apikey", token);
+
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        try {
+            // Dispara um GET para pegar a imagem base64
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    endpoint,
+                    org.springframework.http.HttpMethod.GET,
+                    request,
+                    Map.class
+            );
+
+            return response.getBody(); // Retorna o JSON direto para o React ler
+
+        } catch (Exception e) {
+            throw new RuntimeException("Não foi possível conectar ao motor do WhatsApp. Verifique a URL e o Token.");
         }
     }
 }

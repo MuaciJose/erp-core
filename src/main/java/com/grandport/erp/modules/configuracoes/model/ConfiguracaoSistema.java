@@ -68,6 +68,8 @@ public class ConfiguracaoSistema {
     @Column(length = 1000) // Tamanho maior pois tokens de API costumam ser longos
     private String whatsappToken = "";
 
+    @Column(length = 1000)
+    private String whatsappApiUrl = ""; // NOVO CAMPO: Onde a API está hospedada?
     // ================= FISCAL / CERTIFICADO =================
     @Column(length = 2)
     private String tipoCertificado = "A1";

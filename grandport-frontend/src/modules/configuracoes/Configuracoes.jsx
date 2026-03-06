@@ -3,7 +3,7 @@ import api from '../../api/axios';
 import {
     Settings, Building2, Printer, Sliders, Save, CheckCircle,
     AlertTriangle, Info, X, Store, Percent, Search, Loader2, Camera, Plus,
-    Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb
+    Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -12,6 +12,11 @@ export const Configuracoes = () => {
     const [loading, setLoading] = useState(true);
     const [salvando, setSalvando] = useState(false);
     const [buscandoCnpj, setBuscandoCnpj] = useState(false);
+
+    // 🚀 ESTADOS PARA A MÁGICA DO WHATSAPP (QR CODE)
+    const [qrCodeBase64, setQrCodeBase64] = useState(null);
+    const [statusWhatsapp, setStatusWhatsapp] = useState('DESCONHECIDO');
+    const [gerandoQr, setGerandoQr] = useState(false);
 
     const [config, setConfig] = useState({
         nomeFantasia: '',
@@ -35,6 +40,7 @@ export const Configuracoes = () => {
         horarioBackupAuto: '03:00',
         vendedores: [],
         whatsappToken: '',
+        whatsappApiUrl: '',
         tipoCertificado: 'A1',
         senhaCertificado: ''
     });
@@ -67,6 +73,7 @@ export const Configuracoes = () => {
                     razaoSocial: data.razaoSocial || '',
                     nomeFantasia: data.nomeFantasia || '',
                     whatsappToken: data.whatsappToken || '',
+                    whatsappApiUrl: data.whatsappApiUrl || '',
                     tamanhoImpressora: data.tamanhoImpressora || '80mm',
                     mensagemRodape: data.mensagemRodape || ''
                 }));
@@ -157,6 +164,37 @@ export const Configuracoes = () => {
     };
 
     // =========================================================================
+    // 🚀 MÁGICA: GERAR QR CODE NA TELA
+    // =========================================================================
+    const solicitarQrCode = async () => {
+        if(!config.whatsappToken) return toast.error("Salve o Token da API nas configurações antes de conectar!");
+
+        setGerandoQr(true);
+        const loadId = toast.loading('Solicitando QR Code ao servidor...');
+
+        try {
+            const res = await api.get('/api/whatsapp/qrcode');
+
+            // O backend devolve um objeto. Se a API estiver conectada, retorna status = "open"
+            if (res.data?.instance?.state === 'open' || res.data?.state === 'open') {
+                setStatusWhatsapp('CONECTADO');
+                setQrCodeBase64(null);
+                toast.success('Seu WhatsApp já está conectado!', { id: loadId });
+            } else if (res.data?.base64) {
+                setStatusWhatsapp('AGUARDANDO_LEITURA');
+                setQrCodeBase64(res.data.base64); // A imagem gigante em base64
+                toast.success('Aponte a câmera do celular!', { id: loadId });
+            } else {
+                toast.error('Retorno inesperado da API.', { id: loadId });
+            }
+        } catch (error) {
+            toast.error('Falha de comunicação. Verifique se o servidor/Docker está rodando.', { id: loadId });
+        } finally {
+            setGerandoQr(false);
+        }
+    };
+
+    // =========================================================================
     // 🚀 NOVAS FUNÇÕES DA ABA DE SISTEMA
     // =========================================================================
     const fazerBackup = async () => {
@@ -199,7 +237,7 @@ export const Configuracoes = () => {
         if (confirmacao) {
             const loadId = toast.loading('Resetando banco de dados. Por favor, aguarde...');
             try {
-                await api.delete('/api/configuracoes/resetar-banco'); // Rota corrigida para bater com o Java
+                await api.delete('/api/configuracoes/resetar-banco');
                 toast.success('O banco de dados foi limpo com sucesso!', { id: loadId });
                 setTimeout(() => window.location.reload(), 2000);
             } catch (error) {
@@ -381,7 +419,7 @@ export const Configuracoes = () => {
                                 </div>
 
                                 <div className="md:col-span-2 mt-4 p-5 bg-orange-50 border-2 border-orange-200 rounded-2xl flex items-start gap-4">
-                                    <input type="checkbox" id="permitirEstoqueNegativoGlobal" name="permitirEstoqueNegativoGlobal" checked={config.permitirEstoqueNegativoGlobal || false} onChange={handleChange} className="w-6 h-6 accent-orange-600 mt-1 cursor-pointer" />
+                                    <input type="checkbox" id="permitirEstoqueNegativoGlobal" name="permitirEstoqueNegativoGlobal" checked={config.permitirEstoqueNegativoGlobal || false} onChange={handleChange} className="w-full h-6 accent-orange-600 mt-1 cursor-pointer" />
                                     <div>
                                         <label htmlFor="permitirEstoqueNegativoGlobal" className="font-black text-orange-900 text-lg cursor-pointer block">Permitir Estoque Negativo Global</label>
                                         <p className="text-sm text-orange-800 font-medium mt-1">Se marcado, o sistema não bloqueará vendas de produtos que constam com estoque zero no sistema. Útil se você faz vendas sem dar entrada em nota primeiro.</p>
@@ -391,18 +429,82 @@ export const Configuracoes = () => {
                         </div>
                     )}
 
-                    {/* ABA: INTEGRAÇÕES */}
+                    {/* ========================================================================= */}
+                    {/* 🚀 ABA INTEGRAÇÕES: ATUALIZADA COM O MÓDULO VISUAL DE QR CODE */}
+                    {/* ========================================================================= */}
                     {abaAtiva === 'INTEGRACOES' && (
                         <div className="space-y-6 animate-fade-in">
-                            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><Plug className="text-blue-500" /> Integrações e APIs</h2>
+                            <div className="flex justify-between items-center mb-6 border-b pb-4">
+                                <h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><Plug className="text-blue-500" /> Integrações e APIs</h2>
+                            </div>
 
                             <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl shadow-sm">
-                                <h3 className="font-black text-slate-800 flex items-center gap-2 mb-4"><Smartphone className="text-green-500" /> WhatsApp API</h3>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Token de Autenticação (Global)</label>
-                                    <input type="text" name="whatsappToken" value={config.whatsappToken || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-mono text-sm focus:border-green-500 outline-none" placeholder="Ex: tk_f4928b9283..." />
-                                    <p className="text-xs text-slate-500 mt-2 font-medium">Este token protege a sua API de envios e será usado para disparar os PDFs de Orçamentos e Pedidos diretamente pelo backend.</p>
+
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 pb-4">
+                                    <div>
+                                        <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg"><Smartphone className="text-green-500" /> Motor WhatsApp ERP</h3>
+                                        <p className="text-sm text-slate-500 font-medium">Conecte o seu celular para disparar orçamentos e comprovantes automaticamente.</p>
+                                    </div>
+                                    <div className={`px-4 py-2 rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-inner border ${statusWhatsapp === 'CONECTADO' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-200 text-slate-600 border-slate-300'}`}>
+                                        {statusWhatsapp === 'CONECTADO' ? <CheckCircle size={14}/> : <Info size={14}/>}
+                                        Status: {statusWhatsapp}
+                                    </div>
                                 </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    {/* COLUNA 1: A MÁGICA (Para o Cliente Leigo) */}
+                                    <div className="flex flex-col items-center justify-center bg-white p-8 rounded-2xl border-2 border-dashed border-slate-300 relative min-h-[300px]">
+                                        {qrCodeBase64 ? (
+                                            <div className="flex flex-col items-center animate-fade-in">
+                                                <div className="p-2 bg-white rounded-2xl shadow-xl mb-4 border border-slate-100">
+                                                    <img src={qrCodeBase64} alt="QR Code WhatsApp" className="w-48 h-48 object-contain" />
+                                                </div>
+                                                <h4 className="font-black text-slate-800">Abra o WhatsApp</h4>
+                                                <p className="text-xs text-slate-500 text-center mt-1">Aparelhos conectados {'>'} Conectar aparelho<br/>e aponte a câmera.</p>
+                                                <button onClick={() => setQrCodeBase64(null)} className="mt-4 text-xs font-bold text-red-500 hover:underline">CANCELAR</button>
+                                            </div>
+                                        ) : statusWhatsapp === 'CONECTADO' ? (
+                                            <div className="flex flex-col items-center animate-fade-in text-center">
+                                                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4 shadow-inner"><CheckCircle size={40} /></div>
+                                                <h4 className="font-black text-green-700 text-xl">Celular Conectado!</h4>
+                                                <p className="text-sm text-green-800 font-medium mt-1">Seu sistema já está disparando PDFs.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center text-center">
+                                                <QrCode size={64} className="text-slate-300 mb-4" />
+                                                <h4 className="font-black text-slate-700 mb-1">Aparelho Desconectado</h4>
+                                                <p className="text-xs text-slate-500 mb-6">Para iniciar os disparos de PDF, vincule o seu número comercial ao sistema.</p>
+                                                <button onClick={solicitarQrCode} disabled={gerandoQr} className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl font-black shadow-lg shadow-green-500/30 flex items-center gap-2 transition-all">
+                                                    {gerandoQr ? <Loader2 className="animate-spin" size={18}/> : <Smartphone size={18}/>}
+                                                    {gerandoQr ? 'AGUARDE...' : 'CONECTAR CELULAR (GERAR QR)'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* COLUNA 2: CONFIGURAÇÃO TÉCNICA (Para Você ou API Externa) */}
+                                    <div className="flex flex-col justify-center">
+                                        <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-6">
+                                            <h4 className="font-bold text-orange-800 flex items-center gap-2 text-sm"><Sliders size={16}/> Configuração Técnica (Avançado)</h4>
+                                            <p className="text-xs text-orange-700 mt-1">Deixe vazio para usar o servidor local nativo, ou insira os dados do seu provedor terceirizado (Ex: Z-API, ChatPro).</p>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase">URL da API (Endpoint Base)</label>
+                                                <input type="text" name="whatsappApiUrl" value={config.whatsappApiUrl || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-mono text-sm focus:border-blue-500 outline-none" placeholder="Ex: http://localhost:8081" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase">Token de Autenticação (Global)</label>
+                                                <input type="password" name="whatsappToken" value={config.whatsappToken || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-mono text-sm focus:border-blue-500 outline-none" placeholder="Cole o token fornecido..." />
+                                            </div>
+                                            <button onClick={salvarConfiguracoes} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl mt-2 transition-colors">
+                                                SALVAR DADOS TÉCNICOS
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                     )}
@@ -426,12 +528,10 @@ export const Configuracoes = () => {
                                 <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl flex flex-col justify-center">
                                     <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-4"><Database size={18} className="text-slate-400"/> Manutenção de Dados</h3>
                                     <div className="flex gap-2">
-                                        {/* 🚀 BOTÃO DE BACKUP ATIVADO AQUI */}
                                         <button onClick={fazerBackup} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm" title="Baixar cópia do Banco de Dados">
                                             <Download size={18} /> FAZER BACKUP AGORA
                                         </button>
 
-                                        {/* 🚀 BOTÃO DE LIXEIRA (LOGS) ATIVADO AQUI */}
                                         <button onClick={limparLogsCache} className="bg-red-100 hover:bg-red-200 text-red-600 font-bold px-4 py-3 rounded-xl flex items-center justify-center transition-colors" title="Limpar cache e arquivos temporários">
                                             <Trash2 size={18} />
                                         </button>
@@ -491,7 +591,6 @@ export const Configuracoes = () => {
                                 <p className="text-sm text-red-900 font-medium mb-6 relative z-10">
                                     Ações nesta área são irreversíveis. Utilize apenas em ambiente de teste ou antes de colocar o sistema em produção oficial para os clientes.
                                 </p>
-                                {/* 🚀 BOTÃO DE RESETAR BANCO ATIVADO AQUI */}
                                 <button
                                     onClick={limparBancoDeDados}
                                     className="bg-red-600 hover:bg-red-700 text-white font-black px-6 py-4 rounded-xl flex items-center gap-3 transition-colors shadow-lg relative z-10"
