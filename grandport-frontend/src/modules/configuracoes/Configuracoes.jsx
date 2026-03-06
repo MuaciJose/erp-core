@@ -164,40 +164,40 @@ export const Configuracoes = () => {
     };
 
     // =========================================================================
-    // 🚀 MÁGICA: GERAR QR CODE NA TELA (VERSÃO INTELIGENTE)
+    // 🚀 MÁGICA: GERAR QR CODE COM AUTO-RETRY (CORRIGIDO)
     // =========================================================================
-    const solicitarQrCode = async () => {
-        if(!config.whatsappToken) return toast.error("Salve o Token da API nas configurações antes de conectar!");
-
+    const solicitarQrCode = async (tentativa) => {
+        const numTentativa = typeof tentativa === 'number' ? tentativa : 1;
         setGerandoQr(true);
-        const loadId = toast.loading('Solicitando QR Code ao servidor...');
+        const loadId = toast.loading(`Obtendo QR Code (Tentativa ${numTentativa})...`);
 
         try {
+            // O Java deve retornar exatamente o JSON que você me mandou
             const res = await api.get('/api/whatsapp/qrcode');
-            console.log("RESPOSTA DA API WHATSAPP:", res.data); // Mostra o JSON no F12 para debug
 
-            // 1. Se já estiver conectado
-            if (res.data?.instance?.state === 'open' || res.data?.state === 'open') {
+            // 🚀 MÁGICA: Aqui a gente captura o base64 do objeto 'qrcode'
+            const qrCodeBase64 = res.data?.qrcode?.base64 || res.data?.base64;
+
+            if (res.data?.instance?.status === 'open' || res.data?.status === 'open') {
                 setStatusWhatsapp('CONECTADO');
                 setQrCodeBase64(null);
-                toast.success('Seu WhatsApp já está conectado!', { id: loadId });
+                toast.success('WhatsApp Conectado!', { id: loadId });
             }
-            // 2. Se a API devolveu a imagem Base64 do QR Code
-            else if (res.data?.base64 || res.data?.qrcode?.base64) {
+            else if (qrCodeBase64) {
                 setStatusWhatsapp('AGUARDANDO_LEITURA');
-                setQrCodeBase64(res.data.base64 || res.data.qrcode.base64);
+                setQrCodeBase64(qrCodeBase64); // Salva no estado para exibir na tela
                 toast.success('Aponte a câmera do celular!', { id: loadId });
             }
-            // 3. Se a API avisou que ainda está "esquentando o motor"
-            else if (res.data?.state === 'connecting' || res.data?.instance?.state === 'connecting' || res.data?.status === 'connecting' || res.data?.instance?.status === 'connecting') {
-                toast.error('O motor está iniciando... Clique novamente em 3 segundos.', { id: loadId });
-            }
-            // 4. Se a API devolveu algo totalmente diferente
             else {
-                toast.error('Gerando código... Tente novamente.', { id: loadId });
+                // Se ainda for count: 0, tenta de novo
+                if (numTentativa < 8) {
+                    setTimeout(() => solicitarQrCode(numTentativa + 1), 3000);
+                } else {
+                    toast.error('O motor demorou para gerar o código.', { id: loadId });
+                }
             }
         } catch (error) {
-            toast.error('Falha de comunicação. Verifique se o servidor/Docker está rodando.', { id: loadId });
+            toast.error('Erro ao buscar QR Code no servidor.', { id: loadId });
         } finally {
             setGerandoQr(false);
         }
