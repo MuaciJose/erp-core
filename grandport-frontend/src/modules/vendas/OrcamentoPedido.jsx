@@ -31,7 +31,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     const [modalListaAberto, setModalListaAberto] = useState(false);
     const [orcamentosSalvos, setOrcamentosSalvos] = useState([]);
 
-    // Estados da Venda Perdida
     const [modalVendaPerdidaAberto, setModalVendaPerdidaAberto] = useState(false);
     const [motivoVendaPerdida, setMotivoVendaPerdida] = useState('');
     const [observacaoVendaPerdida, setObservacaoVendaPerdida] = useState('');
@@ -42,23 +41,63 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         setVeiculoSelecionado('');
     };
 
+    // =================================================================================
+    // 🧠 MOTOR CENTRAL DE ESTOQUE (Matemática Perfeita de Reserva)
+    // =================================================================================
+    const extrairItensBackend = (itensBack, statusDoc) => {
+        const isBaixadoNoBanco = statusDoc === 'PEDIDO' || statusDoc === 'AGUARDANDO_PAGAMENTO';
+
+        return (itensBack || []).map(i => {
+            const estoqueFisico = i.produto?.quantidadeEstoque ?? i.estoqueDisponivel ?? 0;
+            const qtd = i.quantidade || i.qtd || 1;
+
+            return {
+                id: i.produto?.id || i.produtoId || i.id,
+                produtoId: i.produto?.id || i.produtoId || i.id,
+                codigo: i.produto?.sku || i.codigo || '---',
+                nome: i.produto?.nome || i.nome,
+                qtd: qtd,
+                preco: i.precoUnitario || i.preco || 0,
+
+                // O SEGREDO ESTÁ AQUI: Guarda o físico separado do que já reservamos!
+                estoqueFisicoReal: estoqueFisico,
+                qtdBaixada: isBaixadoNoBanco ? qtd : 0 // Se for pedido, essa peça já é "nossa"
+            };
+        });
+    };
+
+    // 🔄 Sincroniza ativamente com o banco se o dono ajustou o estoque em outra tela
+    const sincronizarEstoqueSilencioso = async (listaItensAtual) => {
+        if(listaItensAtual.length === 0) return;
+        try {
+            const res = await api.get('/api/produtos');
+            const todosProdutos = res.data;
+            setItens(itensAntigos => itensAntigos.map(item => {
+                const prod = todosProdutos.find(p => p.id === item.produtoId);
+                return prod ? { ...item, estoqueFisicoReal: prod.quantidadeEstoque } : item;
+            }));
+        } catch(e) { console.error(e); }
+    };
+
+    const forcarSincronizacaoEstoque = async () => {
+        if(itens.length === 0) return toast.success("A tela já está atualizada.");
+        const loadId = toast.loading("Buscando dados fresquinhos do estoque...");
+        await sincronizarEstoqueSilencioso(itens);
+        toast.success("Estoque sincronizado com sucesso!", { id: loadId });
+    };
+
+    // =================================================================================
+    // CARREGAMENTOS E EFEITOS
+    // =================================================================================
     useEffect(() => {
         if (orcamentoParaEditar) {
             setOrcamentoId(orcamentoParaEditar.id);
             setModo(orcamentoParaEditar.status || 'ORCAMENTO');
-
-            const itensMapeados = (orcamentoParaEditar.itens || []).map(i => ({
-                id: i.produto?.id || i.id,
-                produtoId: i.produto?.id || i.id,
-                codigo: i.produto?.sku || i.codigo || '---',
-                nome: i.produto?.nome || i.nome,
-                qtd: i.quantidade || i.qtd || 1,
-                preco: i.precoUnitario || i.preco || 0,
-                estoqueDisponivel: i.produto?.quantidadeEstoque ?? 0
-            }));
-
-            setItens(itensMapeados);
             setDescontoInput(orcamentoParaEditar.desconto?.toString() || '');
+
+            const itensMapeados = extrairItensBackend(orcamentoParaEditar.itens, orcamentoParaEditar.status);
+            setItens(itensMapeados);
+            sincronizarEstoqueSilencioso(itensMapeados); // Puxa o número real caso tenha sido alterado manualmente
 
             const restaurarDadosCliente = async () => {
                 const termoBusca = orcamentoParaEditar.cliente?.nome || orcamentoParaEditar.cliente;
@@ -81,21 +120,19 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     }, [orcamentoParaEditar]);
 
     useEffect(() => {
-        api.get('/api/configuracoes')
-            .then(res => {
-                if (res.data) {
-                    const data = Array.isArray(res.data) ? res.data[0] : res.data;
-                    setEmpresaConfig({
-                        nomeFantasia: data?.nomeFantasia || 'GRANDPORT ERP',
-                        razaoSocial: data?.razaoSocial || '',
-                        enderecoString: data?.endereco || '',
-                        cnpj: data?.cnpj || '',
-                        telefone: data?.telefone || '',
-                        mensagemRodape: data?.mensagemRodape || 'Orçamento válido por 5 dias.'
-                    });
-                }
-            })
-            .catch(err => console.error("Erro ao buscar configs", err));
+        api.get('/api/configuracoes').then(res => {
+            if (res.data) {
+                const data = Array.isArray(res.data) ? res.data[0] : res.data;
+                setEmpresaConfig({
+                    nomeFantasia: data?.nomeFantasia || 'GRANDPORT ERP',
+                    razaoSocial: data?.razaoSocial || '',
+                    enderecoString: data?.endereco || '',
+                    cnpj: data?.cnpj || '',
+                    telefone: data?.telefone || '',
+                    mensagemRodape: data?.mensagemRodape || 'Orçamento válido por 5 dias.'
+                });
+            }
+        });
     }, []);
 
     useEffect(() => {
@@ -140,7 +177,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         } else {
             setItens([...itens, {
                 produtoId: peca.id, id: peca.id, codigo: peca.sku, nome: peca.nome,
-                qtd: 1, preco: peca.precoVenda || 0, estoqueDisponivel: peca.quantidadeEstoque || 0
+                qtd: 1, preco: peca.precoVenda || 0,
+                estoqueFisicoReal: peca.quantidadeEstoque || 0,
+                qtdBaixada: 0 // Como acabou de ser adicionado, ainda não roubou do banco
             }]);
         }
         toast.success("Item adicionado");
@@ -151,22 +190,11 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     let valorDescontoReal = descontoTipo === 'VALOR' ? (parseFloat(descontoInput) || 0) : subtotal * ((parseFloat(descontoInput) || 0) / 100);
     const totalFinal = Math.max(0, subtotal - valorDescontoReal);
 
-    // =================================================================================
-    // 🚀 ENVIO DIRETO VIA API DE WHATSAPP DO BACKEND (COM PDF)
-    // =================================================================================
     const acionarWhatsApp = async () => {
-        if (!orcamentoId) {
-            toast.error("Salve o rascunho ou pedido antes de enviar pelo WhatsApp!");
-            return;
-        }
-
-        if (!clienteSelecionado || !clienteSelecionado.telefone) {
-            toast.error("O cliente selecionado não possui um número de telefone cadastrado.");
-            return;
-        }
+        if (!orcamentoId) return toast.error("Salve o rascunho ou pedido antes de enviar pelo WhatsApp!");
+        if (!clienteSelecionado || !clienteSelecionado.telefone) return toast.error("O cliente selecionado não possui um número de telefone cadastrado.");
 
         const loadId = toast.loading("Gerando PDF e enviando via WhatsApp API...");
-
         try {
             await api.post(`/api/vendas/${orcamentoId}/enviar-whatsapp`);
             toast.success("PDF enviado com sucesso para o cliente!", { id: loadId });
@@ -176,9 +204,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         }
     };
 
-    // =================================================================================
-    // PROCESSAMENTO DE API
-    // =================================================================================
     const processarVendaAPI = async (statusDesejado) => {
         if (itens.length === 0) return toast.error("O documento não possui itens.");
 
@@ -195,14 +220,19 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         };
 
         try {
+            let res;
             if (orcamentoId) {
-                await api.put(`/api/vendas/orcamento/${orcamentoId}`, payload);
+                res = await api.put(`/api/vendas/orcamento/${orcamentoId}`, payload);
             } else {
-                const res = await api.post(statusFinal === 'PEDIDO' ? '/api/vendas/pedido' : '/api/vendas/orcamento', payload);
+                res = await api.post(statusFinal === 'PEDIDO' ? '/api/vendas/pedido' : '/api/vendas/orcamento', payload);
                 setOrcamentoId(res.data.id);
             }
 
             toast.success(statusFinal === 'PEDIDO' ? "Pedido salvo!" : "Operação concluída!", { id: loadId });
+
+            if (res.data && res.data.itens) {
+                setItens(extrairItensBackend(res.data.itens, res.data.status));
+            }
 
             if (statusFinal === 'AGUARDANDO_PAGAMENTO') {
                 limparEcra();
@@ -220,9 +250,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         }
     };
 
-    // =================================================================================
-    // 🚀 REGISTRAR VENDA PERDIDA
-    // =================================================================================
     const registrarVendaPerdida = async () => {
         if (itens.length === 0 && !buscaPeca) return toast.error("Adicione itens ou busque uma peça para registrar a perda.");
         if (!motivoVendaPerdida) return toast.error("Selecione o motivo da perda.");
@@ -242,12 +269,10 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         try {
             await api.post('/api/vendas-perdidas', payload);
             toast.success("Venda perdida registrada para análise!", { id: loadId });
-
             setModalVendaPerdidaAberto(false);
             setMotivoVendaPerdida('');
             setObservacaoVendaPerdida('');
             limparEcra();
-
         } catch (e) {
             toast.error("Erro ao registrar venda perdida.", { id: loadId });
         }
@@ -263,9 +288,12 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         if (orcamento.clienteObj) selecionarCliente(orcamento.clienteObj);
         else limparCliente();
 
-        setItens(orcamento.itens || []);
+        const itensFormatados = extrairItensBackend(orcamento.itensRaw, orcamento.status);
+        setItens(itensFormatados);
         setModalListaAberto(false);
+
         toast.success(`Documento #${orcamento.id} reaberto.`);
+        sincronizarEstoqueSilencioso(itensFormatados); // Força atualização de estoque logo ao carregar
     };
 
     useEffect(() => {
@@ -275,7 +303,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                     const formatados = res.data.map(orc => ({
                         id: orc.id, data: orc.dataHora, cliente: orc.cliente ? orc.cliente.nome : 'Cliente Avulso', clienteObj: orc.cliente,
                         veiculo: orc.veiculo ? orc.veiculo.modelo : 'Nenhum', veiculoId: orc.veiculo?.id, valor: orc.valorTotal || 0, status: orc.status,
-                        itens: (orc.itens || []).map(i => ({ produtoId: i.produto?.id, id: i.produto?.id, codigo: i.produto?.sku, nome: i.produto?.nome, qtd: i.quantidade || 0, preco: i.precoUnitario || 0, estoqueDisponivel: i.produto?.quantidadeEstoque ?? 0 }))
+                        itensRaw: orc.itens || [] // Repassa os itens puros para o motor recalcular
                     }));
                     setOrcamentosSalvos(formatados);
                 })
@@ -300,8 +328,14 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                             <button onClick={() => setModalVendaPerdidaAberto(true)} className="bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-xl font-black flex items-center gap-2 border border-red-200 transition-colors shadow-sm" title="Registrar que o cliente desistiu da compra">
                                 <XCircle size={16} /> VENDA PERDIDA
                             </button>
-                            <button onClick={limparEcra} className="bg-slate-100 text-slate-600 hover:bg-slate-200 px-4 py-2 rounded-xl font-black border border-slate-200 transition-colors" title="Apagar tela"><Trash2 size={16} /> LIMPAR</button>
-                            <button onClick={() => setModalListaAberto(true)} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-black shadow-lg"><FolderOpen size={16} /> GUARDADOS</button>
+
+                            {/* 🚀 BOTÃO DE FORÇAR ATUALIZAÇÃO DO ESTOQUE ADICIONADO AQUI! */}
+                            <button onClick={forcarSincronizacaoEstoque} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-xl font-black border border-blue-200 transition-colors flex items-center gap-2" title="Puxar estoque mais recente do servidor">
+                                <RefreshCw size={16} /> ATUALIZAR ESTOQUE
+                            </button>
+
+                            <button onClick={limparEcra} className="bg-slate-100 text-slate-600 hover:bg-slate-200 px-4 py-2 rounded-xl font-black border border-slate-200 transition-colors" title="Apagar tela"><Trash2 size={16} /> LIMPAR CAMPOS</button>
+                            <button onClick={() => setModalListaAberto(true)} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-black shadow-lg"><FolderOpen size={16} /> ABRIR SALVOS</button>
                         </div>
                     </div>
 
@@ -362,8 +396,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                             {itens.map((item) => {
-                                const disponivel = item.estoqueDisponivel ?? 0;
-                                const faltaEstoque = item.qtd > disponivel;
+                                // A MÁGICA: O que eu tenho físico HOJE + o que eu já reservei desse documento.
+                                const disponivelFinal = (item.estoqueFisicoReal || 0) + (item.qtdBaixada || 0);
+                                const faltaEstoque = item.qtd > disponivelFinal;
 
                                 return (
                                     <tr key={item.id} className={`hover:bg-slate-50 border-b ${faltaEstoque ? 'bg-red-50/50' : ''}`}>
@@ -371,8 +406,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                                         <td className="p-4 font-bold text-slate-800 text-sm">
                                             <div>
                                                 <p>{item.nome}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Disponível: {disponivel}</p>
-                                                {faltaEstoque && <span className="text-[10px] font-black text-red-600 flex items-center gap-1 uppercase tracking-tighter mt-1"><AlertTriangle size={10}/> Faltam {item.qtd - disponivel}</span>}
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Disponível: {disponivelFinal}</p>
+                                                {faltaEstoque && <span className="text-[10px] font-black text-red-600 flex items-center gap-1 uppercase tracking-tighter mt-1"><AlertTriangle size={10}/> Faltam {item.qtd - disponivelFinal}</span>}
                                             </div>
                                         </td>
                                         <td className="p-4 text-center">
@@ -419,9 +454,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                 </div>
             </div>
 
-            {/* ========================================================================================= */}
-            {/* 🚀 MODAL DE VENDA PERDIDA */}
-            {/* ========================================================================================= */}
+            {/* MODAL DE VENDA PERDIDA */}
             {modalVendaPerdidaAberto && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 print:hidden">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
@@ -473,9 +506,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                 </div>
             )}
 
-            {/* ========================================================================================= */}
-            {/* 🎯 ÁREA DE IMPRESSÃO A4 (INVISÍVEL) */}
-            {/* ========================================================================================= */}
+            {/* ÁREA DE IMPRESSÃO A4 (INVISÍVEL) */}
             <div className="hidden print:block fixed inset-0 w-full h-full bg-white z-[99999] p-0 text-black">
                 <div className="w-full max-w-[210mm] mx-auto p-6 font-sans text-slate-900">
 
