@@ -88,11 +88,16 @@ public class VendaService {
             throw new RuntimeException("O carrinho de compras está vazio.");
         }
 
+        // 🚀 PUXA A REGRA DE NEGÓCIO GLOBAL
+        ConfiguracaoSistema config = configService.obterConfiguracao();
+        boolean permitirGlobal = config.getPermitirEstoqueNegativoGlobal() != null && config.getPermitirEstoqueNegativoGlobal();
+
         for (ItemVendaDTO itemDTO : dto.itens()) {
             Produto produto = produtoRepository.findById(itemDTO.produtoId())
                     .orElseThrow(() -> new RuntimeException("Produto não encontrado no estoque"));
 
-            if (Boolean.TRUE.equals(produto.getPermitirEstoqueNegativo())) {
+            // Ignora o bloqueio se a regra global estiver ativa OU se o produto específico permitir
+            if (permitirGlobal || Boolean.TRUE.equals(produto.getPermitirEstoqueNegativo())) {
                 continue;
             }
 
@@ -105,7 +110,6 @@ public class VendaService {
             }
         }
     }
-
     // =========================================================================
     // CRIAÇÃO E EDIÇÃO DE DOCUMENTOS
     // =========================================================================

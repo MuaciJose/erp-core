@@ -22,11 +22,22 @@ public class ConfiguracaoSistema {
     private String telefone = "";
     private String email = "";
 
+    // Endereço Antigo (Texto livre)
     @Column(columnDefinition = "TEXT")
     private String endereco = "";
 
+    // Endereço Novo (Estruturado)
+    private String logradouro;
+    private String numero;
+    private String bairro;
+    private String cidade;
+    private String uf;
+
     // ================= VISUAL =================
     private String logoUrl = "";
+
+    @Column(columnDefinition = "TEXT")
+    private String logoBase64;
 
     // ================= IMPRESSÃO E CUPOM =================
     private String tamanhoImpressora = "80mm";
@@ -42,9 +53,6 @@ public class ConfiguracaoSistema {
     private Boolean permitirEstoqueNegativoGlobal = false;
     private Integer diasValidadeOrcamento = 5;
 
-    @Column(columnDefinition = "TEXT")
-    private String logoBase64;
-
     // ================= MANUTENÇÃO E SISTEMA =================
     private String horarioBackupAuto = "03:00";
 
@@ -56,19 +64,14 @@ public class ConfiguracaoSistema {
     )
     private List<VendedorComissao> vendedores = new ArrayList<>();
 
-    // ================= INTEGRAÇÕES E APIS (NOVO) =================
+    // ================= INTEGRAÇÕES E APIS =================
     @Column(length = 1000) // Tamanho maior pois tokens de API costumam ser longos
     private String whatsappToken = "";
 
+    // ================= FISCAL / CERTIFICADO =================
     @Column(length = 2)
     private String tipoCertificado = "A1";
 
     private String senhaCertificado = "";
 
-    // Dentro da classe ConfiguracaoSistema:
-    private String logradouro;
-    private String numero;
-    private String bairro;
-    private String cidade;
-    private String uf;
 }
