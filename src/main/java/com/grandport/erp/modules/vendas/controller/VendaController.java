@@ -14,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/vendas")
@@ -82,5 +83,10 @@ public class VendaController {
     public ResponseEntity<Void> excluir(@PathVariable Long id) {
         service.excluirVenda(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/whatsapp/status")
+    public ResponseEntity<Map<String, Object>> checarStatusWhatsApp() {
+        return ResponseEntity.ok(whatsAppService.consultarStatusInstancia());
     }
 }

@@ -191,16 +191,40 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     const totalFinal = Math.max(0, subtotal - valorDescontoReal);
 
     const acionarWhatsApp = async () => {
-        if (!orcamentoId) return toast.error("Salve o rascunho ou pedido antes de enviar pelo WhatsApp!");
-        if (!clienteSelecionado || !clienteSelecionado.telefone) return toast.error("O cliente selecionado não possui um número de telefone cadastrado.");
+        // 1. Validações Iniciais (Mantidas e Reforçadas)
+        if (!orcamentoId) {
+            return toast.error("Salve o rascunho ou pedido antes de enviar pelo WhatsApp!");
+        }
 
-        const loadId = toast.loading("Gerando PDF e enviando via WhatsApp API...");
+        if (!clienteSelecionado?.telefone) {
+            return toast.error("O cliente não possui um número de telefone cadastrado.");
+        }
+
+        const loadId = toast.loading("Gerando PDF e disparando via WhatsApp...");
+
         try {
-            await api.post(`/api/vendas/${orcamentoId}/enviar-whatsapp`);
-            toast.success("PDF enviado com sucesso para o cliente!", { id: loadId });
+            // 2. Chamada ao seu Backend Java
+            const response = await api.post(`/api/vendas/${orcamentoId}/enviar-whatsapp`);
+
+            // 3. Sucesso (O Java retorna o JSON que definimos no Controller)
+            toast.success(response.data.message || "Documento enviado com sucesso!", { id: loadId });
+
         } catch (e) {
-            const msgErro = e.response?.data?.message || e.response?.data || "Verifique se a API do WhatsApp está conectada.";
-            toast.error("Falha no envio: " + msgErro, { id: loadId });
+            // 🚀 O SEGREDO ESTÁ AQUI: Captura a mensagem real que o Java ou a Evolution API enviou
+            console.error("Erro completo no envio:", e); // Para você ver no F12 o que houve
+
+            let mensagemTraduzida = "Verifique se o celular está conectado.";
+
+            if (e.response?.data) {
+                // Se o Java enviou {"message": "Erro X"}, pegamos o "Erro X"
+                // Se enviou apenas uma string, pegamos a string
+                mensagemTraduzida = e.response.data.message || e.response.data;
+            }
+
+            toast.error(`Falha no envio: ${mensagemTraduzida}`, {
+                id: loadId,
+                duration: 5000 // Deixa o erro um pouco mais de tempo na tela
+            });
         }
     };
 

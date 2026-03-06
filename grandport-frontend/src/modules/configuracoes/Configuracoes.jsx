@@ -3,8 +3,8 @@ import api from '../../api/axios';
 import {
     Settings, Building2, Printer, Sliders, Save, CheckCircle,
     AlertTriangle, Info, X, Store, Percent, Search, Loader2, Camera, Plus,
-    Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode
-} from 'lucide-react';
+    Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode, RefreshCw
+} from 'lucide-react'; // 🚀 Adicionado RefreshCw
 import toast from 'react-hot-toast';
 
 export const Configuracoes = () => {
@@ -17,6 +17,7 @@ export const Configuracoes = () => {
     const [qrCodeBase64, setQrCodeBase64] = useState(null);
     const [statusWhatsapp, setStatusWhatsapp] = useState('DESCONHECIDO');
     const [gerandoQr, setGerandoQr] = useState(false);
+    const [checandoConexao, setChecandoConexao] = useState(false); // 🚀 Novo Estado
 
     const [config, setConfig] = useState({
         nomeFantasia: '',
@@ -172,10 +173,7 @@ export const Configuracoes = () => {
         const loadId = toast.loading(`Obtendo QR Code (Tentativa ${numTentativa})...`);
 
         try {
-            // O Java deve retornar exatamente o JSON que você me mandou
             const res = await api.get('/api/whatsapp/qrcode');
-
-            // 🚀 MÁGICA: Aqui a gente captura o base64 do objeto 'qrcode'
             const qrCodeBase64 = res.data?.qrcode?.base64 || res.data?.base64;
 
             if (res.data?.instance?.status === 'open' || res.data?.status === 'open') {
@@ -185,11 +183,10 @@ export const Configuracoes = () => {
             }
             else if (qrCodeBase64) {
                 setStatusWhatsapp('AGUARDANDO_LEITURA');
-                setQrCodeBase64(qrCodeBase64); // Salva no estado para exibir na tela
+                setQrCodeBase64(qrCodeBase64);
                 toast.success('Aponte a câmera do celular!', { id: loadId });
             }
             else {
-                // Se ainda for count: 0, tenta de novo
                 if (numTentativa < 8) {
                     setTimeout(() => solicitarQrCode(numTentativa + 1), 3000);
                 } else {
@@ -204,32 +201,53 @@ export const Configuracoes = () => {
     };
 
     // =========================================================================
-    // 🚀 NOVAS FUNÇÕES DA ABA DE SISTEMA
+    // 🚀 NOVO: TESTAR CONEXÃO ATIVA (INTEGRADO)
+    // =========================================================================
+    const verificarConexaoAtiva = async () => {
+        setChecandoConexao(true);
+        const loadId = toast.loading('Validando conexão com o WhatsApp...');
+        try {
+            const res = await api.get('/api/vendas/whatsapp/status');
+            const estado = res.data?.instance?.state || res.data?.state;
+
+            if (estado === 'open') {
+                setStatusWhatsapp('CONECTADO');
+                toast.success("WhatsApp está ONLINE!", { id: loadId });
+            } else {
+                setStatusWhatsapp('DESCONECTADO');
+                toast.error("WhatsApp está desconectado.", { id: loadId });
+            }
+        } catch (error) {
+            setStatusWhatsapp('ERRO');
+            toast.error("Falha ao consultar motor do WhatsApp.", { id: loadId });
+        } finally {
+            setChecandoConexao(false);
+        }
+    };
+
+    // =========================================================================
+    // 🚀 NOVAS FUNÇÕES DA ABA DE SISTEMA (MANTIDAS)
     // =========================================================================
     const fazerBackup = async () => {
-        const loadId = toast.loading('Gerando backup do banco de dados... Isto pode demorar alguns segundos.');
+        const loadId = toast.loading('Gerando backup do banco de dados...');
         try {
             const response = await api.get('/api/configuracoes/backup', { responseType: 'blob' });
-
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-
             const dataHoje = new Date().toISOString().split('T')[0];
             link.setAttribute('download', `backup_grandport_${dataHoje}.sql`);
-
             document.body.appendChild(link);
             link.click();
             link.parentNode.removeChild(link);
-
             toast.success('Backup descarregado com sucesso!', { id: loadId });
         } catch (error) {
-            toast.error('Erro ao gerar o backup. Verifique o servidor.', { id: loadId });
+            toast.error('Erro ao gerar o backup.', { id: loadId });
         }
     };
 
     const limparLogsCache = async () => {
-        const loadId = toast.loading('Limpando cache e arquivos temporários...');
+        const loadId = toast.loading('Limpando cache...');
         try {
             await api.post('/api/configuracoes/limpar-logs');
             toast.success('Limpeza de sistema concluída!', { id: loadId });
@@ -239,18 +257,15 @@ export const Configuracoes = () => {
     };
 
     const limparBancoDeDados = async () => {
-        const confirmacao = window.confirm(
-            "⚠️ ATENÇÃO EXTREMA ⚠️\n\nIsso irá APAGAR TODOS os Produtos, Clientes, Vendas e Orçamentos do banco de dados.\nEssa ação é irreversível.\n\nTem certeza absoluta que deseja resetar o sistema?"
-        );
-
+        const confirmacao = window.confirm("⚠️ ATENÇÃO EXTREMA ⚠️\n\nIsso irá APAGAR TUDO.\nTem certeza absoluta?");
         if (confirmacao) {
-            const loadId = toast.loading('Resetando banco de dados. Por favor, aguarde...');
+            const loadId = toast.loading('Resetando banco de dados...');
             try {
                 await api.delete('/api/configuracoes/resetar-banco');
-                toast.success('O banco de dados foi limpo com sucesso!', { id: loadId });
+                toast.success('O banco de dados foi limpo!', { id: loadId });
                 setTimeout(() => window.location.reload(), 2000);
             } catch (error) {
-                toast.error('Erro ao limpar o banco de dados. Verifique a conexão com o servidor.', { id: loadId });
+                toast.error('Erro ao limpar o banco de dados.', { id: loadId });
             }
         }
     };
@@ -420,7 +435,7 @@ export const Configuracoes = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase">Desconto Máximo Permitido (%)</label>
-                                    <input type="number" step="0.1" name="descontoMaximoPermitido" value={config.descontoMaximoPermitido || 0} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-blue-700 focus:border-blue-500 outline-none" />
+                                    <input type="number" step="0.1" name="descontoMaximoPermitido" value={config.descontoMaximoPermitido || 0} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-black text-blue-700 focus:border-blue-500 outline-none" />
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase">Validade do Orçamento (Dias)</label>
@@ -445,6 +460,20 @@ export const Configuracoes = () => {
                         <div className="space-y-6 animate-fade-in">
                             <div className="flex justify-between items-center mb-6 border-b pb-4">
                                 <h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><Plug className="text-blue-500" /> Integrações e APIs</h2>
+
+                                {/* 🚀 BOTÃO DE TESTE DE CONEXÃO (NOVO) */}
+                                <button
+                                    onClick={verificarConexaoAtiva}
+                                    disabled={checandoConexao}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all border-2 ${
+                                        statusWhatsapp === 'CONECTADO'
+                                            ? 'bg-green-50 border-green-200 text-green-700'
+                                            : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    {checandoConexao ? <RefreshCw className="animate-spin" size={14}/> : <div className={`w-2 h-2 rounded-full ${statusWhatsapp === 'CONECTADO' ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`} />}
+                                    {checandoConexao ? 'VALIDANDO...' : 'TESTAR CONEXÃO'}
+                                </button>
                             </div>
 
                             <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl shadow-sm">

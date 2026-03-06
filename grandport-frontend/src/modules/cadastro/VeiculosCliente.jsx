@@ -12,7 +12,7 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
 
     const [modalNovo, setModalNovo] = useState(false);
     const [novoCarro, setNovoCarro] = useState({ placa: '', marca: '', modelo: '', ano: '', km: '' });
-    
+
     const [carroParaHistorico, setCarroParaHistorico] = useState(null);
 
     // ESTADOS PARA O CONFLITO DE PLACA
@@ -21,6 +21,12 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
     const [loadingTransferencia, setLoadingTransferencia] = useState(false);
 
     const carregarVeiculos = async () => {
+        // 🚀 Proteção: Não busca se o ID for undefined ou nulo
+        if (!clienteAtual?.id || clienteAtual.id === 'undefined') {
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         try {
             const res = await api.get(`/api/veiculos/cliente/${clienteAtual.id}`);
@@ -32,7 +38,12 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
         }
     };
 
-    useEffect(() => { carregarVeiculos(); }, [clienteAtual.id]);
+    // 🚀 Atualizado: O useEffect agora só dispara se o ID for válido
+    useEffect(() => {
+        if (clienteAtual?.id) {
+            carregarVeiculos();
+        }
+    }, [clienteAtual?.id]);
 
     const abrirTransferencia = (carro) => {
         setCarroSelecionado(carro);
@@ -53,6 +64,9 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
     };
 
     const salvarNovoCarro = async () => {
+        // 🚀 Proteção: Garante que temos um cliente antes de salvar
+        if (!clienteAtual?.id) return alert("Erro: Cliente não identificado.");
+
         try {
             await api.post(`/api/veiculos/cliente/${clienteAtual.id}`, novoCarro);
             alert('Veículo cadastrado com sucesso!');
@@ -61,7 +75,6 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
             carregarVeiculos();
         } catch (error) {
             if (error.response && error.response.status === 409) {
-                // A placa já existe!
                 setModalNovo(false);
                 setVeiculoConflito(error.response.data);
             } else {
@@ -72,6 +85,8 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
 
     const confirmarTransferenciaForcada = async () => {
         if (!senhaAutorizacao) return alert("Digite sua senha para autorizar.");
+        if (!clienteAtual?.id) return alert("Erro: Cliente destino não identificado.");
+
         setLoadingTransferencia(true);
         try {
             await api.post(`/api/veiculos/transferencia-forcada`, {
@@ -91,7 +106,13 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
         }
     };
 
-    if (loading) return <div className="p-4 text-center font-bold text-gray-400">Carregando garagem...</div>;
+    // 🚀 Interface de carregamento amigável
+    if (loading) return (
+        <div className="p-10 text-center">
+            <div className="animate-spin inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mb-4"></div>
+            <p className="font-bold text-slate-400">Acessando garagem...</p>
+        </div>
+    );
 
     return (
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mt-6">
@@ -100,7 +121,7 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
                     <Car className="text-blue-600" />
                     GARAGEM DO CLIENTE
                 </h3>
-                <button 
+                <button
                     onClick={() => setModalNovo(true)}
                     className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-slate-800 transition-all"
                 >
@@ -125,7 +146,7 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
                                     <p className="text-xs text-slate-500 font-bold">Ano: {carro.ano} • {carro.km ? carro.km.toLocaleString('pt-BR') : '---'} km</p>
                                 </div>
                             </div>
-                            
+
                             <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button onClick={() => setCarroParaHistorico(carro)} className="text-blue-600 bg-blue-100 hover:bg-blue-200 p-2 rounded-lg" title="Ver Histórico de Peças"><History size={16} /></button>
                                 <button onClick={() => abrirTransferencia(carro)} className="text-orange-600 bg-orange-100 hover:bg-orange-200 p-2 rounded-lg" title="Transferir de Dono"><ArrowRightLeft size={16} /></button>
@@ -145,12 +166,12 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
                         <div className="p-8">
                             <h2 className="text-2xl font-black text-slate-800 text-center mb-2">Placa já Cadastrada!</h2>
                             <div className="bg-red-50 p-4 rounded-xl border border-red-100 text-red-800 text-sm font-medium text-center mb-6 leading-relaxed">
-                                A placa <span className="font-black bg-white px-2 py-1 rounded shadow-sm border border-red-200 mx-1 uppercase">{veiculoConflito.placa}</span> 
+                                A placa <span className="font-black bg-white px-2 py-1 rounded shadow-sm border border-red-200 mx-1 uppercase">{veiculoConflito.placa}</span>
                                 já está registrada em nome de:<br/>
                                 <span className="font-black text-lg block mt-2 text-red-900">{veiculoConflito.donoAtualNome}</span>
                             </div>
                             <p className="text-sm text-slate-500 text-center font-bold mb-6">
-                                Deseja forçar a transferência para <span className="text-blue-600">{clienteAtual.nome}</span>?
+                                Deseja forçar a transferência para <span className="text-blue-600">{clienteAtual?.nome}</span>?
                             </p>
                             <div className="mb-6">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1"><Lock size={14} className="text-slate-400" /> Senha de Autorização</label>
@@ -185,7 +206,7 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
                                     <Search className="absolute left-3 top-3 text-slate-400" size={18} />
                                     <select value={novoDonoId} onChange={(e) => setNovoDonoId(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-orange-500 outline-none font-bold text-slate-700">
                                         <option value="">Selecione o cliente na lista...</option>
-                                        {clientesLista.filter(c => c.id !== clienteAtual.id).map(c => (
+                                        {clientesLista.filter(c => c.id !== clienteAtual?.id).map(c => (
                                             <option key={c.id} value={c.id}>{c.nome} (CPF: {c.documento})</option>
                                         ))}
                                     </select>
@@ -220,9 +241,9 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
             )}
 
             {carroParaHistorico && (
-                <HistoricoVeiculoModal 
-                    veiculo={carroParaHistorico} 
-                    onClose={() => setCarroParaHistorico(null)} 
+                <HistoricoVeiculoModal
+                    veiculo={carroParaHistorico}
+                    onClose={() => setCarroParaHistorico(null)}
                 />
             )}
         </div>
