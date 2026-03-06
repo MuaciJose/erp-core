@@ -164,7 +164,7 @@ export const Configuracoes = () => {
     };
 
     // =========================================================================
-    // 🚀 MÁGICA: GERAR QR CODE NA TELA
+    // 🚀 MÁGICA: GERAR QR CODE NA TELA (VERSÃO INTELIGENTE)
     // =========================================================================
     const solicitarQrCode = async () => {
         if(!config.whatsappToken) return toast.error("Salve o Token da API nas configurações antes de conectar!");
@@ -174,18 +174,27 @@ export const Configuracoes = () => {
 
         try {
             const res = await api.get('/api/whatsapp/qrcode');
+            console.log("RESPOSTA DA API WHATSAPP:", res.data); // Mostra o JSON no F12 para debug
 
-            // O backend devolve um objeto. Se a API estiver conectada, retorna status = "open"
+            // 1. Se já estiver conectado
             if (res.data?.instance?.state === 'open' || res.data?.state === 'open') {
                 setStatusWhatsapp('CONECTADO');
                 setQrCodeBase64(null);
                 toast.success('Seu WhatsApp já está conectado!', { id: loadId });
-            } else if (res.data?.base64) {
+            }
+            // 2. Se a API devolveu a imagem Base64 do QR Code
+            else if (res.data?.base64 || res.data?.qrcode?.base64) {
                 setStatusWhatsapp('AGUARDANDO_LEITURA');
-                setQrCodeBase64(res.data.base64); // A imagem gigante em base64
+                setQrCodeBase64(res.data.base64 || res.data.qrcode.base64);
                 toast.success('Aponte a câmera do celular!', { id: loadId });
-            } else {
-                toast.error('Retorno inesperado da API.', { id: loadId });
+            }
+            // 3. Se a API avisou que ainda está "esquentando o motor"
+            else if (res.data?.state === 'connecting' || res.data?.instance?.state === 'connecting' || res.data?.status === 'connecting' || res.data?.instance?.status === 'connecting') {
+                toast.error('O motor está iniciando... Clique novamente em 3 segundos.', { id: loadId });
+            }
+            // 4. Se a API devolveu algo totalmente diferente
+            else {
+                toast.error('Gerando código... Tente novamente.', { id: loadId });
             }
         } catch (error) {
             toast.error('Falha de comunicação. Verifique se o servidor/Docker está rodando.', { id: loadId });

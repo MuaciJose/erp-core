@@ -35,7 +35,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // Rotas Públicas
+                        // ================= ROTAS PÚBLICAS =================
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
@@ -44,10 +44,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/parceiros/consulta-cep/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/configuracoes/backup").permitAll()
 
-                        // CORREÇÃO AQUI: Voltando para um único asterisco para não quebrar o ApplicationContext
+                        // ================= ROTAS PRIVADAS (Requerem Token) =================
+                        .requestMatchers("/api/whatsapp/**").authenticated() // 🚀 Rota agrupada e liberada para usuários logados
                         .requestMatchers(HttpMethod.POST, "/api/vendas/*/whatsapp").authenticated()
 
-                        // Rotas Privadas
                         .requestMatchers("/api/**").authenticated()
                         .requestMatchers("/auth/logout").authenticated()
 
@@ -60,7 +60,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Origem do seu frontend (Vite)
+        // Origem do seu frontend (Vite) - Lembre-se de acessar sempre por localhost!
         configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
         configuration.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
