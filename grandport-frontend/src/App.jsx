@@ -31,6 +31,10 @@ import { GestaoVendas } from './modules/vendas/GestaoVendas';
 import { FilaPedidosCaixa } from './modules/vendas/FilaPedidosCaixa';
 import { RelatorioComissoes } from './modules/vendas/RelatorioComissoes';
 
+// 🚀 NOVO MÓDULO IMPORTADO
+import { ReciboAvulso } from './modules/financeiro/ReciboAvulso';
+import { HistoricoRecibos } from './modules/financeiro/HistoricoRecibos';
+
 
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
@@ -137,7 +141,7 @@ function App() {
                         <>
                             {paginaAtiva === 'dash' && <Dashboard setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'pdv' && <Pdv setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'vendas' && <GestaoVendas />}
+                            {paginaAtiva === 'vendas' && <GestaoVendas setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'fila-caixa' && <FilaPedidosCaixa setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'caixa' && <ControleCaixa />}
                             {paginaAtiva === 'relatorio-comissoes' && <RelatorioComissoes />}
@@ -158,6 +162,10 @@ function App() {
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
                             {paginaAtiva === 'auditoria' && <Auditoria />}
                             {paginaAtiva === 'configuracoes' && <Configuracoes />}
+
+                            {/* 🚀 CORRIGIDO: ReciboAvulso agora recebe setPaginaAtiva */}
+                            {paginaAtiva === 'recibo-avulso' && <ReciboAvulso setPaginaAtiva={setPaginaAtiva} />}
+                            {paginaAtiva === 'historico-recibos' && <HistoricoRecibos setPaginaAtiva={setPaginaAtiva} />}
                         </>
                     )}
                 </div>

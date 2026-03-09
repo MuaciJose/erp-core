@@ -28,7 +28,7 @@ public class ErpCoreApplication {
                     "dash", "pdv", "vendas", "orcamentos", "fila-caixa", "caixa", "relatorio-comissoes", // <-- ADICIONADO AQUI
                     "estoque", "marcas", "ajuste_estoque", "compras", "previsao", "faltas",
                     "contas-pagar", "contas-receber", "bancos", "conciliacao", "plano-contas", "dre",
-                    "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes", "calculadora"
+                    "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes", "calculadora", "recibo-avulso","historico-recibos"
             );
 
             Usuario admin = (Usuario) repository.findByUsername("admin");

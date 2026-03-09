@@ -7,7 +7,8 @@ import api from '../../api/axios';
 import { OrcamentoPedido } from './OrcamentoPedido';
 import { CupomReciboModal } from './CupomReciboModal';
 
-export const GestaoVendas = () => {
+// 🚀 ADICIONADA A PROP setPaginaAtiva PARA O BOTÃO DE RECIBO FUNCIONAR
+export const GestaoVendas = ({ setPaginaAtiva }) => {
     const [telaAtual, setTelaAtual] = useState('LISTA');
     const [busca, setBusca] = useState('');
     const [espelhoAberto, setEspelhoAberto] = useState(null);
@@ -114,13 +115,25 @@ export const GestaoVendas = () => {
                         <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3"><FileText className="text-blue-600 bg-blue-100 p-1.5 rounded-lg" size={36} /> CENTRAL DE VENDAS</h1>
                         <p className="text-slate-500 font-medium mt-1">Acompanhe o ciclo de Orçamentos, Pedidos, Caixa e Faturados.</p>
                     </div>
-                    <button
-                        onClick={() => { setTelaAtual('NOVO'); setVendaParaEditar(null); }}
-                        title="Abrir a tela de balcão para iniciar um novo atendimento"
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-black shadow-lg shadow-blue-600/20 flex items-center gap-2 transition-all transform hover:scale-105"
-                    >
-                        <Plus size={24} /> NOVO ORÇAMENTO / VENDA
-                    </button>
+
+                    <div className="flex gap-4">
+                        {/* 🚀 NOVO BOTÃO DE ATALHO PARA O RECIBO MANUAL */}
+                        <button
+                            onClick={() => setPaginaAtiva('recibo-avulso')}
+                            title="Emitir um recibo manual ou avulso rapidamente"
+                            className="bg-white text-slate-600 px-6 py-4 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-50 transition-all border-2 border-slate-200 shadow-sm"
+                        >
+                            <FileText size={20} className="text-blue-500" /> RECIBO AVULSO
+                        </button>
+
+                        <button
+                            onClick={() => { setTelaAtual('NOVO'); setVendaParaEditar(null); }}
+                            title="Abrir a tela de balcão para iniciar um novo atendimento"
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-black shadow-lg shadow-blue-600/20 flex items-center gap-2 transition-all transform hover:scale-105"
+                        >
+                            <Plus size={24} /> NOVO ORÇAMENTO / VENDA
+                        </button>
+                    </div>
                 </div>
 
                 <div className="bg-white p-6 rounded-t-3xl shadow-sm border border-slate-200 border-b-0 flex gap-4 items-center justify-between">

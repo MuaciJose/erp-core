@@ -9,7 +9,7 @@ import {
     ChevronRight,
     ShoppingCart,
     LogOut,
-    FileText // Importado para manter consistência caso precise no futuro
+    FileText
 } from 'lucide-react';
 
 export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }) => {
@@ -37,7 +37,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Balcão / Central', acao: 'vendas' },
                 { titulo: 'Fila do Caixa', acao: 'fila-caixa' },
                 { titulo: 'Controle de Caixa', acao: 'caixa' },
-                { titulo: 'Relatório de Comissões', acao: 'relatorio-comissoes' } // <-- ADICIONADO AQUI
+                { titulo: 'Relatório de Comissões', acao: 'relatorio-comissoes' }
             ]
         },
         {
@@ -63,7 +63,8 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Contas Bancárias', acao: 'bancos' },
                 { titulo: 'Conciliação Bancária', acao: 'conciliacao' },
                 { titulo: 'Plano de Contas', acao: 'plano-contas' },
-                { titulo: 'Resultado (DRE)', acao: 'dre' }
+                { titulo: 'Resultado (DRE)', acao: 'dre' },
+                { titulo: 'Recibo Avulso', acao: 'recibo-avulso' } // 🚀 ADICIONADO AQUI
             ]
         },
         {
@@ -183,7 +184,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                     <button
                         onClick={onLogout}
                         className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
-                        title="Sair"
+                        title="Sair do Sistema"
                     >
                         <LogOut size={20} />
                     </button>

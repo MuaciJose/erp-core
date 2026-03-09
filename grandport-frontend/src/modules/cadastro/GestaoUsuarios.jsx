@@ -28,7 +28,7 @@ export const GestaoUsuarios = () => {
                 { acao: 'vendas', nome: 'Balcão de Peças / Central' },
                 { acao: 'fila-caixa', nome: 'Fila do Caixa (Receber Pagamentos)' },
                 { acao: 'caixa', nome: 'Controle de Caixa (Abrir/Fechar Turno)' },
-                { acao: 'relatorio-comissoes', nome: 'Relatório de Comissões' } // <-- TELA ADICIONADA AQUI
+                { acao: 'relatorio-comissoes', nome: 'Relatório de Comissões' }
             ]
         },
         {
@@ -50,7 +50,8 @@ export const GestaoUsuarios = () => {
                 { acao: 'bancos', nome: 'Contas Bancárias / Tesouraria' },
                 { acao: 'conciliacao', nome: 'Conciliação Bancária' },
                 { acao: 'plano-contas', nome: 'Plano de Contas' },
-                { acao: 'dre', nome: 'Resultado e Lucro (DRE)' }
+                { acao: 'dre', nome: 'Resultado e Lucro (DRE)' },
+                { acao: 'recibo-avulso', nome: 'Gerador de Recibo Avulso' } // 🚀 ADICIONADO AQUI
             ]
         },
         {
@@ -156,7 +157,7 @@ export const GestaoUsuarios = () => {
     const marcarTudoAdmin = () => setUsuarioForm(prev => ({ ...prev, permissoes: todasAsPermissoes }));
     const limparTudo = () => setUsuarioForm(prev => ({ ...prev, permissoes: [] }));
 
-    if (loading) return <div className="p-8 text-center font-bold text-gray-500">Carregando equipe...</div>;
+    if (loading) return <div className="p-8 text-center font-bold text-gray-500 animate-pulse">Carregando equipe...</div>;
 
     return (
         <div className="p-8 max-w-6xl mx-auto animate-fade-in relative">
@@ -178,7 +179,7 @@ export const GestaoUsuarios = () => {
                             <h4 className="font-black text-lg">{notificacao.titulo}</h4>
                             <p className="text-sm font-medium mt-1 whitespace-pre-line leading-relaxed">{notificacao.mensagem}</p>
                         </div>
-                        <button onClick={() => setNotificacao(null)} className="text-slate-400 hover:text-slate-700 transition-colors p-1"><X size={20}/></button>
+                        <button onClick={() => setNotificacao(null)} title="Fechar notificação" className="text-slate-400 hover:text-slate-700 transition-colors p-1"><X size={20}/></button>
                     </div>
                 </div>
             )}
@@ -191,7 +192,7 @@ export const GestaoUsuarios = () => {
                     </h1>
                     <p className="text-slate-500 mt-1">Gerencie os funcionários e os níveis de permissão</p>
                 </div>
-                <button onClick={abrirModalNovo} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg">
+                <button onClick={abrirModalNovo} title="Cadastrar um novo membro na equipe" className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg">
                     <UserPlus size={20} /> NOVO USUÁRIO
                 </button>
             </div>
@@ -223,8 +224,8 @@ export const GestaoUsuarios = () => {
                                 }
                             </td>
                             <td className="p-4 pr-6 flex justify-center gap-3">
-                                <button onClick={() => abrirModalEditar(user)} className="text-blue-500 hover:text-blue-700 bg-blue-50 p-2 rounded-lg" title="Editar Permissões"><Edit size={18} /></button>
-                                <button onClick={() => alternarStatus(user.id, user.ativo)} className={`${user.ativo ? 'text-red-500 hover:text-red-700 bg-red-50' : 'text-green-600 hover:text-green-800 bg-green-50'} p-2 rounded-lg`} title={user.ativo ? "Bloquear Acesso" : "Liberar Acesso"}>{user.ativo ? <Ban size={18} /> : <CheckCircle size={18} />}</button>
+                                <button onClick={() => abrirModalEditar(user)} className="text-blue-500 hover:text-blue-700 bg-blue-50 p-2 rounded-lg" title="Editar dados e permissões de acesso"><Edit size={18} /></button>
+                                <button onClick={() => alternarStatus(user.id, user.ativo)} className={`${user.ativo ? 'text-red-500 hover:text-red-700 bg-red-50' : 'text-green-600 hover:text-green-800 bg-green-50'} p-2 rounded-lg`} title={user.ativo ? "Bloquear acesso deste usuário ao sistema" : "Liberar acesso deste usuário ao sistema"}>{user.ativo ? <Ban size={18} /> : <CheckCircle size={18} />}</button>
                             </td>
                         </tr>
                     ))}
@@ -237,7 +238,7 @@ export const GestaoUsuarios = () => {
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in">
                         <div className="bg-slate-900 p-6 flex justify-between items-center text-white">
                             <h2 className="text-xl font-black tracking-widest flex items-center gap-2"><ShieldCheck className="text-blue-400" /> {usuarioForm.id ? 'EDITAR USUÁRIO' : 'NOVO USUÁRIO'}</h2>
-                            <button onClick={() => setModalAberto(false)} className="hover:text-red-400 font-bold uppercase text-xs">Fechar</button>
+                            <button onClick={() => setModalAberto(false)} title="Fechar janela" className="hover:text-red-400 font-bold uppercase text-xs">Fechar</button>
                         </div>
 
                         <div className="overflow-y-auto p-8 space-y-6">
@@ -264,8 +265,8 @@ export const GestaoUsuarios = () => {
                                 <div className="flex justify-between items-end mb-4 border-b pb-3">
                                     <h3 className="text-sm font-black text-slate-800 uppercase">Controle de Acesso às Telas</h3>
                                     <div className="flex gap-2">
-                                        <button type="button" onClick={limparTudo} className="text-[10px] font-black tracking-widest bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-300 transition-colors">LIMPAR TUDO</button>
-                                        <button type="button" onClick={marcarTudoAdmin} className="text-[10px] font-black tracking-widest bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition-colors">MARCAR TUDO (ADMIN)</button>
+                                        <button type="button" onClick={limparTudo} title="Remover todas as seleções de permissão" className="text-[10px] font-black tracking-widest bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-300 transition-colors">LIMPAR TUDO</button>
+                                        <button type="button" onClick={marcarTudoAdmin} title="Conceder acesso total a todos os módulos do GrandPort" className="text-[10px] font-black tracking-widest bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition-colors">MARCAR TUDO (ADMIN)</button>
                                     </div>
                                 </div>
 
@@ -274,7 +275,7 @@ export const GestaoUsuarios = () => {
                                         <div key={index} className="bg-slate-50 border rounded-xl p-4">
                                             <div className="flex justify-between items-center mb-3">
                                                 <h4 className="font-bold text-blue-800">{modulo.grupo}</h4>
-                                                <button type="button" onClick={() => handleToggleGrupo(modulo.telas)} className="text-[10px] font-bold text-blue-600 uppercase hover:underline">Marcar/Desmarcar Grupo</button>
+                                                <button type="button" onClick={() => handleToggleGrupo(modulo.telas)} title="Selecionar ou desmarcar todas as telas deste grupo de uma vez" className="text-[10px] font-bold text-blue-600 uppercase hover:underline">Marcar/Desmarcar Grupo</button>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 {modulo.telas.map(tela => (
@@ -293,8 +294,8 @@ export const GestaoUsuarios = () => {
                         </div>
 
                         <div className="p-6 bg-slate-50 border-t flex gap-4">
-                            <button onClick={() => setModalAberto(false)} className="flex-1 py-4 font-bold text-slate-500 rounded-xl hover:bg-slate-100 transition-colors">CANCELAR</button>
-                            <button onClick={salvarUsuario} className="flex-1 bg-blue-600 text-white py-4 rounded-xl font-black shadow-lg hover:bg-blue-700 transition-colors">SALVAR USUÁRIO</button>
+                            <button onClick={() => setModalAberto(false)} title="Sair sem salvar alterações" className="flex-1 py-4 font-bold text-slate-500 rounded-xl hover:bg-slate-100 transition-colors">CANCELAR</button>
+                            <button onClick={salvarUsuario} title="Confirmar dados e gravar permissões no banco de dados" className="flex-1 bg-blue-600 text-white py-4 rounded-xl font-black shadow-lg hover:bg-blue-700 transition-colors">SALVAR USUÁRIO</button>
                         </div>
                     </div>
                 </div>
