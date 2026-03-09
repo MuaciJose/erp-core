@@ -5,13 +5,13 @@ import {
 } from 'lucide-react';
 import api from '../../api/axios';
 import { OrcamentoPedido } from './OrcamentoPedido';
-import { CupomReciboModal } from './CupomReciboModal'; // <-- IMPORTAÇÃO DO NOSSO CUPOM INTELIGENTE
+import { CupomReciboModal } from './CupomReciboModal';
 
 export const GestaoVendas = () => {
     const [telaAtual, setTelaAtual] = useState('LISTA');
     const [busca, setBusca] = useState('');
     const [espelhoAberto, setEspelhoAberto] = useState(null);
-    const [imprimirEspelho, setImprimirEspelho] = useState(false); // Controle para abrir o Modal de Impressão
+    const [imprimirEspelho, setImprimirEspelho] = useState(false);
     const [listaVendas, setListaVendas] = useState([]);
     const [loading, setLoading] = useState(false);
     const [vendaParaEditar, setVendaParaEditar] = useState(null);
@@ -25,14 +25,12 @@ export const GestaoVendas = () => {
                 dataHora: v.dataHora,
                 cliente: v.cliente ? v.cliente.nome : 'Consumidor Final',
                 documento: v.cliente ? v.cliente.documento : '',
-                // Ajuste visual para a lista (Mostra Marca/Modelo/Placa se houver)
                 veiculo: v.veiculo ? `${v.veiculo.marca} ${v.veiculo.modelo} ${v.veiculo.placa ? `(${v.veiculo.placa})` : ''}`.trim() : 'Nenhum',
-                // MANTÉM O OBJETO DO VEÍCULO COMPLETO PARA A IMPRESSÃO A4 (Placa e KM)
                 veiculoObj: v.veiculo || null,
                 total: v.valorTotal || 0,
                 subtotal: v.valorSubtotal || 0,
                 desconto: v.desconto || 0,
-                status: v.status, // ORCAMENTO, PEDIDO, AGUARDANDO_PAGAMENTO, CONCLUIDA
+                status: v.status,
                 vendedor: v.vendedorNome || 'Sistema',
                 metodoPagamento: v.pagamentos && v.pagamentos.length > 0 ? v.pagamentos[0].metodo : 'NÃO PAGO',
                 itens: (v.itens || []).map(i => ({
@@ -96,13 +94,12 @@ export const GestaoVendas = () => {
         return (
             <div className="animate-fade-in flex flex-col h-full bg-white relative z-[10]">
                 <div className="bg-slate-900 p-4 flex items-center gap-4 text-white print:hidden">
-                    <button onClick={() => { setTelaAtual('LISTA'); setVendaParaEditar(null); }} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg flex items-center gap-2 font-bold transition-colors"><ArrowLeft size={20} /> VOLTAR PARA A LISTA</button>
                     <div>
                         <h2 className="font-black text-lg tracking-widest">BALCÃO DE PEÇAS</h2>
                         <p className="text-xs text-slate-400">{vendaParaEditar ? `Acessando Documento #${vendaParaEditar.id}` : 'Criando novo Orçamento / Pedido'}</p>
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto relative z-[11] bg-white">
+                <div className="flex-1 overflow-y-auto relative z-[11] bg-white pt-6">
                     <OrcamentoPedido orcamentoParaEditar={vendaParaEditar} onVoltar={() => { setTelaAtual('LISTA'); setVendaParaEditar(null); }} />
                 </div>
             </div>
@@ -117,20 +114,32 @@ export const GestaoVendas = () => {
                         <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3"><FileText className="text-blue-600 bg-blue-100 p-1.5 rounded-lg" size={36} /> CENTRAL DE VENDAS</h1>
                         <p className="text-slate-500 font-medium mt-1">Acompanhe o ciclo de Orçamentos, Pedidos, Caixa e Faturados.</p>
                     </div>
-                    <button onClick={() => { setTelaAtual('NOVO'); setVendaParaEditar(null); }} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-black shadow-lg shadow-blue-600/20 flex items-center gap-2 transition-all transform hover:scale-105"><Plus size={24} /> NOVO ORÇAMENTO / VENDA</button>
+                    <button
+                        onClick={() => { setTelaAtual('NOVO'); setVendaParaEditar(null); }}
+                        title="Abrir a tela de balcão para iniciar um novo atendimento"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-black shadow-lg shadow-blue-600/20 flex items-center gap-2 transition-all transform hover:scale-105"
+                    >
+                        <Plus size={24} /> NOVO ORÇAMENTO / VENDA
+                    </button>
                 </div>
 
                 <div className="bg-white p-6 rounded-t-3xl shadow-sm border border-slate-200 border-b-0 flex gap-4 items-center justify-between">
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-4 top-3.5 text-slate-400" size={20} />
-                        <input type="text" placeholder="Buscar por Nº, Cliente ou Veículo..." value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold text-slate-700" />
+                        <input
+                            type="text"
+                            placeholder="Buscar por Nº, Cliente ou Veículo..."
+                            value={busca}
+                            onChange={(e) => setBusca(e.target.value)}
+                            className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold text-slate-700"
+                        />
                     </div>
 
                     <div className="flex gap-2">
-                        <div className="px-3 py-1.5 bg-blue-50 rounded-lg text-xs font-bold text-blue-700 border border-blue-200 flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Orçamento</div>
-                        <div className="px-3 py-1.5 bg-orange-50 rounded-lg text-xs font-bold text-orange-700 border border-orange-200 flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span> Pedido</div>
-                        <div className="px-3 py-1.5 bg-purple-50 rounded-lg text-xs font-bold text-purple-700 border border-purple-200 flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Caixa</div>
-                        <div className="px-3 py-1.5 bg-green-50 rounded-lg text-xs font-bold text-green-700 border border-green-200 flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> Faturado</div>
+                        <div className="px-3 py-1.5 bg-blue-50 rounded-lg text-xs font-bold text-blue-700 border border-blue-200 flex items-center gap-1" title="Legenda: Documentos em fase de orçamento"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Orçamento</div>
+                        <div className="px-3 py-1.5 bg-orange-50 rounded-lg text-xs font-bold text-orange-700 border border-orange-200 flex items-center gap-1" title="Legenda: Orçamentos aprovados aguardando separação"><span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span> Pedido</div>
+                        <div className="px-3 py-1.5 bg-purple-50 rounded-lg text-xs font-bold text-purple-700 border border-purple-200 flex items-center gap-1" title="Legenda: Pedidos prontos para pagamento no caixa"><span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Caixa</div>
+                        <div className="px-3 py-1.5 bg-green-50 rounded-lg text-xs font-bold text-green-700 border border-green-200 flex items-center gap-1" title="Legenda: Vendas finalizadas e recebidas"><span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> Faturado</div>
                     </div>
                 </div>
 
@@ -168,14 +177,34 @@ export const GestaoVendas = () => {
                                         <td className="p-4 text-right font-black text-slate-800 text-lg">R$ {venda.total.toFixed(2)}</td>
                                         <td className="p-4 text-center pr-6">
                                             <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={(e) => { e.stopPropagation(); setEspelhoAberto(venda); }} className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors" title="Ver Espelho"><Eye size={16} /></button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setEspelhoAberto(venda); }}
+                                                    className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+                                                    title="Visualizar resumo e itens do documento"
+                                                >
+                                                    <Eye size={16} />
+                                                </button>
                                                 {venda.status !== 'CONCLUIDA' && venda.status !== 'AGUARDANDO_PAGAMENTO' ? (
                                                     <>
-                                                        <button onClick={(e) => { e.stopPropagation(); handleReabrir(venda); }} className="p-2 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded-lg transition-colors" title="Abrir e Editar"><Edit size={16} /></button>
-                                                        <button onClick={(e) => { e.stopPropagation(); handleExcluir(venda.id); }} className="p-2 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg transition-colors" title="Excluir"><Trash2 size={16} /></button>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleReabrir(venda); }}
+                                                            className="p-2 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded-lg transition-colors"
+                                                            title="Reabrir este documento na tela de balcão para edição"
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleExcluir(venda.id); }}
+                                                            className="p-2 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg transition-colors"
+                                                            title="Excluir permanentemente este registro"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
                                                     </>
                                                 ) : (
-                                                    <div className="p-2 text-slate-300 cursor-not-allowed" title="Bloqueado (No Caixa ou Faturado)"><Lock size={16} /></div>
+                                                    <div className="p-2 text-slate-300 cursor-not-allowed" title="Alterações bloqueadas para documentos em fase de caixa ou faturados">
+                                                        <Lock size={16} />
+                                                    </div>
                                                 )}
                                             </div>
                                         </td>
@@ -188,7 +217,7 @@ export const GestaoVendas = () => {
                 </div>
             </div>
 
-            {/* VISUALIZAÇÃO DO ESPELHO NA TELA (MANTIDA) */}
+            {/* VISUALIZAÇÃO DO ESPELHO NA TELA */}
             {espelhoAberto && !imprimirEspelho && (
                 <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-[150] p-4 print:hidden">
                     <div className="bg-slate-50 rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in relative">
@@ -198,10 +227,20 @@ export const GestaoVendas = () => {
                                 <p className="text-blue-300 font-bold mt-1 text-sm">Documento #{espelhoAberto.id} • Emitido em: {new Date(espelhoAberto.dataHora).toLocaleString('pt-BR')}</p>
                             </div>
                             <div className="flex gap-4">
-                                <button onClick={() => setImprimirEspelho(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-black shadow-lg flex items-center gap-2 transition-all transform hover:scale-105">
+                                <button
+                                    onClick={() => setImprimirEspelho(true)}
+                                    title="Abrir opções de impressão (A4 ou Cupom)"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-black shadow-lg flex items-center gap-2 transition-all transform hover:scale-105"
+                                >
                                     <Printer size={20} /> IMPRIMIR {espelhoAberto.status === 'ORCAMENTO' ? 'ORÇAMENTO' : 'CUPOM'}
                                 </button>
-                                <button onClick={() => setEspelhoAberto(null)} className="bg-slate-800 hover:bg-slate-700 p-3 rounded-xl transition-colors text-slate-400 hover:text-white"><X size={24} /></button>
+                                <button
+                                    onClick={() => setEspelhoAberto(null)}
+                                    title="Fechar visualização"
+                                    className="bg-slate-800 hover:bg-slate-700 p-3 rounded-xl transition-colors text-slate-400 hover:text-white"
+                                >
+                                    <X size={24} />
+                                </button>
                             </div>
                         </div>
                         <div className="p-8 overflow-y-auto flex-1 bg-slate-50">
@@ -240,7 +279,7 @@ export const GestaoVendas = () => {
                                 </tbody>
                             </table>
                             <div className="mt-6 flex justify-end">
-                                <div className="w-72 bg-slate-800 text-white p-5 rounded-2xl">
+                                <div className="w-72 bg-slate-800 text-white p-5 rounded-2xl shadow-xl">
                                     <div className="flex justify-between border-b border-slate-700 py-1 text-sm"><span className="text-slate-400 font-bold">Subtotal:</span><span>R$ {(espelhoAberto.subtotal || 0).toFixed(2)}</span></div>
                                     <div className="flex justify-between border-b border-slate-700 py-1 text-sm"><span className="text-slate-400 font-bold">Desconto:</span><span className="text-orange-400">- R$ {(espelhoAberto.desconto || 0).toFixed(2)}</span></div>
                                     <div className="flex justify-between mt-3"><span className="text-lg font-black uppercase text-slate-400">Total:</span><span className="text-2xl font-black text-green-400">R$ {(espelhoAberto.total || 0).toFixed(2)}</span></div>

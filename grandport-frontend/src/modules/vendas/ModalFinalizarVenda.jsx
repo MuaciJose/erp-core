@@ -36,8 +36,8 @@ export const ModalFinalizarVenda = ({ totalVenda, clienteSelecionado, onClose, o
 
     return (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col md:row animate-fade-in">
-                
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col md:flex-row animate-fade-in">
+
                 {/* LADO ESQUERDO: DADOS DO CLIENTE E VEÍCULO */}
                 <div className="w-full md:w-1/2 bg-slate-50 p-8 border-r border-slate-200">
                     <h2 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
@@ -47,7 +47,7 @@ export const ModalFinalizarVenda = ({ totalVenda, clienteSelecionado, onClose, o
                     {clienteSelecionado ? (
                         <div className="space-y-6">
                             {/* Card do Cliente */}
-                            <div className="bg-white p-4 rounded-xl border border-blue-100 shadow-sm">
+                            <div className="bg-white p-4 rounded-xl border border-blue-100 shadow-sm" title="Cliente que receberá a cobrança/pontuação">
                                 <p className="text-[10px] font-black uppercase text-blue-500 tracking-widest mb-1">Cliente na Venda</p>
                                 <p className="font-bold text-slate-800">{clienteSelecionado.nome}</p>
                                 <p className="text-xs text-slate-500">CPF/CNPJ: {clienteSelecionado.documento}</p>
@@ -58,13 +58,14 @@ export const ModalFinalizarVenda = ({ totalVenda, clienteSelecionado, onClose, o
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
                                     <Car size={14} /> Para qual veículo?
                                 </label>
-                                
+
                                 {loadingVeiculos ? (
                                     <div className="p-3 text-sm text-slate-400 font-bold animate-pulse">Buscando garagem...</div>
                                 ) : (
-                                    <select 
+                                    <select
                                         value={veiculoSelecionado}
                                         onChange={(e) => setVeiculoSelecionado(e.target.value)}
+                                        title="Selecione um veículo do cliente para vincular a venda ao histórico de manutenção"
                                         className="w-full p-4 bg-white border-2 border-slate-200 rounded-xl focus:border-blue-600 outline-none font-bold text-slate-700 shadow-sm transition-colors"
                                     >
                                         <option value="">Nenhum específico / Venda Avulsa</option>
@@ -92,34 +93,56 @@ export const ModalFinalizarVenda = ({ totalVenda, clienteSelecionado, onClose, o
                     <div>
                         <div className="flex justify-between items-start mb-8">
                             <h2 className="text-xl font-black text-slate-800">PAGAMENTO</h2>
-                            <button onClick={onClose} className="text-slate-400 hover:text-red-500 transition-colors">
+                            <button
+                                onClick={onClose}
+                                title="Cancelar e voltar para a tela anterior"
+                                className="text-slate-400 hover:text-red-500 transition-colors"
+                            >
                                 <X size={24} />
                             </button>
                         </div>
 
-                        <div className="text-center mb-8 bg-slate-900 p-6 rounded-2xl shadow-inner text-white">
+                        <div className="text-center mb-8 bg-slate-900 p-6 rounded-2xl shadow-inner text-white" title="Valor líquido total do documento">
                             <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-1">Total a Pagar</p>
                             <h1 className="text-5xl font-black text-green-400">R$ {totalVenda.toFixed(2)}</h1>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 mb-8">
-                            <button onClick={() => setMetodoPagamento('PIX')} className={`p-4 rounded-xl border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'PIX' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>
+                            <button
+                                onClick={() => setMetodoPagamento('PIX')}
+                                title="Recebimento via PIX (QR Code ou Chave)"
+                                className={`p-4 rounded-xl border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'PIX' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                            >
                                 <Smartphone size={24} /> PIX
                             </button>
-                            <button onClick={() => setMetodoPagamento('CARTAO')} className={`p-4 rounded-xl border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'CARTAO' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>
+                            <button
+                                onClick={() => setMetodoPagamento('CARTAO')}
+                                title="Recebimento via Cartão de Débito ou Crédito"
+                                className={`p-4 rounded-xl border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'CARTAO' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                            >
                                 <CreditCard size={24} /> Cartão
                             </button>
-                            <button onClick={() => setMetodoPagamento('DINHEIRO')} className={`p-4 rounded-xl border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'DINHEIRO' ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>
+                            <button
+                                onClick={() => setMetodoPagamento('DINHEIRO')}
+                                title="Recebimento em espécie (Dinheiro)"
+                                className={`p-4 rounded-xl border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'DINHEIRO' ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                            >
                                 <DollarSign size={24} /> Dinheiro
                             </button>
-                            <button onClick={() => setMetodoPagamento('A_PRAZO')} disabled={!clienteSelecionado} className={`p-4 rounded-xl border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'A_PRAZO' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-slate-100 text-slate-400 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed'}`}>
+                            <button
+                                onClick={() => setMetodoPagamento('A_PRAZO')}
+                                disabled={!clienteSelecionado}
+                                title={clienteSelecionado ? "Lançar na conta do cliente para pagamento posterior" : "Identifique um cliente para liberar a venda a prazo"}
+                                className={`p-4 rounded-xl border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'A_PRAZO' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-slate-100 text-slate-400 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed'}`}
+                            >
                                 <User size={24} /> Fiado (Prazo)
                             </button>
                         </div>
                     </div>
 
-                    <button 
+                    <button
                         onClick={finalizar}
+                        title="Confirmar o recebimento e finalizar este pedido no sistema"
                         className="w-full py-5 bg-green-600 text-white font-black text-lg rounded-xl hover:bg-green-700 shadow-lg shadow-green-900/20 flex justify-center items-center gap-2 transition-all"
                     >
                         <CheckCircle size={24} /> FINALIZAR VENDA

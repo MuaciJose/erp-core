@@ -79,10 +79,18 @@ export const RelatorioComissoes = () => {
                         <Calendar size={14}/> Período do Relatório
                     </label>
                     <div className="flex gap-2">
-                        <input type="date" className="w-full p-3 bg-slate-50 border-2 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500"
-                               onChange={(e) => setDatas({...datas, inicio: e.target.value})} />
-                        <input type="date" className="w-full p-3 bg-slate-50 border-2 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500"
-                               onChange={(e) => setDatas({...datas, fim: e.target.value})} />
+                        <input
+                            type="date"
+                            title="Data inicial para o cálculo das comissões"
+                            className="w-full p-3 bg-slate-50 border-2 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500"
+                            onChange={(e) => setDatas({...datas, inicio: e.target.value})}
+                        />
+                        <input
+                            type="date"
+                            title="Data final para o cálculo das comissões"
+                            className="w-full p-3 bg-slate-50 border-2 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500"
+                            onChange={(e) => setDatas({...datas, fim: e.target.value})}
+                        />
                     </div>
                 </div>
 
@@ -92,6 +100,7 @@ export const RelatorioComissoes = () => {
                         <Users size={14}/> Filtrar Vendedor
                     </label>
                     <select
+                        title="Selecione um vendedor específico ou deixe em branco para ver todos"
                         className="w-full p-3 bg-slate-50 border-2 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500"
                         value={vendedorSelecionado}
                         onChange={(e) => setVendedorSelecionado(e.target.value)}
@@ -103,10 +112,18 @@ export const RelatorioComissoes = () => {
                     </select>
                 </div>
 
-                <button onClick={gerarRelatorio} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black flex items-center gap-2 hover:bg-black transition-all">
+                <button
+                    onClick={gerarRelatorio}
+                    title="Processar dados e gerar o relatório na tela"
+                    className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black flex items-center gap-2 hover:bg-black transition-all"
+                >
                     {loading ? 'PROCESSANDO...' : 'GERAR RELATÓRIO'}
                 </button>
-                <button onClick={() => window.print()} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-600/20">
+                <button
+                    onClick={() => window.print()}
+                    title="Abrir opções de impressão para PDF ou Papel"
+                    className="bg-blue-600 text-white px-8 py-3 rounded-xl font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-600/20"
+                >
                     <Printer size={20}/> IMPRIMIR
                 </button>
             </div>
@@ -142,11 +159,11 @@ export const RelatorioComissoes = () => {
                                     Vendedor: {vendedor.vendedorNome}
                                 </h2>
                                 <div className="flex gap-6">
-                                    <div className="text-right">
+                                    <div className="text-right" title="Soma total bruta das vendas realizadas por este vendedor">
                                         <p className="text-[10px] font-bold text-slate-400 uppercase">Total Vendido</p>
                                         <p className="font-black text-slate-900">R$ {vendedor.valorTotalVendido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                                     </div>
-                                    <div className="text-right border-l-2 border-slate-200 pl-6">
+                                    <div className="text-right border-l-2 border-slate-200 pl-6" title="Soma total das comissões líquidas deste vendedor">
                                         <p className="text-[10px] font-bold text-blue-500 uppercase">Comissão Total</p>
                                         <p className="font-black text-blue-600 text-lg">R$ {vendedor.totalComissao.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                                     </div>

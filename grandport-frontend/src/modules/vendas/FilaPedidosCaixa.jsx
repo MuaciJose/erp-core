@@ -4,6 +4,9 @@ import { ModalFinalizarVenda } from './ModalFinalizarVenda';
 import { CupomReciboModal } from './CupomReciboModal';
 import api from '../../api/axios';
 
+// --- 🚀 IMPORTAÇÃO DO TOAST ---
+import toast from 'react-hot-toast';
+
 export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const [pedidos, setPedidos] = useState([]);
     const [busca, setBusca] = useState('');
@@ -12,19 +15,10 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const [pedidoPago, setPedidoPago] = useState(null);
 
     // ESTADOS PARA MENSAGENS PROFISSIONAIS
-    const [notificacao, setNotificacao] = useState(null);
     const [modalDevolucaoAberto, setModalDevolucaoAberto] = useState(false);
 
     const [caixaStatus, setCaixaStatus] = useState(null);
     const [loadingCaixa, setLoadingCaixa] = useState(true);
-
-    // SISTEMA DE NOTIFICAÇÕES PROFISSIONAIS
-    const showToast = (tipo, titulo, mensagem) => {
-        setNotificacao({ tipo, titulo, mensagem });
-        setTimeout(() => {
-            setNotificacao(null);
-        }, 4000);
-    };
 
     const verificarCaixa = async () => {
         setLoadingCaixa(true);
@@ -70,6 +64,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     };
 
     const confirmarRecebimento = async (dadosPagamento) => {
+        const idVendaToast = toast.loading("Confirmando recebimento...");
         try {
             const payload = [{
                 metodo: dadosPagamento.metodoPagamento,
@@ -79,8 +74,8 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
             const res = await api.post(`/api/vendas/${pedidoSelecionado.id}/pagar`, payload);
 
-            // SUBSTITUÍDO: alert() por Toast de Sucesso
-            showToast('sucesso', 'Pagamento Aprovado!', `O recebimento do Pedido #${pedidoSelecionado.id} foi concluído com sucesso.`);
+            // ✅ SUCESSO COM TOAST
+            toast.success('Pagamento Aprovado! Pedido finalizado.', { id: idVendaToast });
 
             const pedidoFormatadoParaCupom = {
                 id: res.data.id || pedidoSelecionado.id,
@@ -106,22 +101,22 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
             carregarPedidos();
         } catch (error) {
             const msgErro = error.response?.data?.message || error.message;
-            // SUBSTITUÍDO: alert() por Toast de Erro
-            showToast('erro', 'Falha no Recebimento', msgErro);
+            // ❌ ERRO COM TOAST
+            toast.error(`Falha no Recebimento: ${msgErro}`, { id: idVendaToast });
         }
     };
 
-    // NOVA FUNÇÃO: Executada após confirmar no Modal de Devolução
     const confirmarDevolucaoAoVendedor = async () => {
+        const idDevolucaoToast = toast.loading("Devolvendo pedido ao balcão...");
         try {
             await api.post(`/api/vendas/${pedidoSelecionado.id}/devolver`);
-            showToast('sucesso', 'Pedido Devolvido', `O Pedido #${pedidoSelecionado.id} retornou para o balcão de vendas.`);
+            toast.success('Pedido retornado para o vendedor com sucesso!', { id: idDevolucaoToast });
             setPedidoSelecionado(null);
             setModalDevolucaoAberto(false);
             carregarPedidos();
         } catch (error) {
             const msgErro = error.response?.data?.message || "Erro de conexão com o servidor.";
-            showToast('erro', 'Falha ao Devolver', msgErro);
+            toast.error(`Falha ao Devolver: ${msgErro}`, { id: idDevolucaoToast });
             setModalDevolucaoAberto(false);
         }
     };
@@ -135,7 +130,11 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                     <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6"><Lock size={48} className="text-red-500" /></div>
                     <h1 className="text-3xl font-black text-slate-800 mb-2">CAIXA BLOQUEADO</h1>
                     <p className="text-slate-500 mb-8 font-medium">Você não pode receber pagamentos enquanto o caixa estiver fechado. Abra o caixa para liberar o terminal.</p>
-                    <button onClick={() => setPaginaAtiva('caixa')} className="w-full bg-slate-900 text-white py-4 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-slate-800 transition-all mb-4">
+                    <button
+                        onClick={() => setPaginaAtiva('caixa')}
+                        title="Ir para a gestão de caixa para realizar a abertura"
+                        className="w-full bg-slate-900 text-white py-4 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-slate-800 transition-all mb-4"
+                    >
                         <Wallet size={20} /> IR PARA CONTROLE DE CAIXA
                     </button>
                 </div>
@@ -147,35 +146,20 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         <>
             <div className="p-8 max-w-7xl mx-auto flex h-[90vh] gap-6 animate-fade-in relative print:hidden">
 
-                {/* NOTIFICAÇÃO PROFISSIONAL FLUTUANTE (TOAST) */}
-                {notificacao && (
-                    <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-[9999] animate-fade-in w-full max-w-md px-4">
-                        <div className={`p-4 rounded-2xl shadow-2xl flex items-start gap-4 border-l-4 ${
-                            notificacao.tipo === 'sucesso' ? 'bg-green-50 border-green-500 text-green-800' :
-                                notificacao.tipo === 'erro' ? 'bg-red-50 border-red-500 text-red-800' :
-                                    'bg-orange-50 border-orange-500 text-orange-800'
-                        }`}>
-                            <div className="mt-1">
-                                {notificacao.tipo === 'sucesso' && <CheckCircle size={24} />}
-                                {notificacao.tipo === 'erro' && <AlertCircle size={24} />}
-                                {notificacao.tipo === 'aviso' && <Info size={24} />}
-                            </div>
-                            <div className="flex-1">
-                                <h4 className="font-black text-lg">{notificacao.titulo}</h4>
-                                <p className="text-sm font-medium mt-1 leading-relaxed">{notificacao.mensagem}</p>
-                            </div>
-                            <button onClick={() => setNotificacao(null)} className="text-slate-400 hover:text-slate-700 transition-colors p-1"><X size={20}/></button>
-                        </div>
-                    </div>
-                )}
-
                 {/* LADO ESQUERDO: FILA DE PEDIDOS */}
                 <div className="w-1/3 bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
                     <div className="p-6 bg-slate-900 text-white">
                         <h2 className="text-xl font-black flex items-center gap-2 mb-4"><Clock className="text-blue-400" /> AGUARDANDO CAIXA</h2>
                         <div className="relative">
                             <Search className="absolute left-3 top-3 text-slate-400" size={18} />
-                            <input type="text" placeholder="Buscar N.º Pedido ou Cliente..." value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 outline-none text-sm font-bold text-white transition-colors" />
+                            <input
+                                type="text"
+                                placeholder="Buscar N.º Pedido ou Cliente..."
+                                value={busca}
+                                onChange={(e) => setBusca(e.target.value)}
+                                title="Pesquise por número do pedido ou nome do cliente na fila"
+                                className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 outline-none text-sm font-bold text-white transition-colors"
+                            />
                         </div>
                     </div>
 
@@ -184,7 +168,12 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                             <div className="text-center p-8 text-slate-400 font-bold"><CheckCircle size={48} className="mx-auto mb-4 opacity-50 text-green-500" />A fila está vazia.</div>
                         ) : (
                             pedidosFiltrados.map(pedido => (
-                                <div key={pedido.id} onClick={() => setPedidoSelecionado(pedido)} className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${pedidoSelecionado?.id === pedido.id ? 'bg-blue-50 border-blue-500 shadow-md transform scale-[1.02]' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
+                                <div
+                                    key={pedido.id}
+                                    onClick={() => setPedidoSelecionado(pedido)}
+                                    title={`Clique para selecionar o Pedido #${pedido.id}`}
+                                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${pedidoSelecionado?.id === pedido.id ? 'bg-blue-50 border-blue-500 shadow-md transform scale-[1.02]' : 'bg-white border-slate-200 hover:border-blue-300'}`}
+                                >
                                     <div className="flex justify-between items-start mb-2">
                                         <span className="bg-slate-900 text-white px-2 py-1 rounded text-[10px] font-black tracking-widest uppercase">#{pedido.id}</span>
                                         <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Clock size={12} /> {calcularTempoEspera(pedido.horaEnvio)}</span>
@@ -241,17 +230,17 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                 </table>
                                 <div className="mt-8 flex justify-end">
                                     <div className="w-64 space-y-2 text-sm font-bold text-slate-500">
-                                        <div className="flex justify-between"><span>Subtotal:</span><span>R$ {(pedidoSelecionado.valorSubtotal || 0).toFixed(2)}</span></div>
-                                        <div className="flex justify-between text-orange-500"><span>Desconto Aplicado:</span><span>- R$ {(pedidoSelecionado.desconto || 0).toFixed(2)}</span></div>
+                                        <div className="flex justify-between" title="Valor total bruto antes do desconto"><span>Subtotal:</span><span>R$ {(pedidoSelecionado.valorSubtotal || 0).toFixed(2)}</span></div>
+                                        <div className="flex justify-between text-orange-500" title="Desconto total concedido no balcão"><span>Desconto Aplicado:</span><span>- R$ {(pedidoSelecionado.desconto || 0).toFixed(2)}</span></div>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="p-6 bg-slate-900 border-t border-slate-800 flex flex-col xl:flex-row items-center justify-between gap-4">
                                 <button
-                                    onClick={() => setModalDevolucaoAberto(true)} // SUBSTITUÍDO: Abre Modal em vez do window.confirm
+                                    onClick={() => setModalDevolucaoAberto(true)}
                                     className="px-6 py-4 bg-slate-800 text-red-400 hover:bg-red-500 hover:text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors border border-slate-700 w-full xl:w-auto"
-                                    title="O cliente desistiu ou quer alterar o pedido"
+                                    title="Devolver pedido para que o vendedor realize alterações no balcão"
                                 >
                                     <Undo size={20} /> DEVOLVER AO VENDEDOR
                                 </button>
@@ -259,6 +248,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                 <button
                                     onClick={() => setModalPagamentoAberto(true)}
                                     className="px-8 py-4 bg-green-500 hover:bg-green-400 text-slate-900 font-black text-lg rounded-xl flex items-center justify-center gap-3 shadow-lg w-full xl:w-auto transition-transform transform hover:scale-105"
+                                    title="Abrir a tela de finalização financeira e escolha do método de pagamento"
                                 >
                                     <DollarSign size={24} /> INICIAR RECEBIMENTO
                                 </button>
@@ -273,7 +263,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                 <ModalFinalizarVenda totalVenda={pedidoSelecionado?.valorTotal || 0} clienteSelecionado={pedidoSelecionado?.cliente} onClose={() => setModalPagamentoAberto(false)} onConfirmarVenda={confirmarRecebimento} />
             )}
 
-            {/* MODAL DE CONFIRMAÇÃO DE DEVOLUÇÃO (SUBSTITUI O window.confirm) */}
+            {/* MODAL DE CONFIRMAÇÃO DE DEVOLUÇÃO */}
             {modalDevolucaoAberto && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 print:hidden animate-fade-in">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden p-8 text-center">
@@ -287,12 +277,14 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                         <div className="flex gap-4">
                             <button
                                 onClick={() => setModalDevolucaoAberto(false)}
+                                title="Cancelar e manter o pedido na fila do caixa"
                                 className="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors"
                             >
                                 CANCELAR
                             </button>
                             <button
                                 onClick={confirmarDevolucaoAoVendedor}
+                                title="Confirmar devolução para o sistema de vendas"
                                 className="flex-1 py-4 bg-orange-500 text-white font-black rounded-xl hover:bg-orange-400 transition-colors shadow-lg shadow-orange-500/30"
                             >
                                 SIM, DEVOLVER

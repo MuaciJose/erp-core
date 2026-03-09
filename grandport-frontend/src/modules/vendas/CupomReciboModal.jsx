@@ -68,7 +68,7 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
 
         return (
             <div className={`mx-auto ${largura} p-4 font-mono text-black`}>
-                <div className="text-center border-b border-black pb-3 mb-3 border-dashed">
+                <div className="text-center border-b border-black pb-3 mb-3 border-dashed" title="Dados da Empresa">
                     <h1 className="text-lg font-black uppercase leading-none mb-2">{config.nomeFantasia || 'NOME DA LOJA'}</h1>
                     {config.razaoSocial && <p className={`${txt} uppercase leading-tight`}>{config.razaoSocial}</p>}
                     {config.cnpj && <p className={`${txt} mt-1 font-bold`}>CNPJ: {config.cnpj}</p>}
@@ -76,17 +76,16 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     {config.telefone && <p className={`${txt} mt-1`}>Tel: {config.telefone}</p>}
                 </div>
 
-                <div className={`border-b border-black pb-3 mb-3 border-dashed ${txt}`}>
-                    {/* REDUZIDO: de text-sm para text-[10px] */}
-                    <p className="font-black text-center mb-2 text-[10px]">{tituloCupom} - #{pedido.id}</p>
-                    <p><strong>Data:</strong> {new Date(pedido.dataHora || Date.now()).toLocaleString('pt-BR')}</p>
-                    <p><strong>Cliente:</strong> {extrairNomeCliente(pedido.cliente)}</p>
-                    {veiculoNome !== 'Nenhum' && <p><strong>Veículo:</strong> {veiculoNome} {placa && `(${placa})`}</p>}
-                    {config.exibirVendedorCupom && <p><strong>Vend:</strong> {vendedorNome}</p>}
-                    {isOrcamento && <p className="font-bold mt-1">Válido por {config.diasValidadeOrcamento} dias.</p>}
+                <div className={`border-b border-black pb-3 mb-3 border-dashed ${txt}`} title="Informações do Pedido">
+                    <p className="font-black text-center mb-2 text-[10px]" title="Tipo e número do documento">{tituloCupom} - #{pedido.id}</p>
+                    <p title="Data e hora da emissão"><strong>Data:</strong> {new Date(pedido.dataHora || Date.now()).toLocaleString('pt-BR')}</p>
+                    <p title="Identificação do cliente"><strong>Cliente:</strong> {extrairNomeCliente(pedido.cliente)}</p>
+                    {veiculoNome !== 'Nenhum' && <p title="Veículo vinculado ao serviço"><strong>Veículo:</strong> {veiculoNome} {placa && `(${placa})`}</p>}
+                    {config.exibirVendedorCupom && <p title="Profissional que realizou a venda"><strong>Vend:</strong> {vendedorNome}</p>}
+                    {isOrcamento && <p className="font-bold mt-1" title="Prazo de validade legal do orçamento">Válido por {config.diasValidadeOrcamento} dias.</p>}
                 </div>
 
-                <table className={`w-full text-left mb-4 ${txt}`}>
+                <table className={`w-full text-left mb-4 ${txt}`} title="Lista de Itens">
                     <thead>
                     <tr className="border-b border-black border-dashed">
                         <th className="pb-2 w-2/3">DESCRIÇÃO</th>
@@ -104,22 +103,22 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                                     <p className="font-bold">{item.produto?.nome || item.nome}</p>
                                     <p className="text-[10px] text-gray-500">Cód: {item.produto?.sku || item.codigo || 'S/N'}</p>
                                 </td>
-                                <td className="py-2 text-center font-bold">{qtd}</td>
-                                <td className="py-2 text-right font-bold">{(preco * qtd).toFixed(2)}</td>
+                                <td className="py-2 text-center font-bold" title="Quantidade faturada">{qtd}</td>
+                                <td className="py-2 text-right font-bold" title="Subtotal do item">{(preco * qtd).toFixed(2)}</td>
                             </tr>
                         )
                     })}
                     </tbody>
                 </table>
 
-                <div className={`border-t border-black pt-2 mb-4 border-dashed flex flex-col items-end ${txt}`}>
-                    <div className="w-full flex justify-between mb-1 text-gray-600"><span>Subtotal:</span><span>R$ {valorSubtotal.toFixed(2)}</span></div>
-                    {valorDesconto > 0 && <div className="w-full flex justify-between mb-1 text-gray-600"><span>Desconto:</span><span>- R$ {valorDesconto.toFixed(2)}</span></div>}
-                    <div className="w-full flex justify-between font-black mt-2 pt-2 border-t border-black text-sm"><span>TOTAL:</span><span>R$ {valorTotal.toFixed(2)}</span></div>
-                    {!isOrcamento && <div className="w-full flex justify-between mt-3 font-bold"><span>Pagamento:</span><span className="uppercase">{pedido.metodoPagamento || 'DINHEIRO'}</span></div>}
+                <div className={`border-t border-black pt-2 mb-4 border-dashed flex flex-col items-end ${txt}`} title="Resumo de Valores">
+                    <div className="w-full flex justify-between mb-1 text-gray-600" title="Soma total sem descontos"><span>Subtotal:</span><span>R$ {valorSubtotal.toFixed(2)}</span></div>
+                    {valorDesconto > 0 && <div className="w-full flex justify-between mb-1 text-gray-600" title="Desconto total concedido"><span>Desconto:</span><span>- R$ {valorDesconto.toFixed(2)}</span></div>}
+                    <div className="w-full flex justify-between font-black mt-2 pt-2 border-t border-black text-sm" title="Valor final a pagar"><span>TOTAL:</span><span>R$ {valorTotal.toFixed(2)}</span></div>
+                    {!isOrcamento && <div className="w-full flex justify-between mt-3 font-bold" title="Forma de recebimento"><span>Pagamento:</span><span className="uppercase">{pedido.metodoPagamento || 'DINHEIRO'}</span></div>}
                 </div>
 
-                <div className={`text-center mt-6 ${txt}`}>
+                <div className={`text-center mt-6 ${txt}`} title="Rodapé informativo">
                     <p className="whitespace-pre-line font-bold">{isOrcamento ? 'Orçamento sujeito a alteração de valores.' : config.mensagemRodape}</p>
                     <p className="mt-4 text-[9px] text-gray-400 font-sans">Gerado por Grandport ERP</p>
                 </div>
@@ -134,7 +133,7 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
         return (
             <div className="mx-auto w-[210mm] min-h-[297mm] p-8 font-sans bg-white text-slate-900 leading-snug">
 
-                <div className="flex justify-between items-start border-b-2 border-slate-800 pb-3 mb-4">
+                <div className="flex justify-between items-start border-b-2 border-slate-800 pb-3 mb-4" title="Cabeçalho da Unidade">
                     <div className="flex items-center gap-4">
                         {config.logoBase64 && (
                             <img src={config.logoBase64} alt="Logo" className="w-20 h-20 object-contain" />
@@ -150,15 +149,14 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                         </div>
                     </div>
                     <div className="text-right">
-                        {/* REDUZIDO: de text-lg para text-sm para o título ficar discreto */}
-                        <h2 className="text-sm font-black uppercase border border-slate-800 px-3 py-1 rounded bg-slate-50 inline-block">{tituloCupom}</h2>
-                        <p className="text-base font-black mt-1">Nº {pedido.id}</p>
+                        <h2 className="text-sm font-black uppercase border border-slate-800 px-3 py-1 rounded bg-slate-50 inline-block" title="Finalidade do documento">{tituloCupom}</h2>
+                        <p className="text-base font-black mt-1" title="Número sequencial interno">Nº {pedido.id}</p>
                         <p className="text-[10px] font-medium text-slate-600">Emitido: {new Date(pedido.dataHora || Date.now()).toLocaleString('pt-BR')}</p>
                         {isOrcamento && <p className="text-[10px] font-bold text-red-600 mt-0.5">Válido por {config.diasValidadeOrcamento} dias</p>}
                     </div>
                 </div>
 
-                <div className="border border-slate-300 rounded p-2 mb-4 flex justify-between bg-slate-50 text-xs">
+                <div className="border border-slate-300 rounded p-2 mb-4 flex justify-between bg-slate-50 text-xs" title="Dados Complementares">
                     <div>
                         <p className="text-[9px] font-black uppercase text-slate-500 mb-0.5">Cliente</p>
                         <p className="font-bold text-sm text-slate-900">{extrairNomeCliente(pedido.cliente)}</p>
@@ -176,7 +174,7 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     </div>
                 </div>
 
-                <table className="w-full text-left border-collapse mb-4">
+                <table className="w-full text-left border-collapse mb-4" title="Relação de Produtos e Valores">
                     <thead>
                     <tr className="border-b-2 border-slate-800 text-slate-800">
                         <th className="py-1 px-1 text-[10px] font-black uppercase w-24">Cód/SKU</th>
@@ -206,24 +204,24 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                 <div className="flex justify-between items-end mt-4">
                     <div className="w-1/2">
                         {!isOrcamento && (
-                            <div className="mb-4">
+                            <div className="mb-4" title="Método de quitação">
                                 <p className="text-[9px] font-black uppercase text-slate-500 mb-0.5">Pagamento</p>
                                 <p className="font-bold text-xs text-slate-800 uppercase">{pedido.metodoPagamento || 'DINHEIRO'}</p>
                             </div>
                         )}
-                        <div className="mt-8 border-t border-slate-400 w-3/4 pt-1 text-center">
+                        <div className="mt-8 border-t border-slate-400 w-3/4 pt-1 text-center" title="Espaço para validação do comprador">
                             <p className="text-[10px] font-bold text-slate-600">Assinatura do Cliente</p>
                         </div>
                     </div>
 
-                    <div className="w-64 bg-slate-50 p-2 rounded border border-slate-300 text-xs">
+                    <div className="w-64 bg-slate-50 p-2 rounded border border-slate-300 text-xs" title="Totalização">
                         <div className="flex justify-between mb-1 text-slate-700 font-medium"><span>Subtotal:</span><span>R$ {valorSubtotal.toFixed(2)}</span></div>
                         {valorDesconto > 0 && <div className="flex justify-between mb-1 text-orange-600 font-bold"><span>Desconto:</span><span>- R$ {valorDesconto.toFixed(2)}</span></div>}
                         <div className="flex justify-between font-black text-sm mt-1 pt-1 border-t border-slate-300 text-slate-900"><span>TOTAL:</span><span>R$ {valorTotal.toFixed(2)}</span></div>
                     </div>
                 </div>
 
-                <div className="text-center mt-6 text-[10px] text-slate-500 font-medium">
+                <div className="text-center mt-6 text-[10px] text-slate-500 font-medium" title="Informações Adicionais">
                     <p>{isOrcamento ? 'Orçamento sujeito a alteração de valores.' : config.mensagemRodape}</p>
                 </div>
             </div>
@@ -234,13 +232,37 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-start justify-center z-[9999] p-4 print:p-0 print:bg-white print:backdrop-blur-none overflow-y-auto custom-scrollbar">
 
             <div className="fixed top-4 left-4 flex gap-2 print:hidden z-[10000] bg-white p-2 rounded-xl shadow-xl border border-slate-200">
-                <button onClick={() => setTamanhoPapel('80mm')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tamanhoPapel === '80mm' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:bg-slate-100'}`}><ScrollText size={16} /> Bobina 80mm</button>
-                <button onClick={() => setTamanhoPapel('A4')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tamanhoPapel === 'A4' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:bg-slate-100'}`}><FileText size={16} /> Folha A4</button>
+                <button
+                    onClick={() => setTamanhoPapel('80mm')}
+                    title="Alternar visualização para impressoras térmicas de 80mm"
+                    className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tamanhoPapel === '80mm' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:bg-slate-100'}`}
+                >
+                    <ScrollText size={16} /> Bobina 80mm
+                </button>
+                <button
+                    onClick={() => setTamanhoPapel('A4')}
+                    title="Alternar visualização para impressoras comuns (Folha A4)"
+                    className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tamanhoPapel === 'A4' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:bg-slate-100'}`}
+                >
+                    <FileText size={16} /> Folha A4
+                </button>
             </div>
 
             <div className="fixed top-4 right-4 flex gap-4 print:hidden z-[10000]">
-                <button onClick={handleImprimir} className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-black shadow-lg hover:bg-blue-700 flex items-center gap-2 transition-transform transform hover:scale-105"><Printer size={18} /> IMPRIMIR {isOrcamento ? 'ORÇAMENTO' : 'DOCUMENTO'}</button>
-                <button onClick={onClose} className="bg-slate-800 text-white p-2.5 rounded-lg hover:bg-red-500 shadow-lg transition-colors"><X size={20} /></button>
+                <button
+                    onClick={handleImprimir}
+                    title="Enviar este documento para a impressora configurada"
+                    className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-black shadow-lg hover:bg-blue-700 flex items-center gap-2 transition-transform transform hover:scale-105"
+                >
+                    <Printer size={18} /> IMPRIMIR {isOrcamento ? 'ORÇAMENTO' : 'DOCUMENTO'}
+                </button>
+                <button
+                    onClick={onClose}
+                    title="Fechar esta visualização e retornar à tela anterior"
+                    className="bg-slate-800 text-white p-2.5 rounded-lg hover:bg-red-500 shadow-lg transition-colors"
+                >
+                    <X size={20} />
+                </button>
             </div>
 
             <div id="recibo-modal-print" className={`bg-white text-black shadow-2xl mt-20 mb-16 print:mt-0 print:mb-0 print:shadow-none ${tamanhoPapel === 'A4' ? 'border border-gray-300' : ''}`}>

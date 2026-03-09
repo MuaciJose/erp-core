@@ -189,6 +189,7 @@ export const Pdv = ({ setPaginaAtiva }) => {
 
                     <button
                         onClick={() => setPaginaAtiva('caixa')}
+                        title="Ir para a tela de abertura e fechamento de caixa"
                         className="w-full bg-slate-900 text-white py-4 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-slate-800 transition-all mb-4"
                     >
                         <Wallet size={20} /> IR PARA CONTROLE DE CAIXA
@@ -210,14 +211,22 @@ export const Pdv = ({ setPaginaAtiva }) => {
                     </p>
 
                     <div className="flex flex-col md:flex-row gap-6">
-                        <button onClick={() => window.print()} className="bg-white text-green-700 px-8 py-5 rounded-2xl font-black text-xl hover:bg-slate-100 shadow-2xl flex items-center justify-center gap-3 transition-transform hover:scale-105 active:scale-95">
+                        <button
+                            onClick={() => window.print()}
+                            title="Imprimir uma via do cupom de venda"
+                            className="bg-white text-green-700 px-8 py-5 rounded-2xl font-black text-xl hover:bg-slate-100 shadow-2xl flex items-center justify-center gap-3 transition-transform hover:scale-105 active:scale-95"
+                        >
                             <Printer size={32} /> IMPRIMIR RECIBO
                         </button>
-                        <button onClick={() => {
-                            setCarrinho([]);
-                            setClienteSelecionado(null);
-                            setVendaFinalizada(null);
-                        }} className="bg-green-800 border-2 border-green-500 text-white px-8 py-5 rounded-2xl font-black text-xl hover:bg-green-900 shadow-2xl flex items-center justify-center gap-3 transition-transform hover:scale-105 active:scale-95">
+                        <button
+                            onClick={() => {
+                                setCarrinho([]);
+                                setClienteSelecionado(null);
+                                setVendaFinalizada(null);
+                            }}
+                            title="Limpar tela e iniciar um novo atendimento (Atalho: ESC)"
+                            className="bg-green-800 border-2 border-green-500 text-white px-8 py-5 rounded-2xl font-black text-xl hover:bg-green-900 shadow-2xl flex items-center justify-center gap-3 transition-transform hover:scale-105 active:scale-95"
+                        >
                             <PlusCircle size={32} /> NOVA VENDA (ESC)
                         </button>
                     </div>
@@ -239,7 +248,7 @@ export const Pdv = ({ setPaginaAtiva }) => {
                         <p className="text-[10px] text-slate-400 uppercase">Operador</p>
                         <p className="text-sm font-bold">CAIXA 01</p>
                     </div>
-                    <button onClick={toggleFullScreen} className="p-2 hover:bg-slate-700 rounded-full transition-colors" title="Alternar Tela Cheia">
+                    <button onClick={toggleFullScreen} className="p-2 hover:bg-slate-700 rounded-full transition-colors" title={isFullScreen ? "Sair do modo tela cheia" : "Entrar no modo tela cheia"}>
                         {isFullScreen ? <Minimize size={24} /> : <Maximize size={24} />}
                     </button>
                 </div>
@@ -251,9 +260,9 @@ export const Pdv = ({ setPaginaAtiva }) => {
                 <div className="p-6 bg-slate-50 border-b border-slate-200 z-20">
                     <BuscaInteligente onSelect={adicionarAoCarrinho} />
                     <div className="flex justify-between mt-2 text-xs text-slate-500 px-2">
-                        <span>[F2] Buscar Peça</span>
-                        <span>[F10] Finalizar Venda</span>
-                        <span>[F9] Venda Perdida</span>
+                        <span title="Pressione F2 para focar no campo de busca"> [F2] Buscar Peça</span>
+                        <span title="Pressione F10 para abrir o fechamento de venda"> [F10] Finalizar Venda</span>
+                        <span title="Pressione F9 para registrar uma peça que não foi encontrada no estoque"> [F9] Venda Perdida</span>
                     </div>
                 </div>
 
@@ -279,7 +288,7 @@ export const Pdv = ({ setPaginaAtiva }) => {
                                         <p className="text-xs text-slate-500 font-mono">{item.sku}</p>
                                     </td>
                                     <td className="p-4 text-right font-medium text-slate-600">{formatCurrency(precoProduto)}</td>
-                                    <td className="p-4 text-center font-bold text-slate-800 bg-slate-50 rounded-lg mx-2">{item.qtd}</td>
+                                    <td className="p-4 text-center font-bold text-slate-800 bg-slate-50 rounded-lg mx-2" title="Quantidade atual deste item no carrinho">{item.qtd}</td>
                                     <td className="p-4 text-right font-black text-slate-800">{formatCurrency(precoProduto * item.qtd)}</td>
                                 </tr>
                             );
@@ -293,27 +302,33 @@ export const Pdv = ({ setPaginaAtiva }) => {
 
                 <div className="bg-slate-900 text-white p-6 flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
                     <div className="flex gap-8 items-center">
-                        <div>
+                        <div title="Total de itens diferentes no carrinho">
                             <p className="text-slate-400 text-xs uppercase font-bold">Itens</p>
                             <p className="text-2xl font-bold">{carrinho.length}</p>
                         </div>
-                        <div>
+                        <div title="Valor total dos produtos sem considerar descontos do cliente">
                             <p className="text-slate-400 text-xs uppercase font-bold">Subtotal</p>
                             <p className="text-2xl font-bold text-slate-200">{formatCurrency(calcularTotal())}</p>
                         </div>
                         <button
                             onClick={() => setShowModalPerdida(true)}
+                            title="Registrar falta de item no estoque (Atalho: F9)"
                             className="ml-8 bg-red-600/20 border border-red-500 text-red-400 px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-red-600/40"
                         >
                             <Ban size={16} /> Venda Perdida (F9)
                         </button>
                     </div>
                     <div className="flex items-center gap-6">
-                        <div className="text-right">
+                        <div className="text-right" title="Valor final a ser pago pelo cliente">
                             <p className="text-green-400 text-xs uppercase font-bold mb-1">Total a Pagar</p>
                             <p className="text-5xl font-black tracking-tighter text-white">{formatCurrency(calcularTotal())}</p>
                         </div>
-                        <button onClick={() => setModalAberto(true)} disabled={carrinho.length === 0} className="bg-green-500 hover:bg-green-600 disabled:bg-slate-700 disabled:text-slate-500 text-white px-8 py-4 rounded-xl font-black text-xl shadow-lg hover:shadow-green-500/20 transition-all transform hover:scale-105 active:scale-95">
+                        <button
+                            onClick={() => setModalAberto(true)}
+                            disabled={carrinho.length === 0}
+                            title="Prosseguir para o fechamento e pagamento (Atalho: F10)"
+                            className="bg-green-500 hover:bg-green-600 disabled:bg-slate-700 disabled:text-slate-500 text-white px-8 py-4 rounded-xl font-black text-xl shadow-lg hover:shadow-green-500/20 transition-all transform hover:scale-105 active:scale-95"
+                        >
                             FINALIZAR<span className="block text-[10px] font-normal opacity-80">TECLA F10</span>
                         </button>
                     </div>
@@ -335,14 +350,20 @@ export const Pdv = ({ setPaginaAtiva }) => {
                         <h2 className="text-xl font-black mb-4 text-red-600">Registrar Falta de Peça</h2>
                         <input className="w-full p-3 border rounded-lg mb-4" placeholder="Nome da peça ou Referência..." id="inputPerdida" autoFocus />
                         <div className="flex gap-2">
-                            <button onClick={() => setShowModalPerdida(false)} className="flex-1 py-3 bg-gray-200 rounded-xl font-bold">CANCELAR</button>
-                            <button onClick={async () => {
-                                const desc = document.getElementById('inputPerdida').value;
-                                if (!desc) return toast.error("Descreva a peça!");
-                                await api.post('/api/vendas-perdidas', { descricaoPeca: desc });
-                                setShowModalPerdida(false);
-                                toast.success("Registrado! O gestor será avisado.");
-                            }} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold">CONFIRMAR</button>
+                            <button onClick={() => setShowModalPerdida(false)} title="Cancelar e fechar janela" className="flex-1 py-3 bg-gray-200 rounded-xl font-bold">CANCELAR</button>
+                            <button
+                                onClick={async () => {
+                                    const desc = document.getElementById('inputPerdida').value;
+                                    if (!desc) return toast.error("Descreva a peça!");
+                                    await api.post('/api/vendas-perdidas', { descricaoPeca: desc });
+                                    setShowModalPerdida(false);
+                                    toast.success("Registrado! O gestor será avisado.");
+                                }}
+                                title="Confirmar registro de falta de produto"
+                                className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold"
+                            >
+                                CONFIRMAR
+                            </button>
                         </div>
                     </div>
                 </div>
