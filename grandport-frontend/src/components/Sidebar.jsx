@@ -127,7 +127,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                             {nomeEmpresa}
                         </h1>
                         <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                            Powered by GrandPort
+                            Powered by STM Sistemas
                         </p>
                     </div>
                 )}
