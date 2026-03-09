@@ -173,10 +173,7 @@ export const Configuracoes = () => {
         const loadId = toast.loading(`Obtendo QR Code (Tentativa ${numTentativa})...`);
 
         try {
-            // O Java deve retornar exatamente o JSON que você me mandou
             const res = await api.get('/api/whatsapp/qrcode');
-
-            // 🚀 MÁGICA: Aqui a gente captura o base64 do objeto 'qrcode'
             const qrCodeBase64 = res.data?.qrcode?.base64 || res.data?.base64;
 
             if (res.data?.instance?.status === 'open' || res.data?.status === 'open') {
@@ -186,11 +183,10 @@ export const Configuracoes = () => {
             }
             else if (qrCodeBase64) {
                 setStatusWhatsapp('AGUARDANDO_LEITURA');
-                setQrCodeBase64(qrCodeBase64); // Salva no estado para exibir na tela
+                setQrCodeBase64(qrCodeBase64);
                 toast.success('Aponte a câmera do celular!', { id: loadId });
             }
             else {
-                // Se ainda for count: 0, tenta de novo
                 if (numTentativa < 8) {
                     setTimeout(() => solicitarQrCode(numTentativa + 1), 3000);
                 } else {
@@ -325,7 +321,12 @@ export const Configuracoes = () => {
                     <h1 className="text-3xl font-black text-slate-800 flex items-center gap-3"><Settings className="text-slate-600 bg-slate-200 p-1.5 rounded-xl" size={40} /> CONFIGURAÇÕES</h1>
                     <p className="text-slate-500 mt-1">Gerencie a identidade e as regras do GrandPort.</p>
                 </div>
-                <button onClick={salvarConfiguracoes} disabled={salvando} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-black shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-all disabled:opacity-50">
+                <button
+                    onClick={salvarConfiguracoes}
+                    disabled={salvando}
+                    title="Aplicar e salvar permanentemente todas as alterações realizadas em todas as abas"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-black shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-all disabled:opacity-50"
+                >
                     <Save size={20} /> {salvando ? 'PROCESSANDO...' : 'SALVAR TUDO'}
                 </button>
             </div>
@@ -333,12 +334,12 @@ export const Configuracoes = () => {
             <div className="flex flex-col lg:flex-row gap-8 flex-1">
                 {/* MENU LATERAL */}
                 <div className="w-full lg:w-64 flex flex-col gap-2">
-                    <button onClick={() => setAbaAtiva('EMPRESA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'EMPRESA' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Building2 size={20} /> Dados da Empresa</button>
-                    <button onClick={() => setAbaAtiva('VENDEDORES')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'VENDEDORES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Users size={20} /> Vendedores</button>
-                    <button onClick={() => setAbaAtiva('IMPRESSAO')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'IMPRESSAO' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Printer size={20} /> Impressão</button>
-                    <button onClick={() => setAbaAtiva('REGRAS')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'REGRAS' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Sliders size={20} /> Regras</button>
-                    <button onClick={() => setAbaAtiva('INTEGRACOES')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'INTEGRACOES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Plug size={20} /> Integrações</button>
-                    <button onClick={() => setAbaAtiva('SISTEMA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'SISTEMA' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Database size={20} /> Sistema</button>
+                    <button onClick={() => setAbaAtiva('EMPRESA')} title="Visualizar e editar dados cadastrais e endereço" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'EMPRESA' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Building2 size={20} /> Dados da Empresa</button>
+                    <button onClick={() => setAbaAtiva('VENDEDORES')} title="Configurar comissões da equipe de vendas" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'VENDEDORES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Users size={20} /> Vendedores</button>
+                    <button onClick={() => setAbaAtiva('IMPRESSAO')} title="Configurar formatos de cupom e impressoras" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'IMPRESSAO' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Printer size={20} /> Impressão</button>
+                    <button onClick={() => setAbaAtiva('REGRAS')} title="Definir limites de desconto e estoque" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'REGRAS' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Sliders size={20} /> Regras</button>
+                    <button onClick={() => setAbaAtiva('INTEGRACOES')} title="Gerenciar conexões com WhatsApp e APIs externas" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'INTEGRACOES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Plug size={20} /> Integrações</button>
+                    <button onClick={() => setAbaAtiva('SISTEMA')} title="Ações de segurança, backup e manutenção do banco de dados" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'SISTEMA' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Database size={20} /> Sistema</button>
                 </div>
 
                 <div className="flex-1 bg-white p-8 rounded-3xl shadow-sm border border-slate-200 min-h-[500px]">
@@ -351,12 +352,12 @@ export const Configuracoes = () => {
                             <div className="flex flex-col md:flex-row items-center gap-8 bg-blue-50 p-6 rounded-3xl border-2 border-dashed border-blue-200">
                                 <div className="relative group">
                                     {config.logoBase64 ? <img src={config.logoBase64} alt="Logo" className="w-32 h-32 object-contain bg-white rounded-2xl shadow-md border-2 border-white" /> : <div className="w-32 h-32 bg-slate-200 rounded-2xl flex items-center justify-center text-slate-400"><Plus size={40} /></div>}
-                                    <label className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-xl cursor-pointer hover:bg-blue-700 transition-all shadow-lg"><Camera size={20} /><input type="file" className="hidden" accept="image/*" onChange={handleLogoChange} /></label>
+                                    <label title="Carregar nova imagem de logo do seu computador" className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-xl cursor-pointer hover:bg-blue-700 transition-all shadow-lg"><Camera size={20} /><input type="file" className="hidden" accept="image/*" onChange={handleLogoChange} /></label>
                                 </div>
                                 <div className="flex-1 text-center md:text-left">
                                     <h3 className="font-black text-blue-900 text-lg">Logo da Empresa</h3>
                                     <p className="text-sm text-blue-600">Esta imagem aparecerá nos cabeçalhos dos documentos.</p>
-                                    {config.logoBase64 && <button onClick={() => setConfig(prev => ({...prev, logoBase64: ''}))} className="text-red-500 text-xs font-black mt-2 hover:underline">REMOVER IMAGEM</button>}
+                                    {config.logoBase64 && <button onClick={() => setConfig(prev => ({...prev, logoBase64: ''}))} title="Excluir o logotipo atual" className="text-red-500 text-xs font-black mt-2 hover:underline">REMOVER IMAGEM</button>}
                                 </div>
                             </div>
 
@@ -364,8 +365,8 @@ export const Configuracoes = () => {
                                 <div>
                                     <label className="text-xs font-black text-blue-600 uppercase">CNPJ (Auto-Busca)</label>
                                     <div className="relative mt-1">
-                                        <input type="text" name="cnpj" value={config.cnpj || ''} onChange={handleChange} className="w-full p-3 pr-12 bg-blue-50 border-2 border-blue-200 rounded-xl font-black focus:border-blue-500 outline-none" />
-                                        <button onClick={buscarCNPJ} disabled={buscandoCnpj} className="absolute right-2 top-2 bottom-2 bg-blue-600 text-white p-2 rounded-lg">{buscandoCnpj ? <Loader2 className="animate-spin" size={18}/> : <Search size={18} />}</button>
+                                        <input type="text" name="cnpj" value={config.cnpj || ''} onChange={handleChange} title="Digite apenas números para realizar a busca automática" className="w-full p-3 pr-12 bg-blue-50 border-2 border-blue-200 rounded-xl font-black focus:border-blue-500 outline-none" />
+                                        <button onClick={buscarCNPJ} disabled={buscandoCnpj} title="Consultar dados da empresa automaticamente na Receita Federal via API" className="absolute right-2 top-2 bottom-2 bg-blue-600 text-white p-2 rounded-lg">{buscandoCnpj ? <Loader2 className="animate-spin" size={18}/> : <Search size={18} />}</button>
                                     </div>
                                 </div>
                                 <div>
@@ -435,7 +436,7 @@ export const Configuracoes = () => {
                                             <div className="flex flex-col items-end gap-1">
                                                 <label className="text-[10px] font-bold text-slate-400 uppercase">Comissão (%)</label>
                                                 <div className="relative">
-                                                    <input type="number" step="0.1" value={configVendedor?.comissao || 0} onChange={(e) => handleComissaoChange(membro.id, e.target.value)} className="w-24 p-2 bg-slate-50 border-2 border-slate-200 rounded-lg font-black text-center text-blue-600 outline-none focus:border-blue-500"/>
+                                                    <input type="number" step="0.1" value={configVendedor?.comissao || 0} onChange={(e) => handleComissaoChange(membro.id, e.target.value)} title={`Definir percentual de comissão padrão para ${membro.nome}`} className="w-24 p-2 bg-slate-50 border-2 border-slate-200 rounded-lg font-black text-center text-blue-600 outline-none focus:border-blue-500"/>
                                                     <Percent size={12} className="absolute right-2 top-3 text-slate-400" />
                                                 </div>
                                             </div>
@@ -454,7 +455,7 @@ export const Configuracoes = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase">Tamanho Padrão do Papel (PDV)</label>
-                                    <select name="tamanhoImpressora" value={config.tamanhoImpressora || '80mm'} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none">
+                                    <select name="tamanhoImpressora" value={config.tamanhoImpressora || '80mm'} onChange={handleChange} title="Escolha o formato que melhor se adapta à sua impressora de balcão" className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none">
                                         <option value="80mm">Bobina 80mm</option>
                                         <option value="58mm">Bobina 58mm</option>
                                         <option value="A4">Folha A4</option>
@@ -462,7 +463,7 @@ export const Configuracoes = () => {
                                 </div>
                                 <div className="flex items-center mt-6">
                                     <input type="checkbox" id="exibirVendedorCupom" name="exibirVendedorCupom" checked={config.exibirVendedorCupom || false} onChange={handleChange} className="w-6 h-6 accent-blue-600 rounded cursor-pointer" />
-                                    <label htmlFor="exibirVendedorCupom" className="ml-3 font-bold text-slate-700 cursor-pointer">Exibir nome do vendedor no documento impresso</label>
+                                    <label htmlFor="exibirVendedorCupom" className="ml-3 font-bold text-slate-700 cursor-pointer" title="Se marcado, o nome do vendedor que realizou a venda aparecerá no cabeçalho do recibo">Exibir nome do vendedor no documento impresso</label>
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="text-xs font-bold text-slate-500 uppercase">Mensagem Padrão no Rodapé (Garantia/Agradecimento)</label>
@@ -480,11 +481,11 @@ export const Configuracoes = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase">Desconto Máximo Permitido (%)</label>
-                                    <input type="number" step="0.1" name="descontoMaximoPermitido" value={config.descontoMaximoPermitido || 0} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-blue-700 focus:border-blue-500 outline-none" />
+                                    <input type="number" step="0.1" name="descontoMaximoPermitido" value={config.descontoMaximoPermitido || 0} onChange={handleChange} title="Bloqueia descontos superiores a este valor nas telas de venda" className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-blue-700 focus:border-blue-500 outline-none" />
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase">Validade do Orçamento (Dias)</label>
-                                    <input type="number" name="diasValidadeOrcamento" value={config.diasValidadeOrcamento || 5} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none" />
+                                    <input type="number" name="diasValidadeOrcamento" value={config.diasValidadeOrcamento || 5} onChange={handleChange} title="Período em que o orçamento impresso é considerado válido pela empresa" className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none" />
                                 </div>
 
                                 <div className="md:col-span-2 mt-4 p-5 bg-orange-50 border-2 border-orange-200 rounded-2xl flex items-start gap-4">
@@ -498,18 +499,16 @@ export const Configuracoes = () => {
                         </div>
                     )}
 
-                    {/* ========================================================================= */}
-                    {/* 🚀 ABA INTEGRAÇÕES: ATUALIZADA COM O MÓDULO VISUAL DE QR CODE */}
-                    {/* ========================================================================= */}
+                    {/* ABA INTEGRAÇÕES */}
                     {abaAtiva === 'INTEGRACOES' && (
                         <div className="space-y-6 animate-fade-in">
                             <div className="flex justify-between items-center mb-6 border-b pb-4">
                                 <h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><Plug className="text-blue-500" /> Integrações e APIs</h2>
 
-                                {/* 🚀 NOVO BOTÃO DE TESTE DE CONEXÃO */}
                                 <button
                                     onClick={verificarConexaoAtiva}
                                     disabled={checandoConexao}
+                                    title="Validar se o WhatsApp ainda está conectado e pronto para enviar mensagens"
                                     className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all border-2 ${
                                         statusWhatsapp === 'CONECTADO'
                                             ? 'bg-green-50 border-green-200 text-green-700'
@@ -528,14 +527,13 @@ export const Configuracoes = () => {
                                         <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg"><Smartphone className="text-green-500" /> Motor WhatsApp ERP</h3>
                                         <p className="text-sm text-slate-500 font-medium">Conecte o seu celular para disparar orçamentos e comprovantes automaticamente.</p>
                                     </div>
-                                    <div className={`px-4 py-2 rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-inner border ${statusWhatsapp === 'CONECTADO' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-200 text-slate-600 border-slate-300'}`}>
+                                    <div title="Estado atual da sincronização com o aparelho celular" className={`px-4 py-2 rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-inner border ${statusWhatsapp === 'CONECTADO' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-200 text-slate-600 border-slate-300'}`}>
                                         {statusWhatsapp === 'CONECTADO' ? <CheckCircle size={14}/> : <Info size={14}/>}
                                         Status: {statusWhatsapp}
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                    {/* COLUNA 1: A MÁGICA (Para o Cliente Leigo) */}
                                     <div className="flex flex-col items-center justify-center bg-white p-8 rounded-2xl border-2 border-dashed border-slate-300 relative min-h-[300px]">
                                         {qrCodeBase64 ? (
                                             <div className="flex flex-col items-center animate-fade-in">
@@ -544,7 +542,7 @@ export const Configuracoes = () => {
                                                 </div>
                                                 <h4 className="font-black text-slate-800">Abra o WhatsApp</h4>
                                                 <p className="text-xs text-slate-500 text-center mt-1">Aparelhos conectados {'>'} Conectar aparelho<br/>e aponte a câmera.</p>
-                                                <button onClick={() => setQrCodeBase64(null)} className="mt-4 text-xs font-bold text-red-500 hover:underline">CANCELAR</button>
+                                                <button onClick={() => setQrCodeBase64(null)} title="Interromper processo de leitura" className="mt-4 text-xs font-bold text-red-500 hover:underline">CANCELAR</button>
                                             </div>
                                         ) : statusWhatsapp === 'CONECTADO' ? (
                                             <div className="flex flex-col items-center animate-fade-in text-center">
@@ -557,15 +555,19 @@ export const Configuracoes = () => {
                                                 <QrCode size={64} className="text-slate-300 mb-4" />
                                                 <h4 className="font-black text-slate-700 mb-1">Aparelho Desconectado</h4>
                                                 <p className="text-xs text-slate-500 mb-6">Para iniciar os disparos de PDF, vincule o seu número comercial ao sistema.</p>
-                                                <button onClick={solicitarQrCode} disabled={gerandoQr} className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl font-black shadow-lg shadow-green-500/30 flex items-center gap-2 transition-all">
+                                                <button
+                                                    onClick={solicitarQrCode}
+                                                    disabled={gerandoQr}
+                                                    title="Solicitar ao servidor a geração de um novo código de pareamento"
+                                                    className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl font-black shadow-lg shadow-green-500/30 flex items-center gap-2 transition-all"
+                                                >
                                                     {gerandoQr ? <Loader2 className="animate-spin" size={18}/> : <Smartphone size={18}/>}
-                                                    {gerandoQr ? 'AGUARDE...' : 'CONECTAR CELULAR (GERAR QR)'}
+                                                    {gerandoQr ? 'AGUARDANDE...' : 'CONECTAR CELULAR (GERAR QR)'}
                                                 </button>
                                             </div>
                                         )}
                                     </div>
 
-                                    {/* COLUNA 2: CONFIGURAÇÃO TÉCNICA (Para Você ou API Externa) */}
                                     <div className="flex flex-col justify-center">
                                         <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-6">
                                             <h4 className="font-bold text-orange-800 flex items-center gap-2 text-sm"><Sliders size={16}/> Configuração Técnica (Avançado)</h4>
@@ -581,7 +583,7 @@ export const Configuracoes = () => {
                                                 <label className="text-xs font-bold text-slate-500 uppercase">Token de Autenticação (Global)</label>
                                                 <input type="password" name="whatsappToken" value={config.whatsappToken || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-mono text-sm focus:border-blue-500 outline-none" placeholder="Cole o token fornecido..." />
                                             </div>
-                                            <button onClick={salvarConfiguracoes} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl mt-2 transition-colors">
+                                            <button onClick={salvarConfiguracoes} title="Salvar apenas os dados de endereço e token da API de WhatsApp" className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl mt-2 transition-colors">
                                                 SALVAR DADOS TÉCNICOS
                                             </button>
                                         </div>
@@ -599,23 +601,22 @@ export const Configuracoes = () => {
                                 <Database className="text-blue-500" /> Sistema e Segurança
                             </h2>
 
-                            {/* ROTINAS DE BANCO DE DADOS E BACKUP */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                 <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl">
                                     <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-4"><Clock size={18} className="text-slate-400"/> Rotinas Automáticas</h3>
                                     <label className="text-xs font-bold text-slate-500 uppercase">Horário do Backup Automático</label>
-                                    <input type="time" name="horarioBackupAuto" value={config.horarioBackupAuto || '03:00'} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none transition-all" />
+                                    <input type="time" name="horarioBackupAuto" value={config.horarioBackupAuto || '03:00'} onChange={handleChange} title="Defina o melhor horário (preferencialmente de madrugada) para o sistema salvar uma cópia de segurança" className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none transition-all" />
                                     <p className="text-[10px] text-slate-400 mt-2 font-medium">O sistema fará uma cópia de segurança diária neste horário.</p>
                                 </div>
 
                                 <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl flex flex-col justify-center">
                                     <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-4"><Database size={18} className="text-slate-400"/> Manutenção de Dados</h3>
                                     <div className="flex gap-2">
-                                        <button onClick={fazerBackup} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm" title="Baixar cópia do Banco de Dados">
+                                        <button onClick={fazerBackup} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm" title="Baixar agora uma cópia completa de segurança do banco de dados (.sql) para o seu computador">
                                             <Download size={18} /> FAZER BACKUP AGORA
                                         </button>
 
-                                        <button onClick={limparLogsCache} className="bg-red-100 hover:bg-red-200 text-red-600 font-bold px-4 py-3 rounded-xl flex items-center justify-center transition-colors" title="Limpar cache e arquivos temporários">
+                                        <button onClick={limparLogsCache} className="bg-red-100 hover:bg-red-200 text-red-600 font-bold px-4 py-3 rounded-xl flex items-center justify-center transition-colors" title="Excluir logs antigos e limpar o cache para otimizar a velocidade do servidor">
                                             <Trash2 size={18} />
                                         </button>
                                     </div>
@@ -623,23 +624,21 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            {/* CERTIFICADO DIGITAL FISCAL */}
                             <div className="mt-8 p-6 bg-blue-50 border-2 border-blue-200 rounded-3xl shadow-inner">
                                 <h3 className="font-black text-blue-900 flex items-center gap-2 mb-4"><ShieldCheck className="text-blue-600" /> Certificado Digital (NFe/NFCe)</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="text-xs font-bold text-blue-700 uppercase">Tipo do Certificado</label>
-                                        <select name="tipoCertificado" value={config.tipoCertificado || 'A1'} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-blue-200 rounded-xl font-bold focus:border-blue-500 outline-none">
+                                        <select name="tipoCertificado" value={config.tipoCertificado || 'A1'} onChange={handleChange} title="A1 é um arquivo digital (.pfx), A3 é um dispositivo físico (Token/Cartão)" className="w-full p-3 mt-1 bg-white border-2 border-blue-200 rounded-xl font-bold focus:border-blue-500 outline-none">
                                             <option value="A1">A1 (Arquivo Digital .pfx / .p12)</option>
                                             <option value="A3">A3 (Cartão Físico / Token)</option>
                                         </select>
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-blue-700 uppercase">Senha do Certificado</label>
-                                        <input type="password" name="senhaCertificado" value={config.senhaCertificado || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-blue-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="••••••••" />
+                                        <input type="password" name="senhaCertificado" value={config.senhaCertificado || ''} onChange={handleChange} title="A senha definida no momento da instalação/compra do certificado" className="w-full p-3 mt-1 bg-white border-2 border-blue-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="••••••••" />
                                     </div>
 
-                                    {/* UPLOAD DO ARQUIVO A1 */}
                                     {config.tipoCertificado === 'A1' && (
                                         <div className="md:col-span-2">
                                             <label className="text-xs font-bold text-blue-700 uppercase">Arquivo do Certificado (Upload)</label>
@@ -653,7 +652,7 @@ export const Configuracoes = () => {
                                                     </p>
                                                     <p className="text-xs text-slate-500">Selecione o arquivo do seu certificado (formato .pfx ou .p12)</p>
                                                 </div>
-                                                <label className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold cursor-pointer transition-colors shadow-md">
+                                                <label title="Procurar arquivo do certificado no computador" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold cursor-pointer transition-colors shadow-md">
                                                     PROCURAR
                                                     <input type="file" className="hidden" accept=".pfx,.p12" onChange={(e) => setArquivoCertificado(e.target.files[0])} />
                                                 </label>
@@ -663,7 +662,6 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            {/* ⚠️ ZONA DE PERIGO (LIMPAR BANCO E UPLOAD) */}
                             <div className="mt-8 p-6 border-2 border-red-500 bg-red-50 rounded-3xl relative overflow-hidden">
                                 <div className="absolute -right-4 -top-4 opacity-10">
                                     <AlertTriangle size={150} className="text-red-600" />
@@ -676,8 +674,7 @@ export const Configuracoes = () => {
                                 </p>
 
                                 <div className="flex flex-col gap-3 relative z-10">
-                                    {/* 🚀 NOVO: BOTÃO DE UPLOAD E RESTAURAÇÃO */}
-                                    <label className="bg-white text-red-600 border-2 border-red-600 hover:bg-red-50 px-6 py-4 rounded-xl font-black flex items-center justify-center gap-3 transition-colors shadow-lg cursor-pointer">
+                                    <label title="CUIDADO: Substitui TODOS os dados atuais do sistema pelo conteúdo de um arquivo de backup (.sql)" className="bg-white text-red-600 border-2 border-red-600 hover:bg-red-50 px-6 py-4 rounded-xl font-black flex items-center justify-center gap-3 transition-colors shadow-lg cursor-pointer">
                                         <UploadCloud size={20} /> UPLOAD E RESTAURAR BANCO (.SQL)
                                         <input
                                             type="file"
@@ -689,6 +686,7 @@ export const Configuracoes = () => {
 
                                     <button
                                         onClick={limparBancoDeDados}
+                                        title="CUIDADO EXTREMO: Apaga permanentemente todos os produtos, clientes e vendas cadastrados, resetando o banco de dados"
                                         className="bg-red-600 hover:bg-red-700 text-white font-black px-6 py-4 rounded-xl flex items-center gap-3 transition-colors shadow-lg"
                                     >
                                         <AlertTriangle size={20} /> RESETAR E LIMPAR BANCO DE DADOS
