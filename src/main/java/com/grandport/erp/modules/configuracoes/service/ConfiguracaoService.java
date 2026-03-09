@@ -6,14 +6,17 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
-import org.springframework.jdbc.core.JdbcTemplate; // IMPORTANTE PARA O RESET DO BANCO
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // IMPORTANTE PARA SEGURANÇA NO RESET
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -22,6 +25,7 @@ import java.time.LocalDate;
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Stream;
+import java.util.List;
 
 @Service
 public class ConfiguracaoService {
@@ -33,7 +37,7 @@ public class ConfiguracaoService {
     private TaskScheduler taskScheduler;
 
     @Autowired
-    private JdbcTemplate jdbcTemplate; // INJETADO PARA EXECUTAR COMANDOS SQL DIRETOS
+    private JdbcTemplate jdbcTemplate;
 
     private ScheduledFuture<?> tarefaAgendada;
 
@@ -48,7 +52,7 @@ public class ConfiguracaoService {
 
     @PostConstruct
     public void init() {
-        reagendarBackup(); // Inicia o agendamento assim que o sistema liga
+        reagendarBackup();
     }
 
     public ConfiguracaoSistema obterConfiguracao() {
@@ -59,7 +63,6 @@ public class ConfiguracaoService {
             return repository.save(configPadrao);
         });
 
-        // Travas de segurança para campos antigos e novos não ficarem nulos na interface
         if (config.getHorarioBackupAuto() == null) {
             config.setHorarioBackupAuto("03:00");
         }
@@ -71,38 +74,41 @@ public class ConfiguracaoService {
     }
 
     public ConfiguracaoSistema atualizarConfiguracao(ConfiguracaoSistema dadosAtualizados) {
-        // Como o Spring Data JPA recebe o objeto completo do React,
-        // ele já salva os campos novos (Whatsapp, Certificado) automaticamente!
         dadosAtualizados.setId(1L);
         ConfiguracaoSistema salva = repository.save(dadosAtualizados);
-
-        reagendarBackup(); // Reagenda o backup se o horário mudou
-
+        reagendarBackup();
         return salva;
     }
 
     // =======================================================================
-    // 💣 ZONA DE PERIGO: RESETAR BANCO DE DADOS (PostgreSQL)
+    // 💣 ZONA DE PERIGO: RESETAR BANCO DE DADOS (PostgreSQL Dinâmico)
     // =======================================================================
     @Transactional
     public void resetarBancoDeDados() {
         try {
-            // O comando TRUNCATE com RESTART IDENTITY zera as tabelas e volta o ID (PK) para 1.
-            // O CASCADE garante que ele force a limpeza mesmo havendo chaves estrangeiras (ex: ItemVenda preso numa Venda).
-            // ATENÇÃO: Tabelas 'usuario' e 'configuracao_sistema' ficam de fora para não perder o login.
-            String sql = "TRUNCATE TABLE item_venda, pagamento_venda, venda, produto, veiculo, parceiro RESTART IDENTITY CASCADE;";
+            // 1. O Java pergunta ao Postgres: "Quais tabelas existem aí?" (ignorando as de segurança)
+            String sqlBuscaTabelas = "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('usuario', 'configuracao_sistema')";
 
-            jdbcTemplate.execute(sql);
+            List<String> tabelasParaApagar = jdbcTemplate.queryForList(sqlBuscaTabelas, String.class);
 
-            System.out.println("✅ Banco de dados resetado com sucesso! (Tabelas limpas e IDs zerados)");
+            if (tabelasParaApagar.isEmpty()) {
+                System.out.println("Nenhuma tabela encontrada para resetar.");
+                return;
+            }
+
+            // 2. Monta o comando TRUNCATE perfeitamente de acordo com o que existe no banco
+            String tabelasJuntas = String.join(", ", tabelasParaApagar);
+            String sqlTruncate = "TRUNCATE TABLE " + tabelasJuntas + " RESTART IDENTITY CASCADE;";
+
+            // 3. Executa a limpeza cirúrgica
+            jdbcTemplate.execute(sqlTruncate);
+
+            System.out.println("✅ Banco de dados resetado com sucesso! (Tabelas limpas: " + tabelasJuntas + ")");
         } catch (Exception e) {
             throw new RuntimeException("Falha crítica ao resetar o banco de dados: " + e.getMessage());
         }
     }
 
-    // =======================================================================
-    // LÓGICA DE REAGENDAMENTO DINÂMICO
-    // =======================================================================
     public void reagendarBackup() {
         if (tarefaAgendada != null) {
             tarefaAgendada.cancel(false);
@@ -111,7 +117,6 @@ public class ConfiguracaoService {
         ConfiguracaoSistema config = obterConfiguracao();
         String horario = config.getHorarioBackupAuto();
 
-        // SEGURANÇA: Se por algum motivo ainda estiver nulo ou vazio, usa o padrão
         if (horario == null || !horario.contains(":")) {
             horario = "03:00";
         }
@@ -128,28 +133,91 @@ public class ConfiguracaoService {
         }
     }
 
-    public Resource gerarArquivoBackup() {
+    // =======================================================================
+    // 🚀 RESTAURAÇÃO DE BANCO DIRETA (SEM DEPENDER DO BASH)
+    // =======================================================================
+    public void restaurarBackup(MultipartFile arquivo) throws Exception {
+        File tempFile = File.createTempFile("restore_", ".sql");
+        Files.copy(arquivo.getInputStream(), tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+
         try {
-            // Extrai o nome do banco de dados de dentro da URL (ex: jdbc:postgresql://localhost:5432/grandport)
+            // Extrai as configurações do banco
             String dbName = dbUrlProp.substring(dbUrlProp.lastIndexOf("/") + 1);
-            if (dbName.contains("?")) {
-                dbName = dbName.split("\\?")[0]; // Remove parâmetros caso existam
+            if (dbName.contains("?")) dbName = dbName.split("\\?")[0];
+            String dbUser = dbUserProp;
+            String dbPass = dbPassProp;
+
+            // 1. Limpa o terreno
+            jdbcTemplate.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;");
+            System.out.println("♻️ Esquema public recriado. Iniciando injeção do arquivo...");
+
+            // 2. Identifica o sistema operacional (Para não dar erro no Windows/Linux)
+            boolean isWindows = System.getProperty("os.name").toLowerCase().startsWith("windows");
+            String comandoPsql = isWindows ? "psql.exe" : "psql";
+
+            // 3. Monta o comando de forma direta, sem 'bash -c'
+            ProcessBuilder pb = new ProcessBuilder(
+                    comandoPsql,
+                    "-h", "localhost",
+                    "-U", dbUser,
+                    "-d", dbName,
+                    "-v", "ON_ERROR_STOP=1", // Faz o processo abortar e gritar se der qualquer erro
+                    "-f", tempFile.getAbsolutePath()
+            );
+
+            pb.redirectErrorStream(true);
+            Map<String, String> env = pb.environment();
+            env.put("PGPASSWORD", dbPass);
+
+            Process process = pb.start();
+
+            // 4. Captura a resposta do banco de dados linha por linha
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
             }
 
-            // Usa as variáveis puxadas do application.properties
+            int exitCode = process.waitFor();
+
+            // 5. Se o PSQL retornar código diferente de 0, ele avisa o erro real no console
+            if (exitCode != 0) {
+                System.err.println("❌ ERRO NO PSQL AO RESTAURAR:\n" + output.toString());
+                throw new RuntimeException("O banco de dados rejeitou o arquivo de backup. Verifique o console do Java.");
+            }
+
+            System.out.println("✅ Backup restaurado com sucesso absoluto!");
+
+        } finally {
+            tempFile.delete(); // Limpa o arquivo temporário
+        }
+    }
+
+    public Resource gerarArquivoBackup() {
+        try {
+            String dbName = dbUrlProp.substring(dbUrlProp.lastIndexOf("/") + 1);
+            if (dbName.contains("?")) {
+                dbName = dbName.split("\\?")[0];
+            }
+
             String dbUser = dbUserProp;
             String dbPass = dbPassProp;
 
             boolean isWindows = System.getProperty("os.name").toLowerCase().startsWith("windows");
             String comando = isWindows ? "pg_dump.exe" : "pg_dump";
 
+            // Comando universal e limpo para o PostgreSQL 17
             ProcessBuilder pb = new ProcessBuilder(
-                    comando, "-h", "localhost", "-U", dbUser, "-d", dbName, "--no-owner", "--plain"
+                    comando, "-h", "localhost", "-U", dbUser, "-d", dbName, "--inserts"
             );
 
             Map<String, String> env = pb.environment();
             env.put("PGPASSWORD", dbPass);
-            pb.redirectErrorStream(true);
+
+            // 🔴 O SEGREDO ESTÁ AQUI: Falso! Assim ele NUNCA salva texto de erro dentro do .sql
+            pb.redirectErrorStream(false);
 
             Process process = pb.start();
             return new InputStreamResource(process.getInputStream());

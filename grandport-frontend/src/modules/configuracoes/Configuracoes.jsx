@@ -4,7 +4,7 @@ import {
     Settings, Building2, Printer, Sliders, Save, CheckCircle,
     AlertTriangle, Info, X, Store, Percent, Search, Loader2, Camera, Plus,
     Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode, RefreshCw
-} from 'lucide-react'; // 🚀 Adicionado RefreshCw
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export const Configuracoes = () => {
@@ -17,7 +17,7 @@ export const Configuracoes = () => {
     const [qrCodeBase64, setQrCodeBase64] = useState(null);
     const [statusWhatsapp, setStatusWhatsapp] = useState('DESCONHECIDO');
     const [gerandoQr, setGerandoQr] = useState(false);
-    const [checandoConexao, setChecandoConexao] = useState(false); // 🚀 Novo Estado
+    const [checandoConexao, setChecandoConexao] = useState(false);
 
     const [config, setConfig] = useState({
         nomeFantasia: '',
@@ -173,7 +173,10 @@ export const Configuracoes = () => {
         const loadId = toast.loading(`Obtendo QR Code (Tentativa ${numTentativa})...`);
 
         try {
+            // O Java deve retornar exatamente o JSON que você me mandou
             const res = await api.get('/api/whatsapp/qrcode');
+
+            // 🚀 MÁGICA: Aqui a gente captura o base64 do objeto 'qrcode'
             const qrCodeBase64 = res.data?.qrcode?.base64 || res.data?.base64;
 
             if (res.data?.instance?.status === 'open' || res.data?.status === 'open') {
@@ -183,10 +186,11 @@ export const Configuracoes = () => {
             }
             else if (qrCodeBase64) {
                 setStatusWhatsapp('AGUARDANDO_LEITURA');
-                setQrCodeBase64(qrCodeBase64);
+                setQrCodeBase64(qrCodeBase64); // Salva no estado para exibir na tela
                 toast.success('Aponte a câmera do celular!', { id: loadId });
             }
             else {
+                // Se ainda for count: 0, tenta de novo
                 if (numTentativa < 8) {
                     setTimeout(() => solicitarQrCode(numTentativa + 1), 3000);
                 } else {
@@ -201,7 +205,7 @@ export const Configuracoes = () => {
     };
 
     // =========================================================================
-    // 🚀 NOVO: TESTAR CONEXÃO ATIVA (INTEGRADO)
+    // 🚀 NOVO: TESTAR CONEXÃO ATIVA
     // =========================================================================
     const verificarConexaoAtiva = async () => {
         setChecandoConexao(true);
@@ -226,28 +230,66 @@ export const Configuracoes = () => {
     };
 
     // =========================================================================
-    // 🚀 NOVAS FUNÇÕES DA ABA DE SISTEMA (MANTIDAS)
+    // 🚀 NOVO: RESTAURAR BANCO DE DADOS (UPLOAD)
+    // =========================================================================
+    const restaurarBanco = async (event) => {
+        const arquivo = event.target.files[0];
+        if (!arquivo) return;
+
+        if (!arquivo.name.endsWith('.sql')) {
+            return toast.error("Por favor, selecione um arquivo .sql válido.");
+        }
+
+        const confirmacao = window.confirm(
+            "🚨 ATENÇÃO CRÍTICA 🚨\n\nEsta ação apagará todos os dados atuais e substituirá pelos do arquivo.\n\nTem certeza absoluta?"
+        );
+
+        if (confirmacao) {
+            const formData = new FormData();
+            formData.append('file', arquivo);
+
+            const loadId = toast.loading('Restaurando banco de dados... Não feche o navegador.');
+            try {
+                await api.post('/api/configuracoes/restaurar-banco', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                toast.success('Banco de dados restaurado com sucesso!', { id: loadId });
+                setTimeout(() => window.location.reload(), 3000);
+            } catch (error) {
+                console.error(error);
+                toast.error('Falha na restauração. Verifique o console do servidor.', { id: loadId });
+            }
+        }
+        event.target.value = null;
+    };
+
+    // =========================================================================
+    // 🚀 NOVAS FUNÇÕES DA ABA DE SISTEMA
     // =========================================================================
     const fazerBackup = async () => {
-        const loadId = toast.loading('Gerando backup do banco de dados...');
+        const loadId = toast.loading('Gerando backup do banco de dados... Isto pode demorar alguns segundos.');
         try {
             const response = await api.get('/api/configuracoes/backup', { responseType: 'blob' });
+
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
+
             const dataHoje = new Date().toISOString().split('T')[0];
             link.setAttribute('download', `backup_grandport_${dataHoje}.sql`);
+
             document.body.appendChild(link);
             link.click();
             link.parentNode.removeChild(link);
+
             toast.success('Backup descarregado com sucesso!', { id: loadId });
         } catch (error) {
-            toast.error('Erro ao gerar o backup.', { id: loadId });
+            toast.error('Erro ao gerar o backup. Verifique o servidor.', { id: loadId });
         }
     };
 
     const limparLogsCache = async () => {
-        const loadId = toast.loading('Limpando cache...');
+        const loadId = toast.loading('Limpando cache e arquivos temporários...');
         try {
             await api.post('/api/configuracoes/limpar-logs');
             toast.success('Limpeza de sistema concluída!', { id: loadId });
@@ -257,15 +299,18 @@ export const Configuracoes = () => {
     };
 
     const limparBancoDeDados = async () => {
-        const confirmacao = window.confirm("⚠️ ATENÇÃO EXTREMA ⚠️\n\nIsso irá APAGAR TUDO.\nTem certeza absoluta?");
+        const confirmacao = window.confirm(
+            "⚠️ ATENÇÃO EXTREMA ⚠️\n\nIsso irá APAGAR TODOS os Produtos, Clientes, Vendas e Orçamentos do banco de dados.\nEssa ação é irreversível.\n\nTem certeza absoluta que deseja resetar o sistema?"
+        );
+
         if (confirmacao) {
-            const loadId = toast.loading('Resetando banco de dados...');
+            const loadId = toast.loading('Resetando banco de dados. Por favor, aguarde...');
             try {
                 await api.delete('/api/configuracoes/resetar-banco');
-                toast.success('O banco de dados foi limpo!', { id: loadId });
+                toast.success('O banco de dados foi limpo com sucesso!', { id: loadId });
                 setTimeout(() => window.location.reload(), 2000);
             } catch (error) {
-                toast.error('Erro ao limpar o banco de dados.', { id: loadId });
+                toast.error('Erro ao limpar o banco de dados. Verifique a conexão com o servidor.', { id: loadId });
             }
         }
     };
@@ -435,7 +480,7 @@ export const Configuracoes = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase">Desconto Máximo Permitido (%)</label>
-                                    <input type="number" step="0.1" name="descontoMaximoPermitido" value={config.descontoMaximoPermitido || 0} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-black text-blue-700 focus:border-blue-500 outline-none" />
+                                    <input type="number" step="0.1" name="descontoMaximoPermitido" value={config.descontoMaximoPermitido || 0} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-blue-700 focus:border-blue-500 outline-none" />
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase">Validade do Orçamento (Dias)</label>
@@ -461,7 +506,7 @@ export const Configuracoes = () => {
                             <div className="flex justify-between items-center mb-6 border-b pb-4">
                                 <h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><Plug className="text-blue-500" /> Integrações e APIs</h2>
 
-                                {/* 🚀 BOTÃO DE TESTE DE CONEXÃO (NOVO) */}
+                                {/* 🚀 NOVO BOTÃO DE TESTE DE CONEXÃO */}
                                 <button
                                     onClick={verificarConexaoAtiva}
                                     disabled={checandoConexao}
@@ -618,7 +663,7 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            {/* ⚠️ ZONA DE PERIGO (LIMPAR BANCO) */}
+                            {/* ⚠️ ZONA DE PERIGO (LIMPAR BANCO E UPLOAD) */}
                             <div className="mt-8 p-6 border-2 border-red-500 bg-red-50 rounded-3xl relative overflow-hidden">
                                 <div className="absolute -right-4 -top-4 opacity-10">
                                     <AlertTriangle size={150} className="text-red-600" />
@@ -629,12 +674,26 @@ export const Configuracoes = () => {
                                 <p className="text-sm text-red-900 font-medium mb-6 relative z-10">
                                     Ações nesta área são irreversíveis. Utilize apenas em ambiente de teste ou antes de colocar o sistema em produção oficial para os clientes.
                                 </p>
-                                <button
-                                    onClick={limparBancoDeDados}
-                                    className="bg-red-600 hover:bg-red-700 text-white font-black px-6 py-4 rounded-xl flex items-center gap-3 transition-colors shadow-lg relative z-10"
-                                >
-                                    <AlertTriangle size={20} /> RESETAR E LIMPAR BANCO DE DADOS
-                                </button>
+
+                                <div className="flex flex-col gap-3 relative z-10">
+                                    {/* 🚀 NOVO: BOTÃO DE UPLOAD E RESTAURAÇÃO */}
+                                    <label className="bg-white text-red-600 border-2 border-red-600 hover:bg-red-50 px-6 py-4 rounded-xl font-black flex items-center justify-center gap-3 transition-colors shadow-lg cursor-pointer">
+                                        <UploadCloud size={20} /> UPLOAD E RESTAURAR BANCO (.SQL)
+                                        <input
+                                            type="file"
+                                            accept=".sql"
+                                            className="hidden"
+                                            onChange={restaurarBanco}
+                                        />
+                                    </label>
+
+                                    <button
+                                        onClick={limparBancoDeDados}
+                                        className="bg-red-600 hover:bg-red-700 text-white font-black px-6 py-4 rounded-xl flex items-center gap-3 transition-colors shadow-lg"
+                                    >
+                                        <AlertTriangle size={20} /> RESETAR E LIMPAR BANCO DE DADOS
+                                    </button>
+                                </div>
                             </div>
 
                         </div>
