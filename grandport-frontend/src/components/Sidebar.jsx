@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     LayoutDashboard,
     DollarSign,
@@ -9,29 +9,48 @@ import {
     ChevronRight,
     ShoppingCart,
     LogOut,
-    FileText
+    Menu,
+    ChevronLeft
 } from 'lucide-react';
+import api from '../api/axios'; // Ajuste o caminho se necessário para puxar as configs
 
 export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }) => {
     const [menuExpandido, setMenuExpandido] = useState('vendas');
 
+    // 🚀 NOVO ESTADO: Controla se a Sidebar está aberta ou fechada (recolhida)
+    const [isRetratil, setIsRetratil] = useState(false);
+
+    // 🚀 NOVO ESTADO: Armazena o nome da sua empresa
+    const [nomeEmpresa, setNomeEmpresa] = useState('GRANDPORT ERP');
+
+    // Busca o nome da empresa ao carregar a sidebar
+    useEffect(() => {
+        api.get('/api/configuracoes')
+            .then(res => {
+                const data = Array.isArray(res.data) ? res.data[0] : res.data;
+                if (data && data.nomeFantasia) {
+                    setNomeEmpresa(data.nomeFantasia);
+                }
+            })
+            .catch(err => console.log("Não foi possível carregar o nome da empresa na sidebar.", err));
+    }, []);
+
     const toggleMenu = (menuId) => {
-        setMenuExpandido(menuExpandido === menuId ? null : menuId);
+        if (isRetratil) {
+            // Se tentar expandir um submenu com a sidebar fechada, ela abre automaticamente
+            setIsRetratil(false);
+            setMenuExpandido(menuId);
+        } else {
+            setMenuExpandido(menuExpandido === menuId ? null : menuId);
+        }
     };
 
     const permissoesUsuario = usuarioLogado?.permissoes || [];
 
     const menus = [
+        { id: 'dashboard', titulo: 'Dashboard', icone: <LayoutDashboard size={20} />, acao: 'dash' },
         {
-            id: 'dashboard',
-            titulo: 'Dashboard',
-            icone: <LayoutDashboard size={20} />,
-            acao: 'dash'
-        },
-        {
-            id: 'vendas',
-            titulo: 'Vendas & Frente de Loja',
-            icone: <ShoppingCart size={20} />,
+            id: 'vendas', titulo: 'Vendas & Frente de Loja', icone: <ShoppingCart size={20} />,
             submenus: [
                 { titulo: 'Ponto de Venda (PDV)', acao: 'pdv' },
                 { titulo: 'Balcão / Central', acao: 'vendas' },
@@ -41,9 +60,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             ]
         },
         {
-            id: 'estoque',
-            titulo: 'Estoque & Compras',
-            icone: <Package size={20} />,
+            id: 'estoque', titulo: 'Estoque & Compras', icone: <Package size={20} />,
             submenus: [
                 { titulo: 'Buscar Peças', acao: 'estoque' },
                 { titulo: 'Marcas', acao: 'marcas' },
@@ -54,9 +71,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             ]
         },
         {
-            id: 'financeiro',
-            titulo: 'Financeiro',
-            icone: <DollarSign size={20} />,
+            id: 'financeiro', titulo: 'Financeiro', icone: <DollarSign size={20} />,
             submenus: [
                 { titulo: 'Contas a Pagar', acao: 'contas-pagar' },
                 { titulo: 'Contas a Receber', acao: 'contas-receber' },
@@ -64,13 +79,11 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Conciliação Bancária', acao: 'conciliacao' },
                 { titulo: 'Plano de Contas', acao: 'plano-contas' },
                 { titulo: 'Resultado (DRE)', acao: 'dre' },
-                { titulo: 'Recibo Avulso', acao: 'recibo-avulso' } // 🚀 ADICIONADO AQUI
+                { titulo: 'Recibo Avulso', acao: 'recibo-avulso' }
             ]
         },
         {
-            id: 'cadastros',
-            titulo: 'Administrativo',
-            icone: <Users size={20} />,
+            id: 'cadastros', titulo: 'Administrativo', icone: <Users size={20} />,
             submenus: [
                 { titulo: 'Clientes & Fornecedores', acao: 'parceiros' },
                 { titulo: 'Equipe e Acessos', acao: 'usuarios' },
@@ -78,60 +91,88 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Fiscal / NCM', acao: 'fiscal' }
             ]
         },
-        {
-            id: 'configuracoes',
-            titulo: 'Configurações',
-            icone: <Settings size={20} />,
-            acao: 'configuracoes'
-        }
+        { id: 'configuracoes', titulo: 'Configurações', icone: <Settings size={20} />, acao: 'configuracoes' }
     ];
 
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {
             const submenusPermitidos = menu.submenus.filter(sub => permissoesUsuario.includes(sub.acao));
-            if (submenusPermitidos.length > 0) {
-                return { ...menu, submenus: submenusPermitidos };
-            }
+            if (submenusPermitidos.length > 0) return { ...menu, submenus: submenusPermitidos };
             return null;
         }
-        if (permissoesUsuario.includes(menu.acao)) {
-            return menu;
-        }
+        if (permissoesUsuario.includes(menu.acao)) return menu;
         return null;
     }).filter(menu => menu !== null);
 
     return (
-        <aside className="w-72 bg-slate-900 text-white h-screen flex flex-col shadow-2xl transition-all z-50">
-            <div className="p-6 border-b border-slate-800">
-                <h1 className="text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
-                    GRANDPORT
-                </h1>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                    ERP Autopeças
-                </p>
+        <aside
+            className={`${isRetratil ? 'w-20' : 'w-72'} bg-slate-900 text-white h-screen flex flex-col shadow-2xl transition-all duration-300 z-50 relative`}
+        >
+            {/* BOTÃO DE RECOLHER/EXPANDIR (Flutuante na borda direita) */}
+            <button
+                onClick={() => setIsRetratil(!isRetratil)}
+                className="absolute -right-3 top-8 bg-blue-600 hover:bg-blue-500 text-white p-1 rounded-full shadow-lg border-2 border-slate-900 z-50 transition-colors"
+                title={isRetratil ? "Expandir Menu" : "Recolher Menu"}
+            >
+                {isRetratil ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            </button>
+
+            {/* CABEÇALHO DO MENU */}
+            <div className={`p-6 border-b border-slate-800 flex items-center transition-all ${isRetratil ? 'justify-center px-0' : 'justify-start'}`}>
+                {isRetratil ? (
+                    <Menu size={28} className="text-blue-400" />
+                ) : (
+                    <div className="overflow-hidden whitespace-nowrap">
+                        <h1 className="text-xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 truncate uppercase">
+                            {nomeEmpresa}
+                        </h1>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                            Powered by GrandPort
+                        </p>
+                    </div>
+                )}
             </div>
 
-            <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2 custom-scrollbar">
+            {/* ÁREA DE ROLAGEM DOS MENUS */}
+            <div className="flex-1 overflow-y-auto py-6 px-3 space-y-2 custom-scrollbar overflow-x-hidden">
                 {menusFiltrados.map((menu) => (
-                    <div key={menu.id}>
+                    <div key={menu.id} className="relative group">
                         {menu.submenus ? (
                             <>
                                 <button
                                     onClick={() => toggleMenu(menu.id)}
-                                    className={`w-full flex items-center justify-between p-3 rounded-xl transition-all font-bold ${
+                                    title={isRetratil ? menu.titulo : ""}
+                                    className={`w-full flex items-center p-3 rounded-xl transition-all font-bold ${
                                         menuExpandido === menu.id || menu.submenus.some(sub => sub.acao === paginaAtiva)
                                             ? 'bg-slate-800 text-blue-400'
                                             : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                    }`}
+                                    } ${isRetratil ? 'justify-center' : 'justify-between'}`}
                                 >
                                     <div className="flex items-center gap-3">
                                         {menu.icone}
-                                        <span>{menu.titulo}</span>
+                                        {!isRetratil && <span className="truncate">{menu.titulo}</span>}
                                     </div>
-                                    {menuExpandido === menu.id ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                    {!isRetratil && (menuExpandido === menu.id ? <ChevronDown size={18} /> : <ChevronRight size={18} />)}
                                 </button>
 
-                                {menuExpandido === menu.id && (
+                                {/* TOOLTIP QUANDO RECOLHIDO (Aparece ao passar o mouse) */}
+                                {isRetratil && (
+                                    <div className="absolute left-16 top-0 hidden group-hover:block bg-slate-800 text-white p-2 rounded-lg shadow-xl z-50 w-48 border border-slate-700">
+                                        <p className="text-xs font-black text-blue-400 mb-2 px-2 uppercase">{menu.titulo}</p>
+                                        {menu.submenus.map((sub, index) => (
+                                            <button
+                                                key={index}
+                                                onClick={() => setPaginaAtiva(sub.acao)}
+                                                className={`w-full text-left p-2 rounded text-xs font-semibold hover:bg-slate-700 transition-colors ${paginaAtiva === sub.acao ? 'text-white' : 'text-slate-400'}`}
+                                            >
+                                                {sub.titulo}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* SUBMENUS QUANDO EXPANDIDO */}
+                                {!isRetratil && menuExpandido === menu.id && (
                                     <div className="mt-1 ml-4 pl-4 border-l-2 border-slate-700 space-y-1 animate-fade-in">
                                         {menu.submenus.map((sub, index) => (
                                             <button
@@ -144,7 +185,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                                                 }`}
                                             >
                                                 {paginaAtiva === sub.acao && <div className="w-1.5 h-1.5 rounded-full bg-white"></div>}
-                                                <span className={paginaAtiva === sub.acao ? 'ml-1' : 'ml-3'}>{sub.titulo}</span>
+                                                <span className={`${paginaAtiva === sub.acao ? 'ml-1' : 'ml-3'} truncate`}>{sub.titulo}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -154,36 +195,42 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                             <button
                                 onClick={() => {
                                     setPaginaAtiva(menu.acao);
-                                    setMenuExpandido(null);
+                                    if(isRetratil) setIsRetratil(false); // Opcional: abre a barra ao clicar num atalho
                                 }}
+                                title={isRetratil ? menu.titulo : ""}
                                 className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all font-bold ${
                                     paginaAtiva === menu.acao
                                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
                                         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                }`}
+                                } ${isRetratil ? 'justify-center' : ''}`}
                             >
                                 {menu.icone}
-                                <span>{menu.titulo}</span>
+                                {!isRetratil && <span className="truncate">{menu.titulo}</span>}
                             </button>
                         )}
                     </div>
                 ))}
             </div>
 
-            <div className="p-4 border-t border-slate-800 bg-slate-900">
-                <div className="flex items-center justify-between p-2">
+            {/* RODAPÉ COM USUÁRIO E LOGOUT */}
+            <div className={`p-4 border-t border-slate-800 bg-slate-900 transition-all ${isRetratil ? 'flex flex-col items-center gap-4 px-0' : ''}`}>
+                <div className={`flex items-center ${isRetratil ? 'justify-center' : 'justify-between'} w-full`}>
+
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center font-black text-white">
-                            {usuarioLogado?.nome?.substring(0, 2).toUpperCase()}
+                        <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center font-black text-white shrink-0 shadow-lg">
+                            {usuarioLogado?.nome?.substring(0, 2).toUpperCase() || 'US'}
                         </div>
-                        <div>
-                            <p className="text-sm font-bold text-white leading-tight">{usuarioLogado?.nome?.split(' ')[0]}</p>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase">Acesso Personalizado</p>
-                        </div>
+                        {!isRetratil && (
+                            <div className="overflow-hidden">
+                                <p className="text-sm font-bold text-white truncate">{usuarioLogado?.nome?.split(' ')[0]}</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase truncate">Usuário Logado</p>
+                            </div>
+                        )}
                     </div>
+
                     <button
                         onClick={onLogout}
-                        className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+                        className={`p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors ${isRetratil ? 'mt-2' : ''}`}
                         title="Sair do Sistema"
                     >
                         <LogOut size={20} />
