@@ -1,25 +1,20 @@
 package com.grandport.erp.modules.compras.service;
 
-import com.grandport.erp.modules.compras.dto.ImportacaoResumoDTO;
-import com.grandport.erp.modules.compras.dto.ItemNotaDTO;
-import com.grandport.erp.modules.compras.dto.NfeDTO;
-import com.grandport.erp.modules.compras.dto.NfeProcDTO;
-import com.grandport.erp.modules.estoque.model.Marca;
-import com.grandport.erp.modules.estoque.model.Ncm;
-import com.grandport.erp.modules.estoque.model.Produto;
-import com.grandport.erp.modules.estoque.repository.MarcaRepository;
-import com.grandport.erp.modules.estoque.repository.NcmRepository;
-import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
+import com.grandport.erp.modules.compras.dto.*;
+import com.grandport.erp.modules.compras.model.*;
+import com.grandport.erp.modules.compras.repository.CompraXMLRepository;
+import com.grandport.erp.modules.estoque.model.*;
+import com.grandport.erp.modules.estoque.repository.*;
 import com.grandport.erp.modules.financeiro.model.ContaPagar;
 import com.grandport.erp.modules.financeiro.service.FinanceiroService;
-import com.grandport.erp.modules.parceiro.model.Parceiro;
-import com.grandport.erp.modules.parceiro.model.TipoParceiro;
+import com.grandport.erp.modules.parceiro.model.*;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -33,39 +28,97 @@ public class CompraService {
     @Autowired private MarcaRepository marcaRepository;
     @Autowired private ParceiroRepository parceiroRepository;
     @Autowired private FinanceiroService financeiroService;
+    @Autowired private CompraXMLRepository compraXMLRepository;
 
+    /**
+     * Retorna o histórico de notas para a tabela do React.
+     */
+    public List<ImportacaoResumoDTO> listarHistorico() {
+        return compraXMLRepository.findAll().stream().map(entidade -> {
+            ImportacaoResumoDTO dto = new ImportacaoResumoDTO();
+            dto.setId(entidade.getId());
+            dto.setNumero(entidade.getNumero());
+            dto.setFornecedorNome(entidade.getFornecedor());
+            dto.setValorTotalNota(entidade.getValorTotal());
+            dto.setStatus(entidade.getStatus());
+
+            // Carrega os itens para o espelho
+            dto.setProdutosImportados(entidade.getItens().stream()
+                    .map(i -> new ImportacaoResumoDTO.ProdutoImportadoDTO(
+                            i.getProdutoId(), i.getNome(), i.getPrecoCusto(), i.getPrecoVenda()))
+                    .collect(Collectors.toList()));
+
+            return dto;
+        }).collect(Collectors.toList());
+    }
+
+    /**
+     * Processa o XML e salva no banco com status "Pendente Revisão".
+     */
     @Transactional
     public ImportacaoResumoDTO processarEntradaNota(NfeProcDTO nfeProc) {
         NfeDTO nfe = nfeProc.getNfe();
         NfeDTO.InfoNfe info = nfe.getInfNFe();
-        
+
         ImportacaoResumoDTO resumo = new ImportacaoResumoDTO();
         List<Produto> produtosProcessados = new ArrayList<>();
 
+        // 1. Processar Fornecedor
         Parceiro fornecedor = processarFornecedor(info.getEmitente(), resumo);
 
+        // 2. Processar Itens
         for (NfeDTO.Detalhe detalhe : info.getDetalhes()) {
             Produto p = processarProduto(detalhe.getProduto());
             produtosProcessados.add(p);
         }
-        
-        resumo.setProdutosImportados(produtosProcessados.stream()
-            .map(p -> new ImportacaoResumoDTO.ProdutoImportadoDTO(p.getId(), p.getNome(), p.getPrecoCusto(), p.getPrecoVenda()))
-            .collect(Collectors.toList()));
-        resumo.setQuantidadeProdutosCadastrados(info.getDetalhes().size());
 
-        List<ContaPagar> contas = processarFinanceiro(info, fornecedor);
-        resumo.setParcelasGeradas(contas);
-        resumo.setValorTotalNota(info.getTotal().getIcmsTot().getValorTotal());
+        BigDecimal total = info.getTotal().getIcmsTot().getValorTotal();
+
+        // 3. Salvar Histórico Principal
+        CompraXML historico = new CompraXML();
+        historico.setNumero(info.getIde().getNumeroNota());
+        historico.setFornecedor(fornecedor.getNome());
+        historico.setCnpjFornecedor(fornecedor.getDocumento());
+        historico.setDataImportacao(LocalDateTime.now());
+        historico.setValorTotal(total);
+        historico.setStatus("Pendente Revisão");
+
+        // 4. Salvar Itens do Histórico (vínculo com CompraXML)
+        List<CompraItem> itens = produtosProcessados.stream().map(p -> {
+            CompraItem item = new CompraItem();
+            item.setProdutoId(p.getId());
+            item.setNome(p.getNome());
+            item.setPrecoCusto(p.getPrecoCusto());
+            item.setPrecoVenda(p.getPrecoVenda());
+            item.setCompra(historico);
+            return item;
+        }).collect(Collectors.toList());
+
+        historico.setItens(itens);
+        compraXMLRepository.save(historico);
+
+        // 5. Gerar Financeiro
+        processarFinanceiro(info, fornecedor);
 
         return resumo;
     }
 
+    /**
+     * Trava a nota como "Finalizado" para impedir novas edições de preço.
+     */
+    public void finalizarNota(Long id) {
+        CompraXML nota = compraXMLRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Nota não encontrada"));
+        nota.setStatus("Finalizado");
+        compraXMLRepository.save(nota);
+    }
+
+    // --- MÉTODOS PRIVADOS DE PROCESSAMENTO ---
+
     private Parceiro processarFornecedor(NfeDTO.Emitente emitente, ImportacaoResumoDTO resumo) {
         Optional<Parceiro> fornecedorExistente = parceiroRepository.findByDocumento(emitente.getCnpj());
-        
-        final boolean isNew;
         Parceiro fornecedor;
+        boolean isNew;
 
         if (fornecedorExistente.isPresent()) {
             fornecedor = fornecedorExistente.get();
@@ -78,18 +131,19 @@ public class CompraService {
             parceiroRepository.save(fornecedor);
             isNew = true;
         }
-        
+
         resumo.setFornecedor(new ImportacaoResumoDTO.FornecedorResumoDTO(fornecedor, isNew));
         return fornecedor;
     }
 
     private Produto processarProduto(ItemNotaDTO item) {
         Produto produto = produtoRepository.findByCodigoBarras(item.getEan())
-            .orElseGet(() -> criarNovoProdutoPelaNota(item));
+                .orElseGet(() -> criarNovoProdutoPelaNota(item));
 
         int quantidadeEntrada = item.getQuantidade().intValue();
         produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + quantidadeEntrada);
         produto.setPrecoCusto(item.getValorUnitario());
+
         return produtoRepository.save(produto);
     }
 
@@ -99,10 +153,10 @@ public class CompraService {
             for (NfeDTO.Duplicata dup : info.getCobranca().getDuplicatas()) {
                 String descricao = "Ref. NF-e " + info.getIde().getNumeroNota() + " Parcela " + dup.getNumero();
                 ContaPagar contaSalva = financeiroService.gerarContaPagar(
-                    fornecedor, 
-                    dup.getValor(), 
-                    dup.getDataVencimento().atStartOfDay(), 
-                    descricao
+                        fornecedor,
+                        dup.getValor(),
+                        dup.getDataVencimento().atStartOfDay(),
+                        descricao
                 );
                 contasGeradas.add(contaSalva);
             }
@@ -137,5 +191,9 @@ public class CompraService {
         novo.setMarca(marca);
 
         return novo;
+    }
+
+    public void excluirImportacao(Long id) {
+        compraXMLRepository.deleteById(id);
     }
 }
