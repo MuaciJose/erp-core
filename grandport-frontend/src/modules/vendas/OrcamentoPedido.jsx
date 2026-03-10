@@ -3,8 +3,8 @@ import api from '../../api/axios';
 import {
     Search, FileText, Printer, CheckCircle, Package, User,
     Trash2, ArrowRight, Save, FolderOpen, Car, X, RefreshCw,
-    AlertTriangle, MessageCircle, XCircle, Smartphone, Loader2, ArrowLeft, Receipt
-} from 'lucide-react';
+    AlertTriangle, MessageCircle, XCircle, Smartphone, Loader2, ArrowLeft, Receipt, FileDown
+} from 'lucide-react'; // 🚀 Adicionei o ícone FileDown para baixar o XML
 
 import toast from 'react-hot-toast';
 
@@ -12,6 +12,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     const [modo, setModo] = useState('ORCAMENTO');
     const [itens, setItens] = useState([]);
     const [orcamentoId, setOrcamentoId] = useState(null);
+
+    // 🚀 NOVO ESTADO: Guarda as informações da Nota Fiscal (se existir)
+    const [notaFiscalInfo, setNotaFiscalInfo] = useState(null);
 
     const [buscaCliente, setBuscaCliente] = useState('');
     const [clienteSelecionado, setClienteSelecionado] = useState(null);
@@ -105,6 +108,13 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
             if (orcamentoParaEditar.desconto > 0) {
                 setDescontoTipo('VALOR');
                 setDescontoInput(orcamentoParaEditar.desconto.toString());
+            }
+
+            // 🚀 Carrega a nota fiscal salva no banco de dados para a tela
+            if (orcamentoParaEditar.notaFiscal) {
+                setNotaFiscalInfo(orcamentoParaEditar.notaFiscal);
+            } else {
+                setNotaFiscalInfo(null);
             }
 
             const itensMapeados = extrairItensBackend(orcamentoParaEditar.itens, orcamentoParaEditar.status);
@@ -221,6 +231,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     valorDescontoReal = Math.min(valorDescontoReal, subtotal);
     const totalFinal = Math.max(0, subtotal - valorDescontoReal);
 
+    // =======================================================================
+    // 🚀 LÓGICA DE EMISSÃO COM TROCA DE BOTÃO IMEDIATA
+    // =======================================================================
     const emitirNFe = async () => {
         if (!orcamentoId) return toast.error("Salve o pedido primeiro antes de emitir a Nota Fiscal!");
         if (!clienteSelecionado) return toast.error("Para emitir NF-e, é obrigatório selecionar um cliente!");
@@ -234,11 +247,27 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         const loadId = toast.loading("Aplicando regras tributárias e enviando para a SEFAZ...");
 
         try {
-            await api.post(`/api/fiscal/emitir-nfe/${orcamentoId}`);
+            const response = await api.post(`/api/fiscal/emitir-nfe/${orcamentoId}`);
             toast.success("NF-e Emitida e Autorizada com Sucesso! 🎉", { id: loadId, duration: 5000 });
+
+            // 🚀 SALVA OS DADOS RETORNADOS PELO JAVA PARA TROCAR O BOTÃO NA HORA
+            setNotaFiscalInfo({
+                chaveAcesso: response.data.chaveAcesso,
+                urlDanfe: response.data.urlPdf,
+                status: response.data.status
+            });
+
         } catch (error) {
             const erroSefaz = error.response?.data?.message || "Rejeição da SEFAZ. Verifique os impostos ou o certificado digital.";
             toast.error(erroSefaz, { id: loadId, duration: 8000 });
+        }
+    };
+
+    const abrirPDFDanfe = () => {
+        if (notaFiscalInfo && notaFiscalInfo.urlDanfe) {
+            window.open(notaFiscalInfo.urlDanfe, '_blank');
+        } else {
+            toast.error("O PDF da nota ainda não está disponível.");
         }
     };
 
@@ -350,7 +379,12 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     };
 
     const limparEcra = () => {
-        setItens([]); limparCliente(); setModo('ORCAMENTO'); setOrcamentoId(null); setDescontoInput('');
+        setItens([]);
+        limparCliente();
+        setModo('ORCAMENTO');
+        setOrcamentoId(null);
+        setDescontoInput('');
+        setNotaFiscalInfo(null); // Reseta a nota ao limpar a tela
     };
 
     const carregarOrcamentoLocal = (orcamento) => {
@@ -361,6 +395,13 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
             setDescontoInput(orcamento.desconto.toString());
         } else {
             setDescontoInput('');
+        }
+
+        // Puxa a nota que já vem mapeada no botão da lista de rascunhos
+        if (orcamento.notaFiscal) {
+            setNotaFiscalInfo(orcamento.notaFiscal);
+        } else {
+            setNotaFiscalInfo(null);
         }
 
         if (orcamento.clienteObj) selecionarCliente(orcamento.clienteObj);
@@ -381,7 +422,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                     const formatados = res.data.map(orc => ({
                         id: orc.id, data: orc.dataHora, cliente: orc.cliente ? orc.cliente.nome : 'Cliente Avulso', clienteObj: orc.cliente,
                         veiculo: orc.veiculo ? orc.veiculo.modelo : 'Nenhum', veiculoId: orc.veiculo?.id, valor: orc.valorTotal || 0, desconto: orc.desconto || 0, status: orc.status,
-                        itensRaw: orc.itens || []
+                        itensRaw: orc.itens || [],
+                        notaFiscal: orc.notaFiscal // Garante que a nota vem na busca da lista
                     }));
                     setOrcamentosSalvos(formatados);
                 })
@@ -417,25 +459,39 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                                 <FileText size={24}/>
                             </div>
                             <div>
-                                <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight leading-none">
+                                <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight leading-none flex items-center gap-3">
                                     {modo} #{orcamentoId || 'NOVO'}
+                                    {/* Exibe uma "tagzinha" verde pequena avisando que tem NF-e amarrada */}
+                                    {notaFiscalInfo && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-md tracking-widest uppercase border border-green-200"><Receipt size={10} className="inline mr-1 -mt-0.5"/> NFE GERADA</span>}
                                 </h1>
                                 <p className="text-[11px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Preenchimento de balcão</p>
                             </div>
                         </div>
 
-                        {/* 🚀 TOOLBAR DE AÇÕES (COM O BOTÃO NF-E AQUI EM CIMA NOVAMENTE) */}
+                        {/* 🚀 TOOLBAR DE AÇÕES */}
                         <div className="flex flex-wrap items-center gap-2">
                             <button onClick={() => setModalListaAberto(true)} title="Abrir lista de orçamentos salvos e pendentes" className="px-3 py-2 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-transparent hover:border-slate-200"><FolderOpen size={14} /> SALVOS</button>
                             <button onClick={limparEcra} title="Limpar todos os campos e começar um novo documento" className="px-3 py-2 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-transparent hover:border-slate-200"><Trash2 size={14} /> LIMPAR</button>
                             <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block"></div>
 
-                            {/* 🚀 BOTÃO DE NF-E NO TOPO */}
-                            {orcamentoId && (
+                            {/* 🚀 A MÁGICA DA TROCA DE BOTÃO FISCAL ESTÁ AQUI */}
+                            {orcamentoId && !notaFiscalInfo && (
                                 <button onClick={emitirNFe} title="Gerar Nota Fiscal Eletrônica e transmitir para a SEFAZ" className="px-4 py-2 bg-purple-100 text-purple-700 hover:bg-purple-600 hover:text-white rounded-lg text-xs font-black flex items-center gap-2 transition-all shadow-sm border border-purple-200 hover:border-purple-600">
                                     <Receipt size={16} /> EMITIR NF-E
                                 </button>
                             )}
+
+                            {orcamentoId && notaFiscalInfo && (
+                                <div className="flex items-center rounded-lg border border-green-500 bg-green-50 overflow-hidden shadow-sm shadow-green-500/20">
+                                    <button onClick={abrirPDFDanfe} title="Abrir espelho (DANFE) da Nota para impressão" className="px-4 py-2 text-green-700 hover:bg-green-600 hover:text-white font-black text-xs transition-colors flex items-center gap-2">
+                                        <Printer size={16}/> IMPRIMIR DANFE
+                                    </button>
+                                    <button onClick={abrirPDFDanfe} title="Baixar XML Original" className="px-3 py-2 border-l border-green-200 text-green-600 hover:bg-green-600 hover:text-white transition-colors">
+                                        <FileDown size={16}/>
+                                    </button>
+                                </div>
+                            )}
+
                             {orcamentoId && <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block"></div>}
 
                             <button onClick={forcarSincronizacaoEstoque} title="Consultar o estoque real atualizado dos itens" className="px-3 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><RefreshCw size={14} /> ESTOQUE</button>
@@ -459,8 +515,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="relative">
                             <User className="absolute left-3 top-3 text-slate-400" size={20} />
-                            <input type="text" placeholder="Pesquisar Cliente..." value={buscaCliente} onChange={(e) => setBuscaCliente(e.target.value)} disabled={!!clienteSelecionado} className="w-full pl-10 pr-10 py-3 border-2 rounded-xl font-bold focus:border-blue-500 bg-slate-50 outline-none transition-all" />
-                            {clienteSelecionado && <button onClick={limparCliente} title="Remover cliente selecionado" className="absolute right-3 top-3 text-red-400"><X size={20}/></button>}
+                            <input type="text" placeholder="Pesquisar Cliente..." value={buscaCliente} onChange={(e) => setBuscaCliente(e.target.value)} disabled={!!clienteSelecionado || notaFiscalInfo} className="w-full pl-10 pr-10 py-3 border-2 rounded-xl font-bold focus:border-blue-500 bg-slate-50 outline-none transition-all disabled:opacity-50" />
+                            {clienteSelecionado && !notaFiscalInfo && <button onClick={limparCliente} title="Remover cliente selecionado" className="absolute right-3 top-3 text-red-400"><X size={20}/></button>}
                             {resultadosClientes.length > 0 && !clienteSelecionado && (
                                 <div className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden">
                                     {resultadosClientes.map(c => <div key={c.id} onClick={() => selecionarCliente(c)} className="p-4 hover:bg-blue-50 cursor-pointer border-b font-bold text-slate-700">{c.nome}</div>)}
@@ -469,7 +525,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                         </div>
                         <div className="relative">
                             <Car className="absolute left-3 top-3 text-slate-400" size={20} />
-                            <select value={veiculoSelecionado} onChange={(e) => setVeiculoSelecionado(e.target.value)} disabled={!clienteSelecionado} className="w-full pl-10 pr-4 py-3 border-2 rounded-xl font-bold bg-slate-50 outline-none appearance-none focus:border-blue-500 transition-all">
+                            <select value={veiculoSelecionado} onChange={(e) => setVeiculoSelecionado(e.target.value)} disabled={!clienteSelecionado || notaFiscalInfo} className="w-full pl-10 pr-4 py-3 border-2 rounded-xl font-bold bg-slate-50 outline-none appearance-none focus:border-blue-500 transition-all disabled:opacity-50">
                                 <option value="">Selecione o Veículo...</option>
                                 {clienteSelecionado?.veiculos?.map(v => <option key={v.id} value={v.id}>{v.marca} {v.modelo} - {v.placa}</option>)}
                             </select>
@@ -481,11 +537,11 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
 
                     <div className="relative border-b border-slate-200 bg-slate-50 p-2">
                         <Search className="absolute left-6 top-5 text-blue-500" size={20} />
-                        <input ref={inputPecaRef} type="text" value={buscaPeca} onChange={(e) => setBuscaPeca(e.target.value)} onKeyDown={(e) => {
+                        <input ref={inputPecaRef} type="text" value={buscaPeca} disabled={!!notaFiscalInfo} onChange={(e) => setBuscaPeca(e.target.value)} onKeyDown={(e) => {
                             if (e.key === 'ArrowDown') { e.preventDefault(); setIndexFocadoPeca(p => Math.min(resultadosPecas.length - 1, p + 1)); }
                             else if (e.key === 'ArrowUp') { e.preventDefault(); setIndexFocadoPeca(p => Math.max(0, p - 1)); }
                             else if (e.key === 'Enter' && resultadosPecas[indexFocadoPeca]) { adicionarItem(resultadosPecas[indexFocadoPeca]); }
-                        }} placeholder="Pesquisar peça para adicionar à tabela..." className="w-full pl-12 pr-6 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold shadow-inner focus:border-blue-600 outline-none transition-all" />
+                        }} placeholder={notaFiscalInfo ? "Venda fiscalizada. Não é possível alterar itens." : "Pesquisar peça para adicionar à tabela..."} className="w-full pl-12 pr-6 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold shadow-inner focus:border-blue-600 outline-none transition-all disabled:bg-slate-100 disabled:cursor-not-allowed" />
 
                         {resultadosPecas.length > 0 && (
                             <div className="absolute top-full left-0 w-full mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-72 overflow-y-auto mx-2 w-[calc(100%-16px)]">
@@ -539,10 +595,14 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                                             {faltaEstoque && <span className="text-[10px] font-black text-red-600 flex items-center gap-1 uppercase tracking-tighter mt-1"><AlertTriangle size={10}/> Faltam {item.qtd - disponivelFinal} para fechar pedido</span>}
                                         </td>
                                         <td className="p-4 text-center">
-                                            <input type="number" title="Alterar a quantidade deste item" value={item.qtd} onChange={(e) => setItens(itens.map(i => i.id === item.id ? { ...i, qtd: Math.max(1, parseInt(e.target.value) || 1) } : i))} className={`w-16 p-2 text-center font-black bg-white border-2 rounded-lg outline-none ${faltaEstoque ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 focus:border-blue-500'}`} />
+                                            <input type="number" disabled={!!notaFiscalInfo} title="Alterar a quantidade deste item" value={item.qtd} onChange={(e) => setItens(itens.map(i => i.id === item.id ? { ...i, qtd: Math.max(1, parseInt(e.target.value) || 1) } : i))} className={`w-16 p-2 text-center font-black bg-white border-2 rounded-lg outline-none disabled:bg-transparent disabled:border-transparent ${faltaEstoque ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 focus:border-blue-500'}`} />
                                         </td>
                                         <td className="p-4 text-right font-black text-slate-800 pr-6">R$ {(item.preco * item.qtd).toFixed(2)}</td>
-                                        <td className="p-4 text-center"><button onClick={() => setItens(itens.filter(i => i.id !== item.id))} className="text-slate-300 hover:text-red-500 p-2 transition-colors" title="Remover Peça"><Trash2 size={18} /></button></td>
+                                        <td className="p-4 text-center">
+                                            {!notaFiscalInfo && (
+                                                <button onClick={() => setItens(itens.filter(i => i.id !== item.id))} className="text-slate-300 hover:text-red-500 p-2 transition-colors" title="Remover Peça"><Trash2 size={18} /></button>
+                                            )}
+                                        </td>
                                     </tr>
                                 );
                             })}
@@ -559,13 +619,15 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
 
                             <div className="flex flex-col items-end">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Aplicar Desconto</p>
-                                <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm focus-within:border-blue-400 transition-colors">
+                                <div className={`flex items-center gap-2 p-1.5 rounded-xl border border-slate-200 shadow-sm transition-colors ${notaFiscalInfo ? 'bg-slate-100 cursor-not-allowed' : 'bg-white focus-within:border-blue-400'}`}>
                                     <div className="flex bg-slate-100 p-1 rounded-lg">
                                         <button
+                                            disabled={!!notaFiscalInfo}
                                             onClick={() => setDescontoTipo('VALOR')}
                                             className={`px-3 py-1.5 rounded-md text-xs font-black transition-all ${descontoTipo === 'VALOR' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                                         >R$</button>
                                         <button
+                                            disabled={!!notaFiscalInfo}
                                             onClick={() => setDescontoTipo('PERCENTUAL')}
                                             className={`px-3 py-1.5 rounded-md text-xs font-black transition-all ${descontoTipo === 'PERCENTUAL' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                                         >%</button>
@@ -574,10 +636,11 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                                         type="number"
                                         min="0"
                                         step="0.01"
+                                        disabled={!!notaFiscalInfo}
                                         value={descontoInput}
                                         onChange={(e) => setDescontoInput(e.target.value)}
                                         placeholder="0.00"
-                                        className="w-24 p-2 text-right font-black text-red-600 bg-transparent outline-none text-lg"
+                                        className="w-24 p-2 text-right font-black text-red-600 bg-transparent outline-none text-lg disabled:opacity-70"
                                     />
                                 </div>
                             </div>
@@ -585,7 +648,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                     )}
                 </div>
 
-                {/* 🚀 RODAPÉ (APENAS COM OS BOTÕES DE FECHAR VENDA) */}
                 <div className="bg-slate-900 text-white rounded-b-3xl border-t-4 border-blue-500 p-6 flex flex-col lg:flex-row justify-between items-center shadow-2xl mt-0 relative z-40">
 
                     <div className="text-slate-400 font-bold text-sm mb-6 lg:mb-0 flex items-center gap-2">
@@ -601,14 +663,20 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                             {valorDescontoReal > 0 && <p className="text-xs text-red-400 font-bold mt-1 uppercase tracking-widest">Desconto Aplicado: - R$ {valorDescontoReal.toFixed(2)}</p>}
                         </div>
 
-                        {modo === 'ORCAMENTO' ? (
-                            <button onClick={() => processarVendaAPI('PEDIDO')} title="Converter este orçamento em um pedido firme" className="w-full md:w-auto px-8 py-5 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-orange-500/20 transition-all text-lg group">
-                                CONVERTER EM PEDIDO <ArrowRight size={24} className="group-hover:translate-x-1 transition-transform"/>
-                            </button>
+                        {!notaFiscalInfo ? (
+                            modo === 'ORCAMENTO' ? (
+                                <button onClick={() => processarVendaAPI('PEDIDO')} title="Converter este orçamento em um pedido firme" className="w-full md:w-auto px-8 py-5 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-orange-500/20 transition-all text-lg group">
+                                    CONVERTER EM PEDIDO <ArrowRight size={24} className="group-hover:translate-x-1 transition-transform"/>
+                                </button>
+                            ) : (
+                                <button onClick={() => processarVendaAPI('AGUARDANDO_PAGAMENTO')} title="Finalizar e enviar este pedido para recebimento no caixa" className="w-full md:w-auto px-8 py-5 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/30 transition-all text-lg group">
+                                    ENVIAR PRO CAIXA <CheckCircle size={24} className="group-hover:scale-110 transition-transform"/>
+                                </button>
+                            )
                         ) : (
-                            <button onClick={() => processarVendaAPI('AGUARDANDO_PAGAMENTO')} title="Finalizar e enviar este pedido para recebimento no caixa" className="w-full md:w-auto px-8 py-5 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/30 transition-all text-lg group">
-                                ENVIAR PRO CAIXA <CheckCircle size={24} className="group-hover:scale-110 transition-transform"/>
-                            </button>
+                            <div className="w-full md:w-auto px-8 py-5 bg-slate-800 text-green-400 font-black rounded-2xl flex items-center justify-center gap-3 shadow-inner border border-slate-700 cursor-not-allowed">
+                                <Receipt size={24} /> VENDA FISCALIZADA (NF-e)
+                            </div>
                         )}
                     </div>
                 </div>

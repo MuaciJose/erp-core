@@ -26,12 +26,26 @@ public class ConfiguracaoSistema {
     @Column(columnDefinition = "TEXT")
     private String endereco = "";
 
-    // Endereço Novo (Estruturado)
-    private String logradouro;
-    private String numero;
-    private String bairro;
-    private String cidade;
-    private String uf;
+    // Endereço Novo (Estruturado - Exigência SEFAZ)
+    private String cep = ""; // 🚀 ADICIONADO
+    private String logradouro = "";
+    private String numero = "";
+    private String bairro = "";
+    private String cidade = "";
+    private String uf = "";
+    private String codigoIbgeMunicipio = ""; // 🚀 ADICIONADO (Ex: 2600054 para Abreu e Lima/PE)
+
+    // ================= FISCAL / EMISSÃO NF-E =================
+    @Column(length = 1)
+    private String crt = "1"; // 🚀 ADICIONADO: 1 = Simples Nacional, 3 = Regime Normal
+
+    private Integer ambienteSefaz = 2; // 🚀 ADICIONADO: 1 = Produção (Real), 2 = Homologação (Testes)
+    private Integer serieNfe = 1; // 🚀 ADICIONADO: Série padrão da nota
+    private Long numeroProximaNfe = 1L; // 🚀 ADICIONADO: ERP vai somar +1 a cada nota emitida
+
+    @Column(length = 2)
+    private String tipoCertificado = "A1";
+    private String senhaCertificado = "";
 
     // ================= VISUAL =================
     private String logoUrl = "";
@@ -65,15 +79,9 @@ public class ConfiguracaoSistema {
     private List<VendedorComissao> vendedores = new ArrayList<>();
 
     // ================= INTEGRAÇÕES E APIS =================
-    @Column(length = 1000) // Tamanho maior pois tokens de API costumam ser longos
+    @Column(length = 1000)
     private String whatsappToken = "";
 
     @Column(length = 1000)
-    private String whatsappApiUrl = ""; // NOVO CAMPO: Onde a API está hospedada?
-    // ================= FISCAL / CERTIFICADO =================
-    @Column(length = 2)
-    private String tipoCertificado = "A1";
-
-    private String senhaCertificado = "";
-
+    private String whatsappApiUrl = "";
 }

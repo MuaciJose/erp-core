@@ -29,9 +29,9 @@ public class Venda {
     private Integer kmVeiculo;
 
     // Vendedor
-    private Long vendedorId; // NOVO: ID para rastreamento interno e comissão
+    private Long vendedorId;
     private String vendedorNome;
-    private BigDecimal valorComissao = BigDecimal.ZERO; // NOVO: Valor em R$ calculado no fechamento
+    private BigDecimal valorComissao = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
     private StatusVenda status = StatusVenda.CONCLUIDA;
@@ -46,4 +46,9 @@ public class Venda {
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "venda_id")
     private List<PagamentoVenda> pagamentos = new ArrayList<>();
+
+    // 🚀 ================= FISCAL =================
+    // Mapeia que esta venda pode ter uma Nota Fiscal vinculada
+    @OneToOne(mappedBy = "venda", cascade = CascadeType.ALL)
+    private com.grandport.erp.modules.fiscal.model.NotaFiscal notaFiscal;
 }

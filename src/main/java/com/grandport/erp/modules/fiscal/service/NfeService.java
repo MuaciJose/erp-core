@@ -1,66 +1,64 @@
 package com.grandport.erp.modules.fiscal.service;
 
+import com.grandport.erp.modules.fiscal.model.NotaFiscal;
+import com.grandport.erp.modules.fiscal.repository.NotaFiscalRepository;
+import com.grandport.erp.modules.vendas.model.Venda;
+import com.grandport.erp.modules.vendas.repository.VendaRepository;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 public class NfeService {
 
-    // 🚀 DESCOMENTE ISSO QUANDO TIVER SEU REPOSITORY DE VENDAS IMPORTADO AQUI
-    // @Autowired
-    // private OrcamentoRepository orcamentoRepository;
+    @Autowired
+    private VendaRepository vendaRepository;
 
-    public Map<String, Object> emitirNfeSefaz(Long pedidoId) throws Exception {
+    @Autowired
+    private NotaFiscalRepository notaFiscalRepository;
 
-        System.out.println("Iniciando processo de emissão da NF-e para o Pedido: #" + pedidoId);
+    public Map<String, Object> emitirNfeSefaz(Long vendaId) throws Exception {
+        System.out.println("Iniciando processo de emissão da NF-e para a Venda: #" + vendaId);
 
-        /* =========================================================================
-           1. BUSCA E VALIDAÇÃO NO BANCO DE DADOS
-           (Descomente e ajuste para os nomes das suas entidades do banco)
-        ========================================================================= */
+        // 1. Busca a Venda no banco
+        Venda venda = vendaRepository.findById(vendaId)
+                .orElseThrow(() -> new Exception("Venda não encontrada no banco de dados."));
 
-        // Orcamento pedido = orcamentoRepository.findById(pedidoId)
-        //        .orElseThrow(() -> new Exception("Pedido não encontrado no banco de dados."));
+        // 2. Trava de Segurança: Verifica se já não existe uma nota!
+        NotaFiscal notaExistente = notaFiscalRepository.findByVendaId(vendaId);
+        if (notaExistente != null && notaExistente.getStatus().equals("AUTORIZADA")) {
+            throw new Exception("Esta venda já possui uma NF-e autorizada (Chave: " + notaExistente.getChaveAcesso() + ")");
+        }
 
-        // if (pedido.getCliente() == null || pedido.getCliente().getDocumento() == null) {
-        //     throw new Exception("Rejeição SEFAZ: O cliente da nota precisa ter um CPF ou CNPJ válido.");
-        // }
-
-        // for (ItemOrcamento item : pedido.getItens()) {
-        //     if (item.getProduto().getNcm() == null) {
-        //         throw new Exception("Rejeição SEFAZ: O produto '" + item.getProduto().getNome() + "' está sem código NCM.");
-        //     }
-        // }
-
-        /* =========================================================================
-           2. MONTAGEM DO XML E ENVIO (Simulação)
-        ========================================================================= */
-
-        System.out.println("Montando XML, assinando com Certificado Digital e transmitindo...");
-
-        // Simula o tempo que a SEFAZ demora para processar e devolver a resposta (1.5 segundos)
+        // Simula o tempo que a SEFAZ demora
         Thread.sleep(1500);
 
-        /* =========================================================================
-           3. RETORNO DA SEFAZ (Mock de Sucesso)
-        ========================================================================= */
-
-        // Gera uma Chave de Acesso fictícia de 44 dígitos (padrão NF-e)
-        String chaveAcessoFalsa = "26" + "2403" + "12345678000199" + "55" + "001" + "000001234" + "1" + "12345678" + "9";
-
-        // Gera um número de protocolo fictício
+        // 3. SEFAZ aprovou!
+        String chaveAcessoFalsa = "26240312345678000199550010000012341123456789";
         String protocoloAutorizacao = "1" + (System.currentTimeMillis() / 1000);
+        String urlPdf = "https://grandport.com/fiscal/danfe/" + chaveAcessoFalsa + ".pdf";
 
-        System.out.println("✅ NF-e Autorizada! Chave: " + chaveAcessoFalsa);
+        // 4. SALVAR A NOTA FISCAL NO BANCO DE DADOS
+        NotaFiscal novaNota = new NotaFiscal();
+        novaNota.setVenda(venda); // 🚀 Agora vincula na sua entidade Venda
+        novaNota.setNumero(1234L);
+        novaNota.setChaveAcesso(chaveAcessoFalsa);
+        novaNota.setProtocolo(protocoloAutorizacao);
+        novaNota.setUrlDanfe(urlPdf);
+        novaNota.setStatus("AUTORIZADA");
+
+        notaFiscalRepository.save(novaNota);
+
+        System.out.println("✅ NF-e Salva e amarrada à Venda #" + vendaId);
 
         return Map.of(
                 "status", "AUTORIZADA",
                 "mensagem", "NF-e Autorizada o uso na SEFAZ",
                 "chaveAcesso", chaveAcessoFalsa,
                 "protocolo", protocoloAutorizacao,
-                // Uma URL de exemplo onde ficaria o PDF do DANFE salvo no seu servidor AWS/S3
-                "urlPdf", "https://grandport.com/fiscal/danfe/" + chaveAcessoFalsa + ".pdf"
+                "urlPdf", urlPdf
         );
     }
 }

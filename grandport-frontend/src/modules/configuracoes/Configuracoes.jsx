@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
 import {
     Settings, Building2, Printer, Sliders, Save, CheckCircle,
     AlertTriangle, Info, X, Store, Percent, Search, Loader2, Camera, Plus,
-    Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode, RefreshCw
+    Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode, RefreshCw, Receipt
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-
+import axios from 'axios';
 export const Configuracoes = () => {
     const [abaAtiva, setAbaAtiva] = useState('EMPRESA');
     const [loading, setLoading] = useState(true);
@@ -19,6 +19,7 @@ export const Configuracoes = () => {
     const [gerandoQr, setGerandoQr] = useState(false);
     const [checandoConexao, setChecandoConexao] = useState(false);
 
+    // 🚀 ATUALIZADO COM OS NOVOS CAMPOS FISCAIS E ENDEREÇO
     const [config, setConfig] = useState({
         nomeFantasia: '',
         razaoSocial: '',
@@ -26,11 +27,17 @@ export const Configuracoes = () => {
         inscricaoEstadual: '',
         telefone: '',
         email: '',
+        cep: '',
         logradouro: '',
         numero: '',
         bairro: '',
         cidade: '',
         uf: '',
+        codigoIbgeMunicipio: '',
+        crt: '1',
+        ambienteSefaz: 2,
+        serieNfe: 1,
+        numeroProximaNfe: 1,
         logoBase64: '',
         tamanhoImpressora: '80mm',
         mensagemRodape: '',
@@ -63,16 +70,23 @@ export const Configuracoes = () => {
                 setConfig(prev => ({
                     ...prev,
                     ...data,
+                    cep: data.cep || '',
                     logradouro: data.logradouro || '',
                     numero: data.numero || '',
                     bairro: data.bairro || '',
                     cidade: data.cidade || '',
                     uf: data.uf || '',
+                    codigoIbgeMunicipio: data.codigoIbgeMunicipio || '',
                     telefone: data.telefone || '',
                     email: data.email || '',
                     cnpj: data.cnpj || '',
                     razaoSocial: data.razaoSocial || '',
                     nomeFantasia: data.nomeFantasia || '',
+                    inscricaoEstadual: data.inscricaoEstadual || '',
+                    crt: data.crt || '1',
+                    ambienteSefaz: data.ambienteSefaz || 2,
+                    serieNfe: data.serieNfe || 1,
+                    numeroProximaNfe: data.numeroProximaNfe || 1,
                     whatsappToken: data.whatsappToken || '',
                     whatsappApiUrl: data.whatsappApiUrl || '',
                     tamanhoImpressora: data.tamanhoImpressora || '80mm',
@@ -114,6 +128,9 @@ export const Configuracoes = () => {
         }
     };
 
+    // =========================================================================
+    // 🚀 BUSCA DE CNPJ (BRASIL API)
+    // =========================================================================
     const buscarCNPJ = async () => {
         const cnpjLimpo = config.cnpj.replace(/\D/g, '');
         if (cnpjLimpo.length !== 14) {
@@ -132,19 +149,55 @@ export const Configuracoes = () => {
                 ...prev,
                 razaoSocial: data.razao_social || prev.razaoSocial,
                 nomeFantasia: data.nome_fantasia || data.razao_social || prev.nomeFantasia,
-                telefone: data.ddd_telefone_1 || prev.telefone,
+                telefone: data.ddd_telefone_1 || data.telefone || prev.telefone,
                 email: data.email || prev.email,
-                logradouro: data.logradouro || '',
-                numero: data.numero || '',
-                bairro: data.bairro || '',
-                cidade: data.municipio || '',
-                uf: data.uf || ''
+                cep: data.cep || prev.cep,
+                logradouro: data.logradouro || data.descricao_tipo_de_logradouro || prev.logradouro || '',
+                numero: data.numero || prev.numero || '',
+                bairro: data.bairro || prev.bairro,
+                cidade: data.municipio || prev.cidade,
+                uf: data.uf || prev.uf,
+                codigoIbgeMunicipio: data.codigo_municipio || prev.codigoIbgeMunicipio
             }));
-            toast.success('Endereço e dados da empresa atualizados!', { id: loadId });
+            toast.success('Dados da empresa importados com sucesso!', { id: loadId });
         } catch (error) {
             toast.error('Não foi possível encontrar os dados para este CNPJ.', { id: loadId });
         } finally {
             setBuscandoCnpj(false);
+        }
+    };
+
+    // =========================================================================
+    // 🚀 NOVA BUSCA DE CEP (VIA CEP) PARA GARANTIR O LOGRADOURO E IBGE
+    // =========================================================================
+    const buscarCEP = async () => {
+        const cepLimpo = config.cep.replace(/\D/g, '');
+        if (cepLimpo.length !== 8) {
+            return toast.error('CEP Inválido: Digite os 8 números.');
+        }
+
+        const loadId = toast.loading('Buscando endereço via Correios...');
+
+        try {
+            const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+            if (!response.ok) throw new Error('Erro na requisição');
+            const data = await response.json();
+
+            if (data.erro) {
+                return toast.error('CEP não encontrado.', { id: loadId });
+            }
+
+            setConfig(prev => ({
+                ...prev,
+                logradouro: data.logradouro || prev.logradouro,
+                bairro: data.bairro || prev.bairro,
+                cidade: data.localidade || prev.cidade,
+                uf: data.uf || prev.uf,
+                codigoIbgeMunicipio: data.ibge || prev.codigoIbgeMunicipio
+            }));
+            toast.success('Endereço e IBGE preenchidos!', { id: loadId });
+        } catch (error) {
+            toast.error('Falha ao buscar o CEP.', { id: loadId });
         }
     };
 
@@ -153,19 +206,61 @@ export const Configuracoes = () => {
         const loadId = toast.loading('Salvando configurações...');
 
         try {
+            // 1. Salva os textos (JSON) usando o seu 'api' normal
             const res = await api.put('/api/configuracoes', config);
             const data = Array.isArray(res.data) ? res.data[0] : res.data;
             setConfig(prev => ({ ...prev, ...data }));
-            toast.success('Configurações salvas com sucesso!', { id: loadId });
+
+            // 2. 🚀 ENVIA O ARQUIVO COM FETCH NATIVO (IMUNE AO AXIOS)
+            if (arquivoCertificado) {
+                toast.loading('Enviando Certificado Digital...', { id: loadId });
+
+                const formData = new FormData();
+                formData.append('file', arquivoCertificado);
+
+                // Descobre a URL do seu servidor
+                const baseUrl = api.defaults.baseURL || 'http://localhost:8080';
+
+                // Caça o Token de Segurança de todas as formas possíveis
+                let token = localStorage.getItem('token');
+                if (!token && api.defaults.headers.common['Authorization']) {
+                    token = api.defaults.headers.common['Authorization'];
+                }
+                const authHeader = token ? (token.startsWith('Bearer') ? token : `Bearer ${token}`) : '';
+
+                // 🚀 O DISPARO NATIVO (O Axios não consegue tocar nisso aqui)
+                const uploadRes = await fetch(`${baseUrl}/api/configuracoes/certificado`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': authHeader
+                        // NUNCA coloque 'Content-Type' aqui. O navegador criará a "fronteira" do arquivo.
+                    },
+                    body: formData
+                });
+
+                if (!uploadRes.ok) {
+                    // Se o Java reclamar, agora vamos ler O QUE ele reclamou!
+                    const mensagemErroJava = await uploadRes.text();
+                    console.error("Motivo da recusa do Java:", mensagemErroJava);
+                    throw new Error(mensagemErroJava || 'Falha no upload');
+                }
+
+                setArquivoCertificado(null); // Limpa da tela após sucesso
+            }
+
+            toast.success('Configurações e Certificado salvos com sucesso!', { id: loadId });
+
         } catch (error) {
-            toast.error('Erro ao salvar. Verifique a conexão com o servidor.', { id: loadId });
+            console.error("Erro detalhado:", error);
+            toast.error('Erro ao salvar certificado. Verifique o console.', { id: loadId });
         } finally {
             setSalvando(false);
         }
     };
 
+
     // =========================================================================
-    // 🚀 MÁGICA: GERAR QR CODE COM AUTO-RETRY (CORRIGIDO)
+    // 🚀 WHATSAPP E SISTEMA
     // =========================================================================
     const solicitarQrCode = async (tentativa) => {
         const numTentativa = typeof tentativa === 'number' ? tentativa : 1;
@@ -200,9 +295,6 @@ export const Configuracoes = () => {
         }
     };
 
-    // =========================================================================
-    // 🚀 NOVO: TESTAR CONEXÃO ATIVA
-    // =========================================================================
     const verificarConexaoAtiva = async () => {
         setChecandoConexao(true);
         const loadId = toast.loading('Validando conexão com o WhatsApp...');
@@ -225,9 +317,6 @@ export const Configuracoes = () => {
         }
     };
 
-    // =========================================================================
-    // 🚀 NOVO: RESTAURAR BANCO DE DADOS (UPLOAD)
-    // =========================================================================
     const restaurarBanco = async (event) => {
         const arquivo = event.target.files[0];
         if (!arquivo) return;
@@ -259,9 +348,6 @@ export const Configuracoes = () => {
         event.target.value = null;
     };
 
-    // =========================================================================
-    // 🚀 NOVAS FUNÇÕES DA ABA DE SISTEMA
-    // =========================================================================
     const fazerBackup = async () => {
         const loadId = toast.loading('Gerando backup do banco de dados... Isto pode demorar alguns segundos.');
         try {
@@ -319,7 +405,7 @@ export const Configuracoes = () => {
             <div className="mb-8 flex justify-between items-end">
                 <div>
                     <h1 className="text-3xl font-black text-slate-800 flex items-center gap-3"><Settings className="text-slate-600 bg-slate-200 p-1.5 rounded-xl" size={40} /> CONFIGURAÇÕES</h1>
-                    <p className="text-slate-500 mt-1">Gerencie a identidade e as regras do GrandPort.</p>
+                    <p className="text-slate-500 mt-1">Gerencie a identidade, regras e motor fiscal do ERP.</p>
                 </div>
                 <button
                     onClick={salvarConfiguracoes}
@@ -334,12 +420,13 @@ export const Configuracoes = () => {
             <div className="flex flex-col lg:flex-row gap-8 flex-1">
                 {/* MENU LATERAL */}
                 <div className="w-full lg:w-64 flex flex-col gap-2">
-                    <button onClick={() => setAbaAtiva('EMPRESA')} title="Visualizar e editar dados cadastrais e endereço" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'EMPRESA' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Building2 size={20} /> Dados da Empresa</button>
-                    <button onClick={() => setAbaAtiva('VENDEDORES')} title="Configurar comissões da equipe de vendas" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'VENDEDORES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Users size={20} /> Vendedores</button>
-                    <button onClick={() => setAbaAtiva('IMPRESSAO')} title="Configurar formatos de cupom e impressoras" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'IMPRESSAO' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Printer size={20} /> Impressão</button>
-                    <button onClick={() => setAbaAtiva('REGRAS')} title="Definir limites de desconto e estoque" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'REGRAS' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Sliders size={20} /> Regras</button>
-                    <button onClick={() => setAbaAtiva('INTEGRACOES')} title="Gerenciar conexões com WhatsApp e APIs externas" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'INTEGRACOES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Plug size={20} /> Integrações</button>
-                    <button onClick={() => setAbaAtiva('SISTEMA')} title="Ações de segurança, backup e manutenção do banco de dados" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'SISTEMA' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Database size={20} /> Sistema</button>
+                    <button onClick={() => setAbaAtiva('EMPRESA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'EMPRESA' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Building2 size={20} /> Dados da Empresa</button>
+                    <button onClick={() => setAbaAtiva('FISCAL')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'FISCAL' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Receipt size={20} /> Fiscal / NF-e</button>
+                    <button onClick={() => setAbaAtiva('VENDEDORES')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'VENDEDORES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Users size={20} /> Vendedores</button>
+                    <button onClick={() => setAbaAtiva('IMPRESSAO')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'IMPRESSAO' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Printer size={20} /> Impressão</button>
+                    <button onClick={() => setAbaAtiva('REGRAS')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'REGRAS' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Sliders size={20} /> Regras</button>
+                    <button onClick={() => setAbaAtiva('INTEGRACOES')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'INTEGRACOES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Plug size={20} /> Integrações</button>
+                    <button onClick={() => setAbaAtiva('SISTEMA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'SISTEMA' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Database size={20} /> Sistema</button>
                 </div>
 
                 <div className="flex-1 bg-white p-8 rounded-3xl shadow-sm border border-slate-200 min-h-[500px]">
@@ -366,7 +453,7 @@ export const Configuracoes = () => {
                                     <label className="text-xs font-black text-blue-600 uppercase">CNPJ (Auto-Busca)</label>
                                     <div className="relative mt-1">
                                         <input type="text" name="cnpj" value={config.cnpj || ''} onChange={handleChange} title="Digite apenas números para realizar a busca automática" className="w-full p-3 pr-12 bg-blue-50 border-2 border-blue-200 rounded-xl font-black focus:border-blue-500 outline-none" />
-                                        <button onClick={buscarCNPJ} disabled={buscandoCnpj} title="Consultar dados da empresa automaticamente na Receita Federal via API" className="absolute right-2 top-2 bottom-2 bg-blue-600 text-white p-2 rounded-lg">{buscandoCnpj ? <Loader2 className="animate-spin" size={18}/> : <Search size={18} />}</button>
+                                        <button onClick={buscarCNPJ} disabled={buscandoCnpj} title="Consultar dados da empresa automaticamente na Receita Federal via API" className="absolute right-2 top-2 bottom-2 bg-blue-600 text-white p-2 rounded-lg transition-all hover:bg-blue-700">{buscandoCnpj ? <Loader2 className="animate-spin" size={18}/> : <Search size={18} />}</button>
                                     </div>
                                 </div>
                                 <div>
@@ -379,9 +466,21 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            <h3 className="text-sm font-black text-slate-400 uppercase flex items-center gap-2 mt-8"><MapPin size={16}/> Localização</h3>
+                            <h3 className="text-sm font-black text-slate-400 uppercase flex items-center gap-2 mt-8"><MapPin size={16}/> Localização Oficial (SEFAZ)</h3>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                                <div className="md:col-span-3">
+
+                                {/* 🚀 CAMPO CEP COM BOTÃO VIACEP ADICIONADO */}
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase">CEP (Auto-Busca)</label>
+                                    <div className="relative mt-1">
+                                        <input type="text" name="cep" value={config.cep || ''} onChange={handleChange} maxLength="9" className="w-full p-2 pr-10 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" placeholder="00000-000" />
+                                        <button onClick={buscarCEP} title="Buscar endereço completo e IBGE através da ViaCEP" className="absolute right-1 top-1 bottom-1 bg-slate-100 hover:bg-slate-200 text-blue-600 p-1.5 rounded-md transition-colors">
+                                            <Search size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="md:col-span-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase">Logradouro (Rua/Av)</label>
                                     <input type="text" name="logradouro" value={config.logradouro || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" />
                                 </div>
@@ -393,13 +492,17 @@ export const Configuracoes = () => {
                                     <label className="text-[10px] font-black text-slate-400 uppercase">Bairro</label>
                                     <input type="text" name="bairro" value={config.bairro || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" />
                                 </div>
-                                <div>
+                                <div className="md:col-span-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase">Cidade</label>
                                     <input type="text" name="cidade" value={config.cidade || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-400 uppercase">UF</label>
                                     <input type="text" name="uf" value={config.uf || ''} onChange={handleChange} maxLength="2" className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold text-center outline-none focus:border-blue-500" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase" title="Código exigido pela Receita Federal para emissão de Notas">Cód. IBGE Município</label>
+                                    <input type="text" name="codigoIbgeMunicipio" value={config.codigoIbgeMunicipio || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" />
                                 </div>
                             </div>
 
@@ -411,6 +514,87 @@ export const Configuracoes = () => {
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase">E-mail</label>
                                     <input type="email" name="email" value={config.email || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold outline-none focus:border-blue-500" />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ABA: FISCAL / NF-e (NOVA) */}
+                    {abaAtiva === 'FISCAL' && (
+                        <div className="space-y-6 animate-fade-in">
+                            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4">
+                                <Receipt className="text-blue-500" /> Parâmetros Fiscais (NF-e)
+                            </h2>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Inscrição Estadual (I.E.)</label>
+                                    <input type="text" name="inscricaoEstadual" value={config.inscricaoEstadual || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="Ex: 123456789" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Regime Tributário (CRT)</label>
+                                    <select name="crt" value={config.crt || '1'} onChange={handleChange} className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none">
+                                        <option value="1">Simples Nacional</option>
+                                        <option value="2">Simples Nacional (Excesso de Sublimite)</option>
+                                        <option value="3">Regime Normal (Lucro Presumido/Real)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-3xl border border-slate-100 mt-6">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase">Ambiente Sefaz</label>
+                                    <select name="ambienteSefaz" value={config.ambienteSefaz || 2} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none text-sm">
+                                        <option value={1}>1 - Produção (Com Valor Fiscal)</option>
+                                        <option value={2}>2 - Homologação (Testes)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase">Série da NF-e</label>
+                                    <input type="number" name="serieNfe" value={config.serieNfe || 1} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-bold text-center focus:border-blue-500 outline-none" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase" title="O número que o ERP utilizará para a próxima NF-e gerada">Próximo Nº da NF-e</label>
+                                    <input type="number" name="numeroProximaNfe" value={config.numeroProximaNfe || 1} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-black text-center text-blue-600 focus:border-blue-500 outline-none" />
+                                </div>
+                            </div>
+
+                            {/* CERTIFICADO DIGITAL */}
+                            <div className="mt-8 p-6 bg-blue-50 border-2 border-blue-200 rounded-3xl shadow-inner">
+                                <h3 className="font-black text-blue-900 flex items-center gap-2 mb-4"><ShieldCheck className="text-blue-600" /> Certificado Digital (A1/A3)</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-xs font-bold text-blue-700 uppercase">Tipo do Certificado</label>
+                                        <select name="tipoCertificado" value={config.tipoCertificado || 'A1'} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-blue-200 rounded-xl font-bold focus:border-blue-500 outline-none">
+                                            <option value="A1">A1 (Arquivo Digital .pfx / .p12)</option>
+                                            <option value="A3">A3 (Cartão Físico / Token)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-blue-700 uppercase">Senha do Certificado</label>
+                                        <input type="password" name="senhaCertificado" value={config.senhaCertificado || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-blue-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="••••••••" />
+                                    </div>
+
+                                    {config.tipoCertificado === 'A1' && (
+                                        <div className="md:col-span-2">
+                                            <label className="text-xs font-bold text-blue-700 uppercase">Arquivo do Certificado (Upload)</label>
+                                            <div className="mt-1 flex items-center gap-4 p-4 bg-white border-2 border-dashed border-blue-300 rounded-xl transition-all hover:border-blue-500">
+                                                <div className="bg-blue-100 p-3 rounded-lg text-blue-600">
+                                                    <UploadCloud size={24} />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-bold text-slate-700">
+                                                        {arquivoCertificado ? arquivoCertificado.name : 'Nenhum arquivo selecionado'}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500">Selecione o arquivo do seu certificado (formato .pfx ou .p12)</p>
+                                                </div>
+                                                <label className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold cursor-pointer transition-colors shadow-md">
+                                                    PROCURAR
+                                                    <input type="file" className="hidden" accept=".pfx,.p12" onChange={(e) => setArquivoCertificado(e.target.files[0])} />
+                                                </label>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -562,7 +746,7 @@ export const Configuracoes = () => {
                                                     className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl font-black shadow-lg shadow-green-500/30 flex items-center gap-2 transition-all"
                                                 >
                                                     {gerandoQr ? <Loader2 className="animate-spin" size={18}/> : <Smartphone size={18}/>}
-                                                    {gerandoQr ? 'AGUARDANDE...' : 'CONECTAR CELULAR (GERAR QR)'}
+                                                    {gerandoQr ? 'AGUARDANDO...' : 'CONECTAR CELULAR (GERAR QR)'}
                                                 </button>
                                             </div>
                                         )}
@@ -621,44 +805,6 @@ export const Configuracoes = () => {
                                         </button>
                                     </div>
                                     <p className="text-[10px] text-slate-400 mt-3 font-medium text-center">Recomendamos fazer o download do backup 1x por semana.</p>
-                                </div>
-                            </div>
-
-                            <div className="mt-8 p-6 bg-blue-50 border-2 border-blue-200 rounded-3xl shadow-inner">
-                                <h3 className="font-black text-blue-900 flex items-center gap-2 mb-4"><ShieldCheck className="text-blue-600" /> Certificado Digital (NFe/NFCe)</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="text-xs font-bold text-blue-700 uppercase">Tipo do Certificado</label>
-                                        <select name="tipoCertificado" value={config.tipoCertificado || 'A1'} onChange={handleChange} title="A1 é um arquivo digital (.pfx), A3 é um dispositivo físico (Token/Cartão)" className="w-full p-3 mt-1 bg-white border-2 border-blue-200 rounded-xl font-bold focus:border-blue-500 outline-none">
-                                            <option value="A1">A1 (Arquivo Digital .pfx / .p12)</option>
-                                            <option value="A3">A3 (Cartão Físico / Token)</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-blue-700 uppercase">Senha do Certificado</label>
-                                        <input type="password" name="senhaCertificado" value={config.senhaCertificado || ''} onChange={handleChange} title="A senha definida no momento da instalação/compra do certificado" className="w-full p-3 mt-1 bg-white border-2 border-blue-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="••••••••" />
-                                    </div>
-
-                                    {config.tipoCertificado === 'A1' && (
-                                        <div className="md:col-span-2">
-                                            <label className="text-xs font-bold text-blue-700 uppercase">Arquivo do Certificado (Upload)</label>
-                                            <div className="mt-1 flex items-center gap-4 p-4 bg-white border-2 border-dashed border-blue-300 rounded-xl transition-all hover:border-blue-500">
-                                                <div className="bg-blue-100 p-3 rounded-lg text-blue-600">
-                                                    <UploadCloud size={24} />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <p className="text-sm font-bold text-slate-700">
-                                                        {arquivoCertificado ? arquivoCertificado.name : 'Nenhum arquivo selecionado'}
-                                                    </p>
-                                                    <p className="text-xs text-slate-500">Selecione o arquivo do seu certificado (formato .pfx ou .p12)</p>
-                                                </div>
-                                                <label title="Procurar arquivo do certificado no computador" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold cursor-pointer transition-colors shadow-md">
-                                                    PROCURAR
-                                                    <input type="file" className="hidden" accept=".pfx,.p12" onChange={(e) => setArquivoCertificado(e.target.files[0])} />
-                                                </label>
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
 
