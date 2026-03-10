@@ -10,7 +10,8 @@ public class Endereco {
     private String logradouro;
     private String bairro;
     private String cidade;
-    private String estado;
+    private String uf; // 🚀 Mudamos de 'estado' para 'uf' para bater com o getUf()
     private String numero;
     private String ibge;
+    private String estado;
 }

@@ -86,6 +86,16 @@ public class Produto {
     private String cstPisCofins;
     private String cstIpi;
 
+    // 🚀 NOVOS CAMPOS PARA O MOTOR FISCAL (Regras Padrão de Venda)
+    @Column(length = 4)
+    private String cfopPadrao = "5102"; // Padrão: Venda de mercadoria dentro do Estado
+
+    @Column(length = 3)
+    private String csosnPadrao = "102"; // Padrão: Tributado pelo Simples Nacional sem permissão de crédito
+
+    @Column(length = 2)
+    private String cstPadrao = "00";    // Padrão: Tributado integralmente (Usado se sair do Simples Nacional)
+
     // ================= RELACIONAMENTOS =================
     @ManyToOne
     @JoinColumn(name = "marca_id", nullable = false)
@@ -94,4 +104,5 @@ public class Produto {
     @ManyToOne
     @JoinColumn(name = "ncm_codigo", nullable = false)
     private Ncm ncm; // Mantido o seu relacionamento inteligente com a tabela NCM
+
 }

@@ -2,7 +2,6 @@ package com.grandport.erp.modules.parceiro.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
-
 import java.math.BigDecimal;
 
 @Entity
@@ -35,6 +34,12 @@ public class Parceiro {
 
     @Column(precision = 10, scale = 2)
     private BigDecimal saldoDevedor = BigDecimal.ZERO;
+
+    // 🚀 PONTE FISCAL: Resolve o erro "Cannot resolve method getUf"
+    // Ele traduz o 'estado' do seu Endereco para o 'UF' que a NF-e exige.
+    public String getUf() {
+        return (endereco != null) ? endereco.getEstado() : null;
+    }
 
     @Transient // Não persiste no banco, é calculado
     public BigDecimal getSaldoDisponivel() {
