@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/ncms")
+@RequestMapping("/api/ncm") // 🚀 CORRIGIDO: Tiramos o "s" para ficar igual ao React e ao SecurityConfig
 @Tag(name = "Fiscal - NCM")
 public class NcmController {
 

@@ -8,16 +8,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.grandport.erp.modules.estoque.model.Ncm;
 import com.grandport.erp.modules.estoque.repository.NcmRepository;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class NcmService {
@@ -27,32 +27,29 @@ public class NcmService {
 
     @Transactional
     public void importarNcmDoJson(MultipartFile arquivo) throws IOException {
-        // Configura o Mapper para ignorar diferença entre "Codigo" (JSON) e "codigo" (Java)
         ObjectMapper mapper = JsonMapper.builder()
                 .configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true)
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                 .build();
 
         JsonNode rootNode = mapper.readTree(arquivo.getInputStream());
-        List<Ncm> ncms = new ArrayList<>();
+        List<Ncm> ncmsJson = new ArrayList<>();
 
         if (rootNode.isArray()) {
-            ncms = mapper.convertValue(rootNode, new TypeReference<List<Ncm>>() {});
+            ncmsJson = mapper.convertValue(rootNode, new TypeReference<List<Ncm>>() {});
         } else if (rootNode.isObject()) {
             try {
-                // Tenta mapear direto
                 Ncm unicoNcm = mapper.convertValue(rootNode, Ncm.class);
                 if (unicoNcm.getCodigo() != null) {
-                    ncms.add(unicoNcm);
+                    ncmsJson.add(unicoNcm);
                 } else {
-                    // Tenta encontrar uma lista dentro de qualquer campo (ex: { "data": [...] })
                     Iterator<Map.Entry<String, JsonNode>> fields = rootNode.fields();
                     while (fields.hasNext()) {
                         Map.Entry<String, JsonNode> field = fields.next();
                         if (field.getValue().isArray()) {
                             List<Ncm> listaEncontrada = mapper.convertValue(field.getValue(), new TypeReference<List<Ncm>>() {});
                             if (!listaEncontrada.isEmpty()) {
-                                ncms.addAll(listaEncontrada);
+                                ncmsJson.addAll(listaEncontrada);
                                 break;
                             }
                         }
@@ -63,24 +60,58 @@ public class NcmService {
             }
         }
 
-        if (ncms.isEmpty()) {
+        if (ncmsJson.isEmpty()) {
             throw new RuntimeException("Nenhum NCM válido encontrado no arquivo.");
         }
 
-        // Limpa NCMs com código nulo para evitar erro de banco
-        ncms.removeIf(n -> n.getCodigo() == null || n.getCodigo().trim().isEmpty());
+        // Limpa NCMs inválidos do JSON
+        ncmsJson.removeIf(n -> n.getCodigo() == null || n.getCodigo().trim().isEmpty());
 
-        // Salva em lotes (Batch) para performance
-        repository.saveAll(ncms);
+        // 🚀 LÓGICA DE UPSERT (Update ou Insert)
+
+        // 1. Remove duplicatas que possam vir dentro do próprio JSON (mantém o último)
+        Map<String, Ncm> mapaJson = new LinkedHashMap<>();
+        for (Ncm n : ncmsJson) {
+            mapaJson.put(n.getCodigo(), n);
+        }
+
+        // 2. Busca todos os NCMs que já existem no Banco de Dados
+        List<Ncm> ncmsNoBanco = repository.findAll();
+        Map<String, Ncm> mapaBanco = ncmsNoBanco.stream()
+                .collect(Collectors.toMap(Ncm::getCodigo, n -> n, (n1, n2) -> n1));
+
+        List<Ncm> ncmsParaSalvar = new ArrayList<>();
+
+        // 3. Compara o JSON com o Banco
+        for (Ncm ncmIncoming : mapaJson.values()) {
+            Ncm ncmExistente = mapaBanco.get(ncmIncoming.getCodigo());
+
+            if (ncmExistente != null) {
+                // UPDATE: Se já existe, copia os dados do JSON por cima, mas MANTÉM o ID original!
+                BeanUtils.copyProperties(ncmIncoming, ncmExistente, "id");
+                ncmsParaSalvar.add(ncmExistente);
+            } else {
+                // INSERT: É um NCM novo, apenas adiciona na lista
+                ncmsParaSalvar.add(ncmIncoming);
+            }
+        }
+
+        // Salva tudo de uma vez (novos e atualizados)
+        repository.saveAll(ncmsParaSalvar);
     }
 
     public List<Ncm> buscarNcm(String termo) {
-        // Garante que o termo não vá nulo para o repositório
         if (termo == null) return new ArrayList<>();
         return repository.buscarPorTermo(termo);
     }
+
     @Transactional
     public void limparTabela() {
-        repository.deleteAllInBatch(); // Mais rápido que o deleteAll comum
+        try {
+            repository.deleteAllInBatch();
+        } catch (DataIntegrityViolationException e) {
+            // Captura o erro do banco e devolve uma mensagem limpa para o Frontend
+            throw new RuntimeException("Não é possível limpar a tabela pois existem produtos ou notas usando estes NCMs. Apenas faça o upload do novo arquivo para atualizar os dados.");
+        }
     }
 }

@@ -39,14 +39,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
-                        .requestMatchers("/api/ncm/**").permitAll()
+
                         .requestMatchers("/api/parceiros/consulta-cnpj/**").permitAll()
                         .requestMatchers("/api/parceiros/consulta-cep/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/configuracoes/backup").permitAll()
 
                         // ================= ROTAS PRIVADAS (Requerem Token) =================
-                        .requestMatchers("/api/whatsapp/**").authenticated() // 🚀 Rota agrupada e liberada para usuários logados
+                        .requestMatchers("/api/whatsapp/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/vendas/*/whatsapp").authenticated()
+
+                        // 🚀 NOVO: Rota do módulo fiscal liberada para usuários logados
+                        .requestMatchers("/api/ncm/**").authenticated()
+                        .requestMatchers("/api/fiscal/**").authenticated()
 
                         .requestMatchers("/api/**").authenticated()
                         .requestMatchers("/auth/logout").authenticated()

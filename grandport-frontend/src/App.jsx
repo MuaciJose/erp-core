@@ -31,11 +31,15 @@ import { GestaoVendas } from './modules/vendas/GestaoVendas';
 import { FilaPedidosCaixa } from './modules/vendas/FilaPedidosCaixa';
 import { RelatorioComissoes } from './modules/vendas/RelatorioComissoes';
 
-// 🚀 NOVO MÓDULO IMPORTADO
+// 🚀 MÓDULOS IMPORTADOS
 import { ReciboAvulso } from './modules/financeiro/ReciboAvulso';
 import { HistoricoRecibos } from './modules/financeiro/HistoricoRecibos';
 
+// 🚀 MÓDULO FISCAL (ADICIONADO)
+import { RegrasFiscais } from './modules/fiscal/RegrasFiscais';
 
+// 🚀 MÓDULO Categoria (ADICIONADO)
+import { Categorias } from './modules/estoque/Categorias'; // Ajuste o caminho se necessário
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
     const [paginaAtiva, setPaginaAtiva] = useState('');
@@ -163,9 +167,13 @@ function App() {
                             {paginaAtiva === 'auditoria' && <Auditoria />}
                             {paginaAtiva === 'configuracoes' && <Configuracoes />}
 
-                            {/* 🚀 CORRIGIDO: ReciboAvulso agora recebe setPaginaAtiva */}
                             {paginaAtiva === 'recibo-avulso' && <ReciboAvulso setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'historico-recibos' && <HistoricoRecibos setPaginaAtiva={setPaginaAtiva} />}
+
+                            {/* 🚀 RENDERIZAÇÃO DA TELA DE REGRAS FISCAIS */}
+                            {paginaAtiva === 'regras-fiscais' && <RegrasFiscais setPaginaAtiva={setPaginaAtiva} />}
+
+                            {paginaAtiva === 'categorias' && <Categorias />}
                         </>
                     )}
                 </div>

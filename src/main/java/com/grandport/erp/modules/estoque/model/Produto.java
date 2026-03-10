@@ -32,7 +32,9 @@ public class Produto {
     @Column(name = "ref_original", length = 50)
     private String referenciaOriginal; // O "DNA" da peça que une as marcas
 
-    private String categoria;
+    @ManyToOne
+    @JoinColumn(name = "categoria_id")
+    private Categoria categoria;
 
     private Boolean ativo = true;
 

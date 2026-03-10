@@ -64,6 +64,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             submenus: [
                 { titulo: 'Buscar Peças', acao: 'estoque' },
                 { titulo: 'Marcas', acao: 'marcas' },
+                { titulo: 'Categorias', acao: 'categorias' },
                 { titulo: 'Ajuste de Estoque', acao: 'ajuste_estoque' },
                 { titulo: 'Importar NF-e (XML)', acao: 'compras' },
                 { titulo: 'Previsão de Compras', acao: 'previsao' },
@@ -88,12 +89,15 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Clientes & Fornecedores', acao: 'parceiros' },
                 { titulo: 'Equipe e Acessos', acao: 'usuarios' },
                 { titulo: 'Auditoria de Sistema', acao: 'auditoria' },
-                { titulo: 'Fiscal / NCM', acao: 'fiscal' }
+                { titulo: 'Fiscal / NCM', acao: 'fiscal' },
+                // 🚀 ADICIONADO: Regras Fiscais
+                { titulo: 'Regras Fiscais (NF-e)', acao: 'regras-fiscais' }
             ]
         },
         { id: 'configuracoes', titulo: 'Configurações', icone: <Settings size={20} />, acao: 'configuracoes' }
     ];
 
+    // Aqui filtramos para mostrar apenas as opções que o usuário tem permissão
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {
             const submenusPermitidos = menu.submenus.filter(sub => permissoesUsuario.includes(sub.acao));
