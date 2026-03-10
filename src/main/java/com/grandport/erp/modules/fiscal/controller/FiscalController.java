@@ -25,7 +25,10 @@ public class FiscalController {
     @Autowired
     private NotaFiscalRepository notaFiscalRepository; // 🚀 Para buscar a nota no banco
 
-    @PostMapping("/emitir-nfe/{vendaId}")
+    // =======================================================================
+    // 🚀 ATUALIZADO: ROTA BATE COM O NOVO PAINEL DO REACT (/emitir/{id})
+    // =======================================================================
+    @PostMapping("/emitir/{vendaId}")
     public ResponseEntity<?> emitirNfe(@PathVariable Long vendaId) {
         try {
             Map<String, Object> respostaSefaz = nfeService.emitirNfeSefaz(vendaId);
@@ -51,7 +54,7 @@ public class FiscalController {
     }
 
     // =======================================================================
-    // 🚀 NOVO: ROTA PARA DOWNLOAD/VISUALIZAÇÃO DO DANFE (PDF)
+    // 🚀 ROTA PARA DOWNLOAD/VISUALIZAÇÃO DO DANFE (PDF)
     // =======================================================================
     @GetMapping("/{nfeId}/danfe")
     public ResponseEntity<byte[]> baixarDanfe(@PathVariable Long nfeId) {
@@ -72,6 +75,38 @@ public class FiscalController {
 
         } catch (Exception e) {
             System.err.println("[ERRO - GERAR PDF] " + e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // =======================================================================
+    // 🚀 ROTA PARA DOWNLOAD DO XML (Para enviar ao Contador)
+    // =======================================================================
+    @GetMapping("/{nfeId}/xml")
+    public ResponseEntity<byte[]> baixarXml(@PathVariable Long nfeId) {
+        try {
+            // 1. Busca a nota no banco
+            NotaFiscal nota = notaFiscalRepository.findById(nfeId)
+                    .orElseThrow(() -> new Exception("Nota Fiscal não encontrada."));
+
+            // 2. Aqui você pegaria o XML real que a SEFAZ retornou (se você já salva no banco).
+            // Por enquanto, criamos um XML de simulação válido estruturalmente:
+            String xmlConteudo = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                    "<nfeProc versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\">\n" +
+                    "  \n" +
+                    "  \n" +
+                    "</nfeProc>";
+
+            byte[] xmlBytes = xmlConteudo.getBytes("UTF-8");
+
+            // 3. Força o navegador a fazer o download (attachment)
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=NFe_" + nota.getChaveAcesso() + ".xml")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_XML)
+                    .body(xmlBytes);
+
+        } catch (Exception e) {
+            System.err.println("[ERRO - BAIXAR XML] " + e.getMessage());
             return ResponseEntity.internalServerError().build();
         }
     }

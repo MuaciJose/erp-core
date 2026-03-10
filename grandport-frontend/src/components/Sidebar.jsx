@@ -10,20 +10,16 @@ import {
     ShoppingCart,
     LogOut,
     Menu,
-    ChevronLeft
+    ChevronLeft,
+    FileText // 🚀 Adicionado ícone caso precise no futuro
 } from 'lucide-react';
-import api from '../api/axios'; // Ajuste o caminho se necessário para puxar as configs
+import api from '../api/axios';
 
 export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }) => {
     const [menuExpandido, setMenuExpandido] = useState('vendas');
-
-    // 🚀 NOVO ESTADO: Controla se a Sidebar está aberta ou fechada (recolhida)
     const [isRetratil, setIsRetratil] = useState(false);
-
-    // 🚀 NOVO ESTADO: Armazena o nome da sua empresa
     const [nomeEmpresa, setNomeEmpresa] = useState('GRANDPORT ERP');
 
-    // Busca o nome da empresa ao carregar a sidebar
     useEffect(() => {
         api.get('/api/configuracoes')
             .then(res => {
@@ -37,7 +33,6 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
 
     const toggleMenu = (menuId) => {
         if (isRetratil) {
-            // Se tentar expandir um submenu com a sidebar fechada, ela abre automaticamente
             setIsRetratil(false);
             setMenuExpandido(menuId);
         } else {
@@ -90,8 +85,11 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Equipe e Acessos', acao: 'usuarios' },
                 { titulo: 'Auditoria de Sistema', acao: 'auditoria' },
                 { titulo: 'Fiscal / NCM', acao: 'fiscal' },
-                // 🚀 ADICIONADO: Regras Fiscais
-                { titulo: 'Regras Fiscais (NF-e)', acao: 'regras-fiscais' }
+                { titulo: 'Regras Fiscais (NF-e)', acao: 'regras-fiscais' },
+                // =========================================================
+                // 🚀 ADICIONADO: O novo painel de emissão de notas
+                // =========================================================
+                { titulo: 'Gerenciador de NF-e', acao: 'gerenciador-nfe' }
             ]
         },
         { id: 'configuracoes', titulo: 'Configurações', icone: <Settings size={20} />, acao: 'configuracoes' }
@@ -112,7 +110,6 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         <aside
             className={`${isRetratil ? 'w-20' : 'w-72'} bg-slate-900 text-white h-screen flex flex-col shadow-2xl transition-all duration-300 z-50 relative`}
         >
-            {/* BOTÃO DE RECOLHER/EXPANDIR (Flutuante na borda direita) */}
             <button
                 onClick={() => setIsRetratil(!isRetratil)}
                 className="absolute -right-3 top-8 bg-blue-600 hover:bg-blue-500 text-white p-1 rounded-full shadow-lg border-2 border-slate-900 z-50 transition-colors"
@@ -121,7 +118,6 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 {isRetratil ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
             </button>
 
-            {/* CABEÇALHO DO MENU */}
             <div className={`p-6 border-b border-slate-800 flex items-center transition-all ${isRetratil ? 'justify-center px-0' : 'justify-start'}`}>
                 {isRetratil ? (
                     <Menu size={28} className="text-blue-400" />
@@ -137,7 +133,6 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 )}
             </div>
 
-            {/* ÁREA DE ROLAGEM DOS MENUS */}
             <div className="flex-1 overflow-y-auto py-6 px-3 space-y-2 custom-scrollbar overflow-x-hidden">
                 {menusFiltrados.map((menu) => (
                     <div key={menu.id} className="relative group">
@@ -159,7 +154,6 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                                     {!isRetratil && (menuExpandido === menu.id ? <ChevronDown size={18} /> : <ChevronRight size={18} />)}
                                 </button>
 
-                                {/* TOOLTIP QUANDO RECOLHIDO (Aparece ao passar o mouse) */}
                                 {isRetratil && (
                                     <div className="absolute left-16 top-0 hidden group-hover:block bg-slate-800 text-white p-2 rounded-lg shadow-xl z-50 w-48 border border-slate-700">
                                         <p className="text-xs font-black text-blue-400 mb-2 px-2 uppercase">{menu.titulo}</p>
@@ -175,7 +169,6 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                                     </div>
                                 )}
 
-                                {/* SUBMENUS QUANDO EXPANDIDO */}
                                 {!isRetratil && menuExpandido === menu.id && (
                                     <div className="mt-1 ml-4 pl-4 border-l-2 border-slate-700 space-y-1 animate-fade-in">
                                         {menu.submenus.map((sub, index) => (
@@ -199,7 +192,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                             <button
                                 onClick={() => {
                                     setPaginaAtiva(menu.acao);
-                                    if(isRetratil) setIsRetratil(false); // Opcional: abre a barra ao clicar num atalho
+                                    if(isRetratil) setIsRetratil(false);
                                 }}
                                 title={isRetratil ? menu.titulo : ""}
                                 className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all font-bold ${
@@ -216,7 +209,6 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 ))}
             </div>
 
-            {/* RODAPÉ COM USUÁRIO E LOGOUT */}
             <div className={`p-4 border-t border-slate-800 bg-slate-900 transition-all ${isRetratil ? 'flex flex-col items-center gap-4 px-0' : ''}`}>
                 <div className={`flex items-center ${isRetratil ? 'justify-center' : 'justify-between'} w-full`}>
 

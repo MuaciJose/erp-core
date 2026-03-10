@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="danfe" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="12345678-1234-1234-1234-123456789012">
+    <parameter name="EMITENTE_RAZAO" class="java.lang.String"/>
+    <parameter name="CHAVE_ACESSO" class="java.lang.String"/>
+    <parameter name="NUMERO_NOTA" class="java.lang.Long"/>
+
+    <detail>
+        <band height="150" splitType="Stretch">
+            <staticText>
+                <reportElement x="0" y="0" width="555" height="30" uuid="87654321-4321-4321-4321-210987654321"/>
+                <textElement textAlignment="Center" verticalAlignment="Middle">
+                    <font size="18" isBold="true"/>
+                </textElement>
+                <text><![CDATA[DANFE - DOCUMENTO AUXILIAR DA NOTA FISCAL]]></text>
+            </staticText>
+
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement x="0" y="50" width="555" height="20" uuid="abcde123-1234-1234-1234-123456789012"/>
+                <textElement>
+                    <font size="12" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA["EMPRESA EMITENTE: " + $P{EMITENTE_RAZAO}]]></textFieldExpression>
+            </textField>
+
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement x="0" y="70" width="555" height="20" uuid="fghij456-1234-1234-1234-123456789012"/>
+                <textFieldExpression><![CDATA["NÚMERO DA NOTA: " + $P{NUMERO_NOTA}]]></textFieldExpression>
+            </textField>
+
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement x="0" y="90" width="555" height="20" uuid="klmno789-1234-1234-1234-123456789012"/>
+                <textFieldExpression><![CDATA["CHAVE DE ACESSO: " + $P{CHAVE_ACESSO}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="120" width="555" height="20" uuid="xyz12345-1234-1234-1234-123456789012"/>
+                <textElement textAlignment="Center">
+                    <font size="10" isItalic="true"/>
+                </textElement>
+                <text><![CDATA[Este é um PDF de teste gerado com sucesso pelo sistema da GrandPort!]]></text>
+            </staticText>
+        </band>
+    </detail>
+</jasperReport>

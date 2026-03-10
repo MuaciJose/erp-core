@@ -25,13 +25,12 @@ public class VendaController {
     @Autowired private WhatsAppService whatsAppService;
 
     // =========================================================================
-    // 🚀 ENDPOINT DO WHATSAPP (Ajustado para bater com o Frontend)
+    // 🚀 ENDPOINT DO WHATSAPP
     // =========================================================================
     @PostMapping("/{id}/enviar-whatsapp")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<String> enviarReciboWhatsApp(@PathVariable Long id) {
         try {
-            // Aqui ele chama o serviço que você já tinha criado para disparar o PDF!
             whatsAppService.enviarReciboPdfPorWhatsApp(id);
             return ResponseEntity.ok("{\"message\": \"Documento enviado com sucesso pelo WhatsApp!\"}");
         } catch (Exception e) {
@@ -69,9 +68,17 @@ public class VendaController {
         return ResponseEntity.ok(repository.findByStatus(StatusVenda.AGUARDANDO_PAGAMENTO));
     }
 
+    // =========================================================================
+    // 🚀 PAGAMENTO NO CAIXA (Apenas recebe o valor, NÃO emite a NF-e)
+    // =========================================================================
     @PostMapping("/{id}/pagar")
     public ResponseEntity<Venda> finalizarPagamento(@PathVariable Long id, @RequestBody List<PagamentoVendaDTO> pagamentos) {
-        return ResponseEntity.ok(service.finalizarPagamentoPedido(id, pagamentos));
+        // 1. Processa o pagamento financeiro no caixa
+        Venda vendaPaga = service.finalizarPagamentoPedido(id, pagamentos);
+
+        // 2. Retorna a venda paga para o React (O Recibo é impresso na hora)
+        // A nota fiscal fica aguardando o clique de "Autorizar" na tela do Gerenciador Fiscal
+        return ResponseEntity.ok(vendaPaga);
     }
 
     @PostMapping("/{id}/devolver")

@@ -40,6 +40,8 @@ import { RegrasFiscais } from './modules/fiscal/RegrasFiscais';
 
 // 🚀 MÓDULO Categoria (ADICIONADO)
 import { Categorias } from './modules/estoque/Categorias'; // Ajuste o caminho se necessário
+
+import { GerenciadorFiscal } from './modules/fiscal/GerenciadorFiscal';
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
     const [paginaAtiva, setPaginaAtiva] = useState('');
@@ -174,7 +176,8 @@ function App() {
                             {paginaAtiva === 'regras-fiscais' && <RegrasFiscais setPaginaAtiva={setPaginaAtiva} />}
 
                             {paginaAtiva === 'categorias' && <Categorias />}
-                        </>
+
+                            {paginaAtiva === 'gerenciador-nfe' && <GerenciadorFiscal setPaginaAtiva={setPaginaAtiva} />}                        </>
                     )}
                 </div>
             </main>

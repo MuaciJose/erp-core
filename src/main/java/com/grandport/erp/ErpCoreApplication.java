@@ -29,7 +29,7 @@ public class ErpCoreApplication {
                     "estoque", "marcas", "ajuste_estoque", "compras", "previsao", "faltas",
                     "contas-pagar", "contas-receber", "bancos", "conciliacao", "plano-contas", "dre",
                     "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes", "calculadora", "recibo-avulso","historico-recibos","ncm", "whatsapp",
-                    "backup","regras-fiscais","categorias"
+                    "backup","regras-fiscais","categorias","gerenciador-nfe"
             );
 
             Usuario admin = (Usuario) repository.findByUsername("admin");
