@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
 import {
     Search, FileText, Printer, CheckCircle, Package, User,
-    Trash2, ArrowRight, Tag, Percent, DollarSign, Save, FolderOpen, Car, X, Gauge, Phone, UserPlus, RefreshCw, AlertTriangle, Info, MessageCircle, XCircle, Smartphone, Loader2, ArrowLeft
+    Trash2, ArrowRight, Save, FolderOpen, Car, X, RefreshCw,
+    AlertTriangle, MessageCircle, XCircle, Smartphone, Loader2, ArrowLeft, Receipt
 } from 'lucide-react';
 
 import toast from 'react-hot-toast';
@@ -44,6 +45,12 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         setVeiculoSelecionado('');
     };
 
+    const getNcmString = (ncmInfo) => {
+        if (!ncmInfo) return '';
+        if (typeof ncmInfo === 'string') return ncmInfo;
+        return ncmInfo.codigo || ncmInfo.Codigo || '';
+    };
+
     const extrairItensBackend = (itensBack, statusDoc) => {
         const isBaixadoNoBanco = statusDoc === 'PEDIDO' || statusDoc === 'AGUARDANDO_PAGAMENTO';
 
@@ -59,7 +66,10 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                 qtd: qtd,
                 preco: i.precoUnitario || i.preco || 0,
                 estoqueFisicoReal: estoqueFisico,
-                qtdBaixada: isBaixadoNoBanco ? qtd : 0
+                qtdBaixada: isBaixadoNoBanco ? qtd : 0,
+                ncm: getNcmString(i.produto?.ncm) || getNcmString(i.ncm),
+                origem: i.produto?.origemMercadoria || 0,
+                cest: i.produto?.cest || ''
             };
         });
     };
@@ -79,19 +89,28 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     const forcarSincronizacaoEstoque = async () => {
         if(itens.length === 0) return toast.success("A tela já está atualizada.");
         const loadId = toast.loading("Buscando dados fresquinhos do estoque...");
-        await sincronizarEstoqueSilencioso(itens);
-        toast.success("Estoque sincronizado com sucesso!", { id: loadId });
+        try {
+            await sincronizarEstoqueSilencioso(itens);
+            toast.success("Estoque sincronizado com sucesso!", { id: loadId });
+        } catch (e) {
+            toast.error("Falha ao sincronizar.", { id: loadId });
+        }
     };
 
     useEffect(() => {
         if (orcamentoParaEditar) {
             setOrcamentoId(orcamentoParaEditar.id);
             setModo(orcamentoParaEditar.status || 'ORCAMENTO');
-            setDescontoInput(orcamentoParaEditar.desconto?.toString() || '');
+
+            if (orcamentoParaEditar.desconto > 0) {
+                setDescontoTipo('VALOR');
+                setDescontoInput(orcamentoParaEditar.desconto.toString());
+            }
 
             const itensMapeados = extrairItensBackend(orcamentoParaEditar.itens, orcamentoParaEditar.status);
             setItens(itensMapeados);
-            sincronizarEstoqueSilencioso(itensMapeados);
+
+            sincronizarEstoqueSilencioso(itensMapeados).catch(console.error);
 
             const restaurarDadosCliente = async () => {
                 const termoBusca = orcamentoParaEditar.cliente?.nome || orcamentoParaEditar.cliente;
@@ -104,12 +123,13 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                             setBuscaCliente(clienteFull.nome);
                             const resV = await api.get(`/api/veiculos/cliente/${clienteFull.id}`);
                             setClienteSelecionado(prev => ({ ...prev, veiculos: resV.data || [] }));
-                            if (orcamentoParaEditar.veiculo?.id) setVeiculoSelecionado(orcamentoParaEditar.veiculo.id);
+                            if (orcamentoParaEditar.veiculo?.id) setVeiculoSelecionado(orcamentoParaEditar.veiculo.id.toString());
                         }
                     } catch (e) { console.error(e); }
                 }
             };
-            restaurarDadosCliente();
+
+            restaurarDadosCliente().catch(console.error);
         }
     }, [orcamentoParaEditar]);
 
@@ -160,7 +180,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         setResultadosClientes([]);
         api.get(`/api/veiculos/cliente/${cliente.id}`).then(res => {
             setClienteSelecionado(prev => ({ ...prev, veiculos: res.data || [] }));
-            if(res.data?.length === 1) setVeiculoSelecionado(res.data[0].id);
+            if(res.data?.length === 1) setVeiculoSelecionado(res.data[0].id.toString());
         });
     };
 
@@ -170,10 +190,17 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
             setItens(itens.map(i => (i.id === peca.id || i.produtoId === peca.id) ? { ...i, qtd: i.qtd + 1 } : i));
         } else {
             setItens([...itens, {
-                produtoId: peca.id, id: peca.id, codigo: peca.sku, nome: peca.nome,
-                qtd: 1, preco: peca.precoVenda || 0,
+                produtoId: peca.id,
+                id: peca.id,
+                codigo: peca.sku,
+                nome: peca.nome,
+                qtd: 1,
+                preco: peca.precoVenda || 0,
                 estoqueFisicoReal: peca.quantidadeEstoque || 0,
-                qtdBaixada: 0
+                qtdBaixada: 0,
+                ncm: getNcmString(peca.ncm),
+                origem: peca.origemMercadoria || 0,
+                cest: peca.cest || ''
             }]);
         }
         toast.success("Item adicionado");
@@ -181,8 +208,39 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     };
 
     const subtotal = itens.reduce((acc, item) => acc + ((item.preco || 0) * (item.qtd || 0)), 0);
-    let valorDescontoReal = descontoTipo === 'VALOR' ? (parseFloat(descontoInput) || 0) : subtotal * ((parseFloat(descontoInput) || 0) / 100);
+
+    let valorDescontoReal = 0;
+    const descInputVal = parseFloat(descontoInput) || 0;
+
+    if (descontoTipo === 'VALOR') {
+        valorDescontoReal = descInputVal;
+    } else {
+        valorDescontoReal = subtotal * (descInputVal / 100);
+    }
+
+    valorDescontoReal = Math.min(valorDescontoReal, subtotal);
     const totalFinal = Math.max(0, subtotal - valorDescontoReal);
+
+    const emitirNFe = async () => {
+        if (!orcamentoId) return toast.error("Salve o pedido primeiro antes de emitir a Nota Fiscal!");
+        if (!clienteSelecionado) return toast.error("Para emitir NF-e, é obrigatório selecionar um cliente!");
+        if (!clienteSelecionado.documento) return toast.error(`O cliente ${clienteSelecionado.nome} não possui CPF/CNPJ cadastrado!`);
+
+        const produtosSemNcm = itens.filter(i => !i.ncm);
+        if (produtosSemNcm.length > 0) {
+            return toast.error(`⚠️ O produto "${produtosSemNcm[0].nome}" está sem NCM. A SEFAZ rejeitará a nota.`);
+        }
+
+        const loadId = toast.loading("Aplicando regras tributárias e enviando para a SEFAZ...");
+
+        try {
+            await api.post(`/api/fiscal/emitir-nfe/${orcamentoId}`);
+            toast.success("NF-e Emitida e Autorizada com Sucesso! 🎉", { id: loadId, duration: 5000 });
+        } catch (error) {
+            const erroSefaz = error.response?.data?.message || "Rejeição da SEFAZ. Verifique os impostos ou o certificado digital.";
+            toast.error(erroSefaz, { id: loadId, duration: 8000 });
+        }
+    };
 
     const verificarConexaoZap = async () => {
         setChecandoZap(true);
@@ -292,12 +350,19 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
     };
 
     const limparEcra = () => {
-        setItens([]); limparCliente(); setModo('ORCAMENTO'); setOrcamentoId(null);
+        setItens([]); limparCliente(); setModo('ORCAMENTO'); setOrcamentoId(null); setDescontoInput('');
     };
 
-    const carregarOrcamentoLocal = async (orcamento) => {
+    const carregarOrcamentoLocal = (orcamento) => {
         setOrcamentoId(orcamento.id);
         setModo(orcamento.status);
+        if (orcamento.desconto > 0) {
+            setDescontoTipo('VALOR');
+            setDescontoInput(orcamento.desconto.toString());
+        } else {
+            setDescontoInput('');
+        }
+
         if (orcamento.clienteObj) selecionarCliente(orcamento.clienteObj);
         else limparCliente();
 
@@ -306,7 +371,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         setModalListaAberto(false);
 
         toast.success(`Documento #${orcamento.id} reaberto.`);
-        sincronizarEstoqueSilencioso(itensFormatados);
+        sincronizarEstoqueSilencioso(itensFormatados).catch(console.error);
     };
 
     useEffect(() => {
@@ -315,7 +380,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                 .then(res => {
                     const formatados = res.data.map(orc => ({
                         id: orc.id, data: orc.dataHora, cliente: orc.cliente ? orc.cliente.nome : 'Cliente Avulso', clienteObj: orc.cliente,
-                        veiculo: orc.veiculo ? orc.veiculo.modelo : 'Nenhum', veiculoId: orc.veiculo?.id, valor: orc.valorTotal || 0, status: orc.status,
+                        veiculo: orc.veiculo ? orc.veiculo.modelo : 'Nenhum', veiculoId: orc.veiculo?.id, valor: orc.valorTotal || 0, desconto: orc.desconto || 0, status: orc.status,
                         itensRaw: orc.itens || []
                     }));
                     setOrcamentosSalvos(formatados);
@@ -324,15 +389,12 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
         }
     }, [modalListaAberto]);
 
-    const veiculoDetalhado = clienteSelecionado?.veiculos?.find(v => v.id == veiculoSelecionado);
+    const veiculoDetalhado = clienteSelecionado?.veiculos?.find(v => String(v.id) === String(veiculoSelecionado));
 
     return (
         <div className="flex flex-col h-full bg-white relative z-[15]">
             <div className="p-8 max-w-7xl mx-auto flex flex-col h-full animate-fade-in relative print:hidden">
 
-                {/* ========================================================================= */}
-                {/* 🚀 BOTÃO VOLTAR PROFISSIONAL (GHOST STYLE) */}
-                {/* ========================================================================= */}
                 {onVoltar && (
                     <div className="mb-4">
                         <button
@@ -346,14 +408,10 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                     </div>
                 )}
 
-                {/* ========================================================================= */}
-                {/* 🚀 1. CABEÇALHO E TOOLBAR DE AÇÕES (ORGANIZADO) */}
-                {/* ========================================================================= */}
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 mb-6 z-40">
 
                     <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
 
-                        {/* Título do Documento */}
                         <div className="flex items-center gap-4">
                             <div className={`p-3 rounded-xl text-white shadow-inner ${modo === 'PEDIDO' ? 'bg-orange-500' : 'bg-blue-600'}`}>
                                 <FileText size={24}/>
@@ -366,11 +424,19 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                             </div>
                         </div>
 
-                        {/* Toolbar de Ações (Design Clean) */}
+                        {/* 🚀 TOOLBAR DE AÇÕES (COM O BOTÃO NF-E AQUI EM CIMA NOVAMENTE) */}
                         <div className="flex flex-wrap items-center gap-2">
                             <button onClick={() => setModalListaAberto(true)} title="Abrir lista de orçamentos salvos e pendentes" className="px-3 py-2 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-transparent hover:border-slate-200"><FolderOpen size={14} /> SALVOS</button>
                             <button onClick={limparEcra} title="Limpar todos os campos e começar um novo documento" className="px-3 py-2 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-transparent hover:border-slate-200"><Trash2 size={14} /> LIMPAR</button>
                             <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block"></div>
+
+                            {/* 🚀 BOTÃO DE NF-E NO TOPO */}
+                            {orcamentoId && (
+                                <button onClick={emitirNFe} title="Gerar Nota Fiscal Eletrônica e transmitir para a SEFAZ" className="px-4 py-2 bg-purple-100 text-purple-700 hover:bg-purple-600 hover:text-white rounded-lg text-xs font-black flex items-center gap-2 transition-all shadow-sm border border-purple-200 hover:border-purple-600">
+                                    <Receipt size={16} /> EMITIR NF-E
+                                </button>
+                            )}
+                            {orcamentoId && <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block"></div>}
 
                             <button onClick={forcarSincronizacaoEstoque} title="Consultar o estoque real atualizado dos itens" className="px-3 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><RefreshCw size={14} /> ESTOQUE</button>
                             <button onClick={() => setModalVendaPerdidaAberto(true)} title="Registrar motivo pelo qual o cliente não fechou a venda" className="px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><XCircle size={14} /> PERDA</button>
@@ -379,7 +445,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                             <button onClick={() => processarVendaAPI(modo === 'PEDIDO' ? 'PEDIDO' : 'ORCAMENTO')} title="Salvar progresso atual sem fechar o pedido" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Save size={14}/> RASCUNHO</button>
                             <button onClick={() => window.print()} title="Gerar impressão A4 do documento atual" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Printer size={14}/> IMPRIMIR</button>
 
-                            {/* Grupo do WhatsApp Agrupado */}
                             <div className="flex items-center rounded-lg border border-green-200 bg-green-50 overflow-hidden ml-1">
                                 <button type="button" onClick={verificarConexaoZap} disabled={checandoZap} className="p-2 border-r border-green-200 text-green-600 hover:bg-green-100 transition-colors" title="Verificar se o motor do WhatsApp está conectado">
                                     {checandoZap ? <Loader2 size={14} className="animate-spin" /> : <Smartphone size={14} className={statusZap === 'open' ? 'animate-pulse' : ''} />}
@@ -391,7 +456,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                         </div>
                     </div>
 
-                    {/* Bloco do Cliente */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="relative">
                             <User className="absolute left-3 top-3 text-slate-400" size={20} />
@@ -413,12 +477,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                     </div>
                 </div>
 
-                {/* ========================================================================= */}
-                {/* 🚀 2. ÁREA CENTRAL (BUSCA GRUDADA NA TABELA) */}
-                {/* ========================================================================= */}
                 <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col z-30 overflow-hidden">
 
-                    {/* Barra de Pesquisa Grudada */}
                     <div className="relative border-b border-slate-200 bg-slate-50 p-2">
                         <Search className="absolute left-6 top-5 text-blue-500" size={20} />
                         <input ref={inputPecaRef} type="text" value={buscaPeca} onChange={(e) => setBuscaPeca(e.target.value)} onKeyDown={(e) => {
@@ -436,6 +496,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                                             <div className="flex items-center gap-3 mt-1">
                                                 <p className={`text-xs font-mono ${idx === indexFocadoPeca ? 'text-blue-200' : 'text-slate-500'}`}>{peca.sku}</p>
                                                 <span className={`text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-widest ${idx === indexFocadoPeca ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'}`}>ESTOQUE: {peca.quantidadeEstoque ?? 0}</span>
+                                                {peca.ncm && <span className={`text-[9px] px-1.5 py-0.5 rounded font-black border ${idx === indexFocadoPeca ? 'border-purple-300 text-purple-100' : 'border-purple-200 text-purple-600 bg-purple-50'}`}>NCM {getNcmString(peca.ncm)}</span>}
                                             </div>
                                         </div>
                                         <p className="font-black text-lg">R$ {(peca.precoVenda || 0).toFixed(2)}</p>
@@ -445,7 +506,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                         )}
                     </div>
 
-                    {/* Tabela de Itens */}
                     <div className="overflow-y-auto flex-1">
                         <table className="w-full text-left">
                             <thead className="bg-white text-[10px] font-black uppercase text-slate-400 sticky top-0 border-b border-slate-100 z-10">
@@ -467,58 +527,94 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                                     <tr key={item.id} className={`hover:bg-slate-50 transition-colors ${faltaEstoque ? 'bg-red-50/30' : ''}`}>
                                         <td className="p-4 font-mono text-xs text-slate-500">{item.codigo}</td>
                                         <td className="p-4 font-bold text-slate-800 text-sm">
-                                            <div>
+                                            <div className="flex items-center gap-2">
                                                 <p>{item.nome}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Disponível no sistema: {disponivelFinal}</p>
-                                                {faltaEstoque && <span className="text-[10px] font-black text-red-600 flex items-center gap-1 uppercase tracking-tighter mt-1"><AlertTriangle size={10}/> Faltam {item.qtd - disponivelFinal} para fechar pedido</span>}
+                                                {item.ncm ? (
+                                                    <span title="Produto possui NCM e está pronto para NF-e" className="text-[8px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-black border border-purple-200">NCM: {item.ncm}</span>
+                                                ) : (
+                                                    <span title="⚠️ Sem NCM! A NF-e será rejeitada." className="text-[8px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-black border border-red-200 flex items-center gap-1"><AlertTriangle size={8}/> SEM NCM</span>
+                                                )}
                                             </div>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Disponível no sistema: {disponivelFinal}</p>
+                                            {faltaEstoque && <span className="text-[10px] font-black text-red-600 flex items-center gap-1 uppercase tracking-tighter mt-1"><AlertTriangle size={10}/> Faltam {item.qtd - disponivelFinal} para fechar pedido</span>}
                                         </td>
                                         <td className="p-4 text-center">
                                             <input type="number" title="Alterar a quantidade deste item" value={item.qtd} onChange={(e) => setItens(itens.map(i => i.id === item.id ? { ...i, qtd: Math.max(1, parseInt(e.target.value) || 1) } : i))} className={`w-16 p-2 text-center font-black bg-white border-2 rounded-lg outline-none ${faltaEstoque ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 focus:border-blue-500'}`} />
                                         </td>
                                         <td className="p-4 text-right font-black text-slate-800 pr-6">R$ {(item.preco * item.qtd).toFixed(2)}</td>
-                                        <td className="p-4 text-center"><button onClick={() => setItens(itens.filter(i => i.id !== item.id))} title="Remover esta peça da lista" className="text-slate-300 hover:text-red-500 p-2 transition-colors" title="Remover Peça"><Trash2 size={18} /></button></td>
+                                        <td className="p-4 text-center"><button onClick={() => setItens(itens.filter(i => i.id !== item.id))} className="text-slate-300 hover:text-red-500 p-2 transition-colors" title="Remover Peça"><Trash2 size={18} /></button></td>
                                     </tr>
                                 );
                             })}
                             </tbody>
                         </table>
                     </div>
+
+                    {itens.length > 0 && (
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-col md:flex-row justify-end items-end md:items-center gap-6">
+                            <div className="text-right">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Subtotal dos Itens</p>
+                                <p className="font-black text-xl text-slate-700">R$ {subtotal.toFixed(2)}</p>
+                            </div>
+
+                            <div className="flex flex-col items-end">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Aplicar Desconto</p>
+                                <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm focus-within:border-blue-400 transition-colors">
+                                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                                        <button
+                                            onClick={() => setDescontoTipo('VALOR')}
+                                            className={`px-3 py-1.5 rounded-md text-xs font-black transition-all ${descontoTipo === 'VALOR' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                        >R$</button>
+                                        <button
+                                            onClick={() => setDescontoTipo('PERCENTUAL')}
+                                            className={`px-3 py-1.5 rounded-md text-xs font-black transition-all ${descontoTipo === 'PERCENTUAL' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                        >%</button>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={descontoInput}
+                                        onChange={(e) => setDescontoInput(e.target.value)}
+                                        placeholder="0.00"
+                                        className="w-24 p-2 text-right font-black text-red-600 bg-transparent outline-none text-lg"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                {/* ========================================================================= */}
-                {/* 🚀 3. RODAPÉ (FOCADO NA CONVERSÃO DA VENDA) */}
-                {/* ========================================================================= */}
-                <div className="bg-slate-900 text-white rounded-b-3xl border-t-4 border-blue-500 p-6 flex flex-col md:flex-row justify-between items-center shadow-2xl mt-0 relative z-40">
+                {/* 🚀 RODAPÉ (APENAS COM OS BOTÕES DE FECHAR VENDA) */}
+                <div className="bg-slate-900 text-white rounded-b-3xl border-t-4 border-blue-500 p-6 flex flex-col lg:flex-row justify-between items-center shadow-2xl mt-0 relative z-40">
 
-                    <div className="text-slate-400 font-bold text-sm mb-6 md:mb-0 flex items-center gap-2">
+                    <div className="text-slate-400 font-bold text-sm mb-6 lg:mb-0 flex items-center gap-2">
                         <div className="bg-slate-800 p-2 rounded-lg"><Package size={16}/></div>
                         {itens.length} {itens.length === 1 ? 'item adicionado' : 'itens adicionados'}
                     </div>
 
-                    <div className="flex flex-col md:flex-row items-center gap-6 w-full md:w-auto">
+                    <div className="flex flex-col md:flex-row items-center gap-4 w-full lg:w-auto">
 
-                        {/* TOTAL GIGANTE */}
-                        <div className="text-center md:text-right bg-slate-800 p-4 rounded-2xl md:bg-transparent md:p-0 w-full md:w-auto">
+                        <div className="text-center md:text-right bg-slate-800 p-4 rounded-2xl md:bg-transparent md:p-0 w-full md:w-auto md:mr-4">
                             <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest block mb-1">Total Líquido Final</span>
-                            <h2 className="text-5xl font-black text-green-400 tracking-tighter leading-none">R$ {totalFinal.toFixed(2)}</h2>
+                            <h2 className="text-4xl lg:text-5xl font-black text-green-400 tracking-tighter leading-none">R$ {totalFinal.toFixed(2)}</h2>
+                            {valorDescontoReal > 0 && <p className="text-xs text-red-400 font-bold mt-1 uppercase tracking-widest">Desconto Aplicado: - R$ {valorDescontoReal.toFixed(2)}</p>}
                         </div>
 
-                        {/* O ÚNICO BOTÃO QUE IMPORTA NO FINAL */}
                         {modo === 'ORCAMENTO' ? (
                             <button onClick={() => processarVendaAPI('PEDIDO')} title="Converter este orçamento em um pedido firme" className="w-full md:w-auto px-8 py-5 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-orange-500/20 transition-all text-lg group">
                                 CONVERTER EM PEDIDO <ArrowRight size={24} className="group-hover:translate-x-1 transition-transform"/>
                             </button>
                         ) : (
-                            <button onClick={() => processarVendaAPI('AGUARDANDO_PAGAMENTO')} title="Finalizar e enviar este pedido para recebimento no caixa" className="w-full md:w-auto px-8 py-5 bg-purple-600 hover:bg-purple-700 text-white font-black rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-purple-500/30 transition-all text-lg animate-pulse group">
-                                ENVIAR PARA O CAIXA <CheckCircle size={24} className="group-hover:scale-110 transition-transform"/>
+                            <button onClick={() => processarVendaAPI('AGUARDANDO_PAGAMENTO')} title="Finalizar e enviar este pedido para recebimento no caixa" className="w-full md:w-auto px-8 py-5 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/30 transition-all text-lg group">
+                                ENVIAR PRO CAIXA <CheckCircle size={24} className="group-hover:scale-110 transition-transform"/>
                             </button>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* MODAL DE VENDA PERDIDA E IMPRESSÃO */}
+            {/* MODAL DE VENDA PERDIDA */}
             {modalVendaPerdidaAberto && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 print:hidden">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
@@ -546,6 +642,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                 </div>
             )}
 
+            {/* IMPRESSÃO PDF */}
             <div className="hidden print:block fixed inset-0 w-full h-full bg-white z-[99999] p-0 text-black">
                 <div className="w-full max-w-[210mm] mx-auto p-6 font-sans text-slate-900">
                     <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
@@ -575,7 +672,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                             ) : <p className="font-bold italic text-slate-400 text-center py-2">VENDA BALCÃO</p>}
                         </div>
                     </div>
-                    <table className="w-full mb-6 border-collapse">
+                    <table className="w-full mb-4 border-collapse">
                         <thead>
                         <tr className="bg-slate-100 border-y border-black">
                             <th className="p-1 text-left text-[8px] font-black uppercase w-16">Cód.</th><th className="p-1 text-left text-[8px] font-black uppercase">Descrição</th><th className="p-1 text-center text-[8px] font-black uppercase w-12">Qtd</th><th className="p-1 text-right text-[8px] font-black uppercase w-20">Unitário</th><th className="p-1 text-right text-[8px] font-black uppercase w-20">Subtotal</th>
@@ -589,13 +686,18 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar }) => {
                         ))}
                         </tbody>
                     </table>
-                    <div className="flex justify-between items-start mt-4">
+                    <div className="flex justify-between items-start mt-2">
                         <div className="w-2/3 pr-10"><p className="text-[8.5px] text-slate-600 border-l-2 border-slate-200 pl-2">{empresaConfig.mensagemRodape}</p></div>
-                        <div className="w-1/3 space-y-1"><div className="flex justify-between text-[11px] font-black uppercase"><span>TOTAL LÍQUIDO:</span><span>R$ {totalFinal.toFixed(2)}</span></div></div>
+                        <div className="w-1/3 space-y-1 bg-slate-50 p-2 border border-slate-200 rounded">
+                            <div className="flex justify-between text-[9px] font-bold text-slate-500"><span>SUBTOTAL:</span><span>R$ {subtotal.toFixed(2)}</span></div>
+                            {valorDescontoReal > 0 && <div className="flex justify-between text-[9px] font-bold text-red-600"><span>DESCONTO:</span><span>- R$ {valorDescontoReal.toFixed(2)}</span></div>}
+                            <div className="flex justify-between text-[11px] font-black uppercase border-t border-slate-300 pt-1 mt-1"><span>TOTAL LÍQUIDO:</span><span>R$ {totalFinal.toFixed(2)}</span></div>
+                        </div>
                     </div>
                 </div>
             </div>
 
+            {/* MODAL LISTA DE ORÇAMENTOS */}
             {modalListaAberto && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in print:hidden">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[80vh]">
