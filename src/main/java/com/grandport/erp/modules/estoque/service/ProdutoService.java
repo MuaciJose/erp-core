@@ -29,39 +29,56 @@ public class ProdutoService {
 
     @Transactional
     public Produto cadastrar(ProdutoRequestDTO dto, String imagePath) {
-        Marca marca = marcaRepository.findById(dto.marcaId())
-                .orElseThrow(() -> new RuntimeException("Erro: Marca ID " + dto.marcaId() + " não encontrada."));
-        Ncm ncm = ncmRepository.findById(dto.ncmCodigo())
-                .orElseThrow(() -> new RuntimeException("Erro: NCM " + dto.ncmCodigo() + " não cadastrado no sistema."));
+        // 🚀 BLINDAGEM: Se vier nulo, ele não quebra, ele apenas deixa a variável "null"
+        Marca marca = null;
+        if (dto.marcaId() != null) {
+            marca = marcaRepository.findById(dto.marcaId()).orElse(null);
+        }
+
+        Ncm ncm = null;
+        if (dto.ncmCodigo() != null && !dto.ncmCodigo().trim().isEmpty()) {
+            ncm = ncmRepository.findById(dto.ncmCodigo()).orElse(null);
+        }
 
         Produto produto = new Produto();
         updateProdutoFromDto(produto, dto, marca, ncm, imagePath);
 
         Produto salvo = produtoRepository.save(produto);
-        registrarMovimentacao(salvo, dto.quantidadeEstoque(), "ENTRADA", "Cadastro Inicial");
-        
+
+        // Proteção extra caso a quantidade venha nula do React
+        registrarMovimentacao(salvo, dto.quantidadeEstoque() != null ? dto.quantidadeEstoque() : 0, "ENTRADA", "Cadastro Inicial");
+
         auditoriaService.registrar("ESTOQUE", "CRIACAO", "Cadastrou o produto: " + salvo.getNome());
-        
+
         return salvo;
     }
 
     @Transactional
     public Produto atualizar(Long id, ProdutoRequestDTO dto, String imagePath) {
         Produto produto = findById(id);
-        Marca marca = marcaRepository.findById(dto.marcaId())
-                .orElseThrow(() -> new RuntimeException("Marca não encontrada."));
-        Ncm ncm = ncmRepository.findById(dto.ncmCodigo())
-                .orElseThrow(() -> new RuntimeException("NCM não encontrado."));
+
+        // 🚀 BLINDAGEM NA EDIÇÃO TAMBÉM
+        Marca marca = null;
+        if (dto.marcaId() != null) {
+            marca = marcaRepository.findById(dto.marcaId()).orElse(null);
+        }
+
+        Ncm ncm = null;
+        if (dto.ncmCodigo() != null && !dto.ncmCodigo().trim().isEmpty()) {
+            ncm = ncmRepository.findById(dto.ncmCodigo()).orElse(null);
+        }
 
         updateProdutoFromDto(produto, dto, marca, ncm, imagePath);
-        
+
         Produto salvo = produtoRepository.save(produto);
         auditoriaService.registrar("ESTOQUE", "EDICAO", "Atualizou o produto: " + salvo.getNome());
-        
+
         return salvo;
     }
 
+    // 🚀 O MOTOR QUE CONECTA O DTO COM O BANCO DE DADOS (AGORA COM FISCAL)
     private void updateProdutoFromDto(Produto p, ProdutoRequestDTO dto, Marca marca, Ncm ncm, String imagePath) {
+        // Dados Básicos
         p.setSku(dto.sku());
         p.setNome(dto.nome());
         p.setDescricao(dto.descricao());
@@ -73,10 +90,27 @@ public class ProdutoService {
         p.setMarca(marca);
         p.setNcm(ncm);
         p.setFotoUrl(dto.fotoUrl());
+
+        // 🚀 DADOS FISCAIS
+        p.setCest(dto.cest());
+        p.setOrigemMercadoria(dto.origemMercadoria() != null ? dto.origemMercadoria() : 0);
+        p.setCfopPadrao(dto.cfopPadrao() != null ? dto.cfopPadrao() : "5102");
+        p.setCsosnPadrao(dto.csosnPadrao() != null ? dto.csosnPadrao() : "102");
+        p.setCstPadrao(dto.cstPadrao() != null ? dto.cstPadrao() : "00");
+        p.setCstIcms(dto.cstIcms());
+        p.setCstPisCofins(dto.cstPisCofins());
+        p.setCstIpi(dto.cstIpi());
+
+        // Tratamento seguro para as alíquotas numéricas
+        p.setAliquotaIcms(dto.aliquotaIcms() != null ? dto.aliquotaIcms() : BigDecimal.ZERO);
+        p.setAliquotaIpi(dto.aliquotaIpi() != null ? dto.aliquotaIpi() : BigDecimal.ZERO);
+        p.setAliquotaPis(dto.aliquotaPis() != null ? dto.aliquotaPis() : BigDecimal.ZERO);
+        p.setAliquotaCofins(dto.aliquotaCofins() != null ? dto.aliquotaCofins() : BigDecimal.ZERO);
+
+        // Uploads e Estoque Incial
         if (imagePath != null) {
             p.setFotoLocalPath("/uploads/produtos/" + imagePath);
         }
-        // Quantidade de estoque não é alterada aqui por segurança (use ajuste-estoque)
         if (p.getId() == null) {
             p.setQuantidadeEstoque(dto.quantidadeEstoque());
         }
@@ -89,7 +123,7 @@ public class ProdutoService {
             BigDecimal precoAntigo = produto.getPrecoVenda();
             produto.setPrecoVenda(dto.getNovoPrecoVenda());
             produtoRepository.save(produto);
-            
+
             auditoriaService.registrar("ESTOQUE", "ALTERACAO_PRECO", "Alterou preço de " + produto.getNome() + ": R$ " + precoAntigo + " -> R$ " + dto.getNovoPrecoVenda());
         }
     }
@@ -119,7 +153,7 @@ public class ProdutoService {
         Produto produto = findById(id);
         Integer saldoAnterior = produto.getQuantidadeEstoque();
         Integer diferenca = novaQuantidade - saldoAnterior;
-        
+
         produto.setQuantidadeEstoque(novaQuantidade);
         Produto salvo = produtoRepository.save(produto);
 

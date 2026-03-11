@@ -178,14 +178,12 @@ public class NfeService {
 
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
 
-        // Busca o Cliente/Parceiro real no banco usando o ID que veio do React
         var parceiroOpt = parceiroRepository.findById(dto.getClienteId());
         if (parceiroOpt.isEmpty()) {
             throw new Exception("Cliente/Parceiro ID " + dto.getClienteId() + " não encontrado.");
         }
         com.grandport.erp.modules.parceiro.model.Parceiro clienteDestinatario = parceiroOpt.get();
 
-        // 1. Matemática Financeira Básica
         java.math.BigDecimal totalProdutos = java.math.BigDecimal.ZERO;
         double totalIbs = 0.0;
         double totalCbs = 0.0;
@@ -202,7 +200,6 @@ public class NfeService {
             totalCbs += Double.parseDouble(impostos.getOrDefault("VALOR_CBS", "0.0")) * itemDto.getQuantidade().doubleValue();
         }
 
-        // 2. Cálculo do Total Geral da Nota
         java.math.BigDecimal frete = dto.getFinanceiro() != null && dto.getFinanceiro().getValorFrete() != null ? dto.getFinanceiro().getValorFrete() : java.math.BigDecimal.ZERO;
         java.math.BigDecimal seguro = dto.getFinanceiro() != null && dto.getFinanceiro().getValorSeguro() != null ? dto.getFinanceiro().getValorSeguro() : java.math.BigDecimal.ZERO;
         java.math.BigDecimal outrasDespesas = dto.getFinanceiro() != null && dto.getFinanceiro().getOutrasDespesas() != null ? dto.getFinanceiro().getOutrasDespesas() : java.math.BigDecimal.ZERO;
@@ -210,7 +207,6 @@ public class NfeService {
 
         java.math.BigDecimal valorTotalNota = totalProdutos.add(frete).add(seguro).add(outrasDespesas).subtract(descontoGeral);
 
-        // 3. Gerar Chave e Salvar no Banco
         String cnpjLimpo = config.getCnpj().replaceAll("\\D", "");
         String numeroFormatado = String.format("%09d", config.getNumeroProximaNfe());
         String chaveAcessoReal = "262603" + cnpjLimpo + "55001" + numeroFormatado + "123456789";
@@ -221,7 +217,6 @@ public class NfeService {
         novaNota.setStatus("AUTORIZADA");
         novaNota.setProtocolo("1" + (System.currentTimeMillis() / 1000));
 
-        // 4. Gera e Salva o XML Turbinado (Passando o cliente real fortemente tipado)
         gerarEsalvarXmlAvancado(dto, config, novaNota, clienteDestinatario, totalProdutos, valorTotalNota, frete, seguro, outrasDespesas, descontoGeral, totalIbs, totalCbs);
 
         notaFiscalRepository.save(novaNota);
@@ -239,11 +234,11 @@ public class NfeService {
     }
 
     // =======================================================================
-    // 🚀 GERADOR DE XML AVANÇADO (COM BLOCOS DE FRETE, COBRANÇA E VOLUMES)
+    // 🚀 GERADOR DE XML AVANÇADO (COM BLOCOS DE FRETE, COBRANÇA E VOLUMES E ITENS)
     // =======================================================================
     private void gerarEsalvarXmlAvancado(
             com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO dto, ConfiguracaoSistema config, NotaFiscal nota,
-            com.grandport.erp.modules.parceiro.model.Parceiro clienteDestinatario, // 🚀 TIPO FORTE: Classe Parceiro Real
+            com.grandport.erp.modules.parceiro.model.Parceiro clienteDestinatario,
             java.math.BigDecimal totalProdutos, java.math.BigDecimal totalNota,
             java.math.BigDecimal frete, java.math.BigDecimal seguro, java.math.BigDecimal outras, java.math.BigDecimal desconto,
             double totalIbs, double totalCbs) throws Exception {
@@ -255,12 +250,29 @@ public class NfeService {
         xml.append("  <NFe>\n");
         xml.append("    <infNFe Id=\"NFe").append(nota.getChaveAcesso()).append("\" versao=\"4.00\">\n");
 
+        // =======================================================
+        // 🚀 NOVO BLOCO: IDENTIFICAÇÃO DA NOTA E REFERÊNCIA DE DEVOLUÇÃO
+        // =======================================================
+        xml.append("      <ide>\n");
+        xml.append("        <natOp>").append(dto.getNaturezaOperacao() != null ? dto.getNaturezaOperacao() : "VENDA DE MERCADORIA").append("</natOp>\n");
+        xml.append("        <tpNF>").append(dto.getTipoOperacao() != null ? dto.getTipoOperacao() : 1).append("</tpNF>\n");
+        xml.append("        <finNFe>").append(dto.getFinalidade() != null ? dto.getFinalidade() : 1).append("</finNFe>\n");
+
+        // Se for Devolução (4) e tiver a chave de 44 números, injeta a Referência!
+        if (dto.getFinalidade() != null && dto.getFinalidade() == 4 &&
+                dto.getChaveAcessoReferencia() != null && dto.getChaveAcessoReferencia().length() == 44) {
+            xml.append("        <NFref>\n");
+            xml.append("          <refNFe>").append(dto.getChaveAcessoReferencia()).append("</refNFe>\n");
+            xml.append("        </NFref>\n");
+        }
+        xml.append("      </ide>\n");
+        // =======================================================
+
         xml.append("      <emit>\n");
         xml.append("        <CNPJ>").append(config.getCnpj().replaceAll("\\D", "")).append("</CNPJ>\n");
         xml.append("        <xNome>").append(config.getRazaoSocial()).append("</xNome>\n");
         xml.append("      </emit>\n");
 
-        // 🚀 INJETANDO OS DADOS REAIS DO CLIENTE (Código Limpo e Blindado)
         String docCliente = "00000000000191";
         String nomeCliente = "CLIENTE CONSUMIDOR FINAL";
 
@@ -274,7 +286,6 @@ public class NfeService {
         }
 
         xml.append("      <dest>\n");
-        // A SEFAZ exige a tag <CPF> se tiver 11 dígitos, e <CNPJ> se tiver 14.
         if (docCliente.length() == 11) {
             xml.append("        <CPF>").append(docCliente).append("</CPF>\n");
         } else {
@@ -283,7 +294,23 @@ public class NfeService {
         xml.append("        <xNome>").append(nomeCliente).append("</xNome>\n");
         xml.append("      </dest>\n");
 
-        // --- TOTAIS ---
+        int numItem = 1;
+        for (com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO.ItemNfeDTO itemDto : dto.getItens()) {
+            com.grandport.erp.modules.estoque.model.Produto p = produtoRepository.findById(itemDto.getProdutoId()).orElse(null);
+            String nomeProd = (p != null) ? p.getNome() : "PRODUTO DIVERSO";
+            String cfop = (itemDto.getCfopEspecifico() != null && !itemDto.getCfopEspecifico().isEmpty()) ? itemDto.getCfopEspecifico() : "5102";
+
+            xml.append("      <det nItem=\"").append(numItem++).append("\">\n");
+            xml.append("        <prod>\n");
+            xml.append("          <cProd>").append(itemDto.getProdutoId()).append("</cProd>\n");
+            xml.append("          <xProd>").append(nomeProd).append("</xProd>\n");
+            xml.append("          <CFOP>").append(cfop).append("</CFOP>\n");
+            xml.append("          <qCom>").append(itemDto.getQuantidade()).append("</qCom>\n");
+            xml.append("          <vUnCom>").append(itemDto.getPrecoUnitario()).append("</vUnCom>\n");
+            xml.append("        </prod>\n");
+            xml.append("      </det>\n");
+        }
+
         xml.append("      <total>\n");
         xml.append("        <ICMSTot>\n");
         xml.append("          <vProd>").append(totalProdutos).append("</vProd>\n");
@@ -297,7 +324,6 @@ public class NfeService {
         xml.append("        </ICMSTot>\n");
         xml.append("      </total>\n");
 
-        // --- TRANSPORTE ---
         if (dto.getTransporte() != null) {
             xml.append("      <transp>\n");
             xml.append("        <modFrete>").append(dto.getTransporte().getModalidadeFrete()).append("</modFrete>\n");
@@ -312,7 +338,6 @@ public class NfeService {
             xml.append("      </transp>\n");
         }
 
-        // --- COBRANÇA (FATURA / DUPLICATAS) ---
         if (dto.getFinanceiro() != null && dto.getFinanceiro().getDuplicatas() != null && !dto.getFinanceiro().getDuplicatas().isEmpty()) {
             xml.append("      <cobr>\n");
             xml.append("        <fat>\n");
@@ -330,7 +355,6 @@ public class NfeService {
             xml.append("      </cobr>\n");
         }
 
-        // --- INFORMAÇÕES ADICIONAIS ---
         if (dto.getInformacoesComplementares() != null && !dto.getInformacoesComplementares().isEmpty()) {
             xml.append("      <infAdic>\n");
             xml.append("        <infCpl>").append(dto.getInformacoesComplementares()).append("</infCpl>\n");
@@ -341,7 +365,6 @@ public class NfeService {
         xml.append("  </NFe>\n");
         xml.append("</nfeProc>");
 
-        // 💾 SALVANDO O ARQUIVO FÍSICO NO SERVIDOR
         String diretorioXml = System.getProperty("user.dir") + "/nfe_xmls/";
         java.io.File dir = new java.io.File(diretorioXml);
         if (!dir.exists()) { dir.mkdirs(); }

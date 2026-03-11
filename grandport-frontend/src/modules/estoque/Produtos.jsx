@@ -29,6 +29,7 @@ export const Produtos = () => {
         precoCusto: 0, margemLucro: 0, precoVenda: 0, precoMinimo: 0, comissao: 0,
         unidadeMedida: 'UN', quantidadeEstoque: 0, estoqueMinimo: 0, estoqueMaximo: 0, localizacao: '', pesoLiquido: 0, pesoBruto: 0, permitirEstoqueNegativo: false,
         ncm: '', cest: '', origemMercadoria: 0, cstIcms: '', cstPisCofins: '', cstIpi: '',
+        cfopPadrao: '', csosnPadrao: '', cstPadrao: '', aliquotaIcms: 0, aliquotaIpi: 0, aliquotaPis: 0, aliquotaCofins: 0,
         fotoUrl: '', fotoLocalPath: ''
     };
 
@@ -91,7 +92,6 @@ export const Produtos = () => {
         setTelaAtual('formulario');
     };
 
-
     const abrirEditar = (prod) => {
         const formSeguro = { ...formInicial };
         Object.keys(formInicial).forEach(key => {
@@ -151,8 +151,6 @@ export const Produtos = () => {
         e.preventDefault();
 
         if (!form.nome || !form.sku) return notificar('aviso', 'Campos Incompletos', 'Nome e SKU são obrigatórios.');
-        if (!form.marca || !form.marca.id) return notificar('aviso', 'Atenção', 'Selecione uma Marca na aba Geral.');
-        if (!form.ncm) return notificar('aviso', 'Atenção', 'O NCM é obrigatório para notas fiscais.');
 
         const toastId = toast.loading('Salvando produto...');
 
@@ -169,13 +167,23 @@ export const Produtos = () => {
                 comissao: parseFloat(form.comissao) || 0,
                 pesoLiquido: parseFloat(form.pesoLiquido) || 0,
                 pesoBruto: parseFloat(form.pesoBruto) || 0,
-                marca: { id: parseInt(form.marca.id) },
-                ncm: { codigo: form.ncm },
+                aliquotaIcms: parseFloat(form.aliquotaIcms) || 0,
+                aliquotaIpi: parseFloat(form.aliquotaIpi) || 0,
+                aliquotaPis: parseFloat(form.aliquotaPis) || 0,
+                aliquotaCofins: parseFloat(form.aliquotaCofins) || 0,
                 origemMercadoria: parseInt(form.origemMercadoria) || 0,
-                categoria: form.categoria && form.categoria.id ? { id: parseInt(form.categoria.id) } : null
+
+                // Manda null se não tiver escolhido para o Java aceitar!
+                marcaId: form.marca && form.marca.id ? parseInt(form.marca.id) : null,
+                categoriaId: form.categoria && form.categoria.id ? parseInt(form.categoria.id) : null,
+                ncmCodigo: form.ncm && form.ncm.trim() !== '' ? form.ncm : null
             };
 
+            // Remove o ID se for um cadastro novo para o Java não reclamar
             if (!payload.id) delete payload.id;
+            delete payload.marca;
+            delete payload.categoria;
+            delete payload.ncm;
 
             if (form.id) {
                 await api.put(`/api/produtos/${form.id}`, payload);
@@ -277,8 +285,10 @@ export const Produtos = () => {
             {/* TELA 2: FORMULÁRIO                                        */}
             {/* ========================================================= */}
             {telaAtual === 'formulario' && (
-                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-visible animate-fade-in flex flex-col relative">
-                    <div className="bg-slate-900 p-6 flex justify-between items-center text-white">
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-visible animate-fade-in flex flex-col relative mb-10">
+
+                    {/* CABEÇALHO DO FORMULÁRIO */}
+                    <div className="bg-slate-900 p-6 flex justify-between items-center text-white rounded-t-3xl">
                         <div className="flex items-center gap-4">
                             <button onClick={() => setTelaAtual('lista')} title="Voltar para a lista de produtos (Cancelar)" className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"><ArrowLeft size={20} /></button>
                             <div>
@@ -286,7 +296,6 @@ export const Produtos = () => {
                                 <p className="text-slate-400 text-sm mt-1">{form.id ? 'Modifique as informações da peça abaixo.' : 'Preencha os dados para cadastrar uma nova peça no estoque.'}</p>
                             </div>
                         </div>
-                        <button onClick={salvarProduto} title="Salvar as informações no banco de dados" className="hidden md:flex px-6 py-3 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-500 shadow-lg shadow-blue-600/30 items-center gap-2 transition-transform transform hover:scale-105"><Save size={20}/> SALVAR</button>
                     </div>
 
                     <div className="flex border-b border-slate-200 bg-slate-50 px-6 pt-2 gap-2 overflow-x-auto custom-scrollbar select-none">
@@ -308,9 +317,8 @@ export const Produtos = () => {
                                     <div><label className="text-xs font-bold text-slate-500 uppercase">Ref. Original / Fabricante</label><input type="text" value={form.referenciaOriginal} onChange={e => setForm({...form, referenciaOriginal: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-white outline-none focus:border-blue-500 uppercase font-mono" placeholder="Ex: 51920-SWA-A01" /></div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* ATALHO MARCA */}
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Marca *</label>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Marca</label>
                                         <div className="flex items-center gap-2">
                                             <select value={form.marca.id} onChange={e => setForm({...form, marca: { id: e.target.value }})} className="w-full p-4 border-2 rounded-xl bg-white outline-none font-bold focus:border-blue-500">
                                                 <option value="">-- Selecione uma Marca --</option>
@@ -320,7 +328,6 @@ export const Produtos = () => {
                                         </div>
                                     </div>
 
-                                    {/* ATALHO CATEGORIA */}
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Categoria</label>
                                         <div className="flex items-center gap-2">
@@ -412,7 +419,7 @@ export const Produtos = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="relative">
                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center">
-                                            NCM (Pesquisa Inteligente) *
+                                            NCM (Pesquisa Inteligente)
                                             <Tooltip texto="Nomenclatura Comum do Mercosul. Sem este código de 8 dígitos, a SEFAZ rejeitará a Nota Fiscal." />
                                         </label>
                                         <div className="relative">
@@ -461,7 +468,26 @@ export const Produtos = () => {
                                     </div>
                                 </div>
 
-                                <div className="pt-4">
+                                <div className="pt-4 border-t border-slate-100">
+                                    <h4 className="font-black text-slate-800 mb-4 flex items-center gap-2"><ShieldAlert size={18} className="text-purple-500"/> Padrões de Venda do Sistema</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">CFOP Padrão de Saída</label><input type="text" value={form.cfopPadrao} onChange={e=>setForm({...form, cfopPadrao: e.target.value})} className="w-full p-3 border-2 rounded-xl focus:border-purple-500 outline-none font-mono" placeholder="Ex: 5102"/></div>
+                                        <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">CSOSN (Simples Nacional)</label><input type="text" value={form.csosnPadrao} onChange={e=>setForm({...form, csosnPadrao: e.target.value})} className="w-full p-3 border-2 rounded-xl focus:border-purple-500 outline-none font-mono" placeholder="Ex: 102"/></div>
+                                        <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">CST Padrão (Lucro Presumido)</label><input type="text" value={form.cstPadrao} onChange={e=>setForm({...form, cstPadrao: e.target.value})} className="w-full p-3 border-2 rounded-xl focus:border-purple-500 outline-none font-mono" placeholder="Ex: 00"/></div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 border-t border-slate-100">
+                                    <h4 className="font-black text-slate-800 mb-4">Alíquotas e Outros Impostos</h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                        <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Aliq. ICMS (%)</label><input type="number" step="0.01" value={form.aliquotaIcms} onChange={e=>setForm({...form, aliquotaIcms: e.target.value})} className="w-full p-3 border-2 rounded-xl focus:border-purple-500 outline-none font-mono" /></div>
+                                        <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Aliq. PIS (%)</label><input type="number" step="0.01" value={form.aliquotaPis} onChange={e=>setForm({...form, aliquotaPis: e.target.value})} className="w-full p-3 border-2 rounded-xl focus:border-purple-500 outline-none font-mono" /></div>
+                                        <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Aliq. COFINS (%)</label><input type="number" step="0.01" value={form.aliquotaCofins} onChange={e=>setForm({...form, aliquotaCofins: e.target.value})} className="w-full p-3 border-2 rounded-xl focus:border-purple-500 outline-none font-mono" /></div>
+                                        <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Aliq. IPI (%)</label><input type="number" step="0.01" value={form.aliquotaIpi} onChange={e=>setForm({...form, aliquotaIpi: e.target.value})} className="w-full p-3 border-2 rounded-xl focus:border-purple-500 outline-none font-mono" /></div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 border-t border-slate-100">
                                     <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Origem da Mercadoria (Usada na NF-e)</label>
                                     <select value={form.origemMercadoria} onChange={e=>setForm({...form, origemMercadoria: e.target.value})} className="w-full p-4 border-2 bg-slate-50 rounded-xl font-bold outline-none focus:border-purple-500 text-sm">
                                         <option value="0">0 - Nacional, exceto as indicadas nos códigos 3, 4, 5 e 8</option>
@@ -472,27 +498,6 @@ export const Produtos = () => {
                                         <option value="5">5 - Nacional, com Conteúdo de Importação inf. a 40% (Resolução do Senado)</option>
                                         <option value="8">8 - Nacional, mercadoria com Conteúdo de Importação superior a 70%</option>
                                     </select>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
-                                    <div>
-                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center">
-                                            CST / CSOSN ICMS
-                                            <Tooltip texto="Ex: Empresas do Simples usam 102 (Tributada) ou 500 (ST). Empresas do Lucro Presumido usam 00 (Tributada) ou 60 (ST)." />
-                                        </label>
-                                        <input type="text" value={form.cstIcms} onChange={e=>setForm({...form, cstIcms: e.target.value})} className="w-full p-4 border-2 bg-slate-50 rounded-xl font-mono outline-none focus:border-purple-500 text-lg" placeholder="Ex: 102, 500, 00"/>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center">
-                                            CST PIS/COFINS
-                                            <Tooltip texto="Ex: 01 (Operação Tributável), 49 (Outras Operações) ou 99 (Outras Operações)." />
-                                        </label>
-                                        <input type="text" value={form.cstPisCofins} onChange={e=>setForm({...form, cstPisCofins: e.target.value})} className="w-full p-4 border-2 bg-slate-50 rounded-xl font-mono outline-none focus:border-purple-500 text-lg" placeholder="Ex: 01, 49, 99"/>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">CST IPI</label>
-                                        <input type="text" value={form.cstIpi} onChange={e=>setForm({...form, cstIpi: e.target.value})} className="w-full p-4 border-2 bg-slate-50 rounded-xl font-mono outline-none focus:border-purple-500 text-lg" placeholder="Ex: 50, 51, 99"/>
-                                    </div>
                                 </div>
                             </div>
                         )}
@@ -514,7 +519,8 @@ export const Produtos = () => {
                         )}
                     </div>
 
-                    <div className="p-6 bg-slate-100 flex justify-end gap-4 border-t border-slate-200">
+                    {/* BOTÃO DE SALVAR ÚNICO NO RODAPÉ */}
+                    <div className="p-6 bg-slate-100 flex justify-end gap-4 border-t border-slate-200 rounded-b-3xl">
                         <button onClick={voltarParaLista} title="Descartar alterações e voltar" className="px-8 py-4 font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors">CANCELAR</button>
                         <button onClick={salvarProduto} title="Confirmar e salvar produto" className="px-10 py-4 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-500 shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-transform transform hover:scale-105"><Save size={20}/> SALVAR PRODUTO</button>
                     </div>

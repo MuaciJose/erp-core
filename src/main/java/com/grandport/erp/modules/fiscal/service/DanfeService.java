@@ -7,11 +7,19 @@ import com.grandport.erp.modules.vendas.model.ItemVenda;
 import net.sf.jasperreports.engine.*;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource; // 🚀 Ferramenta nativa do Spring
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
@@ -28,30 +36,26 @@ public class DanfeService {
     // =======================================================================
     public byte[] gerarDanfePdf(NotaFiscal nota) throws Exception {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
-
         ClassPathResource resource = new ClassPathResource("reports/danfe.jrxml");
+
         if (!resource.exists()) {
-            throw new Exception("O Spring Boot não encontrou o arquivo na pasta compilada. Pare o servidor e rode o comando 'mvn clean install' para forçar a cópia do arquivo!");
+            throw new Exception("O Spring Boot não encontrou o arquivo na pasta compilada. Rode 'mvn clean install'.");
         }
 
         InputStream reportStream = resource.getInputStream();
         Map<String, Object> parametros = new HashMap<>();
 
-        // Dados do Emitente
         parametros.put("EMITENTE_RAZAO", config.getRazaoSocial() != null ? config.getRazaoSocial() : "NOME DA LOJA NÃO CONFIGURADO");
         parametros.put("EMITENTE_CNPJ", config.getCnpj());
         parametros.put("EMITENTE_IE", config.getInscricaoEstadual());
         parametros.put("EMITENTE_ENDERECO", config.getLogradouro() + ", " + config.getNumero() + " - " + config.getBairro());
         parametros.put("EMITENTE_CIDADE_UF", config.getCidade() + "/" + config.getUf());
 
-        // Lógica da Logo
         if (config.getLogoBase64() != null && config.getLogoBase64().contains(",")) {
             String base64Image = config.getLogoBase64().split(",")[1];
-            byte[] imageBytes = Base64.getDecoder().decode(base64Image);
-            parametros.put("LOGO", new ByteArrayInputStream(imageBytes));
+            parametros.put("LOGO", new ByteArrayInputStream(Base64.getDecoder().decode(base64Image)));
         }
 
-        // Dados do Cliente
         String nomeCliente = "CONSUMIDOR FINAL";
         String docCliente = "NÃO INFORMADO";
         if (nota.getVenda() != null && nota.getVenda().getCliente() != null) {
@@ -61,7 +65,6 @@ public class DanfeService {
         parametros.put("CLIENTE_NOME", nomeCliente);
         parametros.put("CLIENTE_DOC", docCliente);
 
-        // Dados da Nota
         parametros.put("CHAVE_ACESSO", nota.getChaveAcesso());
         parametros.put("NUMERO_NOTA", nota.getNumero() != null ? String.valueOf(nota.getNumero()) : "S/N");
         parametros.put("PROTOCOLO", nota.getProtocolo());
@@ -72,7 +75,6 @@ public class DanfeService {
         parametros.put("DATA_EMISSAO", dataFormatada);
         parametros.put("INF_COMPLEMENTARES", "DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL. NAO GERA DIREITO A CREDITO FISCAL DE IPI.");
 
-        // Itens
         List<ItemVenda> itens = nota.getVenda() != null ? nota.getVenda().getItens() : List.of();
         JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(itens);
 
@@ -83,32 +85,49 @@ public class DanfeService {
     }
 
     // =======================================================================
-    // 🚀 MOTOR EXCLUSIVO DE DANFE PARA NOTAS AVULSAS (LÊ DIRETO DO XML)
+    // 🚀 MOTOR DE DANFE AVULSA (LÊ O XML USANDO PARSER NATIVO DO JAVA)
     // =======================================================================
     public byte[] gerarDanfeAvulsaPdf(NotaFiscal nota) throws Exception {
-        // Pega as configurações reais da empresa
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
-
         String chave = nota.getChaveAcesso();
         String caminhoXml = System.getProperty("user.dir") + "/nfe_xmls/" + chave + ".xml";
 
-        // Lê o XML inteiro do disco
-        String xml = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(caminhoXml)), java.nio.charset.StandardCharsets.UTF_8);
+        File arquivoXml = new File(caminhoXml);
+        if (!arquivoXml.exists()) {
+            throw new Exception("Arquivo XML não encontrado no caminho: " + caminhoXml);
+        }
 
-        java.util.Map<String, Object> parametros = new java.util.HashMap<>();
+        // 1. O PARSER OFICIAL DO JAVA (Não quebra com pular de linhas e não deixa nulo!)
+        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+        Document doc = dBuilder.parse(arquivoXml);
+        doc.getDocumentElement().normalize();
+
+        Map<String, Object> parametros = new HashMap<>();
         parametros.put("CHAVE_ACESSO", chave);
         parametros.put("NUMERO_NOTA", String.valueOf(nota.getNumero()));
         parametros.put("DATA_EMISSAO", new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm").format(new java.util.Date()));
 
-        // Pesca os dados do cliente de dentro do XML
-        java.util.regex.Matcher mNome = java.util.regex.Pattern.compile("<dest>.*?<xNome>(.*?)</xNome>").matcher(xml);
-        if(mNome.find()) parametros.put("CLIENTE_NOME", mNome.group(1));
+        // 2. PEGANDO O DESTINATÁRIO (CLIENTE) DIRETO DO NODE XML
+        NodeList destNodes = doc.getElementsByTagName("dest");
+        if (destNodes.getLength() > 0) {
+            Element destElement = (Element) destNodes.item(0);
 
-        java.util.regex.Matcher mDoc = java.util.regex.Pattern.compile("<dest>.*?(?:<CNPJ>|<CPF>)(.*?)(?:</CNPJ>|</CPF>)").matcher(xml);
-        if(mDoc.find()) parametros.put("CLIENTE_DOC", mDoc.group(1));
+            if (destElement.getElementsByTagName("xNome").getLength() > 0) {
+                parametros.put("CLIENTE_NOME", destElement.getElementsByTagName("xNome").item(0).getTextContent());
+            }
+            if (destElement.getElementsByTagName("CNPJ").getLength() > 0) {
+                parametros.put("CLIENTE_DOC", destElement.getElementsByTagName("CNPJ").item(0).getTextContent());
+            } else if (destElement.getElementsByTagName("CPF").getLength() > 0) {
+                parametros.put("CLIENTE_DOC", destElement.getElementsByTagName("CPF").item(0).getTextContent());
+            }
+        }
 
-        java.util.regex.Matcher mTotal = java.util.regex.Pattern.compile("<vNF>(.*?)</vNF>").matcher(xml);
-        if(mTotal.find()) parametros.put("VALOR_TOTAL", Double.parseDouble(mTotal.group(1)));
+        // 3. PEGANDO O TOTAL DA NOTA
+        NodeList totalNodes = doc.getElementsByTagName("vNF");
+        if (totalNodes.getLength() > 0) {
+            parametros.put("VALOR_TOTAL", Double.parseDouble(totalNodes.item(0).getTextContent()));
+        }
 
         // Configurações do Emitente Reais
         parametros.put("EMITENTE_RAZAO", config.getRazaoSocial() != null ? config.getRazaoSocial() : "NOME DA LOJA NÃO CONFIGURADO");
@@ -117,31 +136,42 @@ public class DanfeService {
         parametros.put("EMITENTE_ENDERECO", config.getLogradouro() + ", " + config.getNumero() + " - " + config.getBairro());
         parametros.put("INF_COMPLEMENTARES", "DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL. NAO GERA DIREITO A CREDITO FISCAL DE IPI.");
 
-        // Adiciona um item genérico de fechamento para preencher a tabela
-        java.util.List<java.util.Map<String, Object>> itens = new java.util.ArrayList<>();
-        java.util.Map<String, Object> itemUnico = new java.util.HashMap<>();
-        itemUnico.put("produto.sku", "000");
-        itemUnico.put("produto.nome", "MERCADORIAS CONFORME ARQUIVO XML");
-        itemUnico.put("quantidade", 1.0);
-        itemUnico.put("precoUnitario", parametros.get("VALOR_TOTAL") != null ? parametros.get("VALOR_TOTAL") : 0.0);
-        itemUnico.put("produto.cfopPadrao", "5102");
-        itens.add(itemUnico);
+        // 4. LENDO TODOS OS PRODUTOS DA NOTA
+        List<Map<String, Object>> itensList = new ArrayList<>();
+        NodeList detNodes = doc.getElementsByTagName("det");
 
-        // 🚀 CORREÇÃO DO ERRO DO COMPILADOR: Cast forçado para java.util.Collection
+        for (int i = 0; i < detNodes.getLength(); i++) {
+            Element detElement = (Element) detNodes.item(i);
+            Element prodElement = (Element) detElement.getElementsByTagName("prod").item(0);
+
+            Map<String, Object> map = new HashMap<>();
+
+            // As chaves do mapa devem bater com os $F{...} do seu Jasper!
+            map.put("produto.sku", prodElement.getElementsByTagName("cProd").item(0).getTextContent());
+            map.put("produto.nome", prodElement.getElementsByTagName("xProd").item(0).getTextContent());
+            map.put("quantidade", Double.parseDouble(prodElement.getElementsByTagName("qCom").item(0).getTextContent()));
+            map.put("precoUnitario", Double.parseDouble(prodElement.getElementsByTagName("vUnCom").item(0).getTextContent()));
+
+            if (prodElement.getElementsByTagName("CFOP").getLength() > 0) {
+                map.put("produto.cfopPadrao", prodElement.getElementsByTagName("CFOP").item(0).getTextContent());
+            }
+
+            itensList.add(map);
+        }
+
+        // Cast forçado para o Jasper não reclamar
         net.sf.jasperreports.engine.data.JRMapCollectionDataSource dataSource =
-                new net.sf.jasperreports.engine.data.JRMapCollectionDataSource((java.util.Collection) itens);
+                new net.sf.jasperreports.engine.data.JRMapCollectionDataSource((java.util.Collection) itensList);
 
-        // 🚀 LENDO O ARQUIVO DE FORMA PADRONIZADA IGUAL AO PRIMEIRO MÉTODO
         ClassPathResource resource = new ClassPathResource("reports/danfe.jrxml");
         if (!resource.exists()) {
             throw new Exception("O Spring Boot não encontrou o arquivo danfe.jrxml na pasta resources/reports.");
         }
         InputStream jrxmlInput = resource.getInputStream();
 
-        // Compila e Gera o PDF
-        net.sf.jasperreports.engine.JasperReport relatorio = net.sf.jasperreports.engine.JasperCompileManager.compileReport(jrxmlInput);
-        net.sf.jasperreports.engine.JasperPrint impressao = net.sf.jasperreports.engine.JasperFillManager.fillReport(relatorio, parametros, dataSource);
+        JasperReport relatorio = JasperCompileManager.compileReport(jrxmlInput);
+        JasperPrint impressao = JasperFillManager.fillReport(relatorio, parametros, dataSource);
 
-        return net.sf.jasperreports.engine.JasperExportManager.exportReportToPdf(impressao);
+        return JasperExportManager.exportReportToPdf(impressao);
     }
 }
