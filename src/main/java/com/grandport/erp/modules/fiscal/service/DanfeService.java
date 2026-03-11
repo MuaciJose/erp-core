@@ -77,6 +77,7 @@ public class DanfeService {
         // Formata a data de emissão no padrão brasileiro
         String dataFormatada = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm").format(java.util.Date.from(nota.getDataEmissao().atZone(java.time.ZoneId.systemDefault()).toInstant()));
         parametros.put("DATA_EMISSAO", dataFormatada);
+        parametros.put("INF_COMPLEMENTARES", "DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL. NAO GERA DIREITO A CREDITO FISCAL DE IPI.");
 
 
         // 4. Prepara os itens da venda (corpo da tabela)

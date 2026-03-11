@@ -10,6 +10,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 
 @RestController
@@ -20,13 +23,13 @@ public class FiscalController {
     private NfeService nfeService;
 
     @Autowired
-    private DanfeService danfeService; // 🚀 Injetando o "pintor" do PDF
+    private DanfeService danfeService;
 
     @Autowired
-    private NotaFiscalRepository notaFiscalRepository; // 🚀 Para buscar a nota no banco
+    private NotaFiscalRepository notaFiscalRepository;
 
     // =======================================================================
-    // 🚀 ATUALIZADO: ROTA BATE COM O NOVO PAINEL DO REACT (/emitir/{id})
+    // 🚀 EMITIR / AUTORIZAR A NOTA
     // =======================================================================
     @PostMapping("/emitir/{vendaId}")
     public ResponseEntity<?> emitirNfe(@PathVariable Long vendaId) {
@@ -37,7 +40,7 @@ public class FiscalController {
         } catch (Exception e) {
             String mensagemErro = e.getMessage();
 
-            // 🚀 BLINDAGEM CONTRA VAZAMENTO DE SQL NO FRONT-END
+            // BLINDAGEM CONTRA VAZAMENTO DE SQL NO FRONT-END
             if (mensagemErro != null && (
                     mensagemErro.toLowerCase().contains("sql") ||
                             mensagemErro.toLowerCase().contains("constraint") ||
@@ -59,16 +62,12 @@ public class FiscalController {
     @GetMapping("/{nfeId}/danfe")
     public ResponseEntity<byte[]> baixarDanfe(@PathVariable Long nfeId) {
         try {
-            // 1. Busca os dados da nota salvos no banco
             NotaFiscal nota = notaFiscalRepository.findById(nfeId)
                     .orElseThrow(() -> new Exception("Nota Fiscal não encontrada."));
 
-            // 2. Chama o JasperReports (DanfeService) para gerar os bytes do PDF
             byte[] pdfBytes = danfeService.gerarDanfePdf(nota);
 
-            // 3. Monta a resposta para o navegador entender que é um PDF
             return ResponseEntity.ok()
-                    // 'inline' abre no navegador, 'attachment' força o download
                     .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=danfe_" + nota.getNumero() + ".pdf")
                     .contentType(MediaType.APPLICATION_PDF)
                     .body(pdfBytes);
@@ -80,34 +79,54 @@ public class FiscalController {
     }
 
     // =======================================================================
-    // 🚀 ROTA PARA DOWNLOAD DO XML (Para enviar ao Contador)
+    // 🚀 ROTA PARA DOWNLOAD DO XML (Motor 2026 Integrado)
     // =======================================================================
     @GetMapping("/{nfeId}/xml")
     public ResponseEntity<byte[]> baixarXml(@PathVariable Long nfeId) {
         try {
-            // 1. Busca a nota no banco
+            // 1. Busca a nota no banco para pegar a Chave de Acesso
             NotaFiscal nota = notaFiscalRepository.findById(nfeId)
                     .orElseThrow(() -> new Exception("Nota Fiscal não encontrada."));
 
-            // 2. Aqui você pegaria o XML real que a SEFAZ retornou (se você já salva no banco).
-            // Por enquanto, criamos um XML de simulação válido estruturalmente:
-            String xmlConteudo = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                    "<nfeProc versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\">\n" +
-                    "  \n" +
-                    "  \n" +
-                    "</nfeProc>";
+            // 2. Vai até a pasta secreta onde o Java salvou o XML físico
+            String diretorioXml = System.getProperty("user.dir") + "/nfe_xmls/";
+            Path caminhoArquivo = Paths.get(diretorioXml + nota.getChaveAcesso() + ".xml");
 
-            byte[] xmlBytes = xmlConteudo.getBytes("UTF-8");
+            // 3. Trava de segurança caso o arquivo tenha sido apagado da pasta
+            if (!Files.exists(caminhoArquivo)) {
+                throw new Exception("O arquivo XML físico não foi encontrado no servidor.");
+            }
 
-            // 3. Força o navegador a fazer o download (attachment)
+            // 4. Lê o arquivo real
+            byte[] xmlBytes = Files.readAllBytes(caminhoArquivo);
+
+            // 5. Envia para o React baixar com o nome oficial da SEFAZ
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=NFe_" + nota.getChaveAcesso() + ".xml")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + nota.getChaveAcesso() + ".xml")
                     .contentType(org.springframework.http.MediaType.APPLICATION_XML)
                     .body(xmlBytes);
 
         } catch (Exception e) {
             System.err.println("[ERRO - BAIXAR XML] " + e.getMessage());
             return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // =======================================================================
+    // 🚀 ROTA NOVA: EMISSÃO AVANÇADA (TELA DEDICADA DA NF-E)
+    // =======================================================================
+    @PostMapping("/emitir-completa")
+    public ResponseEntity<?> emitirNfeCompleta(@RequestBody com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO request) {
+        try {
+            // O React enviou o JSON perfeitamente preenchido!
+            // Aqui nós chamamos o NfeService passando o DTO completo
+            Map<String, Object> respostaSefaz = nfeService.emitirNfeAvançada(request);
+
+            return ResponseEntity.ok(respostaSefaz);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("message", "Erro ao emitir NF-e Avançada: " + e.getMessage()));
         }
     }
 }
