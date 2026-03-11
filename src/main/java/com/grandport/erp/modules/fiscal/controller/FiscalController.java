@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -27,6 +28,24 @@ public class FiscalController {
 
     @Autowired
     private NotaFiscalRepository notaFiscalRepository;
+
+    // =======================================================================
+    // 🚀 ROTA NOVA: LISTAR TODAS AS NOTAS (PARA O GERENCIADOR FISCAL)
+    // =======================================================================
+    @GetMapping("/notas")
+    public ResponseEntity<List<NotaFiscal>> listarTodasAsNotas() {
+        try {
+            List<NotaFiscal> notas = notaFiscalRepository.findAll();
+
+            // Ordena para a nota mais recente (ID maior) aparecer no topo do React
+            notas.sort((n1, n2) -> n2.getId().compareTo(n1.getId()));
+
+            return ResponseEntity.ok(notas);
+        } catch (Exception e) {
+            System.err.println("[ERRO - LISTAR NOTAS] " + e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 
     // =======================================================================
     // 🚀 EMITIR / AUTORIZAR A NOTA VIA PDV

@@ -8,6 +8,7 @@ import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.model.ItemVenda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -15,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -37,6 +39,31 @@ public class NfeService {
 
     @Autowired
     private MotorFiscalService motorFiscalService;
+
+    // =========================================================================
+    // 🤖 ROBÔ DE CONTINGÊNCIA (RODA A CADA 5 MINUTOS SOZINHO NOS BASTIDORES)
+    // =========================================================================
+    @Scheduled(fixedDelay = 300000) // 300.000 milissegundos = 5 minutos
+    public void roboReenviarNotasContingencia() {
+        // 🚀 Quando plugar a API real da Sefaz, vamos descomentar isso:
+        /*
+        List<NotaFiscal> notasPresas = notaFiscalRepository.findByStatus("CONTINGENCIA");
+        if (!notasPresas.isEmpty()) {
+            System.out.println("🤖 ROBÔ FISCAL: Encontrei " + notasPresas.size() + " nota(s) em contingência. Tentando reenviar para a SEFAZ...");
+            for (NotaFiscal nota : notasPresas) {
+                try {
+                    // Tenta enviar o XML pra Sefaz
+                    // sefazApi.transmitir(nota.getXml());
+                    nota.setStatus("AUTORIZADA");
+                    notaFiscalRepository.save(nota);
+                    System.out.println("✅ Nota " + nota.getNumero() + " autorizada com sucesso!");
+                } catch (Exception e) {
+                    System.out.println("❌ SEFAZ ainda instável para a nota " + nota.getNumero());
+                }
+            }
+        }
+        */
+    }
 
     // =========================================================================
     // 🚀 EMISSÃO AUTOMÁTICA (VINDA DO PDV/CAIXA)
@@ -81,7 +108,12 @@ public class NfeService {
         novaNota.setVenda(venda);
         novaNota.setNumero(config.getNumeroProximaNfe().longValue());
         novaNota.setChaveAcesso(chaveAcessoReal);
+
+        // 🚀 SIMULAÇÃO DE QUEDA DA SEFAZ:
+        // Na vida real, colocaríamos um try/catch aqui chamando a API da Sefaz.
+        // Se der Timeout Exception -> setStatus("CONTINGENCIA")
         novaNota.setStatus("AUTORIZADA");
+
         novaNota.setProtocolo("1" + (System.currentTimeMillis() / 1000));
 
         gerarEsalvarXmlSefaz(venda, config, novaNota, totalIBS, totalCBS);
@@ -92,7 +124,7 @@ public class NfeService {
         configuracaoService.atualizarConfiguracao(config);
 
         return Map.of(
-                "status", "AUTORIZADA",
+                "status", novaNota.getStatus(),
                 "chaveAcesso", chaveAcessoReal,
                 "numero", novaNota.getNumero(),
                 "mensagem", "Nota emitida com sucesso! XML gerado e salvo."
@@ -217,6 +249,11 @@ public class NfeService {
         novaNota.setStatus("AUTORIZADA");
         novaNota.setProtocolo("1" + (System.currentTimeMillis() / 1000));
 
+        // 🚀 O SEGREDO PARA APARECER NO GERENCIADOR SEM DAR PAU:
+        // Como a nota avulsa não tem uma "Venda", salvamos ela como nula.
+        // A sua tela de Gerenciador já está preparada com o `{nota.venda ? ... : ...}` para lidar com isso!
+        novaNota.setVenda(null);
+
         gerarEsalvarXmlAvancado(dto, config, novaNota, clienteDestinatario, totalProdutos, valorTotalNota, frete, seguro, outrasDespesas, descontoGeral, totalIbs, totalCbs);
 
         notaFiscalRepository.save(novaNota);
@@ -251,7 +288,7 @@ public class NfeService {
         xml.append("    <infNFe Id=\"NFe").append(nota.getChaveAcesso()).append("\" versao=\"4.00\">\n");
 
         // =======================================================
-        // 🚀 NOVO BLOCO: IDENTIFICAÇÃO DA NOTA E REFERÊNCIA DE DEVOLUÇÃO
+        // 🚀 BLOCO: IDENTIFICAÇÃO DA NOTA E REFERÊNCIA DE DEVOLUÇÃO
         // =======================================================
         xml.append("      <ide>\n");
         xml.append("        <natOp>").append(dto.getNaturezaOperacao() != null ? dto.getNaturezaOperacao() : "VENDA DE MERCADORIA").append("</natOp>\n");
