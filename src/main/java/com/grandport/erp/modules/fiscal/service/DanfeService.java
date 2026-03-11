@@ -69,12 +69,15 @@ public class DanfeService {
 
         // --- DADOS DA NOTA FISCAL ---
         parametros.put("CHAVE_ACESSO", nota.getChaveAcesso());
-        parametros.put("NUMERO_NOTA", nota.getNumero());
-        parametros.put("PROTOCOLO", nota.getProtocolo());
+        parametros.put("NUMERO_NOTA", nota.getNumero() != null ? String.valueOf(nota.getNumero()) : "S/N");        parametros.put("PROTOCOLO", nota.getProtocolo());
 
         // --- VENDEDOR E VALORES ---
         parametros.put("VENDEDOR", nota.getVenda() != null ? nota.getVenda().getVendedorNome() : "Sistema");
         parametros.put("VALOR_TOTAL", nota.getVenda() != null ? nota.getVenda().getValorTotal() : 0.0);
+        // Formata a data de emissão no padrão brasileiro
+        String dataFormatada = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm").format(java.util.Date.from(nota.getDataEmissao().atZone(java.time.ZoneId.systemDefault()).toInstant()));
+        parametros.put("DATA_EMISSAO", dataFormatada);
+
 
         // 4. Prepara os itens da venda (corpo da tabela)
         List<ItemVenda> itens = nota.getVenda() != null ? nota.getVenda().getItens() : List.of();
