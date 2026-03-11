@@ -24,7 +24,7 @@ public class NfeService {
     private com.grandport.erp.modules.estoque.repository.ProdutoRepository produtoRepository;
 
     @Autowired
-    private com.grandport.erp.modules.parceiro.repository.ParceiroRepository parceiroRepository; // (Se o seu repositório de clientes tiver outro nome, ajuste aqui)
+    private com.grandport.erp.modules.parceiro.repository.ParceiroRepository parceiroRepository;
 
     @Autowired
     private VendaRepository vendaRepository;
@@ -38,6 +38,9 @@ public class NfeService {
     @Autowired
     private MotorFiscalService motorFiscalService;
 
+    // =========================================================================
+    // 🚀 EMISSÃO AUTOMÁTICA (VINDA DO PDV/CAIXA)
+    // =========================================================================
     public Map<String, Object> emitirNfeSefaz(Long vendaId) throws Exception {
         Venda venda = vendaRepository.findById(vendaId)
                 .orElseThrow(() -> new Exception("Venda não encontrada."));
@@ -60,7 +63,6 @@ public class NfeService {
         double totalIBS = 0.0;
         double totalCBS = 0.0;
 
-        // Processamento dos Itens
         for (ItemVenda item : venda.getItens()) {
             Map<String, String> impostos = motorFiscalService.calcularTributosDoItem(
                     item.getProduto(), config.getUf(), ufCliente, config.getCrt()
@@ -71,11 +73,8 @@ public class NfeService {
 
             totalIBS += valorIbsItem;
             totalCBS += valorCbsItem;
-
-            // Aqui você pode setar esses valores no ItemVenda se quiser salvar no banco depois
         }
 
-        // Geração da Chave e Persistência
         String chaveAcessoReal = gerarChaveAcesso(config, venda);
 
         NotaFiscal novaNota = new NotaFiscal();
@@ -85,12 +84,10 @@ public class NfeService {
         novaNota.setStatus("AUTORIZADA");
         novaNota.setProtocolo("1" + (System.currentTimeMillis() / 1000));
 
-        // 🚀 GERA E SALVA O ARQUIVO XML FISICAMENTE
         gerarEsalvarXmlSefaz(venda, config, novaNota, totalIBS, totalCBS);
 
         notaFiscalRepository.save(novaNota);
 
-        // Atualização do Sequencial
         config.setNumeroProximaNfe(config.getNumeroProximaNfe() + 1);
         configuracaoService.atualizarConfiguracao(config);
 
@@ -108,25 +105,19 @@ public class NfeService {
         return "262603" + cnpjLimpo + "55001" + numeroFormatado + "123456789";
     }
 
-    // =========================================================================
-    // 🚀 MOTOR DE GERAÇÃO DO ARQUIVO XML (Com as regras de 2026)
-    // =========================================================================
     private void gerarEsalvarXmlSefaz(Venda venda, ConfiguracaoSistema config, NotaFiscal nota, double totalIbs, double totalCbs) throws Exception {
         StringBuilder xml = new StringBuilder();
 
-        // Cabeçalho Padrão
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         xml.append("<nfeProc versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\">\n");
         xml.append("  <NFe>\n");
         xml.append("    <infNFe Id=\"NFe").append(nota.getChaveAcesso()).append("\" versao=\"4.00\">\n");
 
-        // Dados da Empresa (Emitente)
         xml.append("      <emit>\n");
         xml.append("        <CNPJ>").append(config.getCnpj().replaceAll("\\D", "")).append("</CNPJ>\n");
         xml.append("        <xNome>").append(config.getRazaoSocial()).append("</xNome>\n");
         xml.append("      </emit>\n");
 
-        // Loop dos Itens da Venda
         int numeroItem = 1;
         for (ItemVenda item : venda.getItens()) {
             Map<String, String> impostos = motorFiscalService.calcularTributosDoItem(
@@ -140,34 +131,26 @@ public class NfeService {
             xml.append("          <CFOP>").append(impostos.get("CFOP")).append("</CFOP>\n");
             xml.append("        </prod>\n");
 
-            // 🚀 BLOCO DE IMPOSTOS DA REFORMA TRIBUTÁRIA 2026 (IBS e CBS)
             xml.append("        <imposto>\n");
-
-            // Imposto Estadual/Municipal (IBS)
             xml.append("          <IBS>\n");
             xml.append("            <IBS01>\n");
             xml.append("              <cstIBS>").append(impostos.get("CST_IBS")).append("</cstIBS>\n");
             xml.append("              <vIBS>").append(impostos.get("VALOR_IBS")).append("</vIBS>\n");
             xml.append("            </IBS01>\n");
             xml.append("          </IBS>\n");
-
-            // Contribuição Federal (CBS)
             xml.append("          <CBS>\n");
             xml.append("            <CBS01>\n");
             xml.append("              <cstCBS>").append(impostos.get("CST_CBS")).append("</cstCBS>\n");
             xml.append("              <vCBS>").append(impostos.get("VALOR_CBS")).append("</vCBS>\n");
             xml.append("            </CBS01>\n");
             xml.append("          </CBS>\n");
-
             xml.append("        </imposto>\n");
             xml.append("      </det>\n");
         }
 
-        // Totais da Nota
         xml.append("      <total>\n");
         xml.append("        <ICMSTot>\n");
         xml.append("          <vNF>").append(venda.getValorTotal()).append("</vNF>\n");
-        // Mostrando os totais calculados para a SEFAZ
         xml.append("          <vIBS>").append(String.format(java.util.Locale.US, "%.2f", totalIbs)).append("</vIBS>\n");
         xml.append("          <vCBS>").append(String.format(java.util.Locale.US, "%.2f", totalCbs)).append("</vCBS>\n");
         xml.append("        </ICMSTot>\n");
@@ -177,44 +160,43 @@ public class NfeService {
         xml.append("  </NFe>\n");
         xml.append("</nfeProc>");
 
-        // 💾 SALVANDO O ARQUIVO FÍSICO NO SERVIDOR
         String diretorioXml = System.getProperty("user.dir") + "/nfe_xmls/";
         File dir = new File(diretorioXml);
         if (!dir.exists()) {
-            dir.mkdirs(); // Cria a pasta se não existir
+            dir.mkdirs();
         }
 
         Path caminhoArquivo = Paths.get(diretorioXml + nota.getChaveAcesso() + ".xml");
         Files.write(caminhoArquivo, xml.toString().getBytes(StandardCharsets.UTF_8));
-
-        System.out.println("✅ XML da Nota Fiscal salvo com sucesso em: " + caminhoArquivo.toString());
     }
 
-    // =======================================================================
-    // 🚀 MOTOR PARA A TELA DE EMISSÃO AVANÇADA (COM FRETE, DUPLICATAS, ETC)
-    // =======================================================================
+
     // =======================================================================
     // 🚀 MOTOR PARA A TELA DE EMISSÃO AVANÇADA (COM FRETE E DUPLICATAS)
     // =======================================================================
-    public Map<String, Object> emitirNfeAvançada(com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO dto) throws Exception {
+    public Map<String, Object> emitirNfeAvancada(com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO dto) throws Exception {
 
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
+
+        // Busca o Cliente/Parceiro real no banco usando o ID que veio do React
+        var parceiroOpt = parceiroRepository.findById(dto.getClienteId());
+        if (parceiroOpt.isEmpty()) {
+            throw new Exception("Cliente/Parceiro ID " + dto.getClienteId() + " não encontrado.");
+        }
+        com.grandport.erp.modules.parceiro.model.Parceiro clienteDestinatario = parceiroOpt.get();
 
         // 1. Matemática Financeira Básica
         java.math.BigDecimal totalProdutos = java.math.BigDecimal.ZERO;
         double totalIbs = 0.0;
         double totalCbs = 0.0;
 
-        // Processa os Itens
         for (com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO.ItemNfeDTO itemDto : dto.getItens()) {
             com.grandport.erp.modules.estoque.model.Produto produto = produtoRepository.findById(itemDto.getProdutoId())
                     .orElseThrow(() -> new Exception("Produto ID " + itemDto.getProdutoId() + " não encontrado."));
 
-            // Soma Total dos Produtos (Qtd * Preco)
             java.math.BigDecimal valorItem = itemDto.getQuantidade().multiply(itemDto.getPrecoUnitario());
             totalProdutos = totalProdutos.add(valorItem);
 
-            // Simulação de cálculo IBS/CBS usando o Motor (Para 2026)
             Map<String, String> impostos = motorFiscalService.calcularTributosDoItem(produto, config.getUf(), config.getUf(), config.getCrt());
             totalIbs += Double.parseDouble(impostos.getOrDefault("VALOR_IBS", "0.0")) * itemDto.getQuantidade().doubleValue();
             totalCbs += Double.parseDouble(impostos.getOrDefault("VALOR_CBS", "0.0")) * itemDto.getQuantidade().doubleValue();
@@ -226,7 +208,6 @@ public class NfeService {
         java.math.BigDecimal outrasDespesas = dto.getFinanceiro() != null && dto.getFinanceiro().getOutrasDespesas() != null ? dto.getFinanceiro().getOutrasDespesas() : java.math.BigDecimal.ZERO;
         java.math.BigDecimal descontoGeral = dto.getFinanceiro() != null && dto.getFinanceiro().getValorDescontoGeral() != null ? dto.getFinanceiro().getValorDescontoGeral() : java.math.BigDecimal.ZERO;
 
-        // Total = Produtos + Frete + Seguro + Outras - Desconto
         java.math.BigDecimal valorTotalNota = totalProdutos.add(frete).add(seguro).add(outrasDespesas).subtract(descontoGeral);
 
         // 3. Gerar Chave e Salvar no Banco
@@ -239,15 +220,12 @@ public class NfeService {
         novaNota.setChaveAcesso(chaveAcessoReal);
         novaNota.setStatus("AUTORIZADA");
         novaNota.setProtocolo("1" + (System.currentTimeMillis() / 1000));
-        // Nota: Como não temos uma "Venda" atrelada aqui (pois é avulsa), você pode precisar
-        // ajustar sua entidade NotaFiscal para permitir venda_id nulo, ou criar uma venda genérica.
 
-        // 4. Gera e Salva o XML Turbinado
-        gerarEsalvarXmlAvançado(dto, config, novaNota, totalProdutos, valorTotalNota, frete, seguro, outrasDespesas, descontoGeral, totalIbs, totalCbs);
+        // 4. Gera e Salva o XML Turbinado (Passando o cliente real fortemente tipado)
+        gerarEsalvarXmlAvancado(dto, config, novaNota, clienteDestinatario, totalProdutos, valorTotalNota, frete, seguro, outrasDespesas, descontoGeral, totalIbs, totalCbs);
 
         notaFiscalRepository.save(novaNota);
 
-        // Atualiza a numeração da empresa
         config.setNumeroProximaNfe(config.getNumeroProximaNfe() + 1);
         configuracaoService.atualizarConfiguracao(config);
 
@@ -263,8 +241,9 @@ public class NfeService {
     // =======================================================================
     // 🚀 GERADOR DE XML AVANÇADO (COM BLOCOS DE FRETE, COBRANÇA E VOLUMES)
     // =======================================================================
-    private void gerarEsalvarXmlAvançado(
+    private void gerarEsalvarXmlAvancado(
             com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO dto, ConfiguracaoSistema config, NotaFiscal nota,
+            com.grandport.erp.modules.parceiro.model.Parceiro clienteDestinatario, // 🚀 TIPO FORTE: Classe Parceiro Real
             java.math.BigDecimal totalProdutos, java.math.BigDecimal totalNota,
             java.math.BigDecimal frete, java.math.BigDecimal seguro, java.math.BigDecimal outras, java.math.BigDecimal desconto,
             double totalIbs, double totalCbs) throws Exception {
@@ -276,17 +255,32 @@ public class NfeService {
         xml.append("  <NFe>\n");
         xml.append("    <infNFe Id=\"NFe").append(nota.getChaveAcesso()).append("\" versao=\"4.00\">\n");
 
-        // --- EMITENTE ---
         xml.append("      <emit>\n");
         xml.append("        <CNPJ>").append(config.getCnpj().replaceAll("\\D", "")).append("</CNPJ>\n");
         xml.append("        <xNome>").append(config.getRazaoSocial()).append("</xNome>\n");
         xml.append("      </emit>\n");
 
-        // --- DESTINATÁRIO ---
+        // 🚀 INJETANDO OS DADOS REAIS DO CLIENTE (Código Limpo e Blindado)
+        String docCliente = "00000000000191";
+        String nomeCliente = "CLIENTE CONSUMIDOR FINAL";
+
+        if (clienteDestinatario != null) {
+            if (clienteDestinatario.getDocumento() != null && !clienteDestinatario.getDocumento().isEmpty()) {
+                docCliente = clienteDestinatario.getDocumento().replaceAll("\\D", "");
+            }
+            if (clienteDestinatario.getNome() != null && !clienteDestinatario.getNome().isEmpty()) {
+                nomeCliente = clienteDestinatario.getNome();
+            }
+        }
+
         xml.append("      <dest>\n");
-        // Na prática, você buscaria os dados do clienteRepository usando o dto.getClienteId()
-        xml.append("        <CNPJ>00000000000191</CNPJ>\n");
-        xml.append("        <xNome>CLIENTE CONSUMIDOR FINAL</xNome>\n");
+        // A SEFAZ exige a tag <CPF> se tiver 11 dígitos, e <CNPJ> se tiver 14.
+        if (docCliente.length() == 11) {
+            xml.append("        <CPF>").append(docCliente).append("</CPF>\n");
+        } else {
+            xml.append("        <CNPJ>").append(docCliente).append("</CNPJ>\n");
+        }
+        xml.append("        <xNome>").append(nomeCliente).append("</xNome>\n");
         xml.append("      </dest>\n");
 
         // --- TOTAIS ---
@@ -304,17 +298,19 @@ public class NfeService {
         xml.append("      </total>\n");
 
         // --- TRANSPORTE ---
-        xml.append("      <transp>\n");
-        xml.append("        <modFrete>").append(dto.getTransporte() != null ? dto.getTransporte().getModalidadeFrete() : 9).append("</modFrete>\n");
-        if (dto.getTransporte() != null && dto.getTransporte().getQuantidadeVolumes() != null) {
-            xml.append("        <vol>\n");
-            xml.append("          <qVol>").append(dto.getTransporte().getQuantidadeVolumes()).append("</qVol>\n");
-            xml.append("          <esp>").append(dto.getTransporte().getEspecie() != null ? dto.getTransporte().getEspecie() : "CAIXA").append("</esp>\n");
-            xml.append("          <pesoL>").append(dto.getTransporte().getPesoLiquido()).append("</pesoL>\n");
-            xml.append("          <pesoB>").append(dto.getTransporte().getPesoBruto()).append("</pesoB>\n");
-            xml.append("        </vol>\n");
+        if (dto.getTransporte() != null) {
+            xml.append("      <transp>\n");
+            xml.append("        <modFrete>").append(dto.getTransporte().getModalidadeFrete()).append("</modFrete>\n");
+            if (dto.getTransporte().getQuantidadeVolumes() != null && dto.getTransporte().getQuantidadeVolumes() > 0) {
+                xml.append("        <vol>\n");
+                xml.append("          <qVol>").append(dto.getTransporte().getQuantidadeVolumes()).append("</qVol>\n");
+                xml.append("          <esp>").append(dto.getTransporte().getEspecie() != null ? dto.getTransporte().getEspecie() : "CAIXA").append("</esp>\n");
+                xml.append("          <pesoL>").append(dto.getTransporte().getPesoLiquido()).append("</pesoL>\n");
+                xml.append("          <pesoB>").append(dto.getTransporte().getPesoBruto()).append("</pesoB>\n");
+                xml.append("        </vol>\n");
+            }
+            xml.append("      </transp>\n");
         }
-        xml.append("      </transp>\n");
 
         // --- COBRANÇA (FATURA / DUPLICATAS) ---
         if (dto.getFinanceiro() != null && dto.getFinanceiro().getDuplicatas() != null && !dto.getFinanceiro().getDuplicatas().isEmpty()) {

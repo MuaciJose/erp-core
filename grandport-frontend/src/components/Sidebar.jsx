@@ -11,7 +11,7 @@ import {
     LogOut,
     Menu,
     ChevronLeft,
-    FileText // 🚀 Adicionado ícone caso precise no futuro
+    FileText
 } from 'lucide-react';
 import api from '../api/axios';
 
@@ -86,10 +86,11 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Auditoria de Sistema', acao: 'auditoria' },
                 { titulo: 'Fiscal / NCM', acao: 'fiscal' },
                 { titulo: 'Regras Fiscais (NF-e)', acao: 'regras-fiscais' },
+                { titulo: 'Gerenciador de NF-e', acao: 'gerenciador-nfe' },
                 // =========================================================
-                // 🚀 ADICIONADO: O novo painel de emissão de notas
+                // 🚀 ADICIONADO: A NOVA TELA DE NF-E AVULSA E COMPLETA
                 // =========================================================
-                { titulo: 'Gerenciador de NF-e', acao: 'gerenciador-nfe' }
+                { titulo: 'Emitir NF-e Avulsa', acao: 'emitir-nfe-avulsa' }
             ]
         },
         { id: 'configuracoes', titulo: 'Configurações', icone: <Settings size={20} />, acao: 'configuracoes' }
@@ -134,8 +135,8 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             </div>
 
             <div className="flex-1 overflow-y-auto py-6 px-3 space-y-2 custom-scrollbar overflow-x-hidden">
-                {menusFiltrados.map((menu) => (
-                    <div key={menu.id} className="relative group">
+                {menusFiltrados.map((menu, indexOuter) => (
+                    <div key={menu.id || indexOuter} className="relative group">
                         {menu.submenus ? (
                             <>
                                 <button

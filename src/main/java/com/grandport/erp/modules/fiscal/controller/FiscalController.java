@@ -29,35 +29,25 @@ public class FiscalController {
     private NotaFiscalRepository notaFiscalRepository;
 
     // =======================================================================
-    // 🚀 EMITIR / AUTORIZAR A NOTA
+    // 🚀 EMITIR / AUTORIZAR A NOTA VIA PDV
     // =======================================================================
     @PostMapping("/emitir/{vendaId}")
     public ResponseEntity<?> emitirNfe(@PathVariable Long vendaId) {
         try {
             Map<String, Object> respostaSefaz = nfeService.emitirNfeSefaz(vendaId);
             return ResponseEntity.ok(respostaSefaz);
-
         } catch (Exception e) {
             String mensagemErro = e.getMessage();
-
-            // BLINDAGEM CONTRA VAZAMENTO DE SQL NO FRONT-END
-            if (mensagemErro != null && (
-                    mensagemErro.toLowerCase().contains("sql") ||
-                            mensagemErro.toLowerCase().contains("constraint") ||
-                            mensagemErro.toLowerCase().contains("could not execute statement") ||
-                            mensagemErro.toLowerCase().contains("duplicate key"))) {
-
+            if (mensagemErro != null && (mensagemErro.toLowerCase().contains("sql") || mensagemErro.toLowerCase().contains("constraint"))) {
                 System.err.println("[ERRO GRAVE - FISCAL] " + mensagemErro);
-                e.printStackTrace();
                 mensagemErro = "Inconsistência interna no servidor ao tentar salvar a nota.";
             }
-
             return ResponseEntity.badRequest().body(Map.of("message", mensagemErro));
         }
     }
 
     // =======================================================================
-    // 🚀 ROTA PARA DOWNLOAD/VISUALIZAÇÃO DO DANFE (PDF)
+    // 🚀 ROTA PARA DOWNLOAD/VISUALIZAÇÃO DO DANFE (PDF DO PDV)
     // =======================================================================
     @GetMapping("/{nfeId}/danfe")
     public ResponseEntity<byte[]> baixarDanfe(@PathVariable Long nfeId) {
@@ -71,7 +61,6 @@ public class FiscalController {
                     .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=danfe_" + nota.getNumero() + ".pdf")
                     .contentType(MediaType.APPLICATION_PDF)
                     .body(pdfBytes);
-
         } catch (Exception e) {
             System.err.println("[ERRO - GERAR PDF] " + e.getMessage());
             return ResponseEntity.internalServerError().build();
@@ -84,28 +73,21 @@ public class FiscalController {
     @GetMapping("/{nfeId}/xml")
     public ResponseEntity<byte[]> baixarXml(@PathVariable Long nfeId) {
         try {
-            // 1. Busca a nota no banco para pegar a Chave de Acesso
             NotaFiscal nota = notaFiscalRepository.findById(nfeId)
                     .orElseThrow(() -> new Exception("Nota Fiscal não encontrada."));
 
-            // 2. Vai até a pasta secreta onde o Java salvou o XML físico
             String diretorioXml = System.getProperty("user.dir") + "/nfe_xmls/";
             Path caminhoArquivo = Paths.get(diretorioXml + nota.getChaveAcesso() + ".xml");
 
-            // 3. Trava de segurança caso o arquivo tenha sido apagado da pasta
             if (!Files.exists(caminhoArquivo)) {
                 throw new Exception("O arquivo XML físico não foi encontrado no servidor.");
             }
 
-            // 4. Lê o arquivo real
             byte[] xmlBytes = Files.readAllBytes(caminhoArquivo);
-
-            // 5. Envia para o React baixar com o nome oficial da SEFAZ
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + nota.getChaveAcesso() + ".xml")
                     .contentType(org.springframework.http.MediaType.APPLICATION_XML)
                     .body(xmlBytes);
-
         } catch (Exception e) {
             System.err.println("[ERRO - BAIXAR XML] " + e.getMessage());
             return ResponseEntity.internalServerError().build();
@@ -113,20 +95,43 @@ public class FiscalController {
     }
 
     // =======================================================================
-    // 🚀 ROTA NOVA: EMISSÃO AVANÇADA (TELA DEDICADA DA NF-E)
+    // 🚀 ROTA NOVA: EMISSÃO AVANÇADA (TELA DEDICADA)
     // =======================================================================
     @PostMapping("/emitir-completa")
     public ResponseEntity<?> emitirNfeCompleta(@RequestBody com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO request) {
         try {
-            // O React enviou o JSON perfeitamente preenchido!
-            // Aqui nós chamamos o NfeService passando o DTO completo
-            Map<String, Object> respostaSefaz = nfeService.emitirNfeAvançada(request);
-
+            System.out.println("Recebendo DTO da NF-e Avançada: " + request.getNaturezaOperacao());
+            Map<String, Object> respostaSefaz = nfeService.emitirNfeAvancada(request);
             return ResponseEntity.ok(respostaSefaz);
+        } catch (Exception e) {
+            System.err.println("[ERRO - EMISSÃO AVANÇADA] " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("message", "Erro ao emitir NF-e: " + e.getMessage()));
+        }
+    }
+
+    // =======================================================================
+    // 🚀 ROTA NOVA: BAIXAR PDF (DANFE) DA NOTA AVULSA
+    // =======================================================================
+    @GetMapping(value = "/danfe/avulsa/{chaveAcesso}", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> baixarDanfeAvulsa(@PathVariable String chaveAcesso) {
+        try {
+            // Busca a nota fiscal varrendo o banco pela chave (dispensa alterar o Repository)
+            NotaFiscal nota = notaFiscalRepository.findAll().stream()
+                    .filter(n -> chaveAcesso.equals(n.getChaveAcesso()))
+                    .findFirst()
+                    .orElseThrow(() -> new Exception("Nota Fiscal não encontrada no Banco de Dados."));
+
+            // 🚀 Aciona o Gerador de PDF Mágico
+            byte[] pdfBytes = danfeService.gerarDanfeAvulsaPdf(nota);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"DANFE_" + chaveAcesso + ".pdf\"")
+                    .body(pdfBytes);
 
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body(Map.of("message", "Erro ao emitir NF-e Avançada: " + e.getMessage()));
+            System.err.println("[ERRO - DANFE AVULSA] " + e.getMessage());
+            return ResponseEntity.badRequest().body(null);
         }
     }
 }

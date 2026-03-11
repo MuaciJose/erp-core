@@ -37,11 +37,12 @@ import { HistoricoRecibos } from './modules/financeiro/HistoricoRecibos';
 
 // 🚀 MÓDULO FISCAL (ADICIONADO)
 import { RegrasFiscais } from './modules/fiscal/RegrasFiscais';
+import { GerenciadorFiscal } from './modules/fiscal/GerenciadorFiscal';
+import EmitirNfeAvulsa from './modules/fiscal/EmitirNfeAvulsa'; // <--- NOVA TELA AQUI
 
 // 🚀 MÓDULO Categoria (ADICIONADO)
-import { Categorias } from './modules/estoque/Categorias'; // Ajuste o caminho se necessário
+import { Categorias } from './modules/estoque/Categorias';
 
-import { GerenciadorFiscal } from './modules/fiscal/GerenciadorFiscal';
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
     const [paginaAtiva, setPaginaAtiva] = useState('');
@@ -106,14 +107,14 @@ function App() {
     return (
         <div className="flex h-screen w-screen bg-slate-50 overflow-hidden font-sans">
 
-            {/* 🚀 TOASTER GLOBAL: Configurado para aparecer no topo direito com estilo moderno */}
+            {/* 🚀 TOASTER GLOBAL */}
             <Toaster
                 position="top-right"
                 reverseOrder={false}
                 toastOptions={{
                     duration: 4000,
                     style: {
-                        background: '#1e293b', // Slate 800
+                        background: '#1e293b',
                         color: '#fff',
                         borderRadius: '12px',
                         fontWeight: 'bold'
@@ -172,12 +173,13 @@ function App() {
                             {paginaAtiva === 'recibo-avulso' && <ReciboAvulso setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'historico-recibos' && <HistoricoRecibos setPaginaAtiva={setPaginaAtiva} />}
 
-                            {/* 🚀 RENDERIZAÇÃO DA TELA DE REGRAS FISCAIS */}
                             {paginaAtiva === 'regras-fiscais' && <RegrasFiscais setPaginaAtiva={setPaginaAtiva} />}
-
                             {paginaAtiva === 'categorias' && <Categorias />}
+                            {paginaAtiva === 'gerenciador-nfe' && <GerenciadorFiscal setPaginaAtiva={setPaginaAtiva} />}
 
-                            {paginaAtiva === 'gerenciador-nfe' && <GerenciadorFiscal setPaginaAtiva={setPaginaAtiva} />}                        </>
+                            {/* 🚀 A  NOVA TELA AQUI: */}
+                            {paginaAtiva === 'emitir-nfe-avulsa' && <EmitirNfeAvulsa setPaginaAtiva={setPaginaAtiva} />}
+                        </>
                     )}
                 </div>
             </main>

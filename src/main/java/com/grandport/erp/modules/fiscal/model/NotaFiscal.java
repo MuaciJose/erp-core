@@ -37,7 +37,7 @@ public class NotaFiscal {
 
     // 🚀 RELACIONAMENTO: Uma Nota Fiscal pertence a 1 único Pedido
     @OneToOne
-    @JoinColumn(name = "pedido_id", unique = true, nullable = false)
+    @JoinColumn(name = "pedido_id", unique = true, nullable = true)
     @JsonIgnore // java nã entrar no loop
     private Venda venda;
 }
