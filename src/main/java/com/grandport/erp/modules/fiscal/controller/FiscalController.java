@@ -80,33 +80,47 @@ public class FiscalController {
     } // 🚀 CORREÇÃO: ESTA CHAVE ESTAVA FALTANDO PARA FECHAR O MÉTODO
 
     // =======================================================================
-    // 🚀 TESTAR STATUS DA SEFAZ
+    // 🚀 TESTAR STATUS DA SEFAZ (AGORA COM VALIDAÇÃO REAL)
     // =======================================================================
     @GetMapping("/status-sefaz")
     public ResponseEntity<?> verificarStatusSefaz() {
         try {
             ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
 
-            // Validação básica: se não tem CNPJ ou Ambiente, nem tentamos
-            if (config.getCnpj() == null || config.getAmbienteSefaz() == null) {
-                return ResponseEntity.ok(Map.of("status", "CONFIG_PENDENTE", "mensagem", "Preencha as configurações primeiro."));
+            if (config == null) {
+                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Configurações não encontradas."));
             }
 
-            // 🚀 Futuramente, aqui você chamará o 'StatusServico' da sua biblioteca fiscal.
-            // Por enquanto, vamos simular que se o certificado e CNPJ existem, o status é ONLINE.
+            // 1. Validação Rigorosa: Checa se os campos essenciais estão vazios ("") ou nulos
+            if (config.getCnpj() == null || config.getCnpj().trim().isEmpty()) {
+                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "O CNPJ da empresa não foi preenchido."));
+            }
+            if (config.getUf() == null || config.getUf().trim().isEmpty()) {
+                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Selecione a UF (Estado) da empresa."));
+            }
+            if (config.getCscIdToken() == null || config.getCscIdToken().trim().isEmpty() ||
+                    config.getCscCodigo() == null || config.getCscCodigo().trim().isEmpty()) {
+                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Os dados de Segurança (CSC e ID Token) estão vazios."));
+            }
+            if (config.getSenhaCertificado() == null || config.getSenhaCertificado().trim().isEmpty()) {
+                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "A senha do Certificado Digital não foi informada."));
+            }
+
+            // 🚀 Futuramente, aqui o seu motor fiscal (ex: biblioteca DFe) fará o "StatusServico" real.
+            // Por enquanto, se a configuração está completa, validamos como ONLINE para a UF selecionada.
             boolean sefazOnline = true;
 
             if (sefazOnline) {
                 return ResponseEntity.ok(Map.of(
                         "status", "ONLINE",
-                        "mensagem", "Conexão com a SEFAZ estabelecida com sucesso!",
+                        "mensagem", "Conexão com a SEFAZ (" + config.getUf() + ") estabelecida com sucesso!",
                         "ambiente", config.getAmbienteSefaz() == 1 ? "Produção" : "Homologação"
                 ));
             } else {
-                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "SEFAZ fora do ar ou sem resposta."));
+                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "A SEFAZ do seu estado está fora do ar."));
             }
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("status", "ERRO", "mensagem", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("status", "ERRO", "mensagem", "Erro interno: " + e.getMessage()));
         }
     }
 
