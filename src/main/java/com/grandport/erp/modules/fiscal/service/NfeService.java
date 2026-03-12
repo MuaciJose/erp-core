@@ -66,7 +66,7 @@ public class NfeService {
     }
 
     // =========================================================================
-    // 🚀 EMISSÃO AUTOMÁTICA (VINDA DO PDV/CAIXA)
+    // 🚀 EMISSÃO AUTOMÁTICA PDV -> AGORA GERA CUPOM FISCAL (NFC-e / MOD 65)
     // =========================================================================
     public Map<String, Object> emitirNfeSefaz(Long vendaId) throws Exception {
         Venda venda = vendaRepository.findById(vendaId)
@@ -76,47 +76,32 @@ public class NfeService {
 
         NotaFiscal notaExistente = notaFiscalRepository.findByVendaId(vendaId);
         if (notaExistente != null && "AUTORIZADA".equals(notaExistente.getStatus())) {
-            throw new Exception("NF-e já autorizada com a chave: " + notaExistente.getChaveAcesso());
+            throw new Exception("NFC-e já autorizada com a chave: " + notaExistente.getChaveAcesso());
         }
 
-        String ufCliente = config.getUf();
-        if (venda.getCliente() != null && venda.getCliente().getEndereco() != null) {
-            String ufCadastrada = venda.getCliente().getEndereco().getUf();
-            if (ufCadastrada != null && !ufCadastrada.isBlank()) {
-                ufCliente = ufCadastrada;
-            }
-        }
-
-        double totalIBS = 0.0;
-        double totalCBS = 0.0;
+        String ufCliente = config.getUf(); // No Cupom, geralmente assume-se a UF da loja
+        double totalIBS = 0.0; double totalCBS = 0.0;
 
         for (ItemVenda item : venda.getItens()) {
-            Map<String, String> impostos = motorFiscalService.calcularTributosDoItem(
-                    item.getProduto(), config.getUf(), ufCliente, config.getCrt()
-            );
-
-            double valorIbsItem = Double.parseDouble(impostos.getOrDefault("VALOR_IBS", "0.0"));
-            double valorCbsItem = Double.parseDouble(impostos.getOrDefault("VALOR_CBS", "0.0"));
-
-            totalIBS += valorIbsItem;
-            totalCBS += valorCbsItem;
+            Map<String, String> impostos = motorFiscalService.calcularTributosDoItem(item.getProduto(), config.getUf(), ufCliente, config.getCrt());
+            totalIBS += Double.parseDouble(impostos.getOrDefault("VALOR_IBS", "0.0"));
+            totalCBS += Double.parseDouble(impostos.getOrDefault("VALOR_CBS", "0.0"));
         }
 
-        String chaveAcessoReal = gerarChaveAcesso(config, venda);
+        // 🚀 A CHAVE DA NFC-e MUDA O MODELO DE "55" PARA "65"
+        String cnpjLimpo = config.getCnpj().replaceAll("\\D", "");
+        String numeroFormatado = String.format("%09d", config.getNumeroProximaNfe());
+        String chaveAcessoReal = "262603" + cnpjLimpo + "65001" + numeroFormatado + "123456789";
 
         NotaFiscal novaNota = new NotaFiscal();
         novaNota.setVenda(venda);
         novaNota.setNumero(config.getNumeroProximaNfe().longValue());
         novaNota.setChaveAcesso(chaveAcessoReal);
-
-        // 🚀 SIMULAÇÃO DE QUEDA DA SEFAZ:
-        // Na vida real, colocaríamos um try/catch aqui chamando a API da Sefaz.
-        // Se der Timeout Exception -> setStatus("CONTINGENCIA")
         novaNota.setStatus("AUTORIZADA");
-
         novaNota.setProtocolo("1" + (System.currentTimeMillis() / 1000));
 
-        gerarEsalvarXmlSefaz(venda, config, novaNota, totalIBS, totalCBS);
+        // CHAMA O NOVO GERADOR DE CUPOM FISCAL (NFC-e)
+        gerarEsalvarXmlNfcePDV(venda, config, novaNota, totalIBS, totalCBS);
 
         notaFiscalRepository.save(novaNota);
 
@@ -127,17 +112,14 @@ public class NfeService {
                 "status", novaNota.getStatus(),
                 "chaveAcesso", chaveAcessoReal,
                 "numero", novaNota.getNumero(),
-                "mensagem", "Nota emitida com sucesso! XML gerado e salvo."
+                "mensagem", "Cupom Fiscal (NFC-e) gerado com sucesso!"
         );
     }
 
-    private String gerarChaveAcesso(ConfiguracaoSistema c, Venda v) {
-        String cnpjLimpo = c.getCnpj().replaceAll("\\D", "");
-        String numeroFormatado = String.format("%09d", c.getNumeroProximaNfe());
-        return "262603" + cnpjLimpo + "55001" + numeroFormatado + "123456789";
-    }
-
-    private void gerarEsalvarXmlSefaz(Venda venda, ConfiguracaoSistema config, NotaFiscal nota, double totalIbs, double totalCbs) throws Exception {
+    // =========================================================================
+    // 🚀 GERADOR DE XML ESPECÍFICO PARA CUPOM FISCAL (NFC-e / MOD 65)
+    // =========================================================================
+    private void gerarEsalvarXmlNfcePDV(Venda venda, ConfiguracaoSistema config, NotaFiscal nota, double totalIbs, double totalCbs) throws Exception {
         StringBuilder xml = new StringBuilder();
 
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
@@ -145,24 +127,47 @@ public class NfeService {
         xml.append("  <NFe>\n");
         xml.append("    <infNFe Id=\"NFe").append(nota.getChaveAcesso()).append("\" versao=\"4.00\">\n");
 
+        // 1. IDENTIFICAÇÃO (Mágica do Mod 65)
+        xml.append("      <ide>\n");
+        xml.append("        <natOp>VENDA DE MERCADORIA</natOp>\n");
+        xml.append("        <mod>65</mod>\n"); // 🚀 65 = CUPOM FISCAL
+        xml.append("        <serie>1</serie>\n");
+        xml.append("        <tpNF>1</tpNF>\n"); // 1 = Saída
+        xml.append("        <indFinal>1</indFinal>\n"); // 1 = Consumidor Final
+        xml.append("        <indPres>1</indPres>\n"); // 1 = Venda Presencial (Balcão)
+        xml.append("      </ide>\n");
+
+        // 2. EMITENTE DA LOJA
         xml.append("      <emit>\n");
         xml.append("        <CNPJ>").append(config.getCnpj().replaceAll("\\D", "")).append("</CNPJ>\n");
         xml.append("        <xNome>").append(config.getRazaoSocial()).append("</xNome>\n");
         xml.append("      </emit>\n");
 
+        // 3. DESTINATÁRIO (No Cupom Fiscal é opcional)
+        if (venda.getCliente() != null && venda.getCliente().getDocumento() != null && !venda.getCliente().getDocumento().isEmpty()) {
+            xml.append("      <dest>\n");
+            String doc = venda.getCliente().getDocumento().replaceAll("\\D", "");
+            if (doc.length() == 11) xml.append("        <CPF>").append(doc).append("</CPF>\n");
+            else xml.append("        <CNPJ>").append(doc).append("</CNPJ>\n");
+            xml.append("        <xNome>").append(venda.getCliente().getNome()).append("</xNome>\n");
+            xml.append("      </dest>\n");
+        }
+
+        // 4. PRODUTOS DO CUPOM
         int numeroItem = 1;
         for (ItemVenda item : venda.getItens()) {
-            Map<String, String> impostos = motorFiscalService.calcularTributosDoItem(
-                    item.getProduto(), config.getUf(), config.getUf(), config.getCrt()
-            );
+            Map<String, String> impostos = motorFiscalService.calcularTributosDoItem(item.getProduto(), config.getUf(), config.getUf(), config.getCrt());
 
             xml.append("      <det nItem=\"").append(numeroItem++).append("\">\n");
             xml.append("        <prod>\n");
             xml.append("          <cProd>").append(item.getProduto().getSku()).append("</cProd>\n");
             xml.append("          <xProd>").append(item.getProduto().getNome()).append("</xProd>\n");
             xml.append("          <CFOP>").append(impostos.get("CFOP")).append("</CFOP>\n");
+            xml.append("          <qCom>").append(item.getQuantidade()).append("</qCom>\n");
+            xml.append("          <vUnCom>").append(item.getPrecoUnitario()).append("</vUnCom>\n");
             xml.append("        </prod>\n");
 
+            // Impostos 2026 (IBS/CBS)
             xml.append("        <imposto>\n");
             xml.append("          <IBS>\n");
             xml.append("            <IBS01>\n");
@@ -177,9 +182,11 @@ public class NfeService {
             xml.append("            </CBS01>\n");
             xml.append("          </CBS>\n");
             xml.append("        </imposto>\n");
+
             xml.append("      </det>\n");
         }
 
+        // 5. TOTAIS DO CUPOM
         xml.append("      <total>\n");
         xml.append("        <ICMSTot>\n");
         xml.append("          <vNF>").append(venda.getValorTotal()).append("</vNF>\n");
@@ -188,23 +195,36 @@ public class NfeService {
         xml.append("        </ICMSTot>\n");
         xml.append("      </total>\n");
 
+        // 6. PAGAMENTO (Obrigatório para Cupom Fiscal)
+        xml.append("      <pag>\n");
+        xml.append("        <detPag>\n");
+        xml.append("          <tPag>01</tPag>\n"); // 01 = Dinheiro
+        xml.append("          <vPag>").append(venda.getValorTotal()).append("</vPag>\n");
+        xml.append("        </detPag>\n");
+        xml.append("      </pag>\n");
+
         xml.append("    </infNFe>\n");
+
+        // 7. INFORMAÇÕES SUPLEMENTARES (QR CODE OBRIGATÓRIO DA NFC-e)
+        xml.append("    <infNFeSupl>\n");
+        xml.append("      <qrCode>URL_COM_HASH_GERADO_AQUI</qrCode>\n");
+        xml.append("      <urlChave>https://nfce.sefaz.pe.gov.br/nfce/consulta</urlChave>\n");
+        xml.append("    </infNFeSupl>\n");
+
         xml.append("  </NFe>\n");
         xml.append("</nfeProc>");
 
+        // Salva o XML físico
         String diretorioXml = System.getProperty("user.dir") + "/nfe_xmls/";
         File dir = new File(diretorioXml);
-        if (!dir.exists()) {
-            dir.mkdirs();
-        }
-
+        if (!dir.exists()) dir.mkdirs();
         Path caminhoArquivo = Paths.get(diretorioXml + nota.getChaveAcesso() + ".xml");
         Files.write(caminhoArquivo, xml.toString().getBytes(StandardCharsets.UTF_8));
     }
 
 
     // =======================================================================
-    // 🚀 MOTOR PARA A TELA DE EMISSÃO AVANÇADA (COM FRETE E DUPLICATAS)
+    // 🚀 MOTOR PARA A TELA DE EMISSÃO AVANÇADA (NF-e MOD 55) - MANTIDO INTACTO
     // =======================================================================
     public Map<String, Object> emitirNfeAvancada(com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO dto) throws Exception {
 
@@ -241,6 +261,7 @@ public class NfeService {
 
         String cnpjLimpo = config.getCnpj().replaceAll("\\D", "");
         String numeroFormatado = String.format("%09d", config.getNumeroProximaNfe());
+        // 🚀 O 55 NO MEIO DA CHAVE INDICA QUE É UMA NOTA GRANDE
         String chaveAcessoReal = "262603" + cnpjLimpo + "55001" + numeroFormatado + "123456789";
 
         NotaFiscal novaNota = new NotaFiscal();
@@ -249,9 +270,6 @@ public class NfeService {
         novaNota.setStatus("AUTORIZADA");
         novaNota.setProtocolo("1" + (System.currentTimeMillis() / 1000));
 
-        // 🚀 O SEGREDO PARA APARECER NO GERENCIADOR SEM DAR PAU:
-        // Como a nota avulsa não tem uma "Venda", salvamos ela como nula.
-        // A sua tela de Gerenciador já está preparada com o `{nota.venda ? ... : ...}` para lidar com isso!
         novaNota.setVenda(null);
 
         gerarEsalvarXmlAvancado(dto, config, novaNota, clienteDestinatario, totalProdutos, valorTotalNota, frete, seguro, outrasDespesas, descontoGeral, totalIbs, totalCbs);
@@ -271,7 +289,7 @@ public class NfeService {
     }
 
     // =======================================================================
-    // 🚀 GERADOR DE XML AVANÇADO (COM BLOCOS DE FRETE, COBRANÇA E VOLUMES E ITENS)
+    // 🚀 GERADOR DE XML AVANÇADO (NF-e MOD 55 COM FRETE E FATURA)
     // =======================================================================
     private void gerarEsalvarXmlAvancado(
             com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO dto, ConfiguracaoSistema config, NotaFiscal nota,
@@ -287,15 +305,11 @@ public class NfeService {
         xml.append("  <NFe>\n");
         xml.append("    <infNFe Id=\"NFe").append(nota.getChaveAcesso()).append("\" versao=\"4.00\">\n");
 
-        // =======================================================
-        // 🚀 BLOCO: IDENTIFICAÇÃO DA NOTA E REFERÊNCIA DE DEVOLUÇÃO
-        // =======================================================
         xml.append("      <ide>\n");
         xml.append("        <natOp>").append(dto.getNaturezaOperacao() != null ? dto.getNaturezaOperacao() : "VENDA DE MERCADORIA").append("</natOp>\n");
         xml.append("        <tpNF>").append(dto.getTipoOperacao() != null ? dto.getTipoOperacao() : 1).append("</tpNF>\n");
         xml.append("        <finNFe>").append(dto.getFinalidade() != null ? dto.getFinalidade() : 1).append("</finNFe>\n");
 
-        // Se for Devolução (4) e tiver a chave de 44 números, injeta a Referência!
         if (dto.getFinalidade() != null && dto.getFinalidade() == 4 &&
                 dto.getChaveAcessoReferencia() != null && dto.getChaveAcessoReferencia().length() == 44) {
             xml.append("        <NFref>\n");
@@ -303,7 +317,6 @@ public class NfeService {
             xml.append("        </NFref>\n");
         }
         xml.append("      </ide>\n");
-        // =======================================================
 
         xml.append("      <emit>\n");
         xml.append("        <CNPJ>").append(config.getCnpj().replaceAll("\\D", "")).append("</CNPJ>\n");

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Download, Printer, Settings, Loader2, XCircle, FilePlus2, Mail, CalendarDays, X } from 'lucide-react';
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Download, Printer, Settings, Loader2, XCircle, FilePlus2, Mail, CalendarDays, X, Receipt } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 
@@ -10,14 +10,11 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
     const [filtroStatus, setFiltroStatus] = useState('TODAS');
     const [processandoId, setProcessandoId] = useState(null);
 
-    // 🚀 ESTADOS DO MODAL DE FECHAMENTO
     const [modalFechamentoAberto, setModalFechamentoAberto] = useState(false);
-    const [fechamentoMes, setFechamentoMes] = useState(new Date().getMonth() + 1); // Mês atual
-    const [fechamentoAno, setFechamentoAno] = useState(new Date().getFullYear()); // Ano atual
+    const [fechamentoMes, setFechamentoMes] = useState(new Date().getMonth() + 1);
+    const [fechamentoAno, setFechamentoAno] = useState(new Date().getFullYear());
     const [fechamentoEmail, setFechamentoEmail] = useState('contador@contabilidade.com.br');
     const [enviandoLote, setEnviandoLote] = useState(false);
-
-    // 🚀 NOVO ESTADO: A MENSAGEM CUSTOMIZADA
     const [fechamentoMensagem, setFechamentoMensagem] = useState('Olá Contador,\n\nSeguem em anexo os arquivos XML e PDFs referentes ao fechamento deste mês.\n\nQualquer dúvida, estamos à disposição.');
 
     const carregarDadosFiscais = async () => {
@@ -34,7 +31,7 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
             vendasPagas.forEach(v => {
                 unificados.push({
                     uid: `venda_${v.id}`,
-                    tipo: 'PDV',
+                    tipo: 'PDV', // 🚀 PDV = CUPOM FISCAL (NFC-e)
                     vendaId: v.id,
                     nfeId: v.notaFiscal?.id || null,
                     numeroNota: v.notaFiscal?.numero || null,
@@ -50,7 +47,7 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
             notasAvulsas.forEach(n => {
                 unificados.push({
                     uid: `nota_${n.id}`,
-                    tipo: 'AVULSA',
+                    tipo: 'AVULSA', // 🚀 AVULSA = NOTA GRANDE (NF-e)
                     vendaId: null,
                     nfeId: n.id,
                     numeroNota: n.numero,
@@ -75,38 +72,24 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
         carregarDadosFiscais();
     }, []);
 
-    // =========================================================================
-    // 🚀 LÓGICA DO FECHAMENTO MENSAL
-    // =========================================================================
     const handleEnviarFechamento = async () => {
         if (!fechamentoEmail || !fechamentoEmail.includes('@')) return toast.error("Digite um e-mail válido!");
-
-        // Filtra só as notas autorizadas que baterem com o mês e o ano selecionado
         const notasDoMes = registros.filter(reg => {
             if (reg.statusFiscal !== 'AUTORIZADA' || !reg.nfeId) return false;
-
             const dataReg = new Date(reg.data);
-            const mesBate = (dataReg.getMonth() + 1) === parseInt(fechamentoMes);
-            const anoBate = dataReg.getFullYear() === parseInt(fechamentoAno);
-            return mesBate && anoBate;
+            return (dataReg.getMonth() + 1) === parseInt(fechamentoMes) && dataReg.getFullYear() === parseInt(fechamentoAno);
         });
 
-        if (notasDoMes.length === 0) {
-            return toast.error(`Nenhuma nota Autorizada encontrada no período de ${fechamentoMes}/${fechamentoAno}.`);
-        }
+        if (notasDoMes.length === 0) return toast.error(`Nenhuma nota Autorizada encontrada no período selecionado.`);
 
         const idsParaEnviar = notasDoMes.map(n => n.nfeId);
-
         setEnviandoLote(true);
         const loadId = toast.loading(`Gerando ${idsParaEnviar.length} PDFs e XMLs, aguarde...`);
 
         try {
             const mesFormatado = `${fechamentoMes.toString().padStart(2, '0')}-${fechamentoAno}`;
-            // 🚀 MANDA A MENSAGEM NA URL AGORA
             const url = `/api/fiscal/enviar-lote-contador?email=${fechamentoEmail}&mesAno=${mesFormatado}&mensagem=${encodeURIComponent(fechamentoMensagem)}`;
-
             await api.post(url, idsParaEnviar);
-
             toast.success(`Fechamento enviado com sucesso! (${idsParaEnviar.length} notas)`, { id: loadId });
             setModalFechamentoAberto(false);
         } catch (error) {
@@ -116,15 +99,12 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
         }
     };
 
-    // =========================================================================
-    // OUTRAS AÇÕES (PDV, Imprimir, XML)
-    // =========================================================================
     const handleEmitirNotaPDV = async (vendaId) => {
         setProcessandoId(vendaId);
-        const loadId = toast.loading('Transmitindo para a SEFAZ...');
+        const loadId = toast.loading('Gerando Cupom Fiscal...');
         try {
             await api.post(`/api/fiscal/emitir/${vendaId}`);
-            toast.success('Nota Autorizada com Sucesso!', { id: loadId });
+            toast.success('Cupom Autorizado com Sucesso!', { id: loadId });
             carregarDadosFiscais();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Erro na SEFAZ.', { id: loadId });
@@ -134,9 +114,9 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
     };
 
     const handleImprimirDanfe = async (registro) => {
-        const loadId = toast.loading('Buscando PDF do DANFE...');
+        const loadId = toast.loading('Buscando PDF...');
         const pdfWindow = window.open('', '_blank');
-        if (pdfWindow) pdfWindow.document.write('<h2 style="font-family: sans-serif; padding: 20px;">Gerando PDF...</h2>');
+        if (pdfWindow) pdfWindow.document.write('<h2 style="font-family: sans-serif; padding: 20px;">Gerando PDF para impressão...</h2>');
 
         try {
             let url = registro.tipo === 'PDV' ? `/api/fiscal/${registro.nfeId}/danfe` : `/api/fiscal/danfe/avulsa/${registro.chaveAcesso}`;
@@ -144,8 +124,8 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
             const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
 
             if (pdfWindow) pdfWindow.location.href = fileURL;
-            else { const link = document.createElement('a'); link.href = fileURL; link.download = `DANFE_${registro.numeroNota || registro.chaveAcesso}.pdf`; link.click(); }
-            toast.success('DANFE Aberto!', { id: loadId });
+            else { const link = document.createElement('a'); link.href = fileURL; link.download = `Documento_Fiscal.pdf`; link.click(); }
+            toast.success('Pronto para imprimir!', { id: loadId });
         } catch (error) {
             if (pdfWindow) pdfWindow.close();
             toast.error('Erro ao gerar PDF da nota.', { id: loadId });
@@ -157,7 +137,7 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
         try {
             const response = await api.get(`/api/fiscal/${registro.nfeId}/xml`, { responseType: 'blob' });
             const fileURL = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a'); link.href = fileURL; link.setAttribute('download', `NFe_${registro.chaveAcesso}.xml`);
+            const link = document.createElement('a'); link.href = fileURL; link.setAttribute('download', `XML_${registro.chaveAcesso}.xml`);
             document.body.appendChild(link); link.click(); link.parentNode.removeChild(link);
             toast.success('XML baixado!', { id: loadId });
         } catch (error) {
@@ -165,7 +145,6 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
         }
     };
 
-    // 🚀 NOVO: Enviar Nota Única pro Contador
     const handleEnviarContador = async (registro) => {
         const emailDigitado = window.prompt("Digite o e-mail do contador:", "contador@contabilidade.com.br");
         if (!emailDigitado || !emailDigitado.includes('@')) {
@@ -173,10 +152,10 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
             return;
         }
 
-        const loadId = toast.loading('Enviando e-mail com anexo...');
+        const loadId = toast.loading('Enviando e-mail...');
         try {
             await api.post(`/api/fiscal/${registro.nfeId}/enviar-contador?email=${emailDigitado}`);
-            toast.success('XML enviado com sucesso para o contador!', { id: loadId });
+            toast.success('XML enviado com sucesso!', { id: loadId });
         } catch (error) {
             toast.error(error.response?.data?.message || 'Erro ao enviar o e-mail.', { id: loadId });
         }
@@ -204,23 +183,16 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                 <div>
                     <h1 className="text-3xl font-black text-slate-800 flex items-center gap-3">
                         <FileText className="text-blue-600" size={32} />
-                        Módulo Fiscal (NF-e)
+                        Módulo Fiscal
                     </h1>
-                    <p className="text-slate-500 font-medium mt-1">Gerenciamento Central de Notas do PDV e Avulsas.</p>
+                    <p className="text-slate-500 font-medium mt-1">Gerencie os Cupons Fiscais (PDV) e as Notas Grandes (Avulsas).</p>
                 </div>
                 <div className="flex gap-3">
-                    {/* 🚀 BOTÃO DE FECHAMENTO MENSAL */}
-                    <button
-                        onClick={() => setModalFechamentoAberto(true)}
-                        className="flex items-center gap-2 bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-slate-900 transition-colors shadow-md"
-                    >
+                    <button onClick={() => setModalFechamentoAberto(true)} className="flex items-center gap-2 bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-slate-900 transition-colors shadow-md">
                         <CalendarDays size={18} className="text-blue-400" /> Fechamento do Mês
                     </button>
-                    <button
-                        onClick={() => setPaginaAtiva('emitir-nfe-avulsa')}
-                        className="flex items-center gap-2 bg-purple-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-purple-700 transition-colors shadow-md shadow-purple-600/20"
-                    >
-                        <FilePlus2 size={18} /> Emitir NF-e Avulsa
+                    <button onClick={() => setPaginaAtiva('emitir-nfe-avulsa')} className="flex items-center gap-2 bg-purple-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-purple-700 transition-colors shadow-md shadow-purple-600/20">
+                        <FilePlus2 size={18} /> Emitir Nota A4 (NF-e)
                     </button>
                 </div>
             </div>
@@ -228,7 +200,7 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 mb-6">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-3 text-slate-400" size={18} />
-                    <input type="text" placeholder="Buscar por N.º Nota, Pedido, Cliente ou Chave..." value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:bg-white outline-none text-sm font-bold text-slate-700" />
+                    <input type="text" placeholder="Buscar por N.º, Pedido, Cliente ou Chave..." value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:bg-white outline-none text-sm font-bold text-slate-700" />
                 </div>
                 <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
                     {['TODAS', 'PENDENTES', 'AUTORIZADAS', 'ERRO'].map(status => (
@@ -260,10 +232,28 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                             ) : (
                                 registrosFiltrados.map(reg => (
                                     <tr key={reg.uid} className="hover:bg-slate-50 transition-colors">
+
+                                        {/* 🚀 ETIQUETAS VISUAIS CLARAS (CUPOM vs NOTA A4) */}
                                         <td className="p-4">
-                                            {reg.numeroNota ? <p className="font-black text-slate-800 text-sm">NFe Nº {reg.numeroNota}</p> : <p className="font-black text-orange-500 text-sm">Sem Número</p>}
-                                            {reg.tipo === 'PDV' ? <span className="text-xs text-slate-500 font-medium">Caixa: Venda #{reg.vendaId}</span> : <span className="inline-block mt-1 bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border border-purple-200">Nota Avulsa</span>}
+                                            {reg.numeroNota ? (
+                                                <p className="font-black text-slate-800 text-sm">
+                                                    {reg.tipo === 'PDV' ? 'NFC-e' : 'NF-e'} Nº {reg.numeroNota}
+                                                </p>
+                                            ) : (
+                                                <p className="font-black text-orange-500 text-sm">Aguardando Emissão</p>
+                                            )}
+
+                                            {reg.tipo === 'PDV' ? (
+                                                <span className="inline-block mt-1 bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border border-emerald-200">
+                                                    CUPOM (NFC-e) • Venda #{reg.vendaId}
+                                                </span>
+                                            ) : (
+                                                <span className="inline-block mt-1 bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border border-purple-200">
+                                                    NOTA GRANDE (NF-e)
+                                                </span>
+                                            )}
                                         </td>
+
                                         <td className="p-4 text-sm font-medium text-slate-600">
                                             {new Date(reg.data).toLocaleDateString('pt-BR')} <br/>
                                             <span className="text-xs text-slate-400">{new Date(reg.data).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
@@ -278,17 +268,22 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                                         </td>
                                         <td className="p-4 text-right">
                                             <div className="flex justify-end gap-2">
+
+                                                {/* 🚀 BOTÃO DE AUTORIZAR MUDA DE ACORDO COM O TIPO */}
                                                 {reg.tipo === 'PDV' && reg.statusFiscal === 'PENDENTE' && (
-                                                    <button onClick={() => handleEmitirNotaPDV(reg.vendaId)} disabled={processandoId === reg.vendaId} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-black flex items-center gap-1 transition-colors disabled:opacity-50">
-                                                        {processandoId === reg.vendaId ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />} AUTORIZAR
+                                                    <button onClick={() => handleEmitirNotaPDV(reg.vendaId)} disabled={processandoId === reg.vendaId} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-black flex items-center gap-1 transition-colors disabled:opacity-50 shadow-sm">
+                                                        {processandoId === reg.vendaId ? <Loader2 size={14} className="animate-spin" /> : <Receipt size={14} />} AUTORIZAR CUPOM
                                                     </button>
                                                 )}
+
                                                 {reg.chaveAcesso && (
                                                     <>
-                                                        <button onClick={() => handleImprimirDanfe(reg)} className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm" title="Imprimir DANFE"><Printer size={14} /></button>
-                                                        <button onClick={() => handleBaixarXML(reg)} className="bg-white hover:bg-slate-100 text-green-700 border border-green-300 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm" title="Baixar XML"><Download size={14} /></button>
+                                                        {/* 🚀 BOTÃO DE IMPRIMIR MUDA DE NOME E ÍCONE */}
+                                                        <button onClick={() => handleImprimirDanfe(reg)} className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm" title="Imprimir Documento">
+                                                            {reg.tipo === 'PDV' ? <><Receipt size={14}/> CUPOM</> : <><Printer size={14}/> DANFE</>}
+                                                        </button>
 
-                                                        {/* 🚀 BOTÃO DE E-MAIL INDIVIDUAL */}
+                                                        <button onClick={() => handleBaixarXML(reg)} className="bg-white hover:bg-slate-100 text-green-700 border border-green-300 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm" title="Baixar XML"><Download size={14} /></button>
                                                         <button onClick={() => handleEnviarContador(reg)} className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm" title="Enviar para Contabilidade"><Mail size={14} /></button>
                                                     </>
                                                 )}
@@ -303,7 +298,7 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                 )}
             </div>
 
-            {/* 🚀 MODAL DE FECHAMENTO MENSAL */}
+            {/* MODAL DE FECHAMENTO MENSAL */}
             {modalFechamentoAberto && (
                 <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in border border-slate-200">
@@ -312,7 +307,7 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                             <button onClick={() => setModalFechamentoAberto(false)} className="hover:text-red-400 transition-colors p-1"><X size={20}/></button>
                         </div>
                         <div className="p-6 space-y-5 bg-slate-50">
-                            <p className="text-sm text-slate-600 font-medium">O sistema vai reunir <b>XMLs e PDFs (DANFE)</b> do período escolhido, compactar em um arquivo ZIP e enviar por e-mail.</p>
+                            <p className="text-sm text-slate-600 font-medium">O sistema vai reunir <b>XMLs e PDFs</b> do período escolhido, compactar em um arquivo ZIP e enviar por e-mail.</p>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -340,7 +335,6 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                                 </div>
                             </div>
 
-                            {/* 🚀 A CAIXA DE MENSAGEM CUSTOMIZÁVEL */}
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Mensagem no E-mail</label>
                                 <textarea
@@ -350,7 +344,6 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                                     placeholder="Digite a mensagem para o contador..."
                                 ></textarea>
                             </div>
-
                         </div>
                         <div className="p-5 bg-white border-t border-slate-200 flex justify-end gap-3">
                             <button onClick={() => setModalFechamentoAberto(false)} className="px-5 py-2.5 font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">Cancelar</button>
@@ -366,7 +359,6 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                     </div>
                 </div>
             )}
-
         </div>
     );
 };

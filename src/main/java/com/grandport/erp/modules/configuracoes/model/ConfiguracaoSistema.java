@@ -84,4 +84,11 @@ public class ConfiguracaoSistema {
 
     @Column(length = 1000)
     private String whatsappApiUrl = "";
+
+    // 🚀 NOVOS CAMPOS PARA O CUPOM FISCAL (NFC-e)
+    @Column(name = "csc_id", length = 6)
+    private String cscId; // Ex: "000001"
+
+    @Column(name = "csc_token")
+    private String cscToken; // Ex: "A1B2C3D4-E5F6..."
 }

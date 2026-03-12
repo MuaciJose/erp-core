@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<jasperReport
+        xmlns="http://jasperreports.sourceforge.net/jasperreports"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components"
+
+        xsi:schemaLocation="
+http://jasperreports.sourceforge.net/jasperreports
+http://jasperreports.sourceforge.net/xsd/jasperreport.xsd
+http://jasperreports.sourceforge.net/jasperreports/components
+http://jasperreports.sourceforge.net/xsd/components.xsd"
+
+        name="cupom_nfce_pdv"
+        pageWidth="226"
+        pageHeight="900"
+        columnWidth="216"
+        leftMargin="5"
+        rightMargin="5"
+        topMargin="5"
+        bottomMargin="5"
+        uuid="9a2c2a5c-4a47-4b6a-8a44-1b2f9b0b6a31">
+
+    <!-- PARAMETROS -->
+
+    <parameter name="empresa" class="java.lang.String"/>
+    <parameter name="cnpj" class="java.lang.String"/>
+    <parameter name="endereco" class="java.lang.String"/>
+    <parameter name="cidade" class="java.lang.String"/>
+    <parameter name="numeroNota" class="java.lang.String"/>
+    <parameter name="serie" class="java.lang.String"/>
+    <parameter name="dataHora" class="java.lang.String"/>
+    <parameter name="cpfCliente" class="java.lang.String"/>
+
+    <parameter name="subtotal" class="java.math.BigDecimal"/>
+    <parameter name="desconto" class="java.math.BigDecimal"/>
+    <parameter name="totalVenda" class="java.math.BigDecimal"/>
+
+    <parameter name="formaPagamento" class="java.lang.String"/>
+    <parameter name="valorPago" class="java.math.BigDecimal"/>
+    <parameter name="troco" class="java.math.BigDecimal"/>
+
+    <parameter name="valorTributos" class="java.math.BigDecimal"/>
+    <parameter name="fonteTributos" class="java.lang.String"/>
+
+    <parameter name="qrCode" class="java.lang.String"/>
+    <parameter name="chave" class="java.lang.String"/>
+
+    <!-- CAMPOS DOS ITENS -->
+
+    <field name="sku" class="java.lang.String"/>
+    <field name="produto" class="java.lang.String"/>
+    <field name="quantidade" class="java.math.BigDecimal"/>
+    <field name="precoUnitario" class="java.math.BigDecimal"/>
+    <field name="totalItem" class="java.math.BigDecimal"/>
+
+    <!-- CABEÇALHO -->
+
+    <title>
+        <band height="110">
+
+            <textField>
+                <reportElement x="0" y="0" width="216" height="18" uuid="3c2a8c1d-7a01-4c63-8c11-7e6c5fdd9a01"/>
+                <textElement textAlignment="Center">
+                    <font size="11" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{empresa}]]></textFieldExpression>
+            </textField>
+
+            <textField>
+                <reportElement x="0" y="18" width="216" height="14" uuid="fa94cba2-4df1-4f2e-8e43-4d3a1d6d2e11"/>
+                <textElement textAlignment="Center">
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA["CNPJ: " + $P{cnpj}]]></textFieldExpression>
+            </textField>
+
+            <textField textAdjust="StretchHeight">
+                <reportElement x="0" y="32" width="216" height="14" uuid="5c1a8d7a-2a6c-4c74-b2d3-f2e0bcb12a11"/>
+                <textElement textAlignment="Center">
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{endereco}]]></textFieldExpression>
+            </textField>
+
+            <textField>
+                <reportElement x="0" y="46" width="216" height="14" uuid="0ab8e35f-dc6e-4b4d-9c61-5c1f13c2ab02"/>
+                <textElement textAlignment="Center">
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{cidade}]]></textFieldExpression>
+            </textField>
+
+            <textField>
+                <reportElement x="0" y="62" width="216" height="16" uuid="2e0f88a1-21b7-4fa5-9a33-2f7c4c87bb13"/>
+                <textElement textAlignment="Center">
+                    <font size="9" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[
+"NFC-e Nº " + $P{numeroNota} + "  Série " + $P{serie}
+]]></textFieldExpression>
+            </textField>
+
+            <textField>
+                <reportElement x="0" y="80" width="216" height="14" uuid="c6f2bba7-bc7c-4cbe-b5b4-7a4f3f4a0c55"/>
+                <textElement textAlignment="Center">
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{dataHora}]]></textFieldExpression>
+            </textField>
+
+        </band>
+    </title>
+
+    <!-- CLIENTE -->
+
+    <pageHeader>
+        <band height="18">
+
+            <textField>
+                <reportElement x="0" y="0" width="216" height="18" uuid="6d38a8e7-9a27-4d21-b3a5-2c4a91db1e01"/>
+                <textElement textAlignment="Center">
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA[
+$P{cpfCliente} == null || $P{cpfCliente}.isEmpty()
+? "CONSUMIDOR NÃO IDENTIFICADO"
+: "CPF/CNPJ: " + $P{cpfCliente}
+]]></textFieldExpression>
+            </textField>
+
+        </band>
+    </pageHeader>
+
+    <!-- CABEÇALHO DOS ITENS -->
+
+    <columnHeader>
+        <band height="14">
+
+            <line>
+                <reportElement x="0" y="0" width="216" height="1" uuid="b6f8e35c-4b5e-4c91-9c21-2b9c9bdf2001"/>
+                <graphicElement>
+                    <pen lineStyle="Dashed"/>
+                </graphicElement>
+            </line>
+
+            <staticText>
+                <reportElement x="0" y="2" width="40" height="12" uuid="9c4a3a1b-8d77-4a5b-8c12-d9f2c2caa102"/>
+                <textElement>
+                    <font size="7" isBold="true"/>
+                </textElement>
+                <text><![CDATA[COD]]></text>
+            </staticText>
+
+            <staticText>
+                <reportElement x="40" y="2" width="90" height="12" uuid="91ab47f7-98de-4d1f-88d7-ccf8a38e9003"/>
+                <textElement>
+                    <font size="7" isBold="true"/>
+                </textElement>
+                <text><![CDATA[PRODUTO]]></text>
+            </staticText>
+
+            <staticText>
+                <reportElement x="130" y="2" width="30" height="12" uuid="c34a0f8c-2b5c-4d7c-8c41-d9b28b3a7004"/>
+                <textElement textAlignment="Right">
+                    <font size="7" isBold="true"/>
+                </textElement>
+                <text><![CDATA[QTD]]></text>
+            </staticText>
+
+            <staticText>
+                <reportElement x="160" y="2" width="56" height="12" uuid="9c21a7f3-ef7d-46d4-9c43-76c93e2d3005"/>
+                <textElement textAlignment="Right">
+                    <font size="7" isBold="true"/>
+                </textElement>
+                <text><![CDATA[TOTAL]]></text>
+            </staticText>
+
+        </band>
+    </columnHeader>
+
+    <!-- ITENS -->
+
+    <detail>
+        <band height="16">
+
+            <textField>
+                <reportElement x="0" y="0" width="40" height="14" uuid="4c63d5a1-98c3-4d3c-a4b8-71a8b9c11011"/>
+                <textElement>
+                    <font size="7"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{sku}]]></textFieldExpression>
+            </textField>
+
+            <textField textAdjust="StretchHeight">
+                <reportElement x="40" y="0" width="90" height="14" uuid="1f3a7e5c-67a1-4d61-9c82-33a7e1e72012"/>
+                <textElement>
+                    <font size="7"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{produto}]]></textFieldExpression>
+            </textField>
+
+            <textField pattern="#,##0.00">
+                <reportElement x="130" y="0" width="30" height="14" uuid="c21a8e5a-9b21-4b1a-86c7-b8c2b9a92013"/>
+                <textElement textAlignment="Right">
+                    <font size="7"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{quantidade}]]></textFieldExpression>
+            </textField>
+
+            <textField pattern="#,##0.00">
+                <reportElement x="160" y="0" width="56" height="14" uuid="af6a3f2e-21c3-4b6a-b13a-c8c3f3c42014"/>
+                <textElement textAlignment="Right">
+                    <font size="7"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{totalItem}]]></textFieldExpression>
+            </textField>
+
+        </band>
+    </detail>
+
+    <!-- RESUMO -->
+
+    <summary>
+        <band height="300">
+
+            <line>
+                <reportElement x="0" y="2" width="216" height="1" uuid="72a8f3c3-66f4-4f5d-9d5c-6b9a8d500021"/>
+                <graphicElement>
+                    <pen lineStyle="Dashed"/>
+                </graphicElement>
+            </line>
+
+            <textField>
+                <reportElement x="0" y="10" width="216" height="14" uuid="9b8c3a3c-8d2a-4f2c-8a41-21b9d8b70022"/>
+                <textElement>
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA["SUBTOTAL: R$ " + $P{subtotal}]]></textFieldExpression>
+            </textField>
+
+            <textField>
+                <reportElement x="0" y="24" width="216" height="14" uuid="3a7f5c21-4c4d-4f51-b6a4-2f9b2d220023"/>
+                <textElement>
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA["DESCONTO: R$ " + $P{desconto}]]></textFieldExpression>
+            </textField>
+
+            <textField>
+                <reportElement x="0" y="42" width="216" height="20" uuid="5a7e6b6f-11f3-4c93-8a1d-7c7f8d550024"/>
+                <textElement textAlignment="Right">
+                    <font size="12" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA["TOTAL R$ " + $P{totalVenda}]]></textFieldExpression>
+            </textField>
+
+            <textField>
+                <reportElement x="0" y="65" width="216" height="14" uuid="a7d4c1e2-90a8-4c6d-a2c7-11e4c4b90025"/>
+                <textElement>
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA["FORMA PAGTO: " + $P{formaPagamento}]]></textFieldExpression>
+            </textField>
+
+            <textField>
+                <reportElement x="0" y="80" width="216" height="14" uuid="2e8f7d7a-bf0b-48c5-9c3c-0c4f55a90026"/>
+                <textElement>
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA["VALOR PAGO: R$ " + $P{valorPago}]]></textFieldExpression>
+            </textField>
+
+            <textField>
+                <reportElement x="0" y="95" width="216" height="14" uuid="4b2c7f65-3a5c-49a4-86a4-44c9c5a10027"/>
+                <textElement>
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA["TROCO: R$ " + $P{troco}]]></textFieldExpression>
+            </textField>
+
+            <textField textAdjust="StretchHeight">
+                <reportElement x="0" y="115" width="216" height="25" uuid="8c1a5d22-b3c4-4a9d-8b9d-2a7e7a550028"/>
+                <textElement textAlignment="Center">
+                    <font size="7"/>
+                </textElement>
+                <textFieldExpression><![CDATA[
+"Tributos aproximados: R$ " + $P{valorTributos}
++ "\nFonte: " + $P{fonteTributos}
+]]></textFieldExpression>
+            </textField>
+
+            <!-- QR CODE -->
+
+            <componentElement>
+                <reportElement x="53" y="145" width="110" height="110" uuid="a7d1f6e4-2f4a-4f66-b4c1-5a3e1e8b0029"/>
+                <jr:QRCode>
+                    <jr:codeExpression><![CDATA[$P{qrCode}]]></jr:codeExpression>
+                </jr:QRCode>
+            </componentElement>
+
+            <textField textAdjust="StretchHeight">
+                <reportElement x="0" y="260" width="216" height="20" uuid="c2b4f7c8-8c4a-4b3c-9a22-0e7f5a220030"/>
+                <textElement textAlignment="Center">
+                    <font size="7"/>
+                </textElement>
+                <textFieldExpression><![CDATA[
+"CHAVE DE ACESSO:\n" + $P{chave}
+]]></textFieldExpression>
+            </textField>
+
+        </band>
+    </summary>
+
+</jasperReport>

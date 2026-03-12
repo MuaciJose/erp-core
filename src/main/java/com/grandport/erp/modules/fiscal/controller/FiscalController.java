@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,17 +30,17 @@ public class FiscalController {
     @Autowired
     private NotaFiscalRepository notaFiscalRepository;
 
+    @Autowired
+    private com.grandport.erp.modules.fiscal.service.EmailFiscalService emailFiscalService;
+
     // =======================================================================
-    // 🚀 ROTA NOVA: LISTAR TODAS AS NOTAS (PARA O GERENCIADOR FISCAL)
+    // 🚀 LISTAR TODAS AS NOTAS (PARA O GERENCIADOR FISCAL)
     // =======================================================================
     @GetMapping("/notas")
     public ResponseEntity<List<NotaFiscal>> listarTodasAsNotas() {
         try {
             List<NotaFiscal> notas = notaFiscalRepository.findAll();
-
-            // Ordena para a nota mais recente (ID maior) aparecer no topo do React
             notas.sort((n1, n2) -> n2.getId().compareTo(n1.getId()));
-
             return ResponseEntity.ok(notas);
         } catch (Exception e) {
             System.err.println("[ERRO - LISTAR NOTAS] " + e.getMessage());
@@ -47,26 +48,33 @@ public class FiscalController {
         }
     }
 
-    // =======================================================================
+    /// =======================================================================
     // 🚀 EMITIR / AUTORIZAR A NOTA VIA PDV
     // =======================================================================
     @PostMapping("/emitir/{vendaId}")
-    public ResponseEntity<?> emitirNfe(@PathVariable Long vendaId) {
+    public ResponseEntity<?> emitirCupom(@PathVariable Long vendaId) {
         try {
-            Map<String, Object> respostaSefaz = nfeService.emitirNfeSefaz(vendaId);
-            return ResponseEntity.ok(respostaSefaz);
-        } catch (Exception e) {
-            String mensagemErro = e.getMessage();
-            if (mensagemErro != null && (mensagemErro.toLowerCase().contains("sql") || mensagemErro.toLowerCase().contains("constraint"))) {
-                System.err.println("[ERRO GRAVE - FISCAL] " + mensagemErro);
-                mensagemErro = "Inconsistência interna no servidor ao tentar salvar a nota.";
+            // 1. O NfeService retorna um Map (e não a NotaFiscal inteira)
+            Map<String, Object> resultadoSefaz = nfeService.emitirNfeSefaz(vendaId);
+
+            // 2. O React precisa do ID da nota! Vamos buscar a nota que acabou de ser salva
+            NotaFiscal notaSalva = notaFiscalRepository.findByVendaId(vendaId);
+
+            // 3. Como o Map original é imutável, criamos um novo para adicionar o ID
+            Map<String, Object> response = new HashMap<>(resultadoSefaz);
+
+            if (notaSalva != null) {
+                response.put("id", notaSalva.getId()); // 🚀 INJETAMOS O ID AQUI!
             }
-            return ResponseEntity.badRequest().body(Map.of("message", mensagemErro));
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("mensagem", e.getMessage()));
         }
     }
 
     // =======================================================================
-    // 🚀 ROTA PARA DOWNLOAD/VISUALIZAÇÃO DO DANFE (PDF DO PDV)
+    // 🚀 DOWNLOAD/VISUALIZAÇÃO DO DANFE (PDF DO PDV - O CUPOM INTELIGENTE)
     // =======================================================================
     @GetMapping("/{nfeId}/danfe")
     public ResponseEntity<byte[]> baixarDanfe(@PathVariable Long nfeId) {
@@ -87,7 +95,7 @@ public class FiscalController {
     }
 
     // =======================================================================
-    // 🚀 ROTA PARA DOWNLOAD DO XML (Motor 2026 Integrado)
+    // 🚀 DOWNLOAD DO XML (Motor 2026 Integrado)
     // =======================================================================
     @GetMapping("/{nfeId}/xml")
     public ResponseEntity<byte[]> baixarXml(@PathVariable Long nfeId) {
@@ -114,7 +122,7 @@ public class FiscalController {
     }
 
     // =======================================================================
-    // 🚀 ROTA NOVA: EMISSÃO AVANÇADA (TELA DEDICADA)
+    // 🚀 EMISSÃO AVANÇADA (TELA DEDICADA DE NOTA A4)
     // =======================================================================
     @PostMapping("/emitir-completa")
     public ResponseEntity<?> emitirNfeCompleta(@RequestBody com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO request) {
@@ -130,18 +138,16 @@ public class FiscalController {
     }
 
     // =======================================================================
-    // 🚀 ROTA NOVA: BAIXAR PDF (DANFE) DA NOTA AVULSA
+    // 🚀 BAIXAR PDF (DANFE) DA NOTA AVULSA
     // =======================================================================
     @GetMapping(value = "/danfe/avulsa/{chaveAcesso}", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> baixarDanfeAvulsa(@PathVariable String chaveAcesso) {
         try {
-            // Busca a nota fiscal varrendo o banco pela chave (dispensa alterar o Repository)
             NotaFiscal nota = notaFiscalRepository.findAll().stream()
                     .filter(n -> chaveAcesso.equals(n.getChaveAcesso()))
                     .findFirst()
                     .orElseThrow(() -> new Exception("Nota Fiscal não encontrada no Banco de Dados."));
 
-            // 🚀 Aciona o Gerador de PDF Mágico
             byte[] pdfBytes = danfeService.gerarDanfeAvulsaPdf(nota);
 
             return ResponseEntity.ok()
@@ -153,11 +159,9 @@ public class FiscalController {
             return ResponseEntity.badRequest().body(null);
         }
     }
-    @Autowired
-    private com.grandport.erp.modules.fiscal.service.EmailFiscalService emailFiscalService;
 
     // =======================================================================
-    // 🚀 ROTA NOVA: ENVIAR XML PARA O CONTADOR
+    // 🚀 ENVIAR XML PARA O CONTADOR
     // =======================================================================
     @PostMapping("/{nfeId}/enviar-contador")
     public ResponseEntity<?> enviarParaContador(@PathVariable Long nfeId, @RequestParam String email) {
@@ -175,18 +179,16 @@ public class FiscalController {
     }
 
     // =======================================================================
-    // 🚀 ROTA: ENVIAR LOTE MENSAL (FECHAMENTO)
+    // 🚀 ENVIAR LOTE MENSAL (FECHAMENTO)
     // =======================================================================
     @PostMapping("/enviar-lote-contador")
     public ResponseEntity<?> enviarLoteMensal(
             @RequestParam String email,
             @RequestParam String mesAno,
-            @RequestParam(required = false, defaultValue = "Segue em anexo o fechamento fiscal.") String mensagem, // 🚀 RECEBE A MENSAGEM DO REACT AQUI
+            @RequestParam(required = false, defaultValue = "Segue em anexo o fechamento fiscal.") String mensagem,
             @RequestBody List<Long> nfeIds) {
         try {
             List<NotaFiscal> notasDoLote = notaFiscalRepository.findAllById(nfeIds);
-
-            // Manda a mensagem junto pro serviço!
             emailFiscalService.enviarLoteXmlContador(notasDoLote, email, mesAno, mensagem);
 
             return ResponseEntity.ok(Map.of("message", "Fechamento enviado com sucesso!"));
