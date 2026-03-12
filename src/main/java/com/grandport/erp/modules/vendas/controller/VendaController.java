@@ -9,19 +9,21 @@ import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import com.grandport.erp.modules.vendas.service.WhatsAppService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional; // 🚀 Importação adicionada para funcionar o isPresent()
 
 @RestController
 @RequestMapping("/api/vendas")
 public class VendaController {
 
     @Autowired private VendaService service;
-    @Autowired private VendaRepository repository;
+    @Autowired private VendaRepository repository; // A variável chama apenas 'repository'
     @Autowired private WhatsAppService whatsAppService;
 
     // =========================================================================
@@ -95,5 +97,24 @@ public class VendaController {
     @GetMapping("/whatsapp/status")
     public ResponseEntity<Map<String, Object>> checarStatusWhatsApp() {
         return ResponseEntity.ok(whatsAppService.consultarStatusInstancia());
+    }
+
+    // =========================================================================
+    // 🚀 ROTA PARA BUSCAR UMA VENDA ESPECÍFICA PELO ID (Usada na Reimpressão)
+    // =========================================================================
+    @GetMapping("/{id}")
+    public ResponseEntity<?> buscarVendaPorId(@PathVariable Long id) {
+        try {
+            // 🚀 CORRIGIDO: Agora usa 'repository' que é o nome correto da sua variável
+            Optional<Venda> venda = repository.findById(id);
+
+            if (venda.isPresent()) {
+                return ResponseEntity.ok(venda.get());
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("mensagem", "Venda não encontrada"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("mensagem", e.getMessage()));
+        }
     }
 }
