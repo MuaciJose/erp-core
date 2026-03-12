@@ -153,4 +153,46 @@ public class FiscalController {
             return ResponseEntity.badRequest().body(null);
         }
     }
+    @Autowired
+    private com.grandport.erp.modules.fiscal.service.EmailFiscalService emailFiscalService;
+
+    // =======================================================================
+    // 🚀 ROTA NOVA: ENVIAR XML PARA O CONTADOR
+    // =======================================================================
+    @PostMapping("/{nfeId}/enviar-contador")
+    public ResponseEntity<?> enviarParaContador(@PathVariable Long nfeId, @RequestParam String email) {
+        try {
+            NotaFiscal nota = notaFiscalRepository.findById(nfeId)
+                    .orElseThrow(() -> new Exception("Nota Fiscal não encontrada."));
+
+            emailFiscalService.enviarXmlContador(nota, email);
+
+            return ResponseEntity.ok(Map.of("message", "E-mail enviado com sucesso!"));
+        } catch (Exception e) {
+            System.err.println("[ERRO - EMAIL CONTADOR] " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("message", "Erro ao enviar e-mail: " + e.getMessage()));
+        }
+    }
+
+    // =======================================================================
+    // 🚀 ROTA: ENVIAR LOTE MENSAL (FECHAMENTO)
+    // =======================================================================
+    @PostMapping("/enviar-lote-contador")
+    public ResponseEntity<?> enviarLoteMensal(
+            @RequestParam String email,
+            @RequestParam String mesAno,
+            @RequestParam(required = false, defaultValue = "Segue em anexo o fechamento fiscal.") String mensagem, // 🚀 RECEBE A MENSAGEM DO REACT AQUI
+            @RequestBody List<Long> nfeIds) {
+        try {
+            List<NotaFiscal> notasDoLote = notaFiscalRepository.findAllById(nfeIds);
+
+            // Manda a mensagem junto pro serviço!
+            emailFiscalService.enviarLoteXmlContador(notasDoLote, email, mesAno, mensagem);
+
+            return ResponseEntity.ok(Map.of("message", "Fechamento enviado com sucesso!"));
+        } catch (Exception e) {
+            System.err.println("[ERRO - LOTE CONTADOR] " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("message", "Erro ao enviar lote: " + e.getMessage()));
+        }
+    }
 }
