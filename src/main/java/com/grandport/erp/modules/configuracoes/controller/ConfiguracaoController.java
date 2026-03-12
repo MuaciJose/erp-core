@@ -7,11 +7,9 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-// 🚀 Imports necessários para salvar o certificado na pasta
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -30,13 +28,17 @@ public class ConfiguracaoController {
         return ResponseEntity.ok(service.obterConfiguracao());
     }
 
+    /**
+     * 🚀 SALVAR CONFIGURAÇÕES: Agora este endpoint já recebe automaticamente
+     * os novos campos de NFC-e (serieNfce, numeroProximaNfce, cscIdToken, cscCodigo)
+     */
     @PutMapping
     public ResponseEntity<ConfiguracaoSistema> salvarConfig(@RequestBody ConfiguracaoSistema config) {
         return ResponseEntity.ok(service.atualizarConfiguracao(config));
     }
 
     // =======================================================================
-    // 🚀 NOVO: ENDPOINT PARA RECEBER O CERTIFICADO DIGITAL (.PFX)
+    // 🚀 CERTIFICADO DIGITAL (.PFX)
     // =======================================================================
     @PostMapping("/certificado")
     public ResponseEntity<String> uploadCertificado(@RequestParam("file") MultipartFile file) {
@@ -45,14 +47,14 @@ public class ConfiguracaoController {
         }
 
         try {
-            // Cria uma pasta chamada "certificados" na raiz do projeto Java
+            // Define a pasta de certificados (Pode ser configurada no application.properties futuramente)
             String pastaCertificados = System.getProperty("user.dir") + "/certificados/";
             File diretorio = new File(pastaCertificados);
             if (!diretorio.exists()) {
-                diretorio.mkdirs(); // Se a pasta não existir, o Java cria ela
+                diretorio.mkdirs();
             }
 
-            // Salva o arquivo no disco (Sempre substitui pelo novo com o mesmo nome)
+            // Salva o arquivo. Em Produção, certificado_a1.pfx será lido pelo motor fiscal.
             Path caminhoArquivo = Paths.get(pastaCertificados + "certificado_a1.pfx");
             Files.write(caminhoArquivo, file.getBytes());
 
@@ -65,12 +67,12 @@ public class ConfiguracaoController {
     }
 
     // =======================================================================
-    // ENDPOINT PARA GERAR BACKUP DO BANCO DE DADOS
+    // BACKUP, LOGS E MANUTENÇÃO
     // =======================================================================
+
     @GetMapping("/backup")
     public ResponseEntity<Resource> gerarBackup() {
         Resource arquivoBackup = service.gerarArquivoBackup();
-
         String nomeArquivo = "backup_grandport_" + java.time.LocalDate.now() + ".sql";
 
         return ResponseEntity.ok()
@@ -79,20 +81,13 @@ public class ConfiguracaoController {
                 .body(arquivoBackup);
     }
 
-    // =======================================================================
-    // ENDPOINT PARA LIMPAR LOGS DO SISTEMA
-    // =======================================================================
     @PostMapping("/limpar-logs")
     public ResponseEntity<Void> limparLogs() {
         service.limparLogsTecnicos();
         return ResponseEntity.ok().build();
     }
 
-    // =======================================================================
-    // ENDPOINT PARA RESTAURAR O BANCO DE DADOS VIA UPLOAD (.SQL)
-    // =======================================================================
     @PostMapping("/restaurar-banco")
-    // @PreAuthorize("hasRole('ADMIN')") // Desativado para testes
     public ResponseEntity<String> uploadBanco(@RequestParam("file") MultipartFile file) {
         try {
             service.restaurarBackup(file);
@@ -102,11 +97,8 @@ public class ConfiguracaoController {
         }
     }
 
-    // =======================================================================
-    // ENDPOINT PARA RESETAR O BANCO DE DADOS (ZONA DE PERIGO)
-    // =======================================================================
     @DeleteMapping("/resetar-banco")
-    // @PreAuthorize("hasRole('ADMIN')")
+    // ⚠️ DICA: Em produção, garanta que apenas o ADMIN master tenha acesso aqui!
     public ResponseEntity<Void> resetarBancoDeDados() {
         service.resetarBancoDeDados();
         return ResponseEntity.ok().build();

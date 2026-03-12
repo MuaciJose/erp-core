@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+
 export const Configuracoes = () => {
     const [abaAtiva, setAbaAtiva] = useState('EMPRESA');
     const [loading, setLoading] = useState(true);
@@ -19,7 +20,7 @@ export const Configuracoes = () => {
     const [gerandoQr, setGerandoQr] = useState(false);
     const [checandoConexao, setChecandoConexao] = useState(false);
 
-    // 🚀 ATUALIZADO COM OS NOVOS CAMPOS FISCAIS E ENDEREÇO
+    // 🚀 ESTADO ATUALIZADO COM OS NOVOS CAMPOS DE NFC-e
     const [config, setConfig] = useState({
         nomeFantasia: '',
         razaoSocial: '',
@@ -38,6 +39,12 @@ export const Configuracoes = () => {
         ambienteSefaz: 2,
         serieNfe: 1,
         numeroProximaNfe: 1,
+        // 🚀 NOVOS CAMPOS NFC-e
+        serieNfce: 1,
+        numeroProximaNfce: 1,
+        cscIdToken: '',
+        cscCodigo: '',
+        // =======================
         logoBase64: '',
         tamanhoImpressora: '80mm',
         mensagemRodape: '',
@@ -87,6 +94,12 @@ export const Configuracoes = () => {
                     ambienteSefaz: data.ambienteSefaz || 2,
                     serieNfe: data.serieNfe || 1,
                     numeroProximaNfe: data.numeroProximaNfe || 1,
+                    // 🚀 CARREGANDO OS DADOS DA NFC-e
+                    serieNfce: data.serieNfce || 1,
+                    numeroProximaNfce: data.numeroProximaNfce || 1,
+                    cscIdToken: data.cscIdToken || '',
+                    cscCodigo: data.cscCodigo || '',
+                    // ==============================
                     whatsappToken: data.whatsappToken || '',
                     whatsappApiUrl: data.whatsappApiUrl || '',
                     tamanhoImpressora: data.tamanhoImpressora || '80mm',
@@ -239,7 +252,6 @@ export const Configuracoes = () => {
                 });
 
                 if (!uploadRes.ok) {
-                    // Se o Java reclamar, agora vamos ler O QUE ele reclamou!
                     const mensagemErroJava = await uploadRes.text();
                     console.error("Motivo da recusa do Java:", mensagemErroJava);
                     throw new Error(mensagemErroJava || 'Falha no upload');
@@ -519,7 +531,7 @@ export const Configuracoes = () => {
                         </div>
                     )}
 
-                    {/* ABA: FISCAL / NF-e (NOVA) */}
+                    {/* ABA: FISCAL / NF-e e NFC-e */}
                     {abaAtiva === 'FISCAL' && (
                         <div className="space-y-6 animate-fade-in">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4">
@@ -550,12 +562,35 @@ export const Configuracoes = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase">Série da NF-e</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase">Série da NF-e (Mod. 55)</label>
                                     <input type="number" name="serieNfe" value={config.serieNfe || 1} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-bold text-center focus:border-blue-500 outline-none" />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-500 uppercase" title="O número que o ERP utilizará para a próxima NF-e gerada">Próximo Nº da NF-e</label>
                                     <input type="number" name="numeroProximaNfe" value={config.numeroProximaNfe || 1} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-black text-center text-blue-600 focus:border-blue-500 outline-none" />
+                                </div>
+                            </div>
+
+                            {/* 🚀 NOVO BLOCO: PARÂMETROS NFC-e (CUPOM DE BALCÃO) */}
+                            <h3 className="text-sm font-black text-slate-700 flex items-center gap-2 mt-8 mb-4">
+                                <Receipt className="text-blue-500" size={18} /> Parâmetros Fiscais (NFC-e - Cupom de Balcão)
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase">Série da NFC-e</label>
+                                    <input type="number" name="serieNfce" value={config.serieNfce || 1} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-bold text-center focus:border-blue-500 outline-none" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase">Próximo Nº NFC-e</label>
+                                    <input type="number" name="numeroProximaNfce" value={config.numeroProximaNfce || 1} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-black text-center text-blue-600 focus:border-blue-500 outline-none" />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase" title="O ID do Token gerado na SEFAZ (Ex: 000001)">ID do Token (cIdToken)</label>
+                                    <input type="text" name="cscIdToken" value={config.cscIdToken || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="Ex: 000001" />
+                                </div>
+                                <div className="md:col-span-4">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase" title="O código alfanumérico longo do CSC">Código CSC (Senha)</label>
+                                    <input type="text" name="cscCodigo" value={config.cscCodigo || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-mono text-sm focus:border-blue-500 outline-none" placeholder="Cole aqui o código CSC longo gerado na SEFAZ..." />
                                 </div>
                             </div>
 

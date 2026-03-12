@@ -27,21 +27,30 @@ public class ConfiguracaoSistema {
     private String endereco = "";
 
     // Endereço Novo (Estruturado - Exigência SEFAZ)
-    private String cep = ""; // 🚀 ADICIONADO
+    private String cep = "";
     private String logradouro = "";
     private String numero = "";
     private String bairro = "";
     private String cidade = "";
     private String uf = "";
-    private String codigoIbgeMunicipio = ""; // 🚀 ADICIONADO (Ex: 2600054 para Abreu e Lima/PE)
+    private String codigoIbgeMunicipio = "";
 
-    // ================= FISCAL / EMISSÃO NF-E =================
+    // ================= FISCAL / EMISSÃO NF-E (Modelo 55) =================
     @Column(length = 1)
-    private String crt = "1"; // 🚀 ADICIONADO: 1 = Simples Nacional, 3 = Regime Normal
+    private String crt = "1"; // 1 = Simples Nacional, 3 = Regime Normal
 
-    private Integer ambienteSefaz = 2; // 🚀 ADICIONADO: 1 = Produção (Real), 2 = Homologação (Testes)
-    private Integer serieNfe = 1; // 🚀 ADICIONADO: Série padrão da nota
-    private Long numeroProximaNfe = 1L; // 🚀 ADICIONADO: ERP vai somar +1 a cada nota emitida
+    private Integer ambienteSefaz = 2; // 1 = Produção (Real), 2 = Homologação (Testes)
+    private Integer serieNfe = 1;
+    private Long numeroProximaNfe = 1L;
+
+    // 🚀 NOVOS CAMPOS PARA O CUPOM FISCAL (NFC-e - Modelo 65)
+    // Mantendo a contagem separada da NF-e como manda a SEFAZ
+    private Integer serieNfce = 1;
+    private Long numeroProximaNfce = 1L;
+
+    // Dados do Token CSC (Para gerar o QR Code da NFC-e)
+    private String cscIdToken; // Ex: "000001"
+    private String cscCodigo;  // Ex: "A1B2C3D4-E5F6..."
 
     @Column(length = 2)
     private String tipoCertificado = "A1";
@@ -84,11 +93,4 @@ public class ConfiguracaoSistema {
 
     @Column(length = 1000)
     private String whatsappApiUrl = "";
-
-    // 🚀 NOVOS CAMPOS PARA O CUPOM FISCAL (NFC-e)
-    @Column(name = "csc_id", length = 6)
-    private String cscId; // Ex: "000001"
-
-    @Column(name = "csc_token")
-    private String cscToken; // Ex: "A1B2C3D4-E5F6..."
 }

@@ -60,15 +60,21 @@ public class ConfiguracaoService {
             ConfiguracaoSistema configPadrao = new ConfiguracaoSistema();
             configPadrao.setId(1L);
             configPadrao.setHorarioBackupAuto("03:00");
+            configPadrao.setSerieNfe(1);
+            configPadrao.setNumeroProximaNfe(1L);
+            // 🚀 Campos NFC-e iniciados por padrão
+            configPadrao.setSerieNfce(1);
+            configPadrao.setNumeroProximaNfce(1L);
             return repository.save(configPadrao);
         });
 
-        if (config.getHorarioBackupAuto() == null) {
-            config.setHorarioBackupAuto("03:00");
-        }
-        if (config.getTipoCertificado() == null) {
-            config.setTipoCertificado("A1");
-        }
+        // 🚀 Garantindo que campos novos não voltem nulos para o React
+        if (config.getHorarioBackupAuto() == null) config.setHorarioBackupAuto("03:00");
+        if (config.getTipoCertificado() == null) config.setTipoCertificado("A1");
+        if (config.getSerieNfce() == null) config.setSerieNfce(1);
+        if (config.getNumeroProximaNfce() == null) config.setNumeroProximaNfce(1L);
+        if (config.getCscIdToken() == null) config.setCscIdToken("");
+        if (config.getCscCodigo() == null) config.setCscCodigo("");
 
         return config;
     }
@@ -87,7 +93,7 @@ public class ConfiguracaoService {
     public void resetarBancoDeDados() {
         try {
             // 1. O Java pergunta ao Postgres: "Quais tabelas existem aí?" (ignorando as de segurança)
-            String sqlBuscaTabelas = "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('usuario', 'configuracao_sistema')";
+            String sqlBuscaTabelas = "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('usuario', 'configuracoes_sistema')";
 
             List<String> tabelasParaApagar = jdbcTemplate.queryForList(sqlBuscaTabelas, String.class);
 
@@ -141,7 +147,6 @@ public class ConfiguracaoService {
         Files.copy(arquivo.getInputStream(), tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
         try {
-            // Extrai as configurações do banco
             String dbName = dbUrlProp.substring(dbUrlProp.lastIndexOf("/") + 1);
             if (dbName.contains("?")) dbName = dbName.split("\\?")[0];
             String dbUser = dbUserProp;
@@ -151,17 +156,17 @@ public class ConfiguracaoService {
             jdbcTemplate.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;");
             System.out.println("♻️ Esquema public recriado. Iniciando injeção do arquivo...");
 
-            // 2. Identifica o sistema operacional (Para não dar erro no Windows/Linux)
+            // 2. Identifica o sistema operacional
             boolean isWindows = System.getProperty("os.name").toLowerCase().startsWith("windows");
             String comandoPsql = isWindows ? "psql.exe" : "psql";
 
-            // 3. Monta o comando de forma direta, sem 'bash -c'
+            // 3. Monta o comando
             ProcessBuilder pb = new ProcessBuilder(
                     comandoPsql,
                     "-h", "localhost",
                     "-U", dbUser,
                     "-d", dbName,
-                    "-v", "ON_ERROR_STOP=1", // Faz o processo abortar e gritar se der qualquer erro
+                    "-v", "ON_ERROR_STOP=1",
                     "-f", tempFile.getAbsolutePath()
             );
 
@@ -171,7 +176,6 @@ public class ConfiguracaoService {
 
             Process process = pb.start();
 
-            // 4. Captura a resposta do banco de dados linha por linha
             StringBuilder output = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
@@ -182,16 +186,15 @@ public class ConfiguracaoService {
 
             int exitCode = process.waitFor();
 
-            // 5. Se o PSQL retornar código diferente de 0, ele avisa o erro real no console
             if (exitCode != 0) {
                 System.err.println("❌ ERRO NO PSQL AO RESTAURAR:\n" + output.toString());
-                throw new RuntimeException("O banco de dados rejeitou o arquivo de backup. Verifique o console do Java.");
+                throw new RuntimeException("O banco de dados rejeitou o arquivo de backup.");
             }
 
             System.out.println("✅ Backup restaurado com sucesso absoluto!");
 
         } finally {
-            tempFile.delete(); // Limpa o arquivo temporário
+            tempFile.delete();
         }
     }
 
@@ -208,7 +211,6 @@ public class ConfiguracaoService {
             boolean isWindows = System.getProperty("os.name").toLowerCase().startsWith("windows");
             String comando = isWindows ? "pg_dump.exe" : "pg_dump";
 
-            // Comando universal e limpo para o PostgreSQL 17
             ProcessBuilder pb = new ProcessBuilder(
                     comando, "-h", "localhost", "-U", dbUser, "-d", dbName, "--inserts"
             );
@@ -216,7 +218,6 @@ public class ConfiguracaoService {
             Map<String, String> env = pb.environment();
             env.put("PGPASSWORD", dbPass);
 
-            // 🔴 O SEGREDO ESTÁ AQUI: Falso! Assim ele NUNCA salva texto de erro dentro do .sql
             pb.redirectErrorStream(false);
 
             Process process = pb.start();
@@ -255,7 +256,7 @@ public class ConfiguracaoService {
                             String dataString = path.getFileName().toString().substring(11, 21);
                             if (LocalDate.parse(dataString).isBefore(dataLimite)) {
                                 Files.delete(path);
-                                System.out.println("### [SISTEMA] Removido: " + path.getFileName());
+                                System.out.println("### [SISTEMA] Removido backup antigo: " + path.getFileName());
                             }
                         } catch (Exception ignored) {}
                     });
