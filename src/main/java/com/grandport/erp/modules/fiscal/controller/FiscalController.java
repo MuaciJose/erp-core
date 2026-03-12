@@ -234,4 +234,21 @@ public class FiscalController {
             return ResponseEntity.badRequest().body(Map.of("message", "Erro ao enviar lote: " + e.getMessage()));
         }
     }
+
+    // 🚀 Adicione este endpoint no seu FiscalController.java
+    @GetMapping("/testar-email")
+    public ResponseEntity<?> verificarStatusEmail() {
+        try {
+            emailFiscalService.testarConexaoEmail();
+            return ResponseEntity.ok(Map.of(
+                    "status", "ONLINE",
+                    "mensagem", "Conexão com o servidor de E-mail estabelecida com sucesso!"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "ERRO",
+                    "mensagem", "Falha na autenticação: Verifique a senha de app e o servidor SMTP."
+            ));
+        }
+    }
 }

@@ -93,4 +93,9 @@ public class ConfiguracaoSistema {
 
     @Column(length = 1000)
     private String whatsappApiUrl = "";
+
+    private String smtpHost; // Ex: smtp.gmail.com
+    private Integer smtpPort; // Ex: 587
+    private String emailRemetente;
+    private String senhaEmailRemetente; // Deve ser a "Senha de Aplicativo"
 }

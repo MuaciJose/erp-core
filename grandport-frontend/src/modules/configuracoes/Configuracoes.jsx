@@ -27,17 +27,20 @@ export const Configuracoes = () => {
     const [salvando, setSalvando] = useState(false);
     const [buscandoCnpj, setBuscandoCnpj] = useState(false);
 
-    // 🚀 ESTADOS PARA A MÁGICA DO WHATSAPP (QR CODE)
+    // 🚀 ESTADOS PARA A MÁGICA DO WHATSAPP E E-MAIL
     const [qrCodeBase64, setQrCodeBase64] = useState(null);
     const [statusWhatsapp, setStatusWhatsapp] = useState('DESCONHECIDO');
     const [gerandoQr, setGerandoQr] = useState(false);
     const [checandoConexao, setChecandoConexao] = useState(false);
 
-    // 🚀 NOVOS ESTADOS PARA O STATUS DA SEFAZ
     const [statusSefaz, setStatusSefaz] = useState('DESCONHECIDO');
     const [testandoSefaz, setTestandoSefaz] = useState(false);
 
-    // 🚀 ESTADO ATUALIZADO COM OS NOVOS CAMPOS DE NFC-e
+    // 🚀 NOVOS ESTADOS PARA O STATUS DO E-MAIL
+    const [statusEmail, setStatusEmail] = useState('DESCONHECIDO');
+    const [testandoEmail, setTestandoEmail] = useState(false);
+
+    // 🚀 ESTADO ATUALIZADO COM OS NOVOS CAMPOS DE NFC-e E E-MAIL SMTP
     const [config, setConfig] = useState({
         nomeFantasia: '',
         razaoSocial: '',
@@ -74,7 +77,12 @@ export const Configuracoes = () => {
         whatsappToken: '',
         whatsappApiUrl: '',
         tipoCertificado: 'A1',
-        senhaCertificado: ''
+        senhaCertificado: '',
+        // 🚀 NOVOS CAMPOS E-MAIL (CONTADOR/CLIENTES)
+        smtpHost: 'smtp.gmail.com',
+        smtpPort: 587,
+        emailRemetente: '',
+        senhaEmailRemetente: ''
     });
 
     const [usuariosEquipe, setUsuariosEquipe] = useState([]);
@@ -120,7 +128,12 @@ export const Configuracoes = () => {
                     whatsappToken: data.whatsappToken || '',
                     whatsappApiUrl: data.whatsappApiUrl || '',
                     tamanhoImpressora: data.tamanhoImpressora || '80mm',
-                    mensagemRodape: data.mensagemRodape || ''
+                    mensagemRodape: data.mensagemRodape || '',
+                    // 🚀 CARREGANDO DADOS E-MAIL SMTP
+                    smtpHost: data.smtpHost || 'smtp.gmail.com',
+                    smtpPort: data.smtpPort || 587,
+                    emailRemetente: data.emailRemetente || '',
+                    senhaEmailRemetente: data.senhaEmailRemetente || ''
                 }));
             }
             setUsuariosEquipe(resUsuarios.data || []);
@@ -251,6 +264,27 @@ export const Configuracoes = () => {
             toast.error('Erro ao tentar conectar com a SEFAZ. Verifique os dados e o Certificado.', { id: loadId });
         } finally {
             setTestandoSefaz(false);
+        }
+    };
+
+    // =========================================================================
+    // 🚀 TESTAR CONEXÃO SMTP DE E-MAIL
+    // =========================================================================
+    const verificarConexaoEmail = async () => {
+        // Primeiro, salva as configurações atuais para o Java tentar testar
+        await api.put('/api/configuracoes', config);
+
+        setTestandoEmail(true);
+        const loadId = toast.loading('Autenticando no servidor de E-mail (SMTP)...');
+        try {
+            const res = await api.get('/api/fiscal/testar-email');
+            setStatusEmail('CONECTADO');
+            toast.success(res.data.mensagem || 'E-mail autenticado com sucesso!', { id: loadId });
+        } catch (error) {
+            setStatusEmail('ERRO');
+            toast.error('Falha ao conectar. Verifique se a Senha de App e o Servidor SMTP estão corretos.', { id: loadId });
+        } finally {
+            setTestandoEmail(false);
         }
     };
 
@@ -880,7 +914,62 @@ export const Configuracoes = () => {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
 
+                            {/* 🚀 NOVO BLOCO: CONFIGURAÇÃO DE E-MAIL INSERIDO AQUI */}
+                            <div className="mt-8 p-6 bg-slate-50 border border-slate-200 rounded-3xl shadow-sm">
+                                <div className="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
+                                    <div>
+                                        <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg">📧 Servidor de E-mail (Envio de Notas)</h3>
+                                        <p className="text-sm text-slate-500 font-medium">Configure a conta que fará o envio dos XMLs para o contador e clientes.</p>
+                                    </div>
+
+                                    {/* 🚀 NOVO BOTÃO DE TESTAR CONEXÃO DE E-MAIL */}
+                                    <button
+                                        onClick={verificarConexaoEmail}
+                                        disabled={testandoEmail}
+                                        title="Validar se o e-mail e a senha de aplicativo estão corretos"
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all border-2 ${
+                                            statusEmail === 'CONECTADO'
+                                                ? 'bg-green-50 border-green-200 text-green-700'
+                                                : 'bg-slate-50 border-slate-200 text-slate-600'
+                                        }`}
+                                    >
+                                        {testandoEmail ? <RefreshCw className="animate-spin" size={14}/> :
+                                            <div className={`w-2.5 h-2.5 rounded-full ${
+                                                statusEmail === 'CONECTADO' ? 'bg-green-500 animate-pulse' :
+                                                    statusEmail === 'ERRO' ? 'bg-red-500' : 'bg-slate-400'
+                                            }`} />
+                                        }
+                                        {testandoEmail ? 'TESTANDO...' : 'TESTAR LOGIN DE E-MAIL'}
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase">E-mail Remetente (Gmail, Outlook, etc)</label>
+                                        <input type="email" name="emailRemetente" value={config.emailRemetente || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-bold outline-none focus:border-blue-500" placeholder="loja@gmail.com" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Senha de Aplicativo (App Password)</label>
+                                        <input type="password" name="senhaEmailRemetente" value={config.senhaEmailRemetente || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-bold outline-none focus:border-blue-500" placeholder="••••••••••••••••" />
+                                        <p className="text-[10px] text-blue-600 mt-1 font-bold">⚠️ Importante: Não use a senha normal. Gere uma "Senha de App" no provedor.</p>
+                                    </div>
+
+                                    <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 md:col-span-2">
+                                        <h4 className="text-xs font-black text-orange-800 mb-2">Configurações Avançadas (SMTP)</h4>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase">Servidor SMTP</label>
+                                                <input type="text" name="smtpHost" value={config.smtpHost || 'smtp.gmail.com'} onChange={handleChange} className="w-full p-2 mt-1 bg-white border-2 border-slate-200 rounded-lg text-sm font-mono outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase">Porta SMTP</label>
+                                                <input type="number" name="smtpPort" value={config.smtpPort || 587} onChange={handleChange} className="w-full p-2 mt-1 bg-white border-2 border-slate-200 rounded-lg text-sm font-mono outline-none" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
