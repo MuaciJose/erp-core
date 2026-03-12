@@ -11,6 +11,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import br.com.swconsultoria.nfe.Nfe;
+import br.com.swconsultoria.nfe.dom.ConfiguracoesNfe;
+import br.com.swconsultoria.nfe.dom.enuns.DocumentoEnum;
+import br.com.swconsultoria.nfe.schema_4.retConsStatServ.TRetConsStatServ;
+import com.grandport.erp.modules.fiscal.service.NfeSetupService;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,6 +43,9 @@ public class FiscalController {
     // 🚀 INJEÇÃO ADICIONADA PARA O STATUS DA SEFAZ FUNCIONAR
     @Autowired
     private ConfiguracaoService configuracaoService;
+
+    @Autowired
+    private NfeSetupService nfeSetupService;
 
     // =======================================================================
     // 🚀 LISTAR TODAS AS NOTAS (PARA O GERENCIADOR FISCAL)
@@ -77,10 +85,10 @@ public class FiscalController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("mensagem", e.getMessage()));
         }
-    } // 🚀 CORREÇÃO: ESTA CHAVE ESTAVA FALTANDO PARA FECHAR O MÉTODO
+    }
 
     // =======================================================================
-    // 🚀 TESTAR STATUS DA SEFAZ (AGORA COM VALIDAÇÃO REAL)
+    // 🚀 TESTAR STATUS DA SEFAZ (CONEXÃO REAL COM O GOVERNO)
     // =======================================================================
     @GetMapping("/status-sefaz")
     public ResponseEntity<?> verificarStatusSefaz() {
@@ -91,36 +99,44 @@ public class FiscalController {
                 return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Configurações não encontradas."));
             }
 
-            // 1. Validação Rigorosa: Checa se os campos essenciais estão vazios ("") ou nulos
+            // 1. Validação Básica
             if (config.getCnpj() == null || config.getCnpj().trim().isEmpty()) {
                 return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "O CNPJ da empresa não foi preenchido."));
             }
             if (config.getUf() == null || config.getUf().trim().isEmpty()) {
                 return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Selecione a UF (Estado) da empresa."));
             }
-            if (config.getCscIdToken() == null || config.getCscIdToken().trim().isEmpty() ||
-                    config.getCscCodigo() == null || config.getCscCodigo().trim().isEmpty()) {
-                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Os dados de Segurança (CSC e ID Token) estão vazios."));
-            }
             if (config.getSenhaCertificado() == null || config.getSenhaCertificado().trim().isEmpty()) {
                 return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "A senha do Certificado Digital não foi informada."));
             }
 
-            // 🚀 Futuramente, aqui o seu motor fiscal (ex: biblioteca DFe) fará o "StatusServico" real.
-            // Por enquanto, se a configuração está completa, validamos como ONLINE para a UF selecionada.
-            boolean sefazOnline = true;
+            // 2. 🚀 LIGA O MOTOR! (Carrega certificado e Schemas)
+            ConfiguracoesNfe configSefaz = nfeSetupService.iniciarConfiguracao(config);
 
-            if (sefazOnline) {
+            // 3. BATE NA PORTA DA SEFAZ (Consulta para NFC-e - Modelo 65)
+            TRetConsStatServ retornoSefaz = Nfe.statusServico(configSefaz, DocumentoEnum.NFCE);
+
+            // 4. LÊ A RESPOSTA OFICIAL DO GOVERNO
+            // O código "107" significa "Serviço em Operação"
+            if ("107".equals(retornoSefaz.getCStat())) {
                 return ResponseEntity.ok(Map.of(
                         "status", "ONLINE",
-                        "mensagem", "Conexão com a SEFAZ (" + config.getUf() + ") estabelecida com sucesso!",
+                        "mensagem", "✅ SEFAZ " + config.getUf() + " ONLINE: " + retornoSefaz.getXMotivo(),
                         "ambiente", config.getAmbienteSefaz() == 1 ? "Produção" : "Homologação"
                 ));
             } else {
-                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "A SEFAZ do seu estado está fora do ar."));
+                return ResponseEntity.ok(Map.of(
+                        "status", "OFFLINE",
+                        "mensagem", "❌ SEFAZ Respondeu: " + retornoSefaz.getXMotivo()
+                ));
             }
+
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("status", "ERRO", "mensagem", "Erro interno: " + e.getMessage()));
+            // Se der erro de senha, certificado vencido ou falta de arquivo, cai aqui:
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "ERRO",
+                    "mensagem", "Falha de comunicação: " + e.getMessage()
+            ));
         }
     }
 
