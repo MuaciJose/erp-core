@@ -22,10 +22,17 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
         limiteCredito: 0,
         saldoDevedor: 0
     });
+
     const [loadingCnpj, setLoadingCnpj] = useState(false);
     const [loadingCep, setLoadingCep] = useState(false);
     const isEditing = !!parceiroParaEditar?.id;
 
+    // 🚀 ESTADOS DO IBGE
+    const [estadosIbge, setEstadosIbge] = useState([]);
+    const [cidadesIbge, setCidadesIbge] = useState([]);
+    const [loadingIbge, setLoadingIbge] = useState(false);
+
+    // 1. CARREGAR PARCEIRO PARA EDIÇÃO
     useEffect(() => {
         if (isEditing) {
             setParceiro({
@@ -37,10 +44,69 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
         }
     }, [parceiroParaEditar, isEditing]);
 
+    // 2. BUSCAR ESTADOS (UFs) DO IBGE AO ABRIR A TELA
+    useEffect(() => {
+        fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome')
+            .then(res => res.json())
+            .then(data => setEstadosIbge(data))
+            .catch(err => console.error("Erro ao carregar Estados IBGE:", err));
+    }, []);
+
+    // 3. BUSCAR CIDADES QUANDO O ESTADO MUDAR
+    useEffect(() => {
+        const ufAtual = parceiro.endereco.estado;
+        if (!ufAtual) {
+            setCidadesIbge([]);
+            return;
+        }
+
+        setLoadingIbge(true);
+        fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${ufAtual}/municipios?orderBy=nome`)
+            .then(res => res.json())
+            .then(data => setCidadesIbge(data))
+            .catch(err => console.error("Erro ao carregar Municípios IBGE:", err))
+            .finally(() => setLoadingIbge(false));
+    }, [parceiro.endereco.estado]);
+
+    // 4. 🚀 OBSERVADOR INTELIGENTE (Garante o preenchimento do IBGE mesmo com erro de acentos)
+    useEffect(() => {
+        if (parceiro.endereco.cidade && cidadesIbge.length > 0) {
+            // Remove acentos e joga tudo para minúsculo para comparar com segurança
+            const cidadeFormatada = parceiro.endereco.cidade.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+            const cidadeEncontrada = cidadesIbge.find(c =>
+                c.nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === cidadeFormatada
+            );
+
+            // Se encontrou a cidade e o IBGE ainda está vazio ou diferente, ele força o preenchimento exato
+            if (cidadeEncontrada && parceiro.endereco.ibge !== cidadeEncontrada.id.toString()) {
+                setParceiro(prev => ({
+                    ...prev,
+                    endereco: {
+                        ...prev.endereco,
+                        ibge: cidadeEncontrada.id.toString(),
+                        cidade: cidadeEncontrada.nome // Conserta maiúsculas/minúsculas para o padrão oficial
+                    }
+                }));
+            }
+        }
+    }, [parceiro.endereco.cidade, cidadesIbge]);
+
     const handleChange = (e) => {
         const { name, value } = e.target;
+
         if (['cep', 'logradouro', 'numero', 'bairro', 'cidade', 'estado', 'ibge'].includes(name)) {
-            setParceiro(prev => ({ ...prev, endereco: { ...prev.endereco, [name]: value } }));
+            setParceiro(prev => {
+                const novoEndereco = { ...prev.endereco, [name]: value };
+
+                // Se o usuário clicou e trocou o estado manualmente, limpamos a cidade antiga
+                if (name === 'estado' && prev.endereco.estado !== value) {
+                    novoEndereco.cidade = '';
+                    novoEndereco.ibge = '';
+                }
+
+                return { ...prev, endereco: novoEndereco };
+            });
         } else {
             setParceiro(prev => ({ ...prev, [name]: value }));
         }
@@ -64,7 +130,7 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
                     logradouro: dados.logradouro || '',
                     numero: dados.numero || '',
                     bairro: dados.bairro || '',
-                    cidade: dados.municipio || '',
+                    cidade: dados.municipio || '', // Isso vai disparar o Observador IBGE 🚀
                     estado: dados.uf || '',
                     ibge: dados.codigo_ibge_municipio || '',
                 }
@@ -91,8 +157,8 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
                     ...prev.endereco,
                     logradouro: dados.street || '',
                     bairro: dados.neighborhood || '',
-                    cidade: dados.city || '',
                     estado: dados.state || '',
+                    cidade: dados.city || '', // Isso vai disparar o Observador IBGE 🚀
                     ibge: dados.ibge || '',
                 }
             }));
@@ -184,15 +250,34 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
                         <input name="bairro" type="text" value={parceiro.endereco.bairro || ''} onChange={handleChange} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-500 outline-none" />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Cidade</label>
-                            <input name="cidade" type="text" value={parceiro.endereco.cidade || ''} onChange={handleChange} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-500 outline-none" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Cód. IBGE</label>
-                            <input name="ibge" type="text" value={parceiro.endereco.ibge || ''} onChange={handleChange} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-500 outline-none" />
-                        </div>
+                    {/* 🚀 SELECT DE ESTADO COM CÓDIGOS OFICIAIS */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Estado (UF)</label>
+                        <select name="estado" value={parceiro.endereco.estado || ''} onChange={handleChange} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-500 outline-none">
+                            <option value="">Selecione a UF...</option>
+                            {estadosIbge.map(uf => (
+                                <option key={uf.id} value={uf.sigla}>{uf.nome} ({uf.sigla})</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* 🚀 SELECT DE CIDADE REATIVO */}
+                    <div className="relative">
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Cidade</label>
+                        <select name="cidade" value={parceiro.endereco.cidade || ''} onChange={handleChange} disabled={!parceiro.endereco.estado || loadingIbge} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-500 outline-none disabled:opacity-50">
+                            <option value="">
+                                {!parceiro.endereco.estado ? 'Selecione a UF primeiro...' : 'Selecione a Cidade...'}
+                            </option>
+                            {cidadesIbge.map(c => (
+                                <option key={c.id} value={c.nome}>{c.nome}</option>
+                            ))}
+                        </select>
+                        {loadingIbge && <Loader2 className="absolute right-3 top-9 animate-spin text-blue-500" />}
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Cód. IBGE</label>
+                        <input name="ibge" type="text" value={parceiro.endereco.ibge || ''} readOnly className="w-full p-3 bg-gray-100 border-2 border-gray-100 rounded-xl outline-none text-gray-500 cursor-not-allowed font-bold" placeholder="Automático" title="O Código IBGE é preenchido automaticamente ao selecionar a cidade." />
                     </div>
 
                     <div className="md:col-span-3 border-t pt-6 mt-4">
@@ -225,9 +310,9 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
 
             {/* Seção de Veículos (Apenas para Clientes existentes) */}
             {isEditing && (parceiro.tipo === 'CLIENTE' || parceiro.tipo === 'AMBOS') && (
-                <VeiculosCliente 
-                    clienteAtual={parceiro} 
-                    clientesLista={parceirosLista} 
+                <VeiculosCliente
+                    clienteAtual={parceiro}
+                    clientesLista={parceirosLista}
                 />
             )}
         </div>
