@@ -108,7 +108,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         try {
             const res = await api.post(`/api/fiscal/emitir/${pedidoSelecionado.id}`);
 
-            // 🚀 O pulo do gato: Pegamos o nfeId real ou o que vier no objeto
             const nfeId = res.data.id || res.data.notaFiscal?.id;
 
             if (!nfeId) {
@@ -117,8 +116,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
             toast.success('Cupom Autorizado!', { id: loadId });
 
-            // 🚀 CHAMADA CORRETA: Chama o ID da nota.
-            // O Java vai ver que é modelo 65 e usar o JRXML de Cupom.
             const resPdf = await api.get(`/api/fiscal/${nfeId}/danfe`, {
                 responseType: 'blob'
             });
@@ -130,11 +127,17 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
             carregarPedidos();
         } catch (error) {
             console.error("Erro detalhado:", error);
-            toast.error('Erro: ' + (error.response?.data?.message || error.message), { id: loadId });
+
+            // 🚀 O AJUSTE ESTÁ AQUI:
+            // Procuramos por 'mensagem' (português) que é o que o seu Java envia
+            const mensagemDoServidor = error.response?.data?.mensagem || error.response?.data?.message || error.message;
+
+            toast.error(mensagemDoServidor, { id: loadId, duration: 5000 });
         } finally {
             setProcessandoNfce(false);
         }
     };
+
     const confirmarDevolucaoAoVendedor = async () => {
         const idDevolucaoToast = toast.loading("Devolvendo pedido...");
         try {

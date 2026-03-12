@@ -8,6 +8,19 @@ import {
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
+// 🚀 LISTA OFICIAL PARA GARANTIR QUE O DADO ENVIADO AO JAVA SEJA SEMPRE VÁLIDO
+const ESTADOS_BRASIL = [
+    { uf: 'AC', nome: 'Acre' }, { uf: 'AL', nome: 'Alagoas' }, { uf: 'AP', nome: 'Amapá' },
+    { uf: 'AM', nome: 'Amazonas' }, { uf: 'BA', nome: 'Bahia' }, { uf: 'CE', nome: 'Ceará' },
+    { uf: 'DF', nome: 'Distrito Federal' }, { uf: 'ES', nome: 'Espírito Santo' }, { uf: 'GO', nome: 'Goiás' },
+    { uf: 'MA', nome: 'Maranhão' }, { uf: 'MT', nome: 'Mato Grosso' }, { uf: 'MS', nome: 'Mato Grosso do Sul' },
+    { uf: 'MG', nome: 'Minas Gerais' }, { uf: 'PA', nome: 'Pará' }, { uf: 'PB', nome: 'Paraíba' },
+    { uf: 'PR', nome: 'Paraná' }, { uf: 'PE', nome: 'Pernambuco' }, { uf: 'PI', nome: 'Piauí' },
+    { uf: 'RJ', nome: 'Rio de Janeiro' }, { uf: 'RN', nome: 'Rio Grande do Norte' }, { uf: 'RS', nome: 'Rio Grande do Sul' },
+    { uf: 'RO', nome: 'Rondônia' }, { uf: 'RR', nome: 'Roraima' }, { uf: 'SC', nome: 'Santa Catarina' },
+    { uf: 'SP', nome: 'São Paulo' }, { uf: 'SE', nome: 'Sergipe' }, { uf: 'TO', nome: 'Tocantins' }
+];
+
 export const Configuracoes = () => {
     const [abaAtiva, setAbaAtiva] = useState('EMPRESA');
     const [loading, setLoading] = useState(true);
@@ -19,6 +32,10 @@ export const Configuracoes = () => {
     const [statusWhatsapp, setStatusWhatsapp] = useState('DESCONHECIDO');
     const [gerandoQr, setGerandoQr] = useState(false);
     const [checandoConexao, setChecandoConexao] = useState(false);
+
+    // 🚀 NOVOS ESTADOS PARA O STATUS DA SEFAZ
+    const [statusSefaz, setStatusSefaz] = useState('DESCONHECIDO');
+    const [testandoSefaz, setTestandoSefaz] = useState(false);
 
     // 🚀 ESTADO ATUALIZADO COM OS NOVOS CAMPOS DE NFC-e
     const [config, setConfig] = useState({
@@ -211,6 +228,29 @@ export const Configuracoes = () => {
             toast.success('Endereço e IBGE preenchidos!', { id: loadId });
         } catch (error) {
             toast.error('Falha ao buscar o CEP.', { id: loadId });
+        }
+    };
+
+    // =========================================================================
+    // 🚀 TESTAR CONEXÃO COM A SEFAZ
+    // =========================================================================
+    const verificarConexaoSefaz = async () => {
+        setTestandoSefaz(true);
+        const loadId = toast.loading('Consultando servidores da SEFAZ...');
+        try {
+            const res = await api.get('/api/fiscal/status-sefaz');
+            setStatusSefaz(res.data.status);
+
+            if (res.data.status === 'ONLINE') {
+                toast.success(res.data.mensagem, { id: loadId });
+            } else {
+                toast.error(res.data.mensagem, { id: loadId });
+            }
+        } catch (error) {
+            setStatusSefaz('ERRO');
+            toast.error('Erro ao tentar conectar com a SEFAZ. Verifique os dados e o Certificado.', { id: loadId });
+        } finally {
+            setTestandoSefaz(false);
         }
     };
 
@@ -481,7 +521,6 @@ export const Configuracoes = () => {
                             <h3 className="text-sm font-black text-slate-400 uppercase flex items-center gap-2 mt-8"><MapPin size={16}/> Localização Oficial (SEFAZ)</h3>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
 
-                                {/* 🚀 CAMPO CEP COM BOTÃO VIACEP ADICIONADO */}
                                 <div>
                                     <label className="text-[10px] font-black text-slate-400 uppercase">CEP (Auto-Busca)</label>
                                     <div className="relative mt-1">
@@ -508,10 +547,22 @@ export const Configuracoes = () => {
                                     <label className="text-[10px] font-black text-slate-400 uppercase">Cidade</label>
                                     <input type="text" name="cidade" value={config.cidade || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" />
                                 </div>
+
                                 <div>
                                     <label className="text-[10px] font-black text-slate-400 uppercase">UF</label>
-                                    <input type="text" name="uf" value={config.uf || ''} onChange={handleChange} maxLength="2" className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold text-center outline-none focus:border-blue-500" />
+                                    <select
+                                        name="uf"
+                                        value={config.uf || ''}
+                                        onChange={handleChange}
+                                        className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500"
+                                    >
+                                        <option value="">Selecione</option>
+                                        {ESTADOS_BRASIL.map(estado => (
+                                            <option key={estado.uf} value={estado.uf}>{estado.uf} - {estado.nome}</option>
+                                        ))}
+                                    </select>
                                 </div>
+
                                 <div>
                                     <label className="text-[10px] font-black text-slate-400 uppercase" title="Código exigido pela Receita Federal para emissão de Notas">Cód. IBGE Município</label>
                                     <input type="text" name="codigoIbgeMunicipio" value={config.codigoIbgeMunicipio || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" />
@@ -534,9 +585,31 @@ export const Configuracoes = () => {
                     {/* ABA: FISCAL / NF-e e NFC-e */}
                     {abaAtiva === 'FISCAL' && (
                         <div className="space-y-6 animate-fade-in">
-                            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4">
-                                <Receipt className="text-blue-500" /> Parâmetros Fiscais (NF-e)
-                            </h2>
+                            <div className="flex justify-between items-center mb-6 border-b pb-4">
+                                <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                                    <Receipt className="text-blue-500" /> Parâmetros Fiscais (NF-e)
+                                </h2>
+
+                                {/* 🚀 BOTÃO DE TESTAR CONEXÃO SEFAZ */}
+                                <button
+                                    onClick={verificarConexaoSefaz}
+                                    disabled={testandoSefaz}
+                                    title="Validar comunicação com os servidores da Receita Federal"
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all border-2 ${
+                                        statusSefaz === 'ONLINE'
+                                            ? 'bg-green-50 border-green-200 text-green-700'
+                                            : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    {testandoSefaz ? <RefreshCw className="animate-spin" size={14}/> :
+                                        <div className={`w-2.5 h-2.5 rounded-full ${
+                                            statusSefaz === 'ONLINE' ? 'bg-green-500 animate-pulse' :
+                                                statusSefaz === 'OFFLINE' || statusSefaz === 'ERRO' ? 'bg-red-500' : 'bg-slate-400'
+                                        }`} />
+                                    }
+                                    {testandoSefaz ? 'CONSULTANDO...' : 'TESTAR STATUS SEFAZ'}
+                                </button>
+                            </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
@@ -571,7 +644,6 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            {/* 🚀 NOVO BLOCO: PARÂMETROS NFC-e (CUPOM DE BALCÃO) */}
                             <h3 className="text-sm font-black text-slate-700 flex items-center gap-2 mt-8 mb-4">
                                 <Receipt className="text-blue-500" size={18} /> Parâmetros Fiscais (NFC-e - Cupom de Balcão)
                             </h3>

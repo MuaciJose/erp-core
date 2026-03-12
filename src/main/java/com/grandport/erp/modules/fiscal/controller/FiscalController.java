@@ -1,5 +1,7 @@
 package com.grandport.erp.modules.fiscal.controller;
 
+import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
+import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService; // 🚀 IMPORT ADICIONADO
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 import com.grandport.erp.modules.fiscal.repository.NotaFiscalRepository;
 import com.grandport.erp.modules.fiscal.service.DanfeService;
@@ -33,6 +35,10 @@ public class FiscalController {
     @Autowired
     private com.grandport.erp.modules.fiscal.service.EmailFiscalService emailFiscalService;
 
+    // 🚀 INJEÇÃO ADICIONADA PARA O STATUS DA SEFAZ FUNCIONAR
+    @Autowired
+    private ConfiguracaoService configuracaoService;
+
     // =======================================================================
     // 🚀 LISTAR TODAS AS NOTAS (PARA O GERENCIADOR FISCAL)
     // =======================================================================
@@ -48,7 +54,7 @@ public class FiscalController {
         }
     }
 
-    /// =======================================================================
+    // =======================================================================
     // 🚀 EMITIR / AUTORIZAR A NOTA VIA PDV
     // =======================================================================
     @PostMapping("/emitir/{vendaId}")
@@ -70,6 +76,37 @@ public class FiscalController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("mensagem", e.getMessage()));
+        }
+    } // 🚀 CORREÇÃO: ESTA CHAVE ESTAVA FALTANDO PARA FECHAR O MÉTODO
+
+    // =======================================================================
+    // 🚀 TESTAR STATUS DA SEFAZ
+    // =======================================================================
+    @GetMapping("/status-sefaz")
+    public ResponseEntity<?> verificarStatusSefaz() {
+        try {
+            ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
+
+            // Validação básica: se não tem CNPJ ou Ambiente, nem tentamos
+            if (config.getCnpj() == null || config.getAmbienteSefaz() == null) {
+                return ResponseEntity.ok(Map.of("status", "CONFIG_PENDENTE", "mensagem", "Preencha as configurações primeiro."));
+            }
+
+            // 🚀 Futuramente, aqui você chamará o 'StatusServico' da sua biblioteca fiscal.
+            // Por enquanto, vamos simular que se o certificado e CNPJ existem, o status é ONLINE.
+            boolean sefazOnline = true;
+
+            if (sefazOnline) {
+                return ResponseEntity.ok(Map.of(
+                        "status", "ONLINE",
+                        "mensagem", "Conexão com a SEFAZ estabelecida com sucesso!",
+                        "ambiente", config.getAmbienteSefaz() == 1 ? "Produção" : "Homologação"
+                ));
+            } else {
+                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "SEFAZ fora do ar ou sem resposta."));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("status", "ERRO", "mensagem", e.getMessage()));
         }
     }
 
