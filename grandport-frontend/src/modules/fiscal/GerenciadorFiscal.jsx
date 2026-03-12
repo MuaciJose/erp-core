@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Download, Printer, Settings, Loader2, XCircle, FilePlus2, Mail, CalendarDays, X, Receipt } from 'lucide-react';
+import {
+    Search, FileText, CheckCircle, AlertCircle, Clock, Download,
+    Printer, Loader2, FilePlus2, Mail, CalendarDays, X, Receipt,
+    ChevronLeft, ChevronRight, Calendar
+} from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 
@@ -9,6 +13,14 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
     const [busca, setBusca] = useState('');
     const [filtroStatus, setFiltroStatus] = useState('TODAS');
     const [processandoId, setProcessandoId] = useState(null);
+
+    // 🚀 ESTADOS DE FILTRO DE DATA
+    const [dataInicio, setDataInicio] = useState('');
+    const [dataFim, setDataFim] = useState('');
+
+    // 🚀 ESTADOS DE PAGINAÇÃO
+    const [paginaAtual, setPaginaAtual] = useState(1);
+    const itensPorPagina = 10;
 
     const [modalFechamentoAberto, setModalFechamentoAberto] = useState(false);
     const [fechamentoMes, setFechamentoMes] = useState(new Date().getMonth() + 1);
@@ -26,12 +38,17 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
             ]);
 
             const unificados = [];
+            const nfeIdsAdicionados = new Set();
 
             const vendasPagas = resVendas.data.filter(v => v.status === 'CONCLUIDA' || v.status === 'PAGA');
             vendasPagas.forEach(v => {
+                if (v.notaFiscal?.id) {
+                    nfeIdsAdicionados.add(v.notaFiscal.id);
+                }
+
                 unificados.push({
                     uid: `venda_${v.id}`,
-                    tipo: 'PDV', // 🚀 PDV = CUPOM FISCAL (NFC-e)
+                    tipo: 'PDV',
                     vendaId: v.id,
                     nfeId: v.notaFiscal?.id || null,
                     numeroNota: v.notaFiscal?.numero || null,
@@ -43,20 +60,21 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                 });
             });
 
-            const notasAvulsas = resNotas.data.filter(n => !n.venda);
-            notasAvulsas.forEach(n => {
-                unificados.push({
-                    uid: `nota_${n.id}`,
-                    tipo: 'AVULSA', // 🚀 AVULSA = NOTA GRANDE (NF-e)
-                    vendaId: null,
-                    nfeId: n.id,
-                    numeroNota: n.numero,
-                    data: n.dataEmissao || new Date().toISOString(),
-                    clienteNome: 'Emissão Manual (Avulsa)',
-                    valorTotal: null,
-                    statusFiscal: n.status || 'AUTORIZADA',
-                    chaveAcesso: n.chaveAcesso
-                });
+            resNotas.data.forEach(n => {
+                if (!nfeIdsAdicionados.has(n.id)) {
+                    unificados.push({
+                        uid: `nota_${n.id}`,
+                        tipo: 'AVULSA',
+                        vendaId: null,
+                        nfeId: n.id,
+                        numeroNota: n.numero,
+                        data: n.dataEmissao || new Date().toISOString(),
+                        clienteNome: 'Emissão Manual (NF-e)',
+                        valorTotal: null,
+                        statusFiscal: n.status || 'AUTORIZADA',
+                        chaveAcesso: n.chaveAcesso
+                    });
+                }
             });
 
             unificados.sort((a, b) => new Date(b.data) - new Date(a.data));
@@ -71,6 +89,11 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
     useEffect(() => {
         carregarDadosFiscais();
     }, []);
+
+    // 🚀 Volta para a primeira página se o usuário mudar a busca, data ou status
+    useEffect(() => {
+        setPaginaAtual(1);
+    }, [busca, filtroStatus, dataInicio, dataFim]);
 
     const handleEnviarFechamento = async () => {
         if (!fechamentoEmail || !fechamentoEmail.includes('@')) return toast.error("Digite um e-mail válido!");
@@ -161,21 +184,68 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
         }
     };
 
-    const registrosFiltrados = registros.filter(reg => {
-        const matchBusca = (reg.numeroNota?.toString().includes(busca)) || (reg.vendaId?.toString().includes(busca)) || (reg.clienteNome?.toLowerCase().includes(busca.toLowerCase())) || (reg.chaveAcesso?.includes(busca));
-        let matchStatus = true;
-        if (filtroStatus === 'PENDENTES') matchStatus = reg.statusFiscal === 'PENDENTE' || reg.statusFiscal === 'CONTINGENCIA';
-        if (filtroStatus === 'AUTORIZADAS') matchStatus = reg.statusFiscal === 'AUTORIZADA';
-        if (filtroStatus === 'ERRO') matchStatus = reg.statusFiscal === 'ERRO' || reg.statusFiscal === 'REJEITADA';
-        return matchBusca && matchStatus;
-    });
-
     const BadgeStatusFiscal = ({ status }) => {
         if (status === 'PENDENTE') return <span className="flex items-center gap-1 w-max text-xs font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded border border-orange-200"><Clock size={12}/> Pendente</span>;
         if (status === 'AUTORIZADA') return <span className="flex items-center gap-1 w-max text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200"><CheckCircle size={12}/> Autorizada</span>;
         if (status === 'CONTINGENCIA') return <span className="flex items-center gap-1 w-max text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200"><AlertCircle size={12}/> Offline</span>;
         return <span className="flex items-center gap-1 w-max text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200"><AlertCircle size={12}/> Rejeitada</span>;
     };
+
+    const isCupomFiscal = (chaveAcesso) => {
+        if (!chaveAcesso || chaveAcesso.length < 22) return false;
+        return chaveAcesso.substring(20, 22) === '65';
+    };
+
+    const getNomeTipoNota = (chaveAcesso) => {
+        if (!chaveAcesso || chaveAcesso.length < 22) return 'Aguardando Emissão';
+        return isCupomFiscal(chaveAcesso) ? 'CUPOM FISCAL (NFC-e)' : 'NOTA GRANDE (NF-e)';
+    };
+
+    const getCorTipoNota = (chaveAcesso) => {
+        if (!chaveAcesso || chaveAcesso.length < 22) return 'bg-orange-100 text-orange-700 border-orange-200';
+        return isCupomFiscal(chaveAcesso)
+            ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+            : 'bg-purple-100 text-purple-700 border-purple-200';
+    };
+
+    // =========================================================================
+    // 🚀 LÓGICA DE FILTRAGEM (Busca, Status e Datas)
+    // =========================================================================
+    const registrosFiltrados = registros.filter(reg => {
+        const matchBusca = (reg.numeroNota?.toString().includes(busca)) ||
+            (reg.vendaId?.toString().includes(busca)) ||
+            (reg.clienteNome?.toLowerCase().includes(busca.toLowerCase())) ||
+            (reg.chaveAcesso?.includes(busca));
+
+        let matchStatus = true;
+        if (filtroStatus === 'PENDENTES') matchStatus = reg.statusFiscal === 'PENDENTE' || reg.statusFiscal === 'CONTINGENCIA';
+        if (filtroStatus === 'AUTORIZADAS') matchStatus = reg.statusFiscal === 'AUTORIZADA';
+        if (filtroStatus === 'ERRO') matchStatus = reg.statusFiscal === 'ERRO' || reg.statusFiscal === 'REJEITADA';
+
+        let matchData = true;
+        const dataRegistro = new Date(reg.data);
+        dataRegistro.setHours(0, 0, 0, 0);
+
+        if (dataInicio) {
+            const dInicio = new Date(dataInicio + 'T00:00:00');
+            if (dataRegistro < dInicio) matchData = false;
+        }
+        if (dataFim) {
+            const dFim = new Date(dataFim + 'T23:59:59');
+            if (dataRegistro > dFim) matchData = false;
+        }
+
+        return matchBusca && matchStatus && matchData;
+    });
+
+    // =========================================================================
+    // 🚀 LÓGICA DE PAGINAÇÃO
+    // =========================================================================
+    const totalPaginas = Math.ceil(registrosFiltrados.length / itensPorPagina);
+    const indiceInicial = (paginaAtual - 1) * itensPorPagina;
+    const indiceFinal = indiceInicial + itensPorPagina;
+    const registrosPaginados = registrosFiltrados.slice(indiceInicial, indiceFinal);
+
 
     return (
         <div className="p-8 max-w-7xl mx-auto animate-fade-in relative">
@@ -197,12 +267,42 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                 </div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 mb-6">
+            {/* 🚀 ÁREA DE FILTROS COM DATA */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col xl:flex-row gap-4 mb-6">
+
+                {/* Filtro de Busca */}
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-3 text-slate-400" size={18} />
                     <input type="text" placeholder="Buscar por N.º, Pedido, Cliente ou Chave..." value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:bg-white outline-none text-sm font-bold text-slate-700" />
                 </div>
-                <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
+
+                {/* 🚀 NOVO FILTRO DE DATAS */}
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1.5 px-3">
+                    <Calendar size={18} className="text-slate-400" />
+                    <input
+                        type="date"
+                        value={dataInicio}
+                        onChange={(e) => setDataInicio(e.target.value)}
+                        className="bg-transparent outline-none text-sm font-bold text-slate-600 cursor-pointer"
+                        title="Data Inicial"
+                    />
+                    <span className="text-slate-300 font-bold">até</span>
+                    <input
+                        type="date"
+                        value={dataFim}
+                        onChange={(e) => setDataFim(e.target.value)}
+                        className="bg-transparent outline-none text-sm font-bold text-slate-600 cursor-pointer"
+                        title="Data Final"
+                    />
+                    {(dataInicio || dataFim) && (
+                        <button onClick={() => { setDataInicio(''); setDataFim(''); }} className="ml-1 text-slate-400 hover:text-red-500" title="Limpar Filtro de Data">
+                            <X size={16} />
+                        </button>
+                    )}
+                </div>
+
+                {/* Filtro de Status */}
+                <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2 xl:pb-0">
                     {['TODAS', 'PENDENTES', 'AUTORIZADAS', 'ERRO'].map(status => (
                         <button key={status} onClick={() => setFiltroStatus(status)} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${filtroStatus === status ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
                             {status}
@@ -211,90 +311,118 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                 </div>
             </div>
 
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* TABELA COM ALTURA FIXA E PAGINAÇÃO */}
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[500px]">
                 {loading ? (
-                    <div className="p-12 text-center text-slate-400 font-bold flex flex-col items-center"><Loader2 size={40} className="animate-spin mb-4 text-blue-500" />Sincronizando notas...</div>
+                    <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-slate-400 font-bold"><Loader2 size={40} className="animate-spin mb-4 text-blue-500" />Sincronizando notas...</div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50 border-b border-slate-200">
-                            <tr className="text-[10px] text-slate-500 uppercase tracking-widest">
-                                <th className="p-4 font-black">Identificação</th>
-                                <th className="p-4 font-black">Data</th>
-                                <th className="p-4 font-black">Cliente / Valor</th>
-                                <th className="p-4 font-black">Status SEFAZ</th>
-                                <th className="p-4 text-right font-black">Ações</th>
-                            </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                            {registrosFiltrados.length === 0 ? (
-                                <tr><td colSpan="5" className="p-8 text-center text-slate-400 font-bold">Nenhuma nota encontrada.</td></tr>
-                            ) : (
-                                registrosFiltrados.map(reg => (
-                                    <tr key={reg.uid} className="hover:bg-slate-50 transition-colors">
+                    <>
+                        <div className="overflow-x-auto flex-1">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 border-b border-slate-200">
+                                <tr className="text-[10px] text-slate-500 uppercase tracking-widest">
+                                    <th className="p-4 font-black">Identificação</th>
+                                    <th className="p-4 font-black">Data</th>
+                                    <th className="p-4 font-black">Cliente / Valor</th>
+                                    <th className="p-4 font-black">Status SEFAZ</th>
+                                    <th className="p-4 text-right font-black">Ações</th>
+                                </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                {registrosPaginados.length === 0 ? (
+                                    <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-bold">Nenhum resultado encontrado.</td></tr>
+                                ) : (
+                                    registrosPaginados.map(reg => (
+                                        <tr key={reg.uid} className="hover:bg-slate-50 transition-colors">
 
-                                        {/* 🚀 ETIQUETAS VISUAIS CLARAS (CUPOM vs NOTA A4) */}
-                                        <td className="p-4">
-                                            {reg.numeroNota ? (
-                                                <p className="font-black text-slate-800 text-sm">
-                                                    {reg.tipo === 'PDV' ? 'NFC-e' : 'NF-e'} Nº {reg.numeroNota}
-                                                </p>
-                                            ) : (
-                                                <p className="font-black text-orange-500 text-sm">Aguardando Emissão</p>
-                                            )}
-
-                                            {reg.tipo === 'PDV' ? (
-                                                <span className="inline-block mt-1 bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border border-emerald-200">
-                                                    CUPOM (NFC-e) • Venda #{reg.vendaId}
-                                                </span>
-                                            ) : (
-                                                <span className="inline-block mt-1 bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border border-purple-200">
-                                                    NOTA GRANDE (NF-e)
-                                                </span>
-                                            )}
-                                        </td>
-
-                                        <td className="p-4 text-sm font-medium text-slate-600">
-                                            {new Date(reg.data).toLocaleDateString('pt-BR')} <br/>
-                                            <span className="text-xs text-slate-400">{new Date(reg.data).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
-                                        </td>
-                                        <td className="p-4">
-                                            <p className={`font-bold text-sm truncate max-w-[200px] ${reg.tipo === 'AVULSA' ? 'text-purple-800' : 'text-slate-800'}`}>{reg.clienteNome}</p>
-                                            {reg.valorTotal !== null && <p className="font-black text-emerald-600 text-xs mt-0.5">R$ {reg.valorTotal.toFixed(2)}</p>}
-                                        </td>
-                                        <td className="p-4">
-                                            <BadgeStatusFiscal status={reg.statusFiscal} />
-                                            {reg.chaveAcesso && <p className="text-[10px] font-mono text-slate-400 mt-1">{reg.chaveAcesso}</p>}
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <div className="flex justify-end gap-2">
-
-                                                {/* 🚀 BOTÃO DE AUTORIZAR MUDA DE ACORDO COM O TIPO */}
-                                                {reg.tipo === 'PDV' && reg.statusFiscal === 'PENDENTE' && (
-                                                    <button onClick={() => handleEmitirNotaPDV(reg.vendaId)} disabled={processandoId === reg.vendaId} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-black flex items-center gap-1 transition-colors disabled:opacity-50 shadow-sm">
-                                                        {processandoId === reg.vendaId ? <Loader2 size={14} className="animate-spin" /> : <Receipt size={14} />} AUTORIZAR CUPOM
-                                                    </button>
+                                            <td className="p-4">
+                                                {reg.numeroNota ? (
+                                                    <p className="font-black text-slate-800 text-sm">
+                                                        {isCupomFiscal(reg.chaveAcesso) ? 'NFC-e' : 'NF-e'} Nº {reg.numeroNota}
+                                                    </p>
+                                                ) : (
+                                                    <p className="font-black text-orange-500 text-sm">Aguardando Emissão</p>
                                                 )}
 
-                                                {reg.chaveAcesso && (
-                                                    <>
-                                                        {/* 🚀 BOTÃO DE IMPRIMIR MUDA DE NOME E ÍCONE */}
-                                                        <button onClick={() => handleImprimirDanfe(reg)} className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm" title="Imprimir Documento">
-                                                            {reg.tipo === 'PDV' ? <><Receipt size={14}/> CUPOM</> : <><Printer size={14}/> DANFE</>}
+                                                <div className="flex flex-col gap-1 mt-1">
+                                                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border w-max ${getCorTipoNota(reg.chaveAcesso)}`}>
+                                                        {getNomeTipoNota(reg.chaveAcesso)}
+                                                    </span>
+                                                    <span className="text-[10px] font-bold text-slate-500">
+                                                        {reg.vendaId ? `Origem: Venda #${reg.vendaId}` : 'Emissão Avulsa'}
+                                                    </span>
+                                                </div>
+                                            </td>
+
+                                            <td className="p-4 text-sm font-medium text-slate-600">
+                                                {new Date(reg.data).toLocaleDateString('pt-BR')} <br/>
+                                                <span className="text-xs text-slate-400">{new Date(reg.data).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
+                                            </td>
+                                            <td className="p-4">
+                                                <p className={`font-bold text-sm truncate max-w-[200px] ${!reg.vendaId ? 'text-purple-800' : 'text-slate-800'}`}>{reg.clienteNome}</p>
+                                                {reg.valorTotal !== null && <p className="font-black text-emerald-600 text-xs mt-0.5">R$ {reg.valorTotal.toFixed(2)}</p>}
+                                            </td>
+                                            <td className="p-4">
+                                                <BadgeStatusFiscal status={reg.statusFiscal} />
+                                                {reg.chaveAcesso && <p className="text-[10px] font-mono text-slate-400 mt-1" title={reg.chaveAcesso}>{reg.chaveAcesso.substring(0,24)}...</p>}
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                <div className="flex justify-end gap-2">
+
+                                                    {reg.tipo === 'PDV' && reg.statusFiscal === 'PENDENTE' && (
+                                                        <button onClick={() => handleEmitirNotaPDV(reg.vendaId)} disabled={processandoId === reg.vendaId} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-black flex items-center gap-1 transition-colors disabled:opacity-50 shadow-sm">
+                                                            {processandoId === reg.vendaId ? <Loader2 size={14} className="animate-spin" /> : <Receipt size={14} />} AUTORIZAR CUPOM
                                                         </button>
+                                                    )}
 
-                                                        <button onClick={() => handleBaixarXML(reg)} className="bg-white hover:bg-slate-100 text-green-700 border border-green-300 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm" title="Baixar XML"><Download size={14} /></button>
-                                                        <button onClick={() => handleEnviarContador(reg)} className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm" title="Enviar para Contabilidade"><Mail size={14} /></button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                            </tbody>
-                        </table>
-                    </div>
+                                                    {reg.chaveAcesso && (
+                                                        <>
+                                                            <button onClick={() => handleImprimirDanfe(reg)} className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm" title="Imprimir Documento">
+                                                                {isCupomFiscal(reg.chaveAcesso) ? <><Receipt size={14}/> CUPOM</> : <><Printer size={14}/> DANFE</>}
+                                                            </button>
+
+                                                            <button onClick={() => handleBaixarXML(reg)} className="bg-white hover:bg-slate-100 text-green-700 border border-green-300 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm" title="Baixar XML"><Download size={14} /></button>
+                                                            <button onClick={() => handleEnviarContador(reg)} className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm" title="Enviar para Contabilidade"><Mail size={14} /></button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* 🚀 RODAPÉ DE PAGINAÇÃO */}
+                        {registrosFiltrados.length > 0 && (
+                            <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                                <span className="text-xs font-bold text-slate-500">
+                                    Mostrando do {indiceInicial + 1} até {Math.min(indiceFinal, registrosFiltrados.length)} de {registrosFiltrados.length} notas
+                                </span>
+
+                                <div className="flex items-center gap-4">
+                                    <span className="text-xs font-bold text-slate-600">Página {paginaAtual} de {totalPaginas}</span>
+                                    <div className="flex gap-1">
+                                        <button
+                                            onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))}
+                                            disabled={paginaAtual === 1}
+                                            className="p-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white transition-colors"
+                                        >
+                                            <ChevronLeft size={16} className="text-slate-600"/>
+                                        </button>
+                                        <button
+                                            onClick={() => setPaginaAtual(prev => Math.min(prev + 1, totalPaginas))}
+                                            disabled={paginaAtual === totalPaginas}
+                                            className="p-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white transition-colors"
+                                        >
+                                            <ChevronRight size={16} className="text-slate-600"/>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 
