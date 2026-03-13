@@ -37,6 +37,15 @@ public class ParceiroService {
         parceiroExistente.setTelefone(dadosAtualizados.getTelefone());
         parceiroExistente.setTipo(dadosAtualizados.getTipo());
         parceiroExistente.setEndereco(dadosAtualizados.getEndereco());
+
+
+
+        // 🚀 Atualiza os campos financeiros que estavam sendo ignorados
+        parceiroExistente.setLimiteCredito(dadosAtualizados.getLimiteCredito());
+        parceiroExistente.setIntervaloDiasPagamento(dadosAtualizados.getIntervaloDiasPagamento());
+
+        // O percentual de desconto também é bom garantir
+        parceiroExistente.setPercentualDesconto(dadosAtualizados.getPercentualDesconto());
         
         Parceiro salvo = repository.save(parceiroExistente);
         auditoriaService.registrar("CADASTROS", "EDICAO_PARCEIRO", "Atualizou dados do parceiro: " + salvo.getNome());

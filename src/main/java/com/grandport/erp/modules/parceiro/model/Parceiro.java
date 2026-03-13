@@ -45,4 +45,8 @@ public class Parceiro {
     public BigDecimal getSaldoDisponivel() {
         return limiteCredito.subtract(saldoDevedor);
     }
+
+
+    @Column(name = "intervalo_dias_pagamento")
+    private Integer intervaloDiasPagamento = 30; // Padrão 30 dias
 }

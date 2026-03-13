@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
-import { Save, ArrowLeft, UserPlus, Loader2, DollarSign } from 'lucide-react';
+import { Save, ArrowLeft, UserPlus, Loader2, DollarSign, CalendarClock } from 'lucide-react';
 import { VeiculosCliente } from './VeiculosCliente';
 
 export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parceirosLista }) => {
@@ -20,7 +20,8 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
             ibge: ''
         },
         limiteCredito: 0,
-        saldoDevedor: 0
+        saldoDevedor: 0,
+        intervaloDiasPagamento: 30 // 🚀 NOVO CAMPO: Padrão 30 dias
     });
 
     const [loadingCnpj, setLoadingCnpj] = useState(false);
@@ -32,6 +33,20 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
     const [cidadesIbge, setCidadesIbge] = useState([]);
     const [loadingIbge, setLoadingIbge] = useState(false);
 
+    // =======================================================================
+    // 🚀 MÁSCARA MONETÁRIA (Para o Limite de Crédito)
+    // =======================================================================
+    const formatarMoeda = (valor) => {
+        if (valor === undefined || valor === null || isNaN(Number(valor))) return '0,00';
+        return Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    const handleLimiteCreditoChange = (valorDigitado) => {
+        const apenasDigitos = valorDigitado.replace(/\D/g, '');
+        const valorRealFloat = Number(apenasDigitos) / 100;
+        setParceiro(prev => ({ ...prev, limiteCredito: valorRealFloat }));
+    };
+
     // 1. CARREGAR PARCEIRO PARA EDIÇÃO
     useEffect(() => {
         if (isEditing) {
@@ -39,7 +54,8 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
                 ...parceiroParaEditar,
                 endereco: parceiroParaEditar.endereco || { cep: '', logradouro: '', numero: '', bairro: '', cidade: '', estado: '', ibge: '' },
                 limiteCredito: parceiroParaEditar.limiteCredito || 0,
-                saldoDevedor: parceiroParaEditar.saldoDevedor || 0
+                saldoDevedor: parceiroParaEditar.saldoDevedor || 0,
+                intervaloDiasPagamento: parceiroParaEditar.intervaloDiasPagamento || 30
             });
         }
     }, [parceiroParaEditar, isEditing]);
@@ -68,24 +84,21 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
             .finally(() => setLoadingIbge(false));
     }, [parceiro.endereco.estado]);
 
-    // 4. 🚀 OBSERVADOR INTELIGENTE (Garante o preenchimento do IBGE mesmo com erro de acentos)
+    // 4. OBSERVADOR INTELIGENTE
     useEffect(() => {
         if (parceiro.endereco.cidade && cidadesIbge.length > 0) {
-            // Remove acentos e joga tudo para minúsculo para comparar com segurança
             const cidadeFormatada = parceiro.endereco.cidade.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
             const cidadeEncontrada = cidadesIbge.find(c =>
                 c.nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === cidadeFormatada
             );
 
-            // Se encontrou a cidade e o IBGE ainda está vazio ou diferente, ele força o preenchimento exato
             if (cidadeEncontrada && parceiro.endereco.ibge !== cidadeEncontrada.id.toString()) {
                 setParceiro(prev => ({
                     ...prev,
                     endereco: {
                         ...prev.endereco,
                         ibge: cidadeEncontrada.id.toString(),
-                        cidade: cidadeEncontrada.nome // Conserta maiúsculas/minúsculas para o padrão oficial
+                        cidade: cidadeEncontrada.nome
                     }
                 }));
             }
@@ -98,15 +111,15 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
         if (['cep', 'logradouro', 'numero', 'bairro', 'cidade', 'estado', 'ibge'].includes(name)) {
             setParceiro(prev => {
                 const novoEndereco = { ...prev.endereco, [name]: value };
-
-                // Se o usuário clicou e trocou o estado manualmente, limpamos a cidade antiga
                 if (name === 'estado' && prev.endereco.estado !== value) {
                     novoEndereco.cidade = '';
                     novoEndereco.ibge = '';
                 }
-
                 return { ...prev, endereco: novoEndereco };
             });
+        } else if (name === 'intervaloDiasPagamento') {
+            // Garante que o intervalo seja salvo como número
+            setParceiro(prev => ({ ...prev, [name]: parseInt(value) || 30 }));
         } else {
             setParceiro(prev => ({ ...prev, [name]: value }));
         }
@@ -130,7 +143,7 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
                     logradouro: dados.logradouro || '',
                     numero: dados.numero || '',
                     bairro: dados.bairro || '',
-                    cidade: dados.municipio || '', // Isso vai disparar o Observador IBGE 🚀
+                    cidade: dados.municipio || '',
                     estado: dados.uf || '',
                     ibge: dados.codigo_ibge_municipio || '',
                 }
@@ -158,7 +171,7 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
                     logradouro: dados.street || '',
                     bairro: dados.neighborhood || '',
                     estado: dados.state || '',
-                    cidade: dados.city || '', // Isso vai disparar o Observador IBGE 🚀
+                    cidade: dados.city || '',
                     ibge: dados.ibge || '',
                 }
             }));
@@ -250,7 +263,6 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
                         <input name="bairro" type="text" value={parceiro.endereco.bairro || ''} onChange={handleChange} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-500 outline-none" />
                     </div>
 
-                    {/* 🚀 SELECT DE ESTADO COM CÓDIGOS OFICIAIS */}
                     <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Estado (UF)</label>
                         <select name="estado" value={parceiro.endereco.estado || ''} onChange={handleChange} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-500 outline-none">
@@ -261,7 +273,6 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
                         </select>
                     </div>
 
-                    {/* 🚀 SELECT DE CIDADE REATIVO */}
                     <div className="relative">
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Cidade</label>
                         <select name="cidade" value={parceiro.endereco.cidade || ''} onChange={handleChange} disabled={!parceiro.endereco.estado || loadingIbge} className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-blue-500 outline-none disabled:opacity-50">
@@ -280,22 +291,59 @@ export const CriarParceiro = ({ onSucesso, onCancelar, parceiroParaEditar, parce
                         <input name="ibge" type="text" value={parceiro.endereco.ibge || ''} readOnly className="w-full p-3 bg-gray-100 border-2 border-gray-100 rounded-xl outline-none text-gray-500 cursor-not-allowed font-bold" placeholder="Automático" title="O Código IBGE é preenchido automaticamente ao selecionar a cidade." />
                     </div>
 
+                    {/* 🚀 SESSÃO DE CRÉDITO (ATUALIZADA) */}
                     <div className="md:col-span-3 border-t pt-6 mt-4">
                         <h3 className="text-sm font-black text-blue-600 mb-4 flex items-center gap-2">
-                            <DollarSign size={16} /> CONFIGURAÇÕES DE CRÉDITO
+                            <DollarSign size={16} /> CONFIGURAÇÕES DE CRÉDITO E PAGAMENTO
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+
+                            {/* CAMPO DE LIMITE COM MÁSCARA MONETÁRIA */}
                             <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Limite de Crédito (R$)</label>
-                                <input name="limiteCredito" type="number" value={parceiro.limiteCredito || 0} onChange={handleChange} className="w-full p-3 bg-blue-50 border-2 border-blue-100 rounded-xl focus:border-blue-500 outline-none font-bold text-blue-700" placeholder="0,00" />
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Limite de Crédito</label>
+                                <div className="flex items-center gap-2 bg-blue-50 border-2 border-blue-100 p-2 rounded-xl focus-within:border-blue-500 transition-colors">
+                                    <span className="text-sm font-black text-blue-300 pl-1">R$</span>
+                                    <input
+                                        name="limiteCredito"
+                                        type="text"
+                                        value={formatarMoeda(parceiro.limiteCredito)}
+                                        onChange={(e) => handleLimiteCreditoChange(e.target.value)}
+                                        className="w-full bg-transparent outline-none font-black text-blue-700 text-lg"
+                                        placeholder="0,00"
+                                    />
+                                </div>
                             </div>
-                            <div className="bg-gray-100 p-3 rounded-xl">
+
+                            {/* 🚀 NOVO CAMPO: INTERVALO DE PAGAMENTO */}
+                            {/* 🚀 CAMPO DE INTERVALO FLEXÍVEL */}
+                            <div className="md:col-span-1">
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">
+                                    <CalendarClock size={12}/> Intervalo entre Parcelas (Dias)
+                                </label>
+                                <div className="flex items-center gap-2 bg-gray-50 border-2 border-gray-200 p-2 rounded-xl focus-within:border-blue-500 transition-colors">
+                                    <input
+                                        name="intervaloDiasPagamento"
+                                        type="number"
+                                        min="1"
+                                        max="365"
+                                        value={parceiro.intervaloDiasPagamento || 30}
+                                        onChange={handleChange}
+                                        className="w-full bg-transparent outline-none font-black text-gray-700 text-lg"
+                                        placeholder="Ex: 30"
+                                    />
+                                    <span className="text-xs font-bold text-gray-400 pr-2">DIAS</span>
+                                </div>
+                                <p className="text-[9px] text-slate-400 mt-1 italic">* Padrão de mercado é 30 dias.</p>
+                            </div>
+
+                            <div className="bg-gray-100 p-3 rounded-xl flex flex-col justify-center">
                                 <label className="block text-[10px] font-bold text-gray-500 uppercase">Saldo Devedor Atual</label>
                                 <p className="text-xl font-black text-red-600">R$ {parceiro.saldoDevedor?.toFixed(2) || '0.00'}</p>
                             </div>
-                            <div className="bg-green-50 p-3 rounded-xl border border-green-100">
+
+                            <div className="bg-green-50 p-3 rounded-xl border border-green-100 flex flex-col justify-center">
                                 <label className="block text-[10px] font-bold text-green-600 uppercase">Crédito Disponível</label>
-                                <p className="text-xl font-black text-green-700">R$ {((parceiro.limiteCredito || 0) - (parceiro.saldoDevedor || 0)).toFixed(2)}</p>
+                                <p className="text-xl font-black text-green-700">R$ {Math.max(0, (parceiro.limiteCredito || 0) - (parceiro.saldoDevedor || 0)).toFixed(2)}</p>
                             </div>
                         </div>
                     </div>

@@ -71,14 +71,18 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
         if (pagamentosPrazo.length === 0) return [];
 
         let parcelas = [];
+        // 🚀 Pega o intervalo do cadastro do cliente (ou usa 30 se não tiver)
+        const intervaloCliente = pedido.cliente?.intervaloDiasPagamento || 30;
+
         pagamentosPrazo.forEach(pag => {
             const numParcelas = pag.parcelas || 1;
             const valorParcela = pag.valor / numParcelas;
 
             for (let i = 1; i <= numParcelas; i++) {
-                // Adiciona 30 dias para cada parcela a partir de hoje
                 let dataVencimento = new Date(pedido.dataHora || Date.now());
-                dataVencimento.setDate(dataVencimento.getDate() + (30 * i));
+
+                // 🚀 AQUI ESTÁ A MÁGICA: Multiplica o número da parcela pelo intervalo do cliente
+                dataVencimento.setDate(dataVencimento.getDate() + (intervaloCliente * i));
 
                 parcelas.push({
                     numero: i,
@@ -91,7 +95,6 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
         });
         return parcelas;
     };
-
     const parcelasPromissoria = gerarParcelasPromissoria();
     const possuiPromissoria = parcelasPromissoria.length > 0;
 
