@@ -1,13 +1,14 @@
 package com.grandport.erp.modules.fiscal.controller;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
-import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService; // 🚀 IMPORT ADICIONADO
+import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 import com.grandport.erp.modules.fiscal.repository.NotaFiscalRepository;
 import com.grandport.erp.modules.fiscal.service.DanfeService;
 import com.grandport.erp.modules.fiscal.service.NfeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,7 +41,6 @@ public class FiscalController {
     @Autowired
     private com.grandport.erp.modules.fiscal.service.EmailFiscalService emailFiscalService;
 
-    // 🚀 INJEÇÃO ADICIONADA PARA O STATUS DA SEFAZ FUNCIONAR
     @Autowired
     private ConfiguracaoService configuracaoService;
 
@@ -68,17 +68,12 @@ public class FiscalController {
     @PostMapping("/emitir/{vendaId}")
     public ResponseEntity<?> emitirCupom(@PathVariable Long vendaId) {
         try {
-            // 1. O NfeService retorna um Map (e não a NotaFiscal inteira)
             Map<String, Object> resultadoSefaz = nfeService.emitirNfeSefaz(vendaId);
-
-            // 2. O React precisa do ID da nota! Vamos buscar a nota que acabou de ser salva
             NotaFiscal notaSalva = notaFiscalRepository.findByVendaId(vendaId);
-
-            // 3. Como o Map original é imutável, criamos um novo para adicionar o ID
             Map<String, Object> response = new HashMap<>(resultadoSefaz);
 
             if (notaSalva != null) {
-                response.put("id", notaSalva.getId()); // 🚀 INJETAMOS O ID AQUI!
+                response.put("id", notaSalva.getId());
             }
 
             return ResponseEntity.ok(response);
@@ -88,53 +83,30 @@ public class FiscalController {
     }
 
     // =======================================================================
-    // 🚀 TESTAR STATUS DA SEFAZ (CONEXÃO REAL COM O GOVERNO)
+    // 🚀 TESTAR STATUS DA SEFAZ
     // =======================================================================
     @GetMapping("/status-sefaz")
     public ResponseEntity<?> verificarStatusSefaz() {
-        System.out.println("🚀 [BOTAO CLICADO] Iniciando teste de Status SEFAZ...");
         try {
             ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
+            if (config == null) return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Configurações não encontradas."));
+            if (config.getUf() == null || config.getUf().isEmpty()) return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Selecione a UF."));
 
-            if (config == null) {
-                System.out.println("❌ Erro: Configuração não encontrada no banco.");
-                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Configurações não encontradas."));
-            }
-
-            System.out.println("📝 Dados encontrados: UF=" + config.getUf() + ", Ambiente=" + config.getAmbienteSefaz());
-
-            // 1. Validação
-            if (config.getUf() == null || config.getUf().isEmpty()) {
-                System.out.println("⚠️ Validação falhou: UF vazia.");
-                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Selecione a UF."));
-            }
-
-            // 2. Tenta ligar o motor
-            System.out.println("⚙️ Ligando motor de configuração...");
             ConfiguracoesNfe configSefaz = nfeSetupService.iniciarConfiguracao(config);
-            System.out.println("✅ Motor ligado com sucesso!");
-
-            // 3. Consulta a Sefaz
-            System.out.println("📡 Batendo na porta da SEFAZ oficial...");
             TRetConsStatServ retornoSefaz = Nfe.statusServico(configSefaz, DocumentoEnum.NFCE);
-
-            System.out.println("📩 Resposta recebida! Código: " + retornoSefaz.getCStat());
 
             if ("107".equals(retornoSefaz.getCStat())) {
                 return ResponseEntity.ok(Map.of("status", "ONLINE", "mensagem", "SEFAZ OK: " + retornoSefaz.getXMotivo()));
             } else {
                 return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "SEFAZ Recusou: " + retornoSefaz.getXMotivo()));
             }
-
         } catch (Exception e) {
-            System.out.println("🚨 ERRO CRÍTICO NO JAVA: " + e.getMessage());
-            e.printStackTrace(); // 👈 Isso vai imprimir a "pilha" do erro completa no console!
             return ResponseEntity.badRequest().body(Map.of("status", "ERRO", "mensagem", e.getMessage()));
         }
     }
 
     // =======================================================================
-    // 🚀 DOWNLOAD/VISUALIZAÇÃO DO DANFE (PDF DO PDV - O CUPOM INTELIGENTE)
+    // 🚀 DOWNLOAD DO DANFE (PDV E AVULSA)
     // =======================================================================
     @GetMapping("/{nfeId}/danfe")
     public ResponseEntity<byte[]> baixarDanfe(@PathVariable Long nfeId) {
@@ -149,57 +121,10 @@ public class FiscalController {
                     .contentType(MediaType.APPLICATION_PDF)
                     .body(pdfBytes);
         } catch (Exception e) {
-            System.err.println("[ERRO - GERAR PDF] " + e.getMessage());
             return ResponseEntity.internalServerError().build();
         }
     }
 
-    // =======================================================================
-    // 🚀 DOWNLOAD DO XML (Motor 2026 Integrado)
-    // =======================================================================
-    @GetMapping("/{nfeId}/xml")
-    public ResponseEntity<byte[]> baixarXml(@PathVariable Long nfeId) {
-        try {
-            NotaFiscal nota = notaFiscalRepository.findById(nfeId)
-                    .orElseThrow(() -> new Exception("Nota Fiscal não encontrada."));
-
-            String diretorioXml = System.getProperty("user.dir") + "/nfe_xmls/";
-            Path caminhoArquivo = Paths.get(diretorioXml + nota.getChaveAcesso() + ".xml");
-
-            if (!Files.exists(caminhoArquivo)) {
-                throw new Exception("O arquivo XML físico não foi encontrado no servidor.");
-            }
-
-            byte[] xmlBytes = Files.readAllBytes(caminhoArquivo);
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + nota.getChaveAcesso() + ".xml")
-                    .contentType(org.springframework.http.MediaType.APPLICATION_XML)
-                    .body(xmlBytes);
-        } catch (Exception e) {
-            System.err.println("[ERRO - BAIXAR XML] " + e.getMessage());
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    // =======================================================================
-    // 🚀 EMISSÃO AVANÇADA (TELA DEDICADA DE NOTA A4)
-    // =======================================================================
-    @PostMapping("/emitir-completa")
-    public ResponseEntity<?> emitirNfeCompleta(@RequestBody com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO request) {
-        try {
-            System.out.println("Recebendo DTO da NF-e Avançada: " + request.getNaturezaOperacao());
-            Map<String, Object> respostaSefaz = nfeService.emitirNfeAvancada(request);
-            return ResponseEntity.ok(respostaSefaz);
-        } catch (Exception e) {
-            System.err.println("[ERRO - EMISSÃO AVANÇADA] " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body(Map.of("message", "Erro ao emitir NF-e: " + e.getMessage()));
-        }
-    }
-
-    // =======================================================================
-    // 🚀 BAIXAR PDF (DANFE) DA NOTA AVULSA
-    // =======================================================================
     @GetMapping(value = "/danfe/avulsa/{chaveAcesso}", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> baixarDanfeAvulsa(@PathVariable String chaveAcesso) {
         try {
@@ -213,65 +138,146 @@ public class FiscalController {
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"DANFE_" + chaveAcesso + ".pdf\"")
                     .body(pdfBytes);
-
         } catch (Exception e) {
-            System.err.println("[ERRO - DANFE AVULSA] " + e.getMessage());
             return ResponseEntity.badRequest().body(null);
         }
     }
 
     // =======================================================================
-    // 🚀 ENVIAR XML PARA O CONTADOR
+    // 🚀 DOWNLOAD DO XML
     // =======================================================================
-    @PostMapping("/{nfeId}/enviar-contador")
-    public ResponseEntity<?> enviarParaContador(@PathVariable Long nfeId, @RequestParam String email) {
+    @GetMapping("/{nfeId}/xml")
+    public ResponseEntity<byte[]> baixarXml(@PathVariable Long nfeId) {
         try {
             NotaFiscal nota = notaFiscalRepository.findById(nfeId)
                     .orElseThrow(() -> new Exception("Nota Fiscal não encontrada."));
 
-            emailFiscalService.enviarXmlContador(nota, email);
+            String diretorioXml = System.getProperty("user.dir") + "/nfe_xmls/";
+            Path caminhoArquivo = Paths.get(diretorioXml + nota.getChaveAcesso() + ".xml");
 
-            return ResponseEntity.ok(Map.of("message", "E-mail enviado com sucesso!"));
+            if (!Files.exists(caminhoArquivo)) throw new Exception("XML físico não encontrado.");
+
+            byte[] xmlBytes = Files.readAllBytes(caminhoArquivo);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + nota.getChaveAcesso() + ".xml")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_XML)
+                    .body(xmlBytes);
         } catch (Exception e) {
-            System.err.println("[ERRO - EMAIL CONTADOR] " + e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of("message", "Erro ao enviar e-mail: " + e.getMessage()));
+            return ResponseEntity.internalServerError().build();
         }
     }
 
     // =======================================================================
-    // 🚀 ENVIAR LOTE MENSAL (FECHAMENTO)
+    // 🚀 EMISSÃO AVANÇADA E COMUNICAÇÃO CONTADOR
     // =======================================================================
+    @PostMapping("/emitir-completa")
+    public ResponseEntity<?> emitirNfeCompleta(@RequestBody com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO request) {
+        try {
+            Map<String, Object> respostaSefaz = nfeService.emitirNfeAvancada(request);
+            return ResponseEntity.ok(respostaSefaz);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Erro ao emitir NF-e: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{nfeId}/enviar-contador")
+    public ResponseEntity<?> enviarParaContador(@PathVariable Long nfeId, @RequestParam String email) {
+        try {
+            NotaFiscal nota = notaFiscalRepository.findById(nfeId)
+                    .orElseThrow(() -> new Exception("Nota não encontrada."));
+            emailFiscalService.enviarXmlContador(nota, email);
+            return ResponseEntity.ok(Map.of("message", "E-mail enviado com sucesso!"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Erro: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/enviar-lote-contador")
     public ResponseEntity<?> enviarLoteMensal(
             @RequestParam String email,
             @RequestParam String mesAno,
-            @RequestParam(required = false, defaultValue = "Segue em anexo o fechamento fiscal.") String mensagem,
+            @RequestParam(required = false, defaultValue = "Segue fechamento fiscal.") String mensagem,
             @RequestBody List<Long> nfeIds) {
         try {
             List<NotaFiscal> notasDoLote = notaFiscalRepository.findAllById(nfeIds);
             emailFiscalService.enviarLoteXmlContador(notasDoLote, email, mesAno, mensagem);
-
             return ResponseEntity.ok(Map.of("message", "Fechamento enviado com sucesso!"));
         } catch (Exception e) {
-            System.err.println("[ERRO - LOTE CONTADOR] " + e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of("message", "Erro ao enviar lote: " + e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("message", "Erro: " + e.getMessage()));
         }
     }
 
-    // 🚀 Adicione este endpoint no seu FiscalController.java
     @GetMapping("/testar-email")
     public ResponseEntity<?> verificarStatusEmail() {
         try {
             emailFiscalService.testarConexaoEmail();
-            return ResponseEntity.ok(Map.of(
-                    "status", "ONLINE",
-                    "mensagem", "Conexão com o servidor de E-mail estabelecida com sucesso!"
-            ));
+            return ResponseEntity.ok(Map.of("status", "ONLINE", "mensagem", "E-mail OK"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "status", "ERRO",
-                    "mensagem", "Falha na autenticação: Verifique a senha de app e o servidor SMTP."
-            ));
+            return ResponseEntity.badRequest().body(Map.of("status", "ERRO", "mensagem", "Falha SMTP."));
+        }
+    }
+
+    // =======================================================================
+    // 🚀 EXCLUIR REGISTRO FISCAL COM ERRO/PENDENTE
+    // =======================================================================
+    @DeleteMapping("/notas/{id}")
+    public ResponseEntity<?> excluirNotaComErro(@PathVariable Long id) {
+        try {
+            NotaFiscal nota = notaFiscalRepository.findById(id)
+                    .orElseThrow(() -> new Exception("Nota não encontrada no sistema."));
+
+            if ("AUTORIZADA".equals(nota.getStatus())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("message", "Segurança Fiscal: Não é permitido excluir uma nota autorizada. Utilize a função Cancelar."));
+            }
+
+            // Se for vinculada a uma venda, primeiro tira o vínculo para não dar erro de banco
+            if (nota.getVenda() != null) {
+                nota.getVenda().setNotaFiscal(null);
+            }
+
+            notaFiscalRepository.delete(nota);
+            return ResponseEntity.ok(Map.of("message", "Registro fiscal excluído com sucesso."));
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Erro ao excluir nota: " + e.getMessage()));
+        }
+    }
+
+    // =======================================================================
+    // 🚀 CANCELAR NF-E AVULSA (Aquela que não tem uma venda PDV atrelada)
+    // =======================================================================
+    @PostMapping("/cancelar-nfe/{id}")
+    public ResponseEntity<?> cancelarNotaFiscalAvulsa(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        String justificativa = payload.get("justificativa");
+
+        if (justificativa == null || justificativa.trim().length() < 15) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "A justificativa deve conter no mínimo 15 caracteres."));
+        }
+
+        try {
+            NotaFiscal nota = notaFiscalRepository.findById(id)
+                    .orElseThrow(() -> new Exception("Nota Fiscal não encontrada."));
+
+            if (!"AUTORIZADA".equals(nota.getStatus())) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Apenas notas autorizadas podem ser canceladas na SEFAZ."));
+            }
+
+            // AQUI VOCÊ CHAMA O SEU SERVIÇO QUE FALA COM A SEFAZ
+            // Exemplo: motorFiscalService.cancelarNota(nota.getChaveAcesso(), justificativa);
+
+            System.out.println(">>> Enviando CANCELAMENTO AVULSO para a SEFAZ...");
+            System.out.println("Chave: " + nota.getChaveAcesso());
+
+            nota.setStatus("CANCELADA");
+            notaFiscalRepository.save(nota);
+
+            return ResponseEntity.ok(Map.of("message", "Nota Fiscal cancelada com sucesso na SEFAZ."));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Rejeição SEFAZ: " + e.getMessage()));
         }
     }
 }

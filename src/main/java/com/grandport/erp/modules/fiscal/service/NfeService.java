@@ -4,6 +4,7 @@ import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 import com.grandport.erp.modules.fiscal.repository.NotaFiscalRepository;
+import com.grandport.erp.modules.vendas.model.StatusVenda;
 import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.model.ItemVenda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
@@ -278,6 +279,44 @@ public class NfeService {
         configuracaoService.atualizarConfiguracao(config);
 
         return Map.of("status", "AUTORIZADA", "chaveAcesso", chaveAcessoReal, "numero", numeroNfe);
+    }
+
+    // =========================================================================
+    // 🚀 NOVO MÉTODO: CANCELAR NFE DA VENDA
+    // =========================================================================
+    // =========================================================================
+    // 🚀 NOVO MÉTODO: CANCELAR NFE DA VENDA
+    // =========================================================================
+    public void cancelarNfeDaVenda(Long vendaId, String justificativa) throws Exception {
+        // 1. Busca a Venda no banco de dados
+        Venda venda = vendaRepository.findById(vendaId)
+                .orElseThrow(() -> new Exception("Venda não encontrada."));
+
+        // 2. Verifica se existe nota atrelada
+        NotaFiscal nota = venda.getNotaFiscal();
+        if (nota == null || nota.getChaveAcesso() == null) {
+            throw new Exception("Esta venda não possui uma Nota Fiscal emitida ou autorizada para ser cancelada.");
+        }
+
+        // 3. Simula a chamada para o Motor Fiscal SEFAZ (Substituir pela chamada real depois)
+        // motorFiscalService.enviarEventoCancelamento(nota.getChaveAcesso(), justificativa);
+        System.out.println(">>> Enviando evento de CANCELAMENTO para a SEFAZ...");
+        System.out.println("Chave: " + nota.getChaveAcesso());
+        System.out.println("Justificativa: " + justificativa);
+
+        // 4. Marca a nota como cancelada no banco de dados
+        nota.setStatus("CANCELADA");
+        notaFiscalRepository.save(nota);
+
+        // 5. Devolve a Venda para o status de PEDIDO
+        // para que o vendedor possa corrigir itens e faturar de novo, se precisar.
+        venda.setStatus(StatusVenda.PEDIDO);
+
+        // 6. Desvincula a nota cancelada da venda para não dar erro de "chave duplicada"
+        // se ele for emitir de novo.
+        venda.setNotaFiscal(null);
+
+        vendaRepository.save(venda);
     }
 
     // =========================================================================

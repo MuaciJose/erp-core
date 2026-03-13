@@ -7,6 +7,10 @@ import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.service.VendaService;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import com.grandport.erp.modules.vendas.service.WhatsAppService;
+
+// 🚀 IMPORTAÇÃO DO SERVIÇO FISCAL ADICIONADA
+import com.grandport.erp.modules.fiscal.service.NfeService;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -16,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional; // 🚀 Importação adicionada para funcionar o isPresent()
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/vendas")
@@ -25,6 +29,9 @@ public class VendaController {
     @Autowired private VendaService service;
     @Autowired private VendaRepository repository;
     @Autowired private WhatsAppService whatsAppService;
+
+    // 🚀 INJEÇÃO DO SERVIÇO DE NOTA FISCAL
+    @Autowired private NfeService nfeService;
 
     // =========================================================================
     // 🚀 ENDPOINT DO WHATSAPP
@@ -50,7 +57,7 @@ public class VendaController {
         return ResponseEntity.ok(service.salvarOrcamento(dto));
     }
 
-    // 🚀 CORREÇÃO AQUI: Rota unificada para atualizar qualquer tipo de venda
+    // 🚀 Rota unificada para atualizar qualquer tipo de venda
     @PutMapping("/{id}")
     public ResponseEntity<Venda> atualizarVenda(@PathVariable Long id, @RequestBody VendaRequestDTO dto) {
         return ResponseEntity.ok(service.atualizarVenda(id, dto));
@@ -115,6 +122,30 @@ public class VendaController {
             }
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("mensagem", e.getMessage()));
+        }
+    }
+
+    // =========================================================================
+    // 🚀 ENDPOINT DE CANCELAMENTO DE NFE
+    // =========================================================================
+    @PostMapping("/{id}/cancelar-nfe")
+    public ResponseEntity<?> cancelarNotaFiscal(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        String justificativa = payload.get("justificativa");
+
+        if (justificativa == null || justificativa.trim().length() < 15) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "A justificativa deve conter no mínimo 15 caracteres."));
+        }
+
+        try {
+            // 🚀 LIGAÇÃO REAL COM O SERVIÇO FISCAL ATIVADA
+            nfeService.cancelarNfeDaVenda(id, justificativa);
+
+            return ResponseEntity.ok(Map.of("message", "Nota Fiscal cancelada com sucesso na SEFAZ."));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Rejeição SEFAZ: " + e.getMessage()));
         }
     }
 }

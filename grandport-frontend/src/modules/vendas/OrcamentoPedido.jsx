@@ -45,11 +45,16 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
     const [motivoVendaPerdida, setMotivoVendaPerdida] = useState('');
     const [observacaoVendaPerdida, setObservacaoVendaPerdida] = useState('');
 
+    // 🚀 NOVOS ESTADOS PARA CANCELAMENTO DE NFE
+    const [modalCancelamentoAberto, setModalCancelamentoAberto] = useState(false);
+    const [justificativaCancelamento, setJustificativaCancelamento] = useState('');
+    const [cancelandoNfe, setCancelandoNfe] = useState(false);
+
     const [statusZap, setStatusZap] = useState(null);
     const [checandoZap, setChecandoZap] = useState(false);
 
     // =======================================================================
-    // 🚀 EXTRATOR DE ERROS BLINDADO (Traduz o erro 403 e 401)
+    // 🚀 EXTRATOR DE ERROS BLINDADO
     // =======================================================================
     const extrairErroBackend = (error, mensagemPadrao) => {
         if (error?.response?.status === 403) return "Acesso Negado: Rota bloqueada pelo servidor (Erro 403).";
@@ -64,7 +69,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
     };
 
     // =======================================================================
-    // 🚀 MÁSCARAS MONETÁRIAS (Preenche da direita para esquerda)
+    // MÁSCARAS MONETÁRIAS
     // =======================================================================
     const formatarMoeda = (valor) => {
         if (valor === undefined || valor === null || isNaN(Number(valor))) return '0,00';
@@ -78,7 +83,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
     };
 
     // =======================================================================
-    // 🚀 MATEMÁTICA E VARIÁVEIS NO TOPO (Evita o erro de Tela Branca)
+    // MATEMÁTICA E VARIÁVEIS NO TOPO
     // =======================================================================
     const subtotal = itens.reduce((acc, item) => acc + ((item.preco || 0) * (item.qtd || 0)), 0);
 
@@ -344,6 +349,33 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         }
     };
 
+    // =======================================================================
+    // 🚀 LÓGICA DE CANCELAMENTO DE NFE
+    // =======================================================================
+    const cancelarNFe = async () => {
+        if (justificativaCancelamento.length < 15) {
+            return toast.error("A justificativa deve ter no mínimo 15 caracteres (Regra da SEFAZ).");
+        }
+
+        setCancelandoNfe(true);
+        const loadId = toast.loading("Transmitindo evento de cancelamento para a SEFAZ...");
+
+        try {
+            await api.post(`/api/vendas/${orcamentoId}/cancelar-nfe`, { justificativa: justificativaCancelamento });
+            toast.success("NF-e Cancelada com sucesso e inutilizada na SEFAZ!", { id: loadId, duration: 5000 });
+
+            // Tira a nota da tela para permitir que o pedido seja editado novamente
+            setNotaFiscalInfo(null);
+            setModalCancelamentoAberto(false);
+            setJustificativaCancelamento('');
+
+        } catch (e) {
+            toast.error(extrairErroBackend(e, "Rejeição da SEFAZ ao tentar cancelar a NF-e."), { id: loadId, duration: 6000 });
+        } finally {
+            setCancelandoNfe(false);
+        }
+    };
+
     const abrirPDFDanfe = () => {
         if (notaFiscalInfo && notaFiscalInfo.urlDanfe) {
             window.open(notaFiscalInfo.urlDanfe, '_blank');
@@ -384,9 +416,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         }
     };
 
-    // =======================================================================
-    // 🚀 PROCESSAR VENDA (CORREÇÃO DA ROTA 403 APLICADA AQUI)
-    // =======================================================================
     const processarVendaAPI = async (statusDesejado) => {
         if (itens.length === 0) return toast.error("O documento não possui itens.");
 
@@ -405,10 +434,12 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         try {
             let res;
             if (orcamentoId) {
-                // 🚀 ROTA UNIFICADA (Resolve o erro 403 Forbidden de rota inexistente)
-                res = await api.put(`/api/vendas/${orcamentoId}`, payload);
+                if (modo === 'PEDIDO') {
+                    res = await api.put(`/api/vendas/pedido/${orcamentoId}`, payload);
+                } else {
+                    res = await api.put(`/api/vendas/orcamento/${orcamentoId}`, payload);
+                }
             } else {
-                // Rota de criação
                 res = await api.post(statusFinal === 'PEDIDO' ? '/api/vendas/pedido' : '/api/vendas/orcamento', payload);
                 setOrcamentoId(res.data.id);
             }
@@ -495,9 +526,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         sincronizarEstoqueSilencioso(itensFormatados).catch(console.error);
     };
 
-    // =======================================================================
-    // 🚀 ESCUTA GERAL DO TECLADO
-    // =======================================================================
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
 
@@ -522,6 +550,12 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
             if (modalVendaPerdidaAberto) {
                 if (e.key === 'Escape') setModalVendaPerdidaAberto(false);
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') registrarVendaPerdida();
+                return;
+            }
+
+            if (modalCancelamentoAberto) {
+                if (e.key === 'Escape') setModalCancelamentoAberto(false);
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') cancelarNFe();
                 return;
             }
 
@@ -577,7 +611,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 case 'P':
                     if (e.ctrlKey || e.metaKey) {
                         e.preventDefault();
-                        window.print();
+                        // 🚀 TRUQUE PARA EVITAR TELA BRANCA NA IMPRESSÃO PELO TECLADO
+                        setTimeout(() => window.print(), 300);
                     }
                     break;
                 case 'Escape':
@@ -602,9 +637,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         window.addEventListener('keydown', handleGlobalKeyDown);
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     }, [
-        modalListaAberto, modalVendaPerdidaAberto, modo, orcamentoId, notaFiscalInfo,
+        modalListaAberto, modalVendaPerdidaAberto, modalCancelamentoAberto, modo, orcamentoId, notaFiscalInfo,
         itens, clienteSelecionado, veiculoDetalhado, subtotal, valorDescontoReal, totalFinal,
-        orcamentosSalvos, indexFocadoLista, resultadosClientes, resultadosPecas
+        orcamentosSalvos, indexFocadoLista, resultadosClientes, resultadosPecas, justificativaCancelamento, cancelandoNfe
     ]);
 
     useEffect(() => {
@@ -668,6 +703,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                                 </button>
                             )}
 
+                            {/* BOTÕES FISCAIS (IMPRIMIR E CANCELAR) */}
                             {orcamentoId && notaFiscalInfo && (
                                 <div className="flex items-center rounded-lg border border-green-500 bg-green-50 overflow-hidden shadow-sm shadow-green-500/20">
                                     <button onClick={abrirPDFDanfe} title="Abrir espelho (DANFE) da Nota para impressão" className="px-4 py-2 text-green-700 hover:bg-green-600 hover:text-white font-black text-xs transition-colors flex items-center gap-2">
@@ -675,6 +711,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                                     </button>
                                     <button onClick={abrirPDFDanfe} title="Baixar XML Original" className="px-3 py-2 border-l border-green-200 text-green-600 hover:bg-green-600 hover:text-white transition-colors">
                                         <FileDown size={16}/>
+                                    </button>
+                                    <button onClick={() => setModalCancelamentoAberto(true)} title="Cancelar NF-e na SEFAZ" className="px-3 py-2 border-l border-red-200 bg-white text-red-600 hover:bg-red-600 hover:text-white font-black text-xs transition-colors flex items-center gap-1">
+                                        <Trash2 size={14}/> CANCELAR
                                     </button>
                                 </div>
                             )}
@@ -687,7 +726,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                             <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block"></div>
 
                             <button onClick={() => processarVendaAPI(modo)} title="Salvar progresso atual (F8)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Save size={14}/> SALVAR (F8)</button>
-                            <button onClick={() => window.print()} title="Gerar impressão A4 do documento atual (Ctrl+P)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Printer size={14}/> IMPRIMIR (Ctrl+P)</button>
+
+                            {/* 🚀 TRUQUE PARA EVITAR TELA BRANCA NA IMPRESSÃO PELO MOUSE */}
+                            <button onClick={() => setTimeout(() => window.print(), 300)} title="Gerar impressão A4 do documento atual (Ctrl+P)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Printer size={14}/> IMPRIMIR (Ctrl+P)</button>
 
                             <div className="flex items-center rounded-lg border border-green-200 bg-green-50 overflow-hidden ml-1">
                                 <button type="button" onClick={verificarConexaoZap} disabled={checandoZap} className="p-2 border-r border-green-200 text-green-600 hover:bg-green-100 transition-colors" title="Verificar se o motor do WhatsApp está conectado">
@@ -904,6 +945,45 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 </div>
             </div>
 
+            {/* MODAL DE CANCELAMENTO DE NF-E */}
+            {modalCancelamentoAberto && (
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 print:hidden">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in border-4 border-red-600">
+                        <div className="bg-red-600 p-6 flex justify-between items-center text-white">
+                            <h2 className="font-black tracking-widest flex items-center gap-2"><AlertTriangle /> CANCELAR NF-E</h2>
+                            <button onClick={() => setModalCancelamentoAberto(false)} disabled={cancelandoNfe} title="Fechar (Esc)" className="hover:text-red-200 transition-colors"><X size={24}/></button>
+                        </div>
+                        <div className="p-6 space-y-5 bg-slate-50">
+                            <p className="text-sm text-slate-600 font-medium">Atenção: O cancelamento é irreversível e será transmitido para a SEFAZ. É exigida uma justificativa.</p>
+                            <div>
+                                <label className="text-xs font-black text-slate-500 uppercase">Justificativa (Mín. 15 caracteres) *</label>
+                                <textarea
+                                    autoFocus
+                                    value={justificativaCancelamento}
+                                    onChange={(e) => setJustificativaCancelamento(e.target.value)}
+                                    rows="3"
+                                    disabled={cancelandoNfe}
+                                    className={`w-full p-3 border-2 rounded-xl outline-none mt-1 bg-white shadow-sm transition-colors ${justificativaCancelamento.length >= 15 ? 'border-green-400 focus:border-green-600' : 'border-red-300 focus:border-red-500'}`}
+                                    placeholder="Ex: Cliente desistiu da compra antes da saída da mercadoria."
+                                />
+                                <p className={`text-[10px] mt-1 font-bold tracking-widest uppercase ${justificativaCancelamento.length < 15 ? 'text-red-500' : 'text-green-600'}`}>
+                                    {justificativaCancelamento.length} / 15 Caracteres digitados
+                                </p>
+                            </div>
+                            <button
+                                onClick={cancelarNFe}
+                                disabled={cancelandoNfe || justificativaCancelamento.length < 15}
+                                title="Enviar cancelamento (Ctrl+Enter)"
+                                className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-xl shadow-lg mt-2 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {cancelandoNfe ? <Loader2 className="animate-spin" size={20} /> : <XCircle size={20} />}
+                                {cancelandoNfe ? "PROCESSANDO NA SEFAZ..." : "CONFIRMAR CANCELAMENTO"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* MODAL DE VENDA PERDIDA */}
             {modalVendaPerdidaAberto && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 print:hidden">
@@ -932,8 +1012,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 </div>
             )}
 
-            {/* IMPRESSÃO PDF COM MÁSCARAS */}
-            <div className="hidden print:block fixed inset-0 w-full h-full bg-white z-[99999] p-0 text-black">
+            {/* IMPRESSÃO PDF COM MÁSCARAS E CSS OBRIGATÓRIO */}
+            <div className="hidden print:block absolute top-0 left-0 w-full min-h-screen bg-white z-[99999] p-0 text-black">
                 <div className="w-full max-w-[210mm] mx-auto p-6 font-sans text-slate-900">
                     <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
                         <div className="flex-1">
@@ -1013,9 +1093,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
             <style>{`
                 @media print {
                     @page { size: A4 portrait; margin: 0.3cm; }
-                    body { margin: 0; padding: 0; background: white !important; }
+                    body, html, #root { height: auto !important; overflow: visible !important; margin: 0; padding: 0; background: white !important; }
                     .print\\:hidden { display: none !important; }
-                    .print\\:block { display: block !important; }
+                    .print\\:block { display: block !important; position: static !important; }
                 }
             `}</style>
         </div>
