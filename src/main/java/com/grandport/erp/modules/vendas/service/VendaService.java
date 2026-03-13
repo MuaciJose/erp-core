@@ -166,6 +166,12 @@ public class VendaService {
         venda.setStatus(statusNovo);
         venda.getItens().clear(); // Limpa itens velhos
 
+        // 🚀 CORREÇÃO DO CRONÔMETRO DA FILA DO CAIXA:
+        // Zera o relógio se estiver enviando o documento para o caixa agora
+        if (statusAntigo != StatusVenda.AGUARDANDO_PAGAMENTO && statusNovo == StatusVenda.AGUARDANDO_PAGAMENTO) {
+            venda.setDataHora(java.time.LocalDateTime.now());
+        }
+
         Venda salva = preencherESalvarVenda(venda, dto); // Salva nova lista
 
         // 3. PUXA: Se continuar sendo pedido, tira do estoque de novo

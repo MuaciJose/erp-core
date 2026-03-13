@@ -434,12 +434,10 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         try {
             let res;
             if (orcamentoId) {
-                if (modo === 'PEDIDO') {
-                    res = await api.put(`/api/vendas/pedido/${orcamentoId}`, payload);
-                } else {
-                    res = await api.put(`/api/vendas/orcamento/${orcamentoId}`, payload);
-                }
+                // 🚀 CORREÇÃO: Voltando para a ROTA UNIFICADA (Sem /pedido/ ou /orcamento/)
+                res = await api.put(`/api/vendas/${orcamentoId}`, payload);
             } else {
+                // Rota de criação continua separada
                 res = await api.post(statusFinal === 'PEDIDO' ? '/api/vendas/pedido' : '/api/vendas/orcamento', payload);
                 setOrcamentoId(res.data.id);
             }
@@ -452,6 +450,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
             setModo(statusFinal);
 
+            // Se mandou pro caixa, limpa a tela e volta
             if (statusFinal === 'AGUARDANDO_PAGAMENTO') {
                 limparEcra();
                 if (onVoltar) onVoltar();
