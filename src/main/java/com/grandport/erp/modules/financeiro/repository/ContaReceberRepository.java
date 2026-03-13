@@ -10,7 +10,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ContaReceberRepository extends JpaRepository<ContaReceber, Long> {
+
     List<ContaReceber> findByStatus(StatusFinanceiro status);
+
     List<ContaReceber> findByParceiroIdAndStatus(Long parceiroId, StatusFinanceiro status);
 
     @Query("SELECT SUM(c.valorOriginal) FROM ContaReceber c WHERE c.status = 'PENDENTE' AND c.dataVencimento < CURRENT_DATE")

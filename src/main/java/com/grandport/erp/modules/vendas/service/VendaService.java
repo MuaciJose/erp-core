@@ -260,8 +260,6 @@ public class VendaService {
             throw new RuntimeException("Este pedido já foi faturado!");
         }
 
-        // ⚠️ As peças já foram baixadas do estoque na fase de Pedido, então não descontamos de novo aqui!
-
         for (PagamentoVendaDTO pagDTO : pagamentos) {
             PagamentoVenda pagamento = new PagamentoVenda();
             pagamento.setMetodo(pagDTO.metodo());
@@ -269,8 +267,9 @@ public class VendaService {
             pagamento.setParcelas(pagDTO.parcelas());
             venda.getPagamentos().add(pagamento);
 
-            if ("A_PRAZO".equals(pagDTO.metodo())) {
-                processarVendaAPrazo(venda, venda.getCliente() != null ? venda.getCliente().getId() : null);
+            // 🚀 CORREÇÃO 1: Passando as parcelas para o método abaixo
+            if ("A_PRAZO".equals(pagDTO.metodo()) || "PROMISSORIA".equals(pagDTO.metodo())) {
+                processarVendaAPrazo(venda, venda.getCliente() != null ? venda.getCliente().getId() : null, pagDTO.parcelas());
             } else {
                 caixaService.adicionarVendaAoCaixa(pagDTO.metodo(), pagDTO.valor());
                 financeiroService.registrarEntradaImediata(pagDTO.valor(), pagDTO.metodo());
@@ -298,7 +297,8 @@ public class VendaService {
         return vendaRepository.save(salva);
     }
 
-    private void processarVendaAPrazo(Venda venda, Long parceiroId) {
+    // 🚀 CORREÇÃO 2: Recebendo as parcelas e passando a Venda inteira pro Financeiro
+    private void processarVendaAPrazo(Venda venda, Long parceiroId, Integer parcelas) {
         if (parceiroId == null) throw new RuntimeException("Cliente não informado para venda a prazo.");
 
         Parceiro cliente = parceiroRepository.findById(parceiroId)
@@ -313,7 +313,8 @@ public class VendaService {
         cliente.setSaldoDevedor(cliente.getSaldoDevedor().add(venda.getValorTotal()));
         parceiroRepository.save(cliente);
 
-        financeiroService.gerarContaReceberPrazo(venda.getValorTotal(), cliente);
+        // 🚀 A GRANDE CORREÇÃO DA LINHA 316:
+        financeiroService.gerarContaReceberPrazo(venda, cliente, parcelas);
     }
 
     @Transactional

@@ -72,4 +72,18 @@ public class FinanceiroController {
     public ResponseEntity<DreDTO> getDre(@RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth mesAno) {
         return ResponseEntity.ok(service.calcularDre(mesAno));
     }
+
+    // =======================================================
+    // 🚀 ROTA DE DAR BAIXA (Receber o Pagamento)
+    // =======================================================
+    @PostMapping("/contas-a-receber/{id}/baixar")
+    public ResponseEntity<?> baixarContaReceber(@PathVariable Long id, @RequestBody java.util.Map<String, Object> payload) {
+        try {
+            // CORREÇÃO AQUI: Mudado de 'financeiroService' para 'service'
+            service.baixarContaReceber(id, payload);
+            return ResponseEntity.ok(java.util.Map.of("message", "Conta baixada com sucesso!"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage()));
+        }
+    }
 }

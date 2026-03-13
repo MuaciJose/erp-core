@@ -6,14 +6,17 @@ import com.grandport.erp.modules.financeiro.model.*;
 import com.grandport.erp.modules.financeiro.repository.*;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
+import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,9 +62,9 @@ public class FinanceiroService {
     @Transactional
     public void transferirEntreContas(TransferenciaDTO dto) {
         ContaBancaria origem = bancoRepo.findById(dto.getContaOrigemId())
-            .orElseThrow(() -> new RuntimeException("Conta de origem não encontrada."));
+                .orElseThrow(() -> new RuntimeException("Conta de origem não encontrada."));
         ContaBancaria destino = bancoRepo.findById(dto.getContaDestinoId())
-            .orElseThrow(() -> new RuntimeException("Conta de destino não encontrada."));
+                .orElseThrow(() -> new RuntimeException("Conta de destino não encontrada."));
 
         if (origem.getSaldoAtual().compareTo(dto.getValor()) < 0) {
             throw new RuntimeException("Saldo insuficiente na conta de origem.");
@@ -86,7 +89,7 @@ public class FinanceiroService {
     @Transactional
     public void baixarContaPagar(Long contaId) {
         ContaPagar conta = pagarRepo.findById(contaId)
-            .orElseThrow(() -> new RuntimeException("Conta a pagar não encontrada: ID " + contaId));
+                .orElseThrow(() -> new RuntimeException("Conta a pagar não encontrada: ID " + contaId));
 
         if (conta.getStatus() == StatusFinanceiro.PAGO) throw new RuntimeException("Esta conta já foi paga.");
 
@@ -108,10 +111,10 @@ public class FinanceiroService {
     @Transactional
     public void liquidarContaPagar(Long contaId, Long bancoId) {
         ContaPagar conta = pagarRepo.findById(contaId)
-            .orElseThrow(() -> new RuntimeException("Conta a pagar não encontrada: ID " + contaId));
-        
+                .orElseThrow(() -> new RuntimeException("Conta a pagar não encontrada: ID " + contaId));
+
         ContaBancaria banco = bancoRepo.findById(bancoId)
-            .orElseThrow(() -> new RuntimeException("Conta bancária não encontrada: ID " + bancoId));
+                .orElseThrow(() -> new RuntimeException("Conta bancária não encontrada: ID " + bancoId));
 
         if (conta.getStatus() == StatusFinanceiro.PAGO) throw new RuntimeException("Esta conta já foi paga.");
 
@@ -140,10 +143,10 @@ public class FinanceiroService {
         conta.setValorOriginal(dto.getValor());
         conta.setDataVencimento(dto.getVencimento().atStartOfDay());
         conta.setStatus(StatusFinanceiro.PENDENTE);
-        
+
         if (dto.getPlanoContaId() != null) {
             PlanoConta pc = planoRepo.findById(dto.getPlanoContaId())
-                .orElseThrow(() -> new RuntimeException("Plano de conta não encontrado."));
+                    .orElseThrow(() -> new RuntimeException("Plano de conta não encontrado."));
             conta.setPlanoConta(pc);
         }
 
@@ -164,11 +167,11 @@ public class FinanceiroService {
 
         List<DespesaPorPlanoContaDTO> despesasAgrupadas = pagarRepo.sumDespesasPagasAgrupadasPorPlanoConta(inicioMes, fimMes);
         Map<String, BigDecimal> despesasOperacionais = despesasAgrupadas.stream()
-            .collect(Collectors.toMap(
-                DespesaPorPlanoContaDTO::getDescricaoPlanoConta,
-                DespesaPorPlanoContaDTO::getTotalPago
-            ));
-        
+                .collect(Collectors.toMap(
+                        DespesaPorPlanoContaDTO::getDescricaoPlanoConta,
+                        DespesaPorPlanoContaDTO::getTotalPago
+                ));
+
         dre.setDespesasOperacionais(despesasOperacionais);
 
         return dre;
@@ -187,13 +190,13 @@ public class FinanceiroService {
 
     public ExtratoParceiroDTO gerarExtratoParceiro(Long parceiroId) {
         Parceiro parceiro = parceiroRepository.findById(parceiroId)
-            .orElseThrow(() -> new RuntimeException("Parceiro não encontrado: ID " + parceiroId));
-        
+                .orElseThrow(() -> new RuntimeException("Parceiro não encontrado: ID " + parceiroId));
+
         List<ContaReceberDTO> contas = recebaRepo.findByParceiroIdAndStatus(parceiroId, StatusFinanceiro.PENDENTE)
-            .stream()
-            .map(ContaReceberDTO::new)
-            .collect(Collectors.toList());
-            
+                .stream()
+                .map(ContaReceberDTO::new)
+                .collect(Collectors.toList());
+
         return new ExtratoParceiroDTO(parceiro, contas);
     }
 
@@ -212,21 +215,105 @@ public class FinanceiroService {
         for (int i = 1; i <= parcelas; i++) {
             ContaReceber conta = new ContaReceber();
             conta.setDescricao("Venda Cartão PDV " + i + "/" + parcelas);
-            conta.setValorOriginal(valor.divide(BigDecimal.valueOf(parcelas)));
-            conta.setDataVencimento(LocalDateTime.now().plusDays(30 * i));
+            conta.setValorOriginal(valor.divide(BigDecimal.valueOf(parcelas), 2, RoundingMode.HALF_UP));
+            conta.setDataVencimento(LocalDateTime.now().plusDays(30L * i));
             conta.setStatus(StatusFinanceiro.PENDENTE);
             recebaRepo.save(conta);
         }
     }
 
+    // =========================================================================
+    // 🚀 LÓGICA DE PROMISSÓRIAS (ATUALIZADA)
+    // =========================================================================
     @Transactional
-    public void gerarContaReceberPrazo(BigDecimal valor, Parceiro cliente) {
-        ContaReceber conta = new ContaReceber();
-        conta.setDescricao("Venda a Prazo - PDV");
-        conta.setParceiro(cliente);
-        conta.setValorOriginal(valor);
-        conta.setDataVencimento(LocalDateTime.now().plusDays(30));
-        conta.setStatus(StatusFinanceiro.PENDENTE);
+    public void gerarContaReceberPrazo(Venda venda, Parceiro cliente, Integer parcelas) {
+        if (parcelas == null || parcelas < 1) parcelas = 1;
+
+        int intervaloDias = (cliente.getIntervaloDiasPagamento() != null && cliente.getIntervaloDiasPagamento() > 0)
+                ? cliente.getIntervaloDiasPagamento() : 30;
+
+        BigDecimal valorParcela = venda.getValorTotal().divide(new BigDecimal(parcelas), 2, RoundingMode.HALF_UP);
+
+        for (int i = 1; i <= parcelas; i++) {
+            ContaReceber conta = new ContaReceber();
+            conta.setVenda(venda);
+            conta.setParceiro(cliente);
+            conta.setDescricao("Parcela " + i + "/" + parcelas + " - Pedido #" + venda.getId());
+            conta.setValorOriginal(valorParcela);
+            conta.setDataVencimento(LocalDateTime.now().plusDays((long) intervaloDias * i));
+            conta.setStatus(StatusFinanceiro.PENDENTE);
+
+            recebaRepo.save(conta);
+        }
+    }
+
+    // =========================================================================
+    // 🚀 NOVO: LISTAR CONTAS PENDENTES PARA O FRONT-END DO CAIXA
+    // =========================================================================
+    public List<Map<String, Object>> listarContasReceberPendentes() {
+        List<ContaReceber> contas = recebaRepo.findByStatus(StatusFinanceiro.PENDENTE);
+        List<Map<String, Object>> resposta = new ArrayList<>();
+
+        for (ContaReceber c : contas) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", c.getId());
+            map.put("parceiroNome", c.getParceiro() != null ? c.getParceiro().getNome() : "Cliente não informado");
+            map.put("descricao", c.getDescricao());
+            map.put("dataVencimento", c.getDataVencimento().toString());
+            map.put("valor", c.getValorOriginal());
+
+            // Lógica de atraso
+            boolean atrasado = c.getDataVencimento().isBefore(LocalDateTime.now());
+            map.put("atrasado", atrasado);
+
+            resposta.add(map);
+        }
+        return resposta;
+    }
+
+    // =========================================================================
+    // 🚀 NOVO: BAIXAR CONTA (E RESTAURAR LIMITE DO CLIENTE)
+    // =========================================================================
+    @Transactional
+    public void baixarContaReceber(Long contaId, Map<String, Object> payload) {
+        ContaReceber conta = recebaRepo.findById(contaId)
+                .orElseThrow(() -> new RuntimeException("Conta não encontrada."));
+
+        if (conta.getStatus() == StatusFinanceiro.PAGO) {
+            throw new RuntimeException("Esta conta já foi baixada anteriormente.");
+        }
+
+        // Pega o valor recebido que veio do Front (com Juros/Multa se houver)
+        BigDecimal valorRecebido = new BigDecimal(payload.getOrDefault("valorRecebido", conta.getValorOriginal()).toString());
+        String metodo = payload.getOrDefault("metodoPagamento", "DINHEIRO").toString();
+
+        conta.setStatus(StatusFinanceiro.PAGO);
+        conta.setDataPagamento(LocalDateTime.now());
+        conta.setValorPago(valorRecebido); // Salva o valor real com juros
+
+        // 🚀 MÁGICA: Devolve o limite de crédito para o cliente
+        Parceiro cliente = conta.getParceiro();
+        if (cliente != null) {
+            // Desconta o valor ORIGINAL do Saldo Devedor (Juros é lucro, não devolve limite extra)
+            BigDecimal novoSaldo = cliente.getSaldoDevedor().subtract(conta.getValorOriginal());
+            if(novoSaldo.compareTo(BigDecimal.ZERO) < 0) novoSaldo = BigDecimal.ZERO;
+
+            cliente.setSaldoDevedor(novoSaldo);
+            parceiroRepository.save(cliente);
+        }
+
         recebaRepo.save(conta);
+
+        // Registra o dinheiro no caixa/banco da loja
+        MovimentacaoCaixa mov = new MovimentacaoCaixa();
+        mov.setDescricao("Recebimento C/R: " + conta.getDescricao() + " (" + metodo + ")");
+        mov.setValor(valorRecebido);
+        mov.setTipo("ENTRADA");
+        mov.setCategoria("RECEBIMENTO_CONTA");
+        caixaRepo.save(mov);
+
+        try {
+            auditoriaService.registrar("FINANCEIRO", "BAIXA_RECEBER", "Baixou a conta #" + contaId + " no valor de R$ " + valorRecebido);
+        } catch(Exception e){}
     }
 }
