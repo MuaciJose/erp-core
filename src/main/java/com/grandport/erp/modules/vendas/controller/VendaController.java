@@ -23,7 +23,7 @@ import java.util.Optional; // 🚀 Importação adicionada para funcionar o isPr
 public class VendaController {
 
     @Autowired private VendaService service;
-    @Autowired private VendaRepository repository; // A variável chama apenas 'repository'
+    @Autowired private VendaRepository repository;
     @Autowired private WhatsAppService whatsAppService;
 
     // =========================================================================
@@ -50,7 +50,8 @@ public class VendaController {
         return ResponseEntity.ok(service.salvarOrcamento(dto));
     }
 
-    @PutMapping("/orcamento/{id}")
+    // 🚀 CORREÇÃO AQUI: Rota unificada para atualizar qualquer tipo de venda
+    @PutMapping("/{id}")
     public ResponseEntity<Venda> atualizarVenda(@PathVariable Long id, @RequestBody VendaRequestDTO dto) {
         return ResponseEntity.ok(service.atualizarVenda(id, dto));
     }
@@ -105,7 +106,6 @@ public class VendaController {
     @GetMapping("/{id}")
     public ResponseEntity<?> buscarVendaPorId(@PathVariable Long id) {
         try {
-            // 🚀 CORRIGIDO: Agora usa 'repository' que é o nome correto da sua variável
             Optional<Venda> venda = repository.findById(id);
 
             if (venda.isPresent()) {

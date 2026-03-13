@@ -8,22 +8,30 @@ import { OrcamentoPedido } from './OrcamentoPedido';
 import { CupomReciboModal } from './CupomReciboModal';
 import toast from 'react-hot-toast';
 
+// 🚀 IMPORTANTE: Importe o componente da Nota Avulsa aqui! (Ajuste o caminho da pasta se precisar)
+import EmitirNfeAvulsa from '../fiscal/EmitirNfeAvulsa';
+
 export const GestaoVendas = ({ setPaginaAtiva }) => {
-    const [telaAtual, setTelaAtual] = useState('LISTA');
+    const [telaAtual, setTelaAtual] = useState('LISTA'); // Pode ser: 'LISTA', 'NOVO', 'NOTA_FISCAL'
     const [busca, setBusca] = useState('');
     const [espelhoAberto, setEspelhoAberto] = useState(null);
     const [imprimirEspelho, setImprimirEspelho] = useState(false);
-    const [listaVendas, setListaVendas] = useState([]); // 🚀 Nome correto do estado
+    const [listaVendas, setListaVendas] = useState([]);
     const [loading, setLoading] = useState(false);
     const [vendaParaEditar, setVendaParaEditar] = useState(null);
+
+    // 🚀 ESTADO QUE GUARDA O PACOTE DA NOTA
+    const [dadosParaAjusteFiscal, setDadosParaAjusteFiscal] = useState(null);
+
+    const formatarMoeda = (valor) => {
+        if (valor === undefined || valor === null || isNaN(Number(valor))) return '0,00';
+        return Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
 
     const carregarVendas = async () => {
         setLoading(true);
         try {
             const res = await api.get('/api/vendas');
-            console.log("Dados recebidos do Java:", res.data);
-
-            // 🚀 AQUI ESTAVA O ERRO: Trocado setVendas por setListaVendas
             if (Array.isArray(res.data)) {
                 setListaVendas(res.data);
             } else if (res.data?.content && Array.isArray(res.data.content)) {
@@ -33,10 +41,8 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
             }
         } catch (error) {
             console.error("Erro ao carregar vendas:", error);
-            if (typeof toast !== 'undefined') {
-                toast.error("Erro ao carregar lista de vendas.");
-            }
-            setListaVendas([]); // 🚀 Trocado setVendas por setListaVendas
+            if (typeof toast !== 'undefined') toast.error("Erro ao carregar lista de vendas.");
+            setListaVendas([]);
         } finally {
             setLoading(false);
         }
@@ -46,7 +52,27 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
         if (telaAtual === 'LISTA') carregarVendas();
     }, [telaAtual]);
 
-    // 🚀 CORREÇÃO: Mapeando os campos dinâmicos que vêm do seu Java (v.cliente.nome, v.valorTotal)
+    useEffect(() => {
+        const handleGlobalKeyDown = (e) => {
+            if (espelhoAberto && !imprimirEspelho) {
+                if (e.key === 'Escape') setEspelhoAberto(null);
+                return;
+            }
+            if (telaAtual === 'LISTA') {
+                if (e.key === 'F2') {
+                    e.preventDefault();
+                    document.getElementById('busca-vendas')?.focus();
+                } else if (e.key === 'F3') {
+                    e.preventDefault();
+                    setTelaAtual('NOVO');
+                    setVendaParaEditar(null);
+                }
+            }
+        };
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, [telaAtual, espelhoAberto, imprimirEspelho]);
+
     const vendasFiltradas = listaVendas.filter(v => {
         const idMatch = v.id?.toString().includes(busca);
         const clienteNome = v.cliente?.nome || v.cliente || "";
@@ -61,9 +87,7 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
                 await api.delete(`/api/vendas/${id}`);
                 toast.success("Registro excluído com sucesso!");
                 carregarVendas();
-            } catch (error) {
-                toast.error("Erro ao excluir registro.");
-            }
+            } catch (error) { toast.error("Erro ao excluir registro."); }
         }
     };
 
@@ -74,19 +98,32 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
 
     const getBadgeStatus = (status) => {
         switch(status) {
-            case 'ORCAMENTO':
-                return <span className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase flex items-center gap-1 w-max mx-auto"><FileText size={12}/> Orçamento</span>;
-            case 'PEDIDO':
-                return <span className="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase flex items-center gap-1 w-max mx-auto"><Package size={12}/> Pedido</span>;
-            case 'AGUARDANDO_PAGAMENTO':
-                return <span className="bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase flex items-center gap-1 w-max mx-auto animate-pulse"><Wallet size={12}/> Caixa</span>;
-            case 'CONCLUIDA':
-                return <span className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase flex items-center gap-1 w-max mx-auto"><CheckCircle size={12}/> Faturado</span>;
-            default:
-                return <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase flex items-center gap-1 w-max mx-auto">{status}</span>;
+            case 'ORCAMENTO': return <span className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase flex items-center gap-1 w-max mx-auto"><FileText size={12}/> Orçamento</span>;
+            case 'PEDIDO': return <span className="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase flex items-center gap-1 w-max mx-auto"><Package size={12}/> Pedido</span>;
+            case 'AGUARDANDO_PAGAMENTO': return <span className="bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase flex items-center gap-1 w-max mx-auto animate-pulse"><Wallet size={12}/> Caixa</span>;
+            case 'CONCLUIDA': return <span className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase flex items-center gap-1 w-max mx-auto"><CheckCircle size={12}/> Faturado</span>;
+            default: return <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase flex items-center gap-1 w-max mx-auto">{status}</span>;
         }
     };
 
+    // ==================================================================
+    // 🚀 TELA 3 (NOVA): NOTA FISCAL AVULSA (Faturamento Assistido)
+    // ==================================================================
+    if (telaAtual === 'NOTA_FISCAL') {
+        return (
+            <div className="h-full bg-slate-100 relative z-[20]">
+                {/* O componente da nota recebe os dados e a função de voltar */}
+                <EmitirNfeAvulsa
+                    dadosIniciais={dadosParaAjusteFiscal}
+                    onVoltar={() => setTelaAtual('NOVO')}
+                />
+            </div>
+        );
+    }
+
+    // ==================================================================
+    // 🚀 TELA 1: BALCÃO (ORÇAMENTO/PEDIDO)
+    // ==================================================================
     if (telaAtual === 'NOVO') {
         return (
             <div className="animate-fade-in flex flex-col h-full bg-white relative z-[10]">
@@ -97,12 +134,23 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto relative z-[11] bg-white pt-6">
-                    <OrcamentoPedido orcamentoParaEditar={vendaParaEditar} onVoltar={() => { setTelaAtual('LISTA'); setVendaParaEditar(null); }} />
+                    <OrcamentoPedido
+                        orcamentoParaEditar={vendaParaEditar}
+                        onVoltar={() => { setTelaAtual('LISTA'); setVendaParaEditar(null); }}
+                        // 🚀 AQUI É ONDE A MÁGICA ACONTECE!
+                        onIrParaNota={(dadosEmpacotados) => {
+                            setDadosParaAjusteFiscal(dadosEmpacotados); // 1. Guarda os dados
+                            setTelaAtual('NOTA_FISCAL'); // 2. Abre a tela da nota AQUI MESMO, em vez do menu principal
+                        }}
+                    />
                 </div>
             </div>
         );
     }
 
+    // ==================================================================
+    // 🚀 TELA 2: LISTAGEM PRINCIPAL
+    // ==================================================================
     return (
         <>
             <div className="p-8 max-w-7xl mx-auto flex flex-col h-[90vh] animate-fade-in relative print:hidden">
@@ -122,9 +170,10 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
 
                         <button
                             onClick={() => { setTelaAtual('NOVO'); setVendaParaEditar(null); }}
+                            title="Atalho: F3"
                             className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-black shadow-lg shadow-blue-600/20 flex items-center gap-2 transition-all transform hover:scale-105"
                         >
-                            <Plus size={24} /> NOVO ORÇAMENTO / VENDA
+                            <Plus size={24} /> NOVO ORÇAMENTO (F3)
                         </button>
                     </div>
                 </div>
@@ -133,8 +182,9 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-4 top-3.5 text-slate-400" size={20} />
                         <input
+                            id="busca-vendas"
                             type="text"
-                            placeholder="Buscar por Nº, Cliente ou Veículo..."
+                            placeholder="Buscar por Nº, Cliente ou Veículo (F2)..."
                             value={busca}
                             onChange={(e) => setBusca(e.target.value)}
                             className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold text-slate-700"
@@ -181,7 +231,7 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
                                         <td className="p-4 text-sm font-bold text-slate-600">{venda.veiculo?.modelo || "Balcão"}</td>
                                         <td className="p-4 text-center">{getBadgeStatus(venda.status)}</td>
                                         <td className="p-4 text-right font-black text-slate-800 text-lg">
-                                            R$ {Number(venda.valorTotal || 0).toFixed(2)}
+                                            R$ {formatarMoeda(venda.valorTotal)}
                                         </td>
                                         <td className="p-4 text-center pr-6">
                                             <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -238,7 +288,7 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
                                 >
                                     <Printer size={20} /> IMPRIMIR
                                 </button>
-                                <button onClick={() => setEspelhoAberto(null)} className="bg-slate-800 p-3 rounded-xl text-slate-400 hover:text-white">
+                                <button onClick={() => setEspelhoAberto(null)} title="Pressione Esc para fechar" className="bg-slate-800 p-3 rounded-xl text-slate-400 hover:text-white">
                                     <X size={24} />
                                 </button>
                             </div>
@@ -270,17 +320,17 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
                                     <tr key={idx} className="border-b">
                                         <td className="p-3 font-bold text-sm">{item.produto?.nome || item.nome}</td>
                                         <td className="p-3 text-center">{item.quantidade || item.qtd}</td>
-                                        <td className="p-3 text-right">R$ {Number(item.precoUnitario || item.preco).toFixed(2)}</td>
-                                        <td className="p-3 text-right font-black">R$ {(Number(item.precoUnitario || item.preco) * (item.quantidade || item.qtd)).toFixed(2)}</td>
+                                        <td className="p-3 text-right">R$ {formatarMoeda(item.precoUnitario || item.preco)}</td>
+                                        <td className="p-3 text-right font-black">R$ {formatarMoeda((item.precoUnitario || item.preco) * (item.quantidade || item.qtd))}</td>
                                     </tr>
                                 ))}
                                 </tbody>
                             </table>
                             <div className="mt-6 flex justify-end">
                                 <div className="w-72 bg-slate-800 text-white p-5 rounded-2xl">
-                                    <div className="flex justify-between py-1 text-sm border-b border-slate-700"><span className="text-slate-400">Subtotal:</span><span>R$ {Number(espelhoAberto.valorSubtotal || espelhoAberto.subtotal || 0).toFixed(2)}</span></div>
-                                    <div className="flex justify-between py-1 text-sm border-b border-slate-700"><span className="text-slate-400">Desconto:</span><span className="text-orange-400">- R$ {Number(espelhoAberto.desconto || 0).toFixed(2)}</span></div>
-                                    <div className="flex justify-between mt-3"><span className="font-black uppercase">Total:</span><span className="text-2xl font-black text-green-400">R$ {Number(espelhoAberto.valorTotal || espelhoAberto.total || 0).toFixed(2)}</span></div>
+                                    <div className="flex justify-between py-1 text-sm border-b border-slate-700"><span className="text-slate-400">Subtotal:</span><span>R$ {formatarMoeda(espelhoAberto.valorSubtotal || espelhoAberto.subtotal)}</span></div>
+                                    <div className="flex justify-between py-1 text-sm border-b border-slate-700"><span className="text-slate-400">Desconto:</span><span className="text-orange-400">- R$ {formatarMoeda(espelhoAberto.desconto)}</span></div>
+                                    <div className="flex justify-between mt-3"><span className="font-black uppercase">Total:</span><span className="text-2xl font-black text-green-400">R$ {formatarMoeda(espelhoAberto.valorTotal || espelhoAberto.total)}</span></div>
                                 </div>
                             </div>
                         </div>
