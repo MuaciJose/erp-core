@@ -10,11 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/configuracoes")
@@ -28,41 +24,29 @@ public class ConfiguracaoController {
         return ResponseEntity.ok(service.obterConfiguracao());
     }
 
-    /**
-     * 🚀 SALVAR CONFIGURAÇÕES: Agora este endpoint já recebe automaticamente
-     * os novos campos de NFC-e (serieNfce, numeroProximaNfce, cscIdToken, cscCodigo)
-     */
     @PutMapping
     public ResponseEntity<ConfiguracaoSistema> salvarConfig(@RequestBody ConfiguracaoSistema config) {
         return ResponseEntity.ok(service.atualizarConfiguracao(config));
     }
 
     // =======================================================================
-    // 🚀 CERTIFICADO DIGITAL (.PFX)
+    // 🚀 CERTIFICADO DIGITAL (.PFX) - ATUALIZADO
     // =======================================================================
     @PostMapping("/certificado")
-    public ResponseEntity<String> uploadCertificado(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadCertificado(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("{\"message\": \"Arquivo de certificado vazio.\"}");
+            return ResponseEntity.badRequest().body(Map.of("message", "Arquivo de certificado vazio."));
         }
 
         try {
-            // Define a pasta de certificados (Pode ser configurada no application.properties futuramente)
-            String pastaCertificados = System.getProperty("user.dir") + "/certificados/";
-            File diretorio = new File(pastaCertificados);
-            if (!diretorio.exists()) {
-                diretorio.mkdirs();
-            }
+            // 🚀 AGORA CHAMA O SERVICE QUE SALVA COM O NOME DO CNPJ
+            service.salvarCertificadoDigital(file);
 
-            // Salva o arquivo. Em Produção, certificado_a1.pfx será lido pelo motor fiscal.
-            Path caminhoArquivo = Paths.get(pastaCertificados + "certificado_a1.pfx");
-            Files.write(caminhoArquivo, file.getBytes());
+            return ResponseEntity.ok(Map.of("message", "Certificado digital salvo com sucesso e vinculado ao CNPJ!"));
 
-            return ResponseEntity.ok("{\"message\": \"Certificado digital salvo com sucesso e pronto para emissão!\"}");
-
-        } catch (IOException e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().body("{\"message\": \"Erro ao salvar certificado: " + e.getMessage() + "\"}");
+        } catch (Exception e) {
+            // Em caso de erro (ex: CNPJ não preenchido), retorna a mensagem real do Service
+            return ResponseEntity.badRequest().body(Map.of("message", "Erro ao salvar certificado: " + e.getMessage()));
         }
     }
 
@@ -98,7 +82,6 @@ public class ConfiguracaoController {
     }
 
     @DeleteMapping("/resetar-banco")
-    // ⚠️ DICA: Em produção, garanta que apenas o ADMIN master tenha acesso aqui!
     public ResponseEntity<Void> resetarBancoDeDados() {
         service.resetarBancoDeDados();
         return ResponseEntity.ok().build();

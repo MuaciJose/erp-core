@@ -11,7 +11,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update # MUDADO PARA CREATE PARA RECRIAR O BANCO COM A COLUNA TEXT
-    show-sql: true # Mostra os comandos SQL no console para debug
+    show-sql: false # Mostra os comandos SQL no console para debug
     properties:
       hibernate:
         format_sql: true
@@ -40,6 +40,12 @@ spring:
           auth: true
           starttls:
             enable: true
+
+logging:
+  level:
+    com.grandport: DEBUG  # Mude de INFO para DEBUG para ver tudo o que acontece
+    br.com.swconsultoria.nfe: DEBUG # Isso mostra os detalhes da biblioteca fiscal
+
 
 api:
   security:

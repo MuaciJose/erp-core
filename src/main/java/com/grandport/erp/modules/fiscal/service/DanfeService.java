@@ -87,10 +87,31 @@ public class DanfeService {
             }
             dataSource = new JRMapCollectionDataSource(itensMap);
         } else {
-            // Layout A4
+            // =======================================================================
+            // 📑 LAYOUT A4 (NF-e Modelo 55) - Preenchendo seu JRXML completo
+            // =======================================================================
             parametros.put("EMITENTE_RAZAO", config.getRazaoSocial());
             parametros.put("EMITENTE_CNPJ", config.getCnpj());
+            parametros.put("EMITENTE_IE", config.getInscricaoEstadual());
+            parametros.put("EMITENTE_ENDERECO", config.getLogradouro() + ", " + config.getNumero() + " - " + config.getBairro() + " - " + config.getCidade() + "/" + config.getUf());
+
             parametros.put("CHAVE_ACESSO", nota.getChaveAcesso());
+            parametros.put("NUMERO_NOTA", String.valueOf(nota.getNumero()));
+            parametros.put("DATA_EMISSAO", new SimpleDateFormat("dd/MM/yyyy HH:mm").format(new Date()));
+
+            // Dados do Cliente (pegando da Venda)
+            if (nota.getVenda() != null && nota.getVenda().getCliente() != null) {
+                parametros.put("CLIENTE_NOME", nota.getVenda().getCliente().getNome());
+                parametros.put("CLIENTE_DOC", nota.getVenda().getCliente().getDocumento());
+            }
+
+            // Totais
+            BigDecimal totalVenda = (nota.getVenda() != null) ? nota.getVenda().getValorTotal() : BigDecimal.ZERO;
+            parametros.put("VALOR_TOTAL", totalVenda);
+
+            parametros.put("INF_COMPLEMENTARES", "Documento autorizado por meio do protocolo oficial da SEFAZ.");
+
+            // O DataSource para os itens (SKU, Nome, Qtd, Preço)
             dataSource = new JRBeanCollectionDataSource(nota.getVenda() != null ? nota.getVenda().getItens() : List.of());
         }
 

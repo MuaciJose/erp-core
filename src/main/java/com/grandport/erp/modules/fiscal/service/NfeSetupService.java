@@ -18,12 +18,13 @@ public class NfeSetupService {
         // 1. Aponta para a pasta de Schemas
         String pastaSchemas = System.getProperty("user.dir") + "/schemas";
 
-        // 2. Aponta para o Certificado Digital salvo no servidor
-        String caminhoCertificado = System.getProperty("user.dir") + "/certificados/certificado.pfx";
+        // 🚀 ATUALIZAÇÃO: Busca o certificado pelo CNPJ da empresa (limpando pontos/traços)
+        String cnpjLimpo = config.getCnpj().replaceAll("[^0-9]", "");
+        String caminhoCertificado = System.getProperty("user.dir") + File.separator + "certificados" + File.separator + cnpjLimpo + ".pfx";
 
         File arquivoCertificado = new File(caminhoCertificado);
         if (!arquivoCertificado.exists()) {
-            throw new Exception("Arquivo do Certificado Digital não encontrado no servidor.");
+            throw new Exception("Certificado Digital não encontrado para o CNPJ " + cnpjLimpo + " em: " + caminhoCertificado);
         }
 
         // 3. Carrega o certificado usando a senha que está no banco de dados
@@ -33,10 +34,10 @@ public class NfeSetupService {
         EstadosEnum estado = EstadosEnum.valueOf(config.getUf());
         AmbienteEnum ambiente = config.getAmbienteSefaz() == 1 ? AmbienteEnum.PRODUCAO : AmbienteEnum.HOMOLOGACAO;
 
-        // 5. 🚀 Dá a partida no motor (MÉTODO ATUALIZADO PARA A VERSÃO 4+)
+        // 5. 🚀 Dá a partida no motor
         ConfiguracoesNfe configSefaz = ConfiguracoesNfe.criarConfiguracoes(estado, ambiente, certificado, pastaSchemas);
 
-        // Timeout de segurança (para o sistema não travar se a Sefaz demorar a responder)
+        // Timeout de segurança
         configSefaz.setTimeout(30000); // 30 segundos
 
         return configSefaz;

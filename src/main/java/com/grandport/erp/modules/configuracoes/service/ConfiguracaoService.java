@@ -87,6 +87,36 @@ public class ConfiguracaoService {
     }
 
     // =======================================================================
+    // 🔐 UPLOAD DO CERTIFICADO DIGITAL (Salvando pelo CNPJ)
+    // =======================================================================
+    public void salvarCertificadoDigital(MultipartFile arquivo) throws Exception {
+        ConfiguracaoSistema config = obterConfiguracao();
+
+        if (config.getCnpj() == null || config.getCnpj().trim().isEmpty()) {
+            throw new Exception("Preencha e salve o CNPJ da empresa antes de enviar o certificado.");
+        }
+
+        // Limpa o CNPJ (remove pontos e traços) para o nome do arquivo ficar limpo
+        String cnpjLimpo = config.getCnpj().replaceAll("[^0-9]", "");
+
+        // Caminho da pasta: /certificados na raiz do projeto
+        String diretorioDestino = System.getProperty("user.dir") + File.separator + "certificados";
+        File pasta = new File(diretorioDestino);
+
+        if (!pasta.exists()) {
+            pasta.mkdirs();
+        }
+
+        // Define o nome final do arquivo como: 12345678000199.pfx
+        Path caminhoCompleto = Paths.get(diretorioDestino + File.separator + cnpjLimpo + ".pfx");
+
+        // Salva o arquivo substituindo se já existir
+        Files.copy(arquivo.getInputStream(), caminhoCompleto, StandardCopyOption.REPLACE_EXISTING);
+
+        System.out.println("✅ Certificado salvo com sucesso: " + caminhoCompleto.getFileName());
+    }
+
+    // =======================================================================
     // 💣 ZONA DE PERIGO: RESETAR BANCO DE DADOS (PostgreSQL Dinâmico)
     // =======================================================================
     @Transactional

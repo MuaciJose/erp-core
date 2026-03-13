@@ -92,51 +92,44 @@ public class FiscalController {
     // =======================================================================
     @GetMapping("/status-sefaz")
     public ResponseEntity<?> verificarStatusSefaz() {
+        System.out.println("🚀 [BOTAO CLICADO] Iniciando teste de Status SEFAZ...");
         try {
             ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
 
             if (config == null) {
+                System.out.println("❌ Erro: Configuração não encontrada no banco.");
                 return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Configurações não encontradas."));
             }
 
-            // 1. Validação Básica
-            if (config.getCnpj() == null || config.getCnpj().trim().isEmpty()) {
-                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "O CNPJ da empresa não foi preenchido."));
-            }
-            if (config.getUf() == null || config.getUf().trim().isEmpty()) {
-                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Selecione a UF (Estado) da empresa."));
-            }
-            if (config.getSenhaCertificado() == null || config.getSenhaCertificado().trim().isEmpty()) {
-                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "A senha do Certificado Digital não foi informada."));
+            System.out.println("📝 Dados encontrados: UF=" + config.getUf() + ", Ambiente=" + config.getAmbienteSefaz());
+
+            // 1. Validação
+            if (config.getUf() == null || config.getUf().isEmpty()) {
+                System.out.println("⚠️ Validação falhou: UF vazia.");
+                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "Selecione a UF."));
             }
 
-            // 2. 🚀 LIGA O MOTOR! (Carrega certificado e Schemas)
+            // 2. Tenta ligar o motor
+            System.out.println("⚙️ Ligando motor de configuração...");
             ConfiguracoesNfe configSefaz = nfeSetupService.iniciarConfiguracao(config);
+            System.out.println("✅ Motor ligado com sucesso!");
 
-            // 3. BATE NA PORTA DA SEFAZ (Consulta para NFC-e - Modelo 65)
+            // 3. Consulta a Sefaz
+            System.out.println("📡 Batendo na porta da SEFAZ oficial...");
             TRetConsStatServ retornoSefaz = Nfe.statusServico(configSefaz, DocumentoEnum.NFCE);
 
-            // 4. LÊ A RESPOSTA OFICIAL DO GOVERNO
-            // O código "107" significa "Serviço em Operação"
+            System.out.println("📩 Resposta recebida! Código: " + retornoSefaz.getCStat());
+
             if ("107".equals(retornoSefaz.getCStat())) {
-                return ResponseEntity.ok(Map.of(
-                        "status", "ONLINE",
-                        "mensagem", "✅ SEFAZ " + config.getUf() + " ONLINE: " + retornoSefaz.getXMotivo(),
-                        "ambiente", config.getAmbienteSefaz() == 1 ? "Produção" : "Homologação"
-                ));
+                return ResponseEntity.ok(Map.of("status", "ONLINE", "mensagem", "SEFAZ OK: " + retornoSefaz.getXMotivo()));
             } else {
-                return ResponseEntity.ok(Map.of(
-                        "status", "OFFLINE",
-                        "mensagem", "❌ SEFAZ Respondeu: " + retornoSefaz.getXMotivo()
-                ));
+                return ResponseEntity.ok(Map.of("status", "OFFLINE", "mensagem", "SEFAZ Recusou: " + retornoSefaz.getXMotivo()));
             }
 
         } catch (Exception e) {
-            // Se der erro de senha, certificado vencido ou falta de arquivo, cai aqui:
-            return ResponseEntity.badRequest().body(Map.of(
-                    "status", "ERRO",
-                    "mensagem", "Falha de comunicação: " + e.getMessage()
-            ));
+            System.out.println("🚨 ERRO CRÍTICO NO JAVA: " + e.getMessage());
+            e.printStackTrace(); // 👈 Isso vai imprimir a "pilha" do erro completa no console!
+            return ResponseEntity.badRequest().body(Map.of("status", "ERRO", "mensagem", e.getMessage()));
         }
     }
 
