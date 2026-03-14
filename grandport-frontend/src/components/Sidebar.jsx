@@ -11,7 +11,7 @@ import {
     LogOut,
     Menu,
     ChevronLeft,
-    FileText
+    HelpCircle
 } from 'lucide-react';
 import api from '../api/axios';
 
@@ -87,23 +87,27 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Fiscal / NCM', acao: 'fiscal' },
                 { titulo: 'Regras Fiscais (NF-e)', acao: 'regras-fiscais' },
                 { titulo: 'Gerenciador de NF-e', acao: 'gerenciador-nfe' },
-                // =========================================================
-                // 🚀 ADICIONADO: A NOVA TELA DE NF-E AVULSA E COMPLETA
-                // =========================================================
                 { titulo: 'Emitir NF-e Avulsa', acao: 'emitir-nfe-avulsa' }
             ]
         },
-        { id: 'configuracoes', titulo: 'Configurações', icone: <Settings size={20} />, acao: 'configuracoes' }
+        { id: 'configuracoes', titulo: 'Configurações', icone: <Settings size={20} />, acao: 'configuracoes' },
+        { id: 'manual', titulo: 'Manual do Usuário', icone: <HelpCircle size={20} />, acao: 'manual' }
     ];
 
-    // Aqui filtramos para mostrar apenas as opções que o usuário tem permissão
+    // 🚀 Telas que todo mundo pode ver, mesmo sem permissão especial no banco
+    const rotasLivres = ['dash', 'manual'];
+
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {
             const submenusPermitidos = menu.submenus.filter(sub => permissoesUsuario.includes(sub.acao));
             if (submenusPermitidos.length > 0) return { ...menu, submenus: submenusPermitidos };
             return null;
         }
-        if (permissoesUsuario.includes(menu.acao)) return menu;
+
+        // Verifica se é uma rota livre OU se o usuário tem a permissão específica
+        if (rotasLivres.includes(menu.acao) || permissoesUsuario.includes(menu.acao)) {
+            return menu;
+        }
         return null;
     }).filter(menu => menu !== null);
 

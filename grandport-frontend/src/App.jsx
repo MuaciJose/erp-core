@@ -30,6 +30,7 @@ import { WidgetCalculadora } from './components/WidgetCalculadora';
 import { GestaoVendas } from './modules/vendas/GestaoVendas';
 import { FilaPedidosCaixa } from './modules/vendas/FilaPedidosCaixa';
 import { RelatorioComissoes } from './modules/vendas/RelatorioComissoes';
+import { ManualUsuario } from './modules/manual/ManualUsuario';
 
 // 🚀 MÓDULOS IMPORTADOS
 import { ReciboAvulso } from './modules/financeiro/ReciboAvulso';
@@ -169,6 +170,7 @@ function App() {
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
                             {paginaAtiva === 'auditoria' && <Auditoria />}
                             {paginaAtiva === 'configuracoes' && <Configuracoes />}
+                            {paginaAtiva === 'manual' && <ManualUsuario onVoltar={() => setPaginaAtiva('dash')} />}
 
                             {paginaAtiva === 'recibo-avulso' && <ReciboAvulso setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'historico-recibos' && <HistoricoRecibos setPaginaAtiva={setPaginaAtiva} />}
@@ -177,7 +179,6 @@ function App() {
                             {paginaAtiva === 'categorias' && <Categorias />}
                             {paginaAtiva === 'gerenciador-nfe' && <GerenciadorFiscal setPaginaAtiva={setPaginaAtiva} />}
 
-                            {/* 🚀 A  NOVA TELA AQUI: */}
                             {paginaAtiva === 'emitir-nfe-avulsa' && <EmitirNfeAvulsa setPaginaAtiva={setPaginaAtiva} />}
                         </>
                     )}

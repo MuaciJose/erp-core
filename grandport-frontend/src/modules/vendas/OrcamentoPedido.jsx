@@ -3,7 +3,8 @@ import api from '../../api/axios';
 import {
     Search, FileText, Printer, CheckCircle, Package, User,
     Trash2, ArrowRight, Save, FolderOpen, Car, X, RefreshCw,
-    AlertTriangle, MessageCircle, XCircle, Smartphone, Loader2, ArrowLeft, Receipt, FileDown
+    AlertTriangle, MessageCircle, XCircle, Smartphone, Loader2, ArrowLeft, Receipt, FileDown,
+    Image as ImageIcon
 } from 'lucide-react';
 
 import toast from 'react-hot-toast';
@@ -30,6 +31,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
     const [resultadosPecas, setResultadosPecas] = useState([]);
     const [indexFocadoPeca, setIndexFocadoPeca] = useState(-1);
 
+    const [previewImagemPeca, setPreviewImagemPeca] = useState(null);
+
     const inputPecaRef = useRef(null);
     const inputClienteRef = useRef(null);
     const inputDescontoRef = useRef(null);
@@ -45,7 +48,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
     const [motivoVendaPerdida, setMotivoVendaPerdida] = useState('');
     const [observacaoVendaPerdida, setObservacaoVendaPerdida] = useState('');
 
-    // 🚀 NOVOS ESTADOS PARA CANCELAMENTO DE NFE
     const [modalCancelamentoAberto, setModalCancelamentoAberto] = useState(false);
     const [justificativaCancelamento, setJustificativaCancelamento] = useState('');
     const [cancelandoNfe, setCancelandoNfe] = useState(false);
@@ -53,9 +55,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
     const [statusZap, setStatusZap] = useState(null);
     const [checandoZap, setChecandoZap] = useState(false);
 
-    // =======================================================================
-    // 🚀 EXTRATOR DE ERROS BLINDADO
-    // =======================================================================
     const extrairErroBackend = (error, mensagemPadrao) => {
         if (error?.response?.status === 403) return "Acesso Negado: Rota bloqueada pelo servidor (Erro 403).";
         if (error?.response?.status === 401) return "Sessão expirada. Por favor, recarregue a página e faça login novamente.";
@@ -68,9 +67,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         return error?.message || mensagemPadrao;
     };
 
-    // =======================================================================
-    // MÁSCARAS MONETÁRIAS
-    // =======================================================================
     const formatarMoeda = (valor) => {
         if (valor === undefined || valor === null || isNaN(Number(valor))) return '0,00';
         return Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -82,9 +78,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         callback(valorRealFloat);
     };
 
-    // =======================================================================
-    // MATEMÁTICA E VARIÁVEIS NO TOPO
-    // =======================================================================
     const subtotal = itens.reduce((acc, item) => acc + ((item.preco || 0) * (item.qtd || 0)), 0);
 
     let valorDescontoReal = 0;
@@ -101,9 +94,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
     const veiculoDetalhado = clienteSelecionado?.veiculos?.find(v => String(v.id) === String(veiculoSelecionado));
 
-    // =======================================================================
-    // FUNÇÕES ORIGINAIS
-    // =======================================================================
     const limparCliente = () => {
         setClienteSelecionado(null);
         setBuscaCliente('');
@@ -344,14 +334,10 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         if (onIrParaNota) {
             onIrParaNota(dadosParaFaturar);
         } else {
-            console.error("Função onIrParaNota não encontrada nas props.");
             toast.error("Erro na integração da tela fiscal.");
         }
     };
 
-    // =======================================================================
-    // 🚀 LÓGICA DE CANCELAMENTO DE NFE
-    // =======================================================================
     const cancelarNFe = async () => {
         if (justificativaCancelamento.length < 15) {
             return toast.error("A justificativa deve ter no mínimo 15 caracteres (Regra da SEFAZ).");
@@ -364,7 +350,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
             await api.post(`/api/vendas/${orcamentoId}/cancelar-nfe`, { justificativa: justificativaCancelamento });
             toast.success("NF-e Cancelada com sucesso e inutilizada na SEFAZ!", { id: loadId, duration: 5000 });
 
-            // Tira a nota da tela para permitir que o pedido seja editado novamente
             setNotaFiscalInfo(null);
             setModalCancelamentoAberto(false);
             setJustificativaCancelamento('');
@@ -434,10 +419,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         try {
             let res;
             if (orcamentoId) {
-                // 🚀 CORREÇÃO: Voltando para a ROTA UNIFICADA (Sem /pedido/ ou /orcamento/)
                 res = await api.put(`/api/vendas/${orcamentoId}`, payload);
             } else {
-                // Rota de criação continua separada
                 res = await api.post(statusFinal === 'PEDIDO' ? '/api/vendas/pedido' : '/api/vendas/orcamento', payload);
                 setOrcamentoId(res.data.id);
             }
@@ -450,7 +433,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
             setModo(statusFinal);
 
-            // Se mandou pro caixa, limpa a tela e volta
             if (statusFinal === 'AGUARDANDO_PAGAMENTO') {
                 limparEcra();
                 if (onVoltar) onVoltar();
@@ -523,6 +505,141 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
         toast.success(`Documento #${orcamento.id} reaberto.`);
         sincronizarEstoqueSilencioso(itensFormatados).catch(console.error);
+    };
+
+    // =======================================================================
+    // 🚀 NOVO MOTOR DE IMPRESSÃO: IFRAME INVISÍVEL
+    // =======================================================================
+    const imprimirViaIframe = () => {
+        if (itens.length === 0) return toast.error("Adicione itens para imprimir.");
+
+        // Cria o Iframe e esconde ele 100% da tela
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = 'none';
+        iframe.style.opacity = '0';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentWindow.document;
+
+        // Monta as linhas da tabela
+        const linhasItens = itens.map(item => `
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 6px; font-family: monospace; font-size: 10px; color: #475569;">${item.codigo}</td>
+                <td style="padding: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase;">${item.nome}</td>
+                <td style="padding: 6px; text-align: center; font-size: 12px; font-weight: bold;">${item.qtd}</td>
+                <td style="padding: 6px; text-align: right; font-size: 12px;">R$ ${formatarMoeda(item.preco)}</td>
+                <td style="padding: 6px; text-align: right; font-size: 12px; font-weight: bold;">R$ ${formatarMoeda(item.preco * item.qtd)}</td>
+            </tr>
+        `).join('');
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head>
+                <meta charset="UTF-8">
+                <title>Impressao Documento</title>
+                <style>
+                    body { font-family: 'Segoe UI', Arial, sans-serif; color: #000; margin: 0; padding: 20px; font-size: 12px; }
+                    .header { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; }
+                    .empresa-info h1 { margin: 0; font-size: 20px; text-transform: uppercase; font-weight: 900; }
+                    .empresa-info p { margin: 2px 0; font-size: 11px; font-weight: bold; color: #475569; text-transform: uppercase; }
+                    .doc-info { text-align: right; }
+                    .doc-info .badge { background: #000; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 16px; font-weight: 900; text-transform: uppercase; display: inline-block; margin-bottom: 4px; }
+                    .cliente-veiculo { display: flex; border: 1px solid #000; border-radius: 6px; margin-bottom: 20px; }
+                    .box { padding: 10px; flex: 1; }
+                    .box:first-child { border-right: 1px solid #000; flex: 1.5; }
+                    .box-title { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 900; margin: 0 0 2px 0; }
+                    .box-value { font-size: 13px; font-weight: 900; text-transform: uppercase; margin: 0 0 2px 0; }
+                    .box-sub { font-size: 11px; font-weight: bold; margin: 0; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                    th { border-bottom: 2px solid #000; border-top: 2px solid #000; padding: 8px 6px; text-align: left; font-size: 10px; text-transform: uppercase; background: #f8fafc; color: #000;}
+                    .totais-container { display: flex; justify-content: space-between; margin-top: 10px; }
+                    .rodape-msg { font-size: 11px; color: #475569; width: 60%; border-left: 2px solid #cbd5e1; padding-left: 10px; font-weight: 500; }
+                    .valores { width: 35%; border: 1px solid #cbd5e1; padding: 10px; border-radius: 6px; background: #f8fafc; }
+                    .linha-valor { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; margin-bottom: 4px; }
+                    .linha-total { display: flex; justify-content: space-between; font-size: 16px; font-weight: 900; border-top: 1px solid #94a3b8; padding-top: 8px; margin-top: 6px; text-transform: uppercase; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="empresa-info">
+                        <h1>${empresaConfig.nomeFantasia}</h1>
+                        <p>${empresaConfig.razaoSocial}</p>
+                        ${empresaConfig.enderecoString ? `<p>${empresaConfig.enderecoString}</p>` : ''}
+                        <p>CNPJ: ${empresaConfig.cnpj || '---'} | TEL: ${empresaConfig.telefone || '---'}</p>
+                    </div>
+                    <div class="doc-info">
+                        <div class="badge">${modo}</div>
+                        <p style="font-size: 12px; font-weight: 900; color: #000; margin-top: 5px;">Nº DOC: ${orcamentoId || 'PROVISÓRIO'}</p>
+                        <p style="font-size: 11px;">${new Date().toLocaleString('pt-BR')}</p>
+                    </div>
+                </div>
+
+                <div class="cliente-veiculo">
+                    <div class="box">
+                        <p class="box-title">Identificação do Cliente</p>
+                        <p class="box-value">${clienteSelecionado?.nome || 'CLIENTE NÃO IDENTIFICADO / AVULSO'}</p>
+                        <p class="box-sub">DOC: ${clienteSelecionado?.documento || '---'} | TEL: ${clienteSelecionado?.telefone || '---'}</p>
+                    </div>
+                    <div class="box" style="background: #f8fafc;">
+                        <p class="box-title">Veículo em Atendimento</p>
+                        ${veiculoDetalhado ? `
+                            <p class="box-value">${veiculoDetalhado.marca} ${veiculoDetalhado.modelo}</p>
+                            <p class="box-sub">PLACA: ${veiculoDetalhado.placa} | KM: ${veiculoDetalhado.km}</p>
+                        ` : `<p class="box-value" style="color: #64748b; font-style: italic; margin-top: 5px;">VENDA BALCÃO</p>`}
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">Cód.</th>
+                            <th style="width: 45%;">Descrição</th>
+                            <th style="width: 10%; text-align: center;">Qtd</th>
+                            <th style="width: 15%; text-align: right;">Unitário</th>
+                            <th style="width: 15%; text-align: right;">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${linhasItens}
+                    </tbody>
+                </table>
+
+                <div class="totais-container">
+                    <div class="rodape-msg">
+                        ${empresaConfig.mensagemRodape}
+                    </div>
+                    <div class="valores">
+                        <div class="linha-valor"><span>SUBTOTAL:</span><span>R$ ${formatarMoeda(subtotal)}</span></div>
+                        ${valorDescontoReal > 0 ? `<div class="linha-valor" style="color: #dc2626;"><span>DESCONTO:</span><span>- R$ ${formatarMoeda(valorDescontoReal)}</span></div>` : ''}
+                        <div class="linha-total"><span>TOTAL:</span><span>R$ ${formatarMoeda(totalFinal)}</span></div>
+                    </div>
+                </div>
+
+                <script>
+                    window.onload = function() {
+                        setTimeout(function() {
+                            window.print();
+                        }, 200);
+                    }
+                </script>
+            </body>
+            </html>
+        `;
+
+        doc.open();
+        doc.write(htmlContent);
+        doc.close();
+
+        // O Iframe se auto-destrói após 10 segundos para não deixar lixo na RAM
+        setTimeout(() => {
+            if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+            }
+        }, 10000);
     };
 
     useEffect(() => {
@@ -610,8 +727,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 case 'P':
                     if (e.ctrlKey || e.metaKey) {
                         e.preventDefault();
-                        // 🚀 TRUQUE PARA EVITAR TELA BRANCA NA IMPRESSÃO PELO TECLADO
-                        setTimeout(() => window.print(), 300);
+                        // 🚀 ATUALIZADO PARA IFRAME
+                        imprimirViaIframe();
                     }
                     break;
                 case 'Escape':
@@ -641,25 +758,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         orcamentosSalvos, indexFocadoLista, resultadosClientes, resultadosPecas, justificativaCancelamento, cancelandoNfe
     ]);
 
-    useEffect(() => {
-        if (modalListaAberto) {
-            api.get('/api/vendas/orcamentos')
-                .then(res => {
-                    const formatados = res.data.map(orc => ({
-                        id: orc.id, data: orc.dataHora, cliente: orc.cliente ? orc.cliente.nome : 'Cliente Avulso', clienteObj: orc.cliente,
-                        veiculo: orc.veiculo ? orc.veiculo.modelo : 'Nenhum', veiculoId: orc.veiculo?.id, valor: orc.valorTotal || 0, desconto: orc.desconto || 0, status: orc.status,
-                        itensRaw: orc.itens || [],
-                        notaFiscal: orc.notaFiscal
-                    }));
-                    setOrcamentosSalvos(formatados);
-                })
-                .catch(e => toast.error(extrairErroBackend(e, "Erro ao carregar lista.")));
-        }
-    }, [modalListaAberto]);
-
     return (
         <div className="flex flex-col h-full bg-white relative z-[15]">
-            <div className="p-8 max-w-7xl mx-auto flex flex-col h-full animate-fade-in relative print:hidden">
+            <div className="p-8 max-w-7xl mx-auto flex flex-col h-full animate-fade-in relative">
 
                 {onVoltar && (
                     <div className="mb-4">
@@ -702,7 +803,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                                 </button>
                             )}
 
-                            {/* BOTÕES FISCAIS (IMPRIMIR E CANCELAR) */}
                             {orcamentoId && notaFiscalInfo && (
                                 <div className="flex items-center rounded-lg border border-green-500 bg-green-50 overflow-hidden shadow-sm shadow-green-500/20">
                                     <button onClick={abrirPDFDanfe} title="Abrir espelho (DANFE) da Nota para impressão" className="px-4 py-2 text-green-700 hover:bg-green-600 hover:text-white font-black text-xs transition-colors flex items-center gap-2">
@@ -726,8 +826,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
                             <button onClick={() => processarVendaAPI(modo)} title="Salvar progresso atual (F8)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Save size={14}/> SALVAR (F8)</button>
 
-                            {/* 🚀 TRUQUE PARA EVITAR TELA BRANCA NA IMPRESSÃO PELO MOUSE */}
-                            <button onClick={() => setTimeout(() => window.print(), 300)} title="Gerar impressão A4 do documento atual (Ctrl+P)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Printer size={14}/> IMPRIMIR (Ctrl+P)</button>
+                            {/* 🚀 ATUALIZADO PARA IFRAME */}
+                            <button onClick={imprimirViaIframe} title="Gerar impressão A4 do documento atual (Ctrl+P)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Printer size={14}/> IMPRIMIR (Ctrl+P)</button>
 
                             <div className="flex items-center rounded-lg border border-green-200 bg-green-50 overflow-hidden ml-1">
                                 <button type="button" onClick={verificarConexaoZap} disabled={checandoZap} className="p-2 border-r border-green-200 text-green-600 hover:bg-green-100 transition-colors" title="Verificar se o motor do WhatsApp está conectado">
@@ -799,19 +899,42 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
                         {resultadosPecas.length > 0 && (
                             <div className="absolute top-full left-0 w-full mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-72 overflow-y-auto mx-2 w-[calc(100%-16px)]">
-                                {resultadosPecas.map((peca, idx) => (
-                                    <div key={peca.id} onClick={() => adicionarItem(peca)} className={`p-4 border-b flex justify-between items-center cursor-pointer transition-colors ${idx === indexFocadoPeca ? 'bg-blue-600 text-white' : 'hover:bg-slate-50'}`}>
-                                        <div>
-                                            <p className="font-bold text-md leading-tight">{peca.nome}</p>
-                                            <div className="flex items-center gap-3 mt-1">
-                                                <p className={`text-xs font-mono ${idx === indexFocadoPeca ? 'text-blue-200' : 'text-slate-500'}`}>{peca.sku}</p>
-                                                <span className={`text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-widest ${idx === indexFocadoPeca ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'}`}>ESTOQUE: {peca.quantidadeEstoque ?? 0}</span>
-                                                {peca.ncm && <span className={`text-[9px] px-1.5 py-0.5 rounded font-black border ${idx === indexFocadoPeca ? 'border-purple-300 text-purple-100' : 'border-purple-200 text-purple-600 bg-purple-50'}`}>NCM {getNcmString(peca.ncm)}</span>}
+                                {resultadosPecas.map((peca, idx) => {
+                                    const temFoto = peca.fotoUrl || peca.fotoLocalPath;
+                                    return (
+                                        <div
+                                            key={peca.id}
+                                            onClick={() => adicionarItem(peca)}
+                                            onMouseEnter={() => {
+                                                if(temFoto) setPreviewImagemPeca(temFoto);
+                                            }}
+                                            onMouseLeave={() => setPreviewImagemPeca(null)}
+                                            className={`p-4 border-b flex justify-between items-center cursor-pointer transition-colors ${idx === indexFocadoPeca ? 'bg-blue-600 text-white' : 'hover:bg-slate-50'}`}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 overflow-hidden ${idx === indexFocadoPeca ? 'bg-blue-500/30' : 'bg-slate-100 border border-slate-200'}`}>
+                                                    {temFoto ? (
+                                                        <img src={temFoto} alt="Peca" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <ImageIcon size={20} className={idx === indexFocadoPeca ? 'text-blue-200' : 'text-slate-300'} />
+                                                    )}
+                                                </div>
+
+                                                <div>
+                                                    <p className="font-bold text-md leading-tight flex items-center gap-2">
+                                                        {peca.nome}
+                                                    </p>
+                                                    <div className="flex items-center gap-3 mt-1">
+                                                        <p className={`text-xs font-mono ${idx === indexFocadoPeca ? 'text-blue-200' : 'text-slate-500'}`}>{peca.sku}</p>
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-widest ${idx === indexFocadoPeca ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'}`}>ESTOQUE: {peca.quantidadeEstoque ?? 0}</span>
+                                                        {peca.ncm && <span className={`text-[9px] px-1.5 py-0.5 rounded font-black border ${idx === indexFocadoPeca ? 'border-purple-300 text-purple-100' : 'border-purple-200 text-purple-600 bg-purple-50'}`}>NCM {getNcmString(peca.ncm)}</span>}
+                                                    </div>
+                                                </div>
                                             </div>
+                                            <p className="font-black text-lg">R$ {formatarMoeda(peca.precoVenda)}</p>
                                         </div>
-                                        <p className="font-black text-lg">R$ {formatarMoeda(peca.precoVenda)}</p>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         )}
                     </div>
@@ -946,7 +1069,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
             {/* MODAL DE CANCELAMENTO DE NF-E */}
             {modalCancelamentoAberto && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 print:hidden">
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in border-4 border-red-600">
                         <div className="bg-red-600 p-6 flex justify-between items-center text-white">
                             <h2 className="font-black tracking-widest flex items-center gap-2"><AlertTriangle /> CANCELAR NF-E</h2>
@@ -985,7 +1108,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
             {/* MODAL DE VENDA PERDIDA */}
             {modalVendaPerdidaAberto && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 print:hidden">
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
                         <div className="bg-red-600 p-6 flex justify-between items-center text-white">
                             <h2 className="font-black tracking-widest flex items-center gap-2"><XCircle /> REGISTRAR PERDA</h2>
@@ -1011,64 +1134,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 </div>
             )}
 
-            {/* IMPRESSÃO PDF COM MÁSCARAS E CSS OBRIGATÓRIO */}
-            <div className="hidden print:block absolute top-0 left-0 w-full min-h-screen bg-white z-[99999] p-0 text-black">
-                <div className="w-full max-w-[210mm] mx-auto p-6 font-sans text-slate-900">
-                    <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
-                        <div className="flex-1">
-                            <h1 className="text-xl font-black uppercase leading-none mb-1">{empresaConfig.nomeFantasia}</h1>
-                            <p className="text-[9px] font-bold text-slate-600 uppercase mb-2">{empresaConfig.razaoSocial}</p>
-                            <div className="text-[9.5px] leading-tight font-medium text-slate-700">
-                                {empresaConfig.enderecoString && <div className="whitespace-pre-line mb-1 uppercase font-bold text-slate-600">{empresaConfig.enderecoString}</div>}
-                                <p className="mt-1">{empresaConfig.cnpj && `CNPJ: ${empresaConfig.cnpj}`}{empresaConfig.cnpj && empresaConfig.telefone && ' | '}{empresaConfig.telefone && <span className="font-bold">WhatsApp/Tel: {empresaConfig.telefone}</span>}</p>
-                            </div>
-                        </div>
-                        <div className="text-right flex flex-col items-end">
-                            <div className="bg-black text-white px-3 py-1.5 rounded mb-1"><h2 className="text-md font-black uppercase leading-none">{modo}</h2></div>
-                            <p className="text-[9px] font-black uppercase">Nº DOC: <span className="text-blue-700">{orcamentoId || 'PROVISÓRIO'}</span></p>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-5 border border-black rounded mb-3 text-[9px]">
-                        <div className="col-span-3 p-1.5 border-r border-black">
-                            <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Identificação do Cliente</p>
-                            <p className="font-black uppercase truncate">{clienteSelecionado?.nome || 'CLIENTE NÃO IDENTIFICADO'}</p>
-                            <p className="font-bold">DOC: {clienteSelecionado?.documento || '---'} | TEL: {clienteSelecionado?.telefone || '---'}</p>
-                        </div>
-                        <div className="col-span-2 p-1.5 bg-slate-50">
-                            <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Veículo em Atendimento</p>
-                            {veiculoDetalhado ? (
-                                <><p className="font-black uppercase truncate">{veiculoDetalhado.marca} {veiculoDetalhado.modelo}</p><p className="font-bold uppercase">PLACA: {veiculoDetalhado.placa} | KM: {veiculoDetalhado.km}</p></>
-                            ) : <p className="font-bold italic text-slate-400 text-center py-2">VENDA BALCÃO</p>}
-                        </div>
-                    </div>
-                    <table className="w-full mb-4 border-collapse">
-                        <thead>
-                        <tr className="bg-slate-100 border-y border-black">
-                            <th className="p-1 text-left text-[8px] font-black uppercase w-16">Cód.</th><th className="p-1 text-left text-[8px] font-black uppercase">Descrição</th><th className="p-1 text-center text-[8px] font-black uppercase w-12">Qtd</th><th className="p-1 text-right text-[8px] font-black uppercase w-20">Unitário</th><th className="p-1 text-right text-[8px] font-black uppercase w-20">Subtotal</th>
-                        </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                        {itens.map((item, index) => (
-                            <tr key={index} className="border-b border-slate-50">
-                                <td className="p-1 text-[8.5px] font-mono">{item.codigo}</td><td className="p-1 text-[9px] font-bold uppercase">{item.nome}</td><td className="p-1 text-center text-[9px] font-bold">{item.qtd}</td><td className="p-1 text-right text-[9px]">{formatarMoeda(item.preco)}</td><td className="p-1 text-right text-[9px] font-black">{formatarMoeda(item.preco * item.qtd)}</td>
-                            </tr>
-                        ))}
-                        </tbody>
-                    </table>
-                    <div className="flex justify-between items-start mt-2">
-                        <div className="w-2/3 pr-10"><p className="text-[8.5px] text-slate-600 border-l-2 border-slate-200 pl-2">{empresaConfig.mensagemRodape}</p></div>
-                        <div className="w-1/3 space-y-1 bg-slate-50 p-2 border border-slate-200 rounded">
-                            <div className="flex justify-between text-[9px] font-bold text-slate-500"><span>SUBTOTAL:</span><span>R$ {formatarMoeda(subtotal)}</span></div>
-                            {valorDescontoReal > 0 && <div className="flex justify-between text-[9px] font-bold text-red-600"><span>DESCONTO:</span><span>- R$ {formatarMoeda(valorDescontoReal)}</span></div>}
-                            <div className="flex justify-between text-[11px] font-black uppercase border-t border-slate-300 pt-1 mt-1"><span>TOTAL LÍQUIDO:</span><span>R$ {formatarMoeda(totalFinal)}</span></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             {/* MODAL LISTA DE ORÇAMENTOS */}
             {modalListaAberto && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in print:hidden">
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[80vh]">
                         <div className="bg-slate-900 p-6 flex justify-between items-center text-white"><h2 className="text-xl font-black tracking-widest flex items-center gap-2"><FolderOpen /> ORÇAMENTOS PENDENTES (Use as setas para navegar)</h2><button onClick={() => setModalListaAberto(false)} title="Fechar lista de orçamentos (Esc)"><X size={24}/></button></div>
                         <div className="overflow-y-auto p-6 bg-slate-50 flex-1">
@@ -1089,14 +1157,21 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 </div>
             )}
 
-            <style>{`
-                @media print {
-                    @page { size: A4 portrait; margin: 0.3cm; }
-                    body, html, #root { height: auto !important; overflow: visible !important; margin: 0; padding: 0; background: white !important; }
-                    .print\\:hidden { display: none !important; }
-                    .print\\:block { display: block !important; position: static !important; }
-                }
-            `}</style>
+            {/* OVERLAY DE ZOOM DA IMAGEM DA PEÇA */}
+            {previewImagemPeca && (
+                <div className="fixed inset-0 pointer-events-none z-[99999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white p-2 rounded-3xl shadow-2xl">
+                        <img
+                            src={previewImagemPeca}
+                            alt="Visualização da Peça"
+                            className="max-w-2xl max-h-[70vh] rounded-2xl object-contain"
+                            onError={(e) => {
+                                setPreviewImagemPeca(null);
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
