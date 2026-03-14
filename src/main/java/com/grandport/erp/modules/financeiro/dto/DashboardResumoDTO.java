@@ -16,6 +16,10 @@ public class DashboardResumoDTO {
     private List<TopProdutoDTO> topProdutos;
     private List<AlertaDTO> alertas;
 
+    // 🚀 NOVOS CAMPOS ADICIONADOS PARA OS GRÁFICOS
+    private List<VendaSemanalDTO> vendasSemanal;
+    private List<CategoriaVendaDTO> vendasPorCategoria;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -31,5 +35,22 @@ public class DashboardResumoDTO {
     public static class AlertaDTO {
         private String tipo;
         private String msg;
+    }
+
+    // 🚀 NOVAS CLASSES PARA OS GRÁFICOS
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class VendaSemanalDTO {
+        private String name;
+        private BigDecimal vendas;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CategoriaVendaDTO {
+        private String name;
+        private Integer value;
     }
 }

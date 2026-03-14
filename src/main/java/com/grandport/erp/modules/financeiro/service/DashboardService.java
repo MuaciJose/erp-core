@@ -13,8 +13,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class DashboardService {
@@ -33,18 +35,18 @@ public class DashboardService {
         // KPIs Financeiros com tratamento de nulo
         resumo.setFaturamentoMes(vendaRepository.sumTotalVendasPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
         resumo.setReceberAtrasado(contaReceberRepository.sumContasAtrasadas().orElse(BigDecimal.ZERO));
-        
+
         Long vendasHoje = vendaRepository.countVendasByData(LocalDate.now().atStartOfDay(), LocalDate.now().atTime(LocalTime.MAX));
         resumo.setVendasHoje(vendasHoje != null ? vendasHoje : 0L);
 
         // KPIs de Estoque
         Long baixoEstoque = produtoRepository.countProdutosBaixoEstoque();
         resumo.setProdutosBaixoEstoque(baixoEstoque != null ? baixoEstoque : 0L);
-        
+
         // Top Produtos (Garante lista não nula)
         List<DashboardResumoDTO.TopProdutoDTO> top = vendaRepository.findTop5ProdutosMaisVendidosMes();
         resumo.setTopProdutos(top != null ? top : new ArrayList<>());
-        
+
         // Alertas
         resumo.setAlertas(new ArrayList<>());
         if (resumo.getReceberAtrasado().compareTo(BigDecimal.ZERO) > 0) {
@@ -53,6 +55,35 @@ public class DashboardService {
         if (resumo.getProdutosBaixoEstoque() > 0) {
             resumo.getAlertas().add(new DashboardResumoDTO.AlertaDTO("ESTOQUE", resumo.getProdutosBaixoEstoque() + " produtos estão com estoque baixo ou zerado."));
         }
+
+        // =========================================================================
+        // 🚀 NOVO: DADOS PARA OS GRÁFICOS DO REACT
+        // =========================================================================
+
+        // 1. Gráfico Semanal (Calculando os últimos 7 dias usando o SEU método de soma)
+        List<DashboardResumoDTO.VendaSemanalDTO> graficoSemanal = new ArrayList<>();
+        LocalDate hoje = LocalDate.now();
+        for (int i = 6; i >= 0; i--) {
+            LocalDate dataAlvo = hoje.minusDays(i);
+            LocalDateTime inicioDia = dataAlvo.atStartOfDay();
+            LocalDateTime fimDia = dataAlvo.atTime(LocalTime.MAX);
+
+            BigDecimal totalDia = vendaRepository.sumTotalVendasPeriodo(inicioDia, fimDia).orElse(BigDecimal.ZERO);
+
+            String diaSemana = dataAlvo.getDayOfWeek().getDisplayName(TextStyle.SHORT, new Locale("pt", "BR"));
+            String diaFormatado = diaSemana.substring(0, 1).toUpperCase() + diaSemana.substring(1);
+
+            graficoSemanal.add(new DashboardResumoDTO.VendaSemanalDTO(diaFormatado, totalDia));
+        }
+        resumo.setVendasSemanal(graficoSemanal);
+
+        // 2. Gráfico de Categorias (Por enquanto fixo, para não quebrar até você criar as Categorias no BD)
+        List<DashboardResumoDTO.CategoriaVendaDTO> categorias = new ArrayList<>();
+        categorias.add(new DashboardResumoDTO.CategoriaVendaDTO("Suspensão", 350));
+        categorias.add(new DashboardResumoDTO.CategoriaVendaDTO("Freios", 420));
+        categorias.add(new DashboardResumoDTO.CategoriaVendaDTO("Filtros", 210));
+        categorias.add(new DashboardResumoDTO.CategoriaVendaDTO("Óleos", 300));
+        resumo.setVendasPorCategoria(categorias);
 
         return resumo;
     }
@@ -66,11 +97,11 @@ public class DashboardService {
             if (criticos != null && !criticos.isEmpty()) {
                 Produto p = criticos.get(0);
                 insights.add(new InsightDTO(
-                    "ALERTA_ESTOQUE",
-                    "Risco de Ruptura (Curva A)",
-                    "O produto '" + p.getNome() + "' está com estoque baixo (" + p.getQuantidadeEstoque() + " un) e é um dos seus mais vendidos.",
-                    "GERAR PEDIDO DE COMPRA",
-                    "orange"
+                        "ALERTA_ESTOQUE",
+                        "Risco de Ruptura (Curva A)",
+                        "O produto '" + p.getNome() + "' está com estoque baixo (" + p.getQuantidadeEstoque() + " un) e é um dos seus mais vendidos.",
+                        "GERAR PEDIDO DE COMPRA",
+                        "orange"
                 ));
             }
 
@@ -80,21 +111,21 @@ public class DashboardService {
             if (parados != null && !parados.isEmpty()) {
                 Produto p = parados.get(0);
                 insights.add(new InsightDTO(
-                    "DINHEIRO_PARADO",
-                    "Capital de Giro Travado",
-                    "Você tem " + p.getQuantidadeEstoque() + " unidades de '" + p.getNome() + "' sem nenhuma venda há mais de 90 dias.",
-                    "CRIAR PROMOÇÃO (QUEIMA)",
-                    "red"
+                        "DINHEIRO_PARADO",
+                        "Capital de Giro Travado",
+                        "Você tem " + p.getQuantidadeEstoque() + " unidades de '" + p.getNome() + "' sem nenhuma venda há mais de 90 dias.",
+                        "CRIAR PROMOÇÃO (QUEIMA)",
+                        "red"
                 ));
             }
 
             // 3. Oportunidade de Venda
             insights.add(new InsightDTO(
-                "OPORTUNIDADE_VENDA",
-                "Venda Casada (Cross-Sell)",
-                "Notamos que muitos clientes que compram Óleo não levam o Filtro. Treine a equipe para oferecer o kit completo!",
-                "VER RELATÓRIO DE VENDAS",
-                "blue"
+                    "OPORTUNIDADE_VENDA",
+                    "Venda Casada (Cross-Sell)",
+                    "Notamos que muitos clientes que compram Óleo não levam o Filtro. Treine a equipe para oferecer o kit completo!",
+                    "VER RELATÓRIO DE VENDAS",
+                    "blue"
             ));
         } catch (Exception e) {
             e.printStackTrace();
