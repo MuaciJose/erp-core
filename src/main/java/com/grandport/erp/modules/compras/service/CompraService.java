@@ -5,6 +5,7 @@ import com.grandport.erp.modules.compras.model.*;
 import com.grandport.erp.modules.compras.repository.CompraXMLRepository;
 import com.grandport.erp.modules.estoque.model.*;
 import com.grandport.erp.modules.estoque.repository.*;
+import com.grandport.erp.modules.estoque.service.EstoqueService;
 import com.grandport.erp.modules.financeiro.model.ContaPagar;
 import com.grandport.erp.modules.financeiro.service.FinanceiroService;
 import com.grandport.erp.modules.parceiro.model.*;
@@ -29,6 +30,7 @@ public class CompraService {
     @Autowired private ParceiroRepository parceiroRepository;
     @Autowired private FinanceiroService financeiroService;
     @Autowired private CompraXMLRepository compraXMLRepository;
+    @Autowired private EstoqueService estoqueService;
 
     public List<ImportacaoResumoDTO> listarHistorico() {
         return compraXMLRepository.findAll().stream().map(entidade -> {
@@ -74,7 +76,6 @@ public class CompraService {
         }
 
         ImportacaoResumoDTO resumo = new ImportacaoResumoDTO();
-        List<Produto> produtosProcessados = new ArrayList<>();
         List<CompraItem> itensDaNota = new ArrayList<>();
 
         Parceiro fornecedor = processarFornecedor(info.getEmitente(), resumo);
@@ -88,30 +89,36 @@ public class CompraService {
         historico.setValorTotal(total);
         historico.setStatus("Pendente Revisão");
 
+        String numeroNota = info.getIde().getNumeroNota();
+        String fornecedorNome = fornecedor.getNome();
+
+        // 🚀 Criamos a lista para o resumo que vai pro Front-end
+        List<ImportacaoResumoDTO.ProdutoImportadoDTO> resumoItens = new ArrayList<>();
+
         for (NfeDTO.Detalhe detalhe : info.getDetalhes()) {
-            Produto p = processarProduto(detalhe.getProduto());
-            produtosProcessados.add(p);
+            Produto p = processarProduto(detalhe.getProduto(), numeroNota, fornecedorNome);
 
             CompraItem item = new CompraItem();
             item.setProdutoId(p.getId());
             item.setNome(p.getNome());
             item.setPrecoCusto(p.getPrecoCusto());
             item.setPrecoVenda(p.getPrecoVenda());
-
             item.setCodigoFornecedor(detalhe.getProduto().getCodigoProduto());
             item.setEanBarras(detalhe.getProduto().getEan());
             item.setQuantidade(detalhe.getProduto().getQuantidade());
             item.setValorUnitario(detalhe.getProduto().getValorUnitario());
             item.setNcm(detalhe.getProduto().getNcm());
-
-            // 🚀 AQUI ESTAVAM OS ERROS! COMENTEI TUDO PARA O MAVEN PASSAR:
-            // item.setUnidadeMedida(detalhe.getProduto().getUnidadeMedida());
-            // item.setValorTotal(detalhe.getProduto().getValorTotal());
-            // item.setCfop(detalhe.getProduto().getCfop());
-            // if(detalhe.getImposto() != null && detalhe.getImposto().getIcms() != null) { }
-
             item.setCompra(historico);
+
             itensDaNota.add(item);
+
+            // 🚀 Alimenta o objeto de resumo para o React mostrar na tela na hora
+            ImportacaoResumoDTO.ProdutoImportadoDTO pDto = new ImportacaoResumoDTO.ProdutoImportadoDTO(
+                    p.getId(), p.getNome(), p.getPrecoCusto(), p.getPrecoVenda()
+            );
+            pDto.setSku(item.getCodigoFornecedor());
+            pDto.setQuantidade(item.getQuantidade());
+            resumoItens.add(pDto);
         }
 
         historico.setItens(itensDaNota);
@@ -119,10 +126,16 @@ public class CompraService {
 
         processarFinanceiro(info, fornecedor, historico);
 
+        // 🚀 Finaliza o preenchimento do resumo para o Front-end
+        resumo.setId(historico.getId());
+        resumo.setNumero(historico.getNumero());
+        resumo.setValorTotalNota(historico.getValorTotal());
+        resumo.setStatus(historico.getStatus());
+        resumo.setProdutosImportados(resumoItens);
+
         return resumo;
     }
 
-    // 🚀 NOVO MÉTODO QUE RECEBE OS PREÇOS E ATUALIZA O ESTOQUE
     @Transactional
     public void finalizarNota(Long id, ConfirmacaoNotaDTO dto) {
         CompraXML nota = compraXMLRepository.findById(id)
@@ -134,15 +147,12 @@ public class CompraService {
 
         if (dto != null && dto.getItens() != null) {
             for (ConfirmacaoNotaDTO.ItemConfirmacao itemDto : dto.getItens()) {
-
                 if (itemDto.getProdutoId() != null) {
-                    // 1. Atualiza o Preço no Estoque Principal (O que já estava funcionando)
                     produtoRepository.findById(itemDto.getProdutoId()).ifPresent(produto -> {
                         produto.setPrecoVenda(itemDto.getPrecoVenda());
                         produtoRepository.save(produto);
                     });
 
-                    // 🚀 2. A CORREÇÃO: Atualiza o Preço dentro da Nota para o React lembrar!
                     nota.getItens().stream()
                             .filter(i -> i.getProdutoId() != null && i.getProdutoId().equals(itemDto.getProdutoId()))
                             .findFirst()
@@ -154,7 +164,7 @@ public class CompraService {
         }
 
         nota.setStatus("Finalizado");
-        compraXMLRepository.save(nota); // Salva a nota com os preços atualizados
+        compraXMLRepository.save(nota);
     }
 
     private Parceiro processarFornecedor(NfeDTO.Emitente emitente, ImportacaoResumoDTO resumo) {
@@ -178,14 +188,23 @@ public class CompraService {
         return fornecedor;
     }
 
-    private Produto processarProduto(ItemNotaDTO item) {
+    private Produto processarProduto(ItemNotaDTO item, String numeroNota, String fornecedorNome) {
         Produto produto = produtoRepository.findByCodigoBarras(item.getEan())
                 .orElseGet(() -> criarNovoProdutoPelaNota(item));
 
         int quantidadeEntrada = item.getQuantidade().intValue();
-        produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + quantidadeEntrada);
-        produto.setPrecoCusto(item.getValorUnitario());
 
+        // 🚀 REGISTRO NO HISTÓRICO: Aqui é onde o "reloginho" é alimentado!
+        estoqueService.registrarMovimentacao(
+                produto,
+                quantidadeEntrada,
+                "ENTRADA",
+                "Importação de XML",
+                fornecedorNome,
+                numeroNota
+        );
+
+        produto.setPrecoCusto(item.getValorUnitario());
         return produtoRepository.save(produto);
     }
 

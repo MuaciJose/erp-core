@@ -8,7 +8,6 @@ import java.time.LocalDateTime;
 @Table(name = "movimentacoes_estoque")
 @Data
 public class MovimentacaoEstoque {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -19,13 +18,14 @@ public class MovimentacaoEstoque {
     @JoinColumn(name = "produto_id", nullable = false)
     private Produto produto;
 
-    private Integer quantidade; // Positivo para entrada, negativo para saída
+    private Integer quantidade;
+    private String tipo; // "ENTRADA", "SAIDA"
+    private String motivo; // Ex: "Venda Balcão"
 
-    private String tipo; // "ENTRADA", "SAIDA", "AJUSTE"
+    // 🚀 NOVOS CAMPOS PARA RASTREABILIDADE
+    private String parceiro; // Nome do Cliente ou Fornecedor
+    private String documento; // Número da NF-e, Venda ou Pedido
 
-    private String motivo; // Ex: "Venda #123", "NF-e 456", "Inventário"
-    
     private Integer saldoAnterior;
-    
     private Integer saldoAtual;
 }
