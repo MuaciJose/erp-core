@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.compras.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
@@ -78,12 +79,29 @@ public class NfeDTO {
         private BigDecimal valorTotal;
     }
 
+    // 🚀 BLINDAGEM DO FINANCEIRO
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Cobranca {
+        // Mapeamos a Fatura para o Jackson não se perder antes de chegar nas duplicatas
+        @JacksonXmlProperty(localName = "fat")
+        private Fatura fatura;
+
         @JacksonXmlElementWrapper(useWrapping = false)
         @JacksonXmlProperty(localName = "dup")
         private List<Duplicata> duplicatas;
+    }
+
+    // Estrutura da Fatura (Opcional, mas ajuda o Jackson)
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Fatura {
+        @JacksonXmlProperty(localName = "nFat")
+        private String numero;
+        @JacksonXmlProperty(localName = "vOrig")
+        private BigDecimal valorOriginal;
+        @JacksonXmlProperty(localName = "vLiq")
+        private BigDecimal valorLiquido;
     }
 
     @Data
@@ -91,8 +109,12 @@ public class NfeDTO {
     public static class Duplicata {
         @JacksonXmlProperty(localName = "nDup")
         private String numero;
+
+        // 🚀 FORÇANDO O PADRÃO DE DATA PARA EVITAR ERRO DE PARSE
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
         @JacksonXmlProperty(localName = "dVenc")
         private LocalDate dataVencimento;
+
         @JacksonXmlProperty(localName = "vDup")
         private BigDecimal valor;
     }

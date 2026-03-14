@@ -44,11 +44,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/parceiros/consulta-cep/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/configuracoes/backup").permitAll()
 
+                        // 🚀 NOVO: Rota de compras liberada explicitamente para evitar o Erro 403 no PUT
+                        .requestMatchers("/api/compras/**").permitAll()
+
                         // ================= ROTAS PRIVADAS (Requerem Token) =================
                         .requestMatchers("/api/whatsapp/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/vendas/*/whatsapp").authenticated()
 
-                        // 🚀 NOVO: Rota do módulo fiscal liberada para usuários logados
+                        // Rota do módulo fiscal liberada para usuários logados
                         .requestMatchers("/api/ncm/**").authenticated()
                         .requestMatchers("/api/fiscal/**").authenticated()
 

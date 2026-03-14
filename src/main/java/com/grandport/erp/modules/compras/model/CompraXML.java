@@ -24,4 +24,17 @@ public class CompraXML {
 
     @OneToMany(mappedBy = "compra", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<CompraItem> itens = new ArrayList<>();
+
+    // 🚀 AQUI ESTÁ A SOLUÇÃO: A lista para guardar o financeiro (Duplicatas)!
+    @OneToMany(mappedBy = "compra", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<CompraParcela> parcelas = new ArrayList<>();
+
+    // 🛡️ Getters e Setters explícitos para o Maven nunca mais reclamar:
+    public List<CompraParcela> getParcelas() {
+        return parcelas;
+    }
+
+    public void setParcelas(List<CompraParcela> parcelas) {
+        this.parcelas = parcelas;
+    }
 }
