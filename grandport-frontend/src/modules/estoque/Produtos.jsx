@@ -4,10 +4,9 @@ import toast from 'react-hot-toast';
 import {
     Package, Plus, Search, Edit, Trash2, CheckCircle, Ban, X, Save,
     FileText, DollarSign, Box, ShieldAlert, Image as ImageIcon, Info, ArrowLeft,
-    History // 🚀 Já estava aqui, vamos usar!
+    History
 } from 'lucide-react';
 
-// Importe o componente que você criou (ajuste o caminho se necessário)
 import { ExtratoEstoque } from './ExtratoEstoque';
 
 export const Produtos = () => {
@@ -16,10 +15,9 @@ export const Produtos = () => {
     const [categorias, setCategorias] = useState([]);
 
     const [busca, setBusca] = useState('');
-    const [telaAtual, setTelaAtual] = useState('lista'); // 'lista', 'formulario', ou 'extrato'
+    const [telaAtual, setTelaAtual] = useState('lista');
     const [abaAtiva, setAbaAtiva] = useState('geral');
 
-    // 🚀 Estado para saber qual produto mostrar no extrato
     const [produtoSelecionado, setProdutoSelecionado] = useState(null);
 
     const [resultadosNcm, setResultadosNcm] = useState([]);
@@ -32,6 +30,9 @@ export const Produtos = () => {
     const [modalCategoriaAberto, setModalCategoriaAberto] = useState(false);
     const [novaCategoriaNome, setNovaCategoriaNome] = useState('');
     const [salvandoCategoria, setSalvandoCategoria] = useState(false);
+
+    // 🚀 NOVO ESTADO: Guarda a URL da imagem para o Zoom
+    const [previewImagem, setPreviewImagem] = useState(null);
 
     const formInicial = {
         id: '', nome: '', sku: '', codigoBarras: '', referenciaOriginal: '', aplicacao: '',
@@ -118,7 +119,6 @@ export const Produtos = () => {
         setTelaAtual('formulario');
     };
 
-    // 🚀 Nova função para abrir o extrato
     const abrirExtrato = (prod) => {
         setProdutoSelecionado(prod);
         setTelaAtual('extrato');
@@ -226,7 +226,6 @@ export const Produtos = () => {
     return (
         <div className="p-8 max-w-7xl mx-auto animate-fade-in relative">
 
-            {/* 🚀 NOVA TELA: EXTRATO DE ESTOQUE */}
             {telaAtual === 'extrato' && produtoSelecionado && (
                 <ExtratoEstoque
                     produto={produtoSelecionado}
@@ -267,11 +266,25 @@ export const Produtos = () => {
                             <tbody>
                             {produtos.map(p => (
                                 <tr key={p.id} className="border-b hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 pl-6">
-                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-200 border border-slate-300 flex items-center justify-center">
-                                            {p.fotoUrl || p.fotoLocalPath ? <img src={p.fotoUrl || p.fotoLocalPath} alt={p.nome} className="w-full h-full object-cover" onError={(e) => e.target.src = 'https://via.placeholder.com/40?text=Img'} /> : <ImageIcon size={16} className="text-slate-400" />}
+                                    {/* 🚀 LÓGICA DO HOVER NA CÉLULA DA FOTO */}
+                                    <td
+                                        className="p-4 pl-6 relative"
+                                        onMouseEnter={() => {
+                                            if (p.fotoUrl || p.fotoLocalPath) {
+                                                setPreviewImagem(p.fotoUrl || p.fotoLocalPath);
+                                            }
+                                        }}
+                                        onMouseLeave={() => setPreviewImagem(null)}
+                                    >
+                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-200 border border-slate-300 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-colors">
+                                            {p.fotoUrl || p.fotoLocalPath ? (
+                                                <img src={p.fotoUrl || p.fotoLocalPath} alt={p.nome} className="w-full h-full object-cover" onError={(e) => e.target.src = 'https://via.placeholder.com/40?text=Img'} />
+                                            ) : (
+                                                <ImageIcon size={16} className="text-slate-400" />
+                                            )}
                                         </div>
                                     </td>
+
                                     <td className="p-4 font-mono text-xs text-slate-500">{p.sku}</td>
                                     <td className="p-4">
                                         <p className="font-bold text-slate-800">{p.nome}</p>
@@ -284,7 +297,6 @@ export const Produtos = () => {
                                     <td className="p-4 text-center">{p.ativo ? <span className="text-green-500" title="Produto Ativo"><CheckCircle size={16} className="mx-auto"/></span> : <span className="text-red-500" title="Produto Inativo"><Ban size={16} className="mx-auto"/></span>}</td>
                                     <td className="p-4 pr-6 text-center">
                                         <div className="flex items-center justify-center gap-1">
-                                            {/* 🚀 O RELOGINHO ADICIONADO AQUI! */}
                                             <button
                                                 onClick={() => abrirExtrato(p)}
                                                 title="Ver extrato de movimentações"
@@ -312,7 +324,7 @@ export const Produtos = () => {
             )}
 
             {/* ========================================================= */}
-            {/* TELA 2: FORMULÁRIO (MANTIDO IGUAL)                         */}
+            {/* TELA 2: FORMULÁRIO                                        */}
             {/* ========================================================= */}
             {telaAtual === 'formulario' && (
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-visible animate-fade-in flex flex-col relative mb-10">
@@ -509,7 +521,6 @@ export const Produtos = () => {
                                     <select value={form.origemMercadoria} onChange={e=>setForm({...form, origemMercadoria: e.target.value})} className="w-full p-4 border-2 bg-slate-50 rounded-xl font-bold outline-none focus:border-purple-500 text-sm">
                                         <option value="0">0 - Nacional...</option>
                                         <option value="1">1 - Estrangeira...</option>
-                                        {/* ... Outras opções ... */}
                                     </select>
                                 </div>
                             </div>
@@ -575,6 +586,21 @@ export const Produtos = () => {
                             <button onClick={salvarNovaCategoriaRapida} disabled={salvandoCategoria} className="px-6 py-3 bg-purple-600 text-white font-black rounded-xl hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-lg shadow-purple-600/20">{salvandoCategoria ? 'Salvando...' : 'Salvar e Usar'}</button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* 🚀 OVERLAY DE ZOOM DA IMAGEM */}
+            {previewImagem && (
+                <div className="fixed inset-0 pointer-events-none z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+                    <img
+                        src={previewImagem}
+                        alt="Zoom do Produto"
+                        className="max-w-xl max-h-[70vh] rounded-3xl shadow-2xl border-4 border-white object-contain"
+                        onError={(e) => {
+                            // Se a imagem falhar ao carregar no zoom, fecha ele
+                            setPreviewImagem(null);
+                        }}
+                    />
                 </div>
             )}
 
