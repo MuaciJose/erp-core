@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
     Package, Plus, Search, Edit, Trash2, CheckCircle, Ban, X, Save,
     FileText, DollarSign, Box, ShieldAlert, Image as ImageIcon, Info, ArrowLeft,
-    History
+    History, Car
 } from 'lucide-react';
 
 import { ExtratoEstoque } from './ExtratoEstoque';
@@ -31,6 +31,10 @@ export const Produtos = () => {
     const [novaCategoriaNome, setNovaCategoriaNome] = useState('');
     const [salvandoCategoria, setSalvandoCategoria] = useState(false);
 
+    // 🚀 ESTADOS PARA O MODAL DE CONSULTA "TOP"
+    const [modalAplicacao, setModalAplicacao] = useState({ aberto: false, texto: '', nome: '' });
+    const [filtroModal, setFiltroModal] = useState('');
+
     // 🚀 NOVO ESTADO: Guarda a URL da imagem para o Zoom
     const [previewImagem, setPreviewImagem] = useState(null);
 
@@ -45,6 +49,32 @@ export const Produtos = () => {
     };
 
     const [form, setForm] = useState(formInicial);
+
+    // 🚀 ATALHO DE TECLADO (ESC) PARA FECHAR O MODAL INSTANTANEAMENTE
+    useEffect(() => {
+        const handleEsc = (event) => {
+            if (event.key === 'Escape') fecharModalConsulta();
+        };
+        if (modalAplicacao.aberto) window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [modalAplicacao.aberto]);
+
+    const fecharModalConsulta = () => {
+        setModalAplicacao({ aberto: false, texto: '', nome: '' });
+        setFiltroModal('');
+    };
+
+    // 🚀 MOTOR DE BUSCA INTERNO: Quebra o "blocão" de texto em uma lista organizada
+    const todasAsLinhas = modalAplicacao.texto
+        ? modalAplicacao.texto
+            .split(/[;|\n,\/]/) // Aceita Enter, Vírgula, Ponto e Vírgula ou Barra
+            .map(item => item.trim())
+            .filter(item => item.length > 1)
+        : [];
+
+    const linhasFiltradas = todasAsLinhas.filter(linha =>
+        linha.toLowerCase().includes(filtroModal.toLowerCase())
+    );
 
     const notificar = (tipo, titulo, msg) => {
         const conteudo = (
@@ -233,6 +263,64 @@ export const Produtos = () => {
                 />
             )}
 
+            {/* 🚀 NOVO MODAL DE CONSULTA "TOP" COM FILTRO EM TEMPO REAL */}
+            {modalAplicacao.aberto && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-fade-in p-4 text-left">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 flex flex-col max-h-[85vh]">
+                        <div className="bg-blue-600 p-6 text-white flex justify-between items-center shrink-0">
+                            <div>
+                                <h3 className="font-black text-lg flex items-center gap-2"><Car size={20}/> Consultar Aplicação</h3>
+                                <p className="text-[10px] text-blue-100 font-bold uppercase tracking-widest">{modalAplicacao.nome}</p>
+                            </div>
+                            <button onClick={fecharModalConsulta} className="bg-blue-500 hover:bg-red-500 p-2 rounded-xl transition-all flex items-center gap-2 text-[10px] font-black group">
+                                <span className="hidden group-hover:block">FECHAR</span> [ESC] <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-4 bg-slate-100 border-b shrink-0">
+                            <div className="relative">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    placeholder="Pesquisar modelo, ano ou motor..."
+                                    className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 shadow-sm transition-all"
+                                    value={filtroModal}
+                                    onChange={(e) => setFiltroModal(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto bg-slate-50 custom-scrollbar flex-1">
+                            {linhasFiltradas.length > 0 ? (
+                                <div className="grid grid-cols-1 gap-2">
+                                    {linhasFiltradas.map((linha, idx) => (
+                                        <div key={idx} className="p-4 bg-white border border-slate-200 rounded-2xl font-bold text-slate-700 text-sm flex items-center gap-3 shadow-sm hover:border-blue-400 hover:bg-blue-50 transition-all group animate-fade-in">
+                                            <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                                <Car size={16} />
+                                            </div>
+                                            {linha}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="py-20 text-center text-slate-400">
+                                    <Ban className="mx-auto mb-4 opacity-20" size={60} />
+                                    <p className="font-black text-lg">Nada encontrado.</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-4 bg-white border-t flex justify-between items-center px-8 shrink-0">
+                            <span className="text-[10px] font-black text-slate-400 uppercase">
+                                {linhasFiltradas.length} de {todasAsLinhas.length} veículos
+                            </span>
+                            <button onClick={fecharModalConsulta} className="px-8 py-3 bg-slate-900 text-white font-black rounded-xl hover:bg-red-600 transition-all text-xs tracking-widest uppercase">FECHAR</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ========================================================= */}
             {/* TELA 1: LISTA                                             */}
             {/* ========================================================= */}
@@ -266,7 +354,6 @@ export const Produtos = () => {
                             <tbody>
                             {produtos.map(p => (
                                 <tr key={p.id} className="border-b hover:bg-slate-50 transition-colors">
-                                    {/* 🚀 LÓGICA DO HOVER NA CÉLULA DA FOTO */}
                                     <td
                                         className="p-4 pl-6 relative"
                                         onMouseEnter={() => {
@@ -297,6 +384,9 @@ export const Produtos = () => {
                                     <td className="p-4 text-center">{p.ativo ? <span className="text-green-500" title="Produto Ativo"><CheckCircle size={16} className="mx-auto"/></span> : <span className="text-red-500" title="Produto Inativo"><Ban size={16} className="mx-auto"/></span>}</td>
                                     <td className="p-4 pr-6 text-center">
                                         <div className="flex items-center justify-center gap-1">
+                                            {/* 🚀 BOTÃO INFO QUE ABRE O MODAL TOP DE APLICAÇÃO */}
+                                            <button onClick={() => setModalAplicacao({ aberto: true, texto: p.aplicacao, nome: p.nome })} title="Consultar Aplicação" className="text-blue-600 hover:bg-blue-100 p-2 rounded-lg transition-colors border border-blue-100"><Info size={18}/></button>
+
                                             <button
                                                 onClick={() => abrirExtrato(p)}
                                                 title="Ver extrato de movimentações"
@@ -379,7 +469,28 @@ export const Produtos = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div><label className="text-xs font-bold text-slate-500 uppercase">Aplicação (Compatibilidade)</label><input type="text" value={form.aplicacao} onChange={e => setForm({...form, aplicacao: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-white outline-none focus:border-blue-500 font-bold" placeholder="Ex: Palio 1.0 2012>, Uno Way..." /></div>
+
+                                {/* 🚀 CAMPO DE APLICAÇÃO "TOP" COM AUTO-EXPAND NO FORMULÁRIO */}
+                                <div className="group/app">
+                                    <label className="text-xs font-bold text-slate-500 uppercase flex justify-between">
+                                        Aplicação (Compatibilidade)
+                                        <span className="text-[10px] text-blue-500 font-black animate-pulse group-hover/app:hidden">
+                                            Passe o mouse para expandir a lista
+                                        </span>
+                                    </label>
+                                    <textarea
+                                        value={form.aplicacao}
+                                        onChange={e => setForm({...form, aplicacao: e.target.value})}
+                                        placeholder="Digite os veículos compatíveis. Use ENTER para separar a lista..."
+                                        className="w-full p-4 border-2 rounded-xl bg-white outline-none
+                                                   transition-all duration-500 ease-in-out
+                                                   h-14 min-h-[56px] overflow-hidden
+                                                   hover:h-80 hover:overflow-y-auto
+                                                   focus:h-80 focus:border-blue-500 focus:ring-4 focus:ring-blue-100
+                                                   font-bold text-sm leading-relaxed"
+                                    />
+                                </div>
+
                                 <div><label className="text-xs font-bold text-slate-500 uppercase">Descrição Completa</label><textarea value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-white outline-none h-32 focus:border-blue-500" placeholder="Detalhes técnicos da peça..." /></div>
                                 <label title="Desmarque para esconder este produto na tela de Vendas" className="flex items-center gap-3 cursor-pointer font-bold text-slate-700 bg-white p-5 border-2 border-slate-200 rounded-xl w-max hover:bg-slate-50 transition-colors">
                                     <input type="checkbox" checked={form.ativo} onChange={e => setForm({...form, ativo: e.target.checked})} className="w-6 h-6 rounded cursor-pointer accent-blue-600" /> Produto Ativo (Aparecerá no PDV)
@@ -544,14 +655,14 @@ export const Produtos = () => {
 
                     <div className="p-6 bg-slate-100 flex justify-end gap-4 border-t border-slate-200 rounded-b-3xl">
                         <button onClick={voltarParaLista} className="px-8 py-4 font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors">CANCELAR</button>
-                        <button onClick={salvarProduto} className="px-10 py-4 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-500 shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-transform transform hover:scale-105"><Save size={20}/> SALVAR PRODUTO</button>
+                        <button onClick={salvarProduto} className="px-10 py-4 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-500 shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-transform transform hover:scale-105 uppercase tracking-widest text-xs"><Save size={18}/> Salvar Produto</button>
                     </div>
                 </div>
             )}
 
-            {/* MINI-MODAL DE MARCA */}
+            {/* MINI-MODAL DE MARCA - MANTIDO ORIGINAL */}
             {modalMarcaAberto && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4 text-left">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in border border-slate-100">
                         <div className="p-6 bg-slate-900 flex justify-between items-center text-white">
                             <h3 className="font-black text-lg flex items-center gap-2">Nova Marca</h3>
@@ -569,9 +680,9 @@ export const Produtos = () => {
                 </div>
             )}
 
-            {/* MINI-MODAL DE CATEGORIA */}
+            {/* MINI-MODAL DE CATEGORIA - MANTIDO ORIGINAL */}
             {modalCategoriaAberto && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4 text-left">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in border border-slate-100">
                         <div className="p-6 bg-purple-900 flex justify-between items-center text-white">
                             <h3 className="font-black text-lg flex items-center gap-2">Nova Categoria</h3>
@@ -589,7 +700,7 @@ export const Produtos = () => {
                 </div>
             )}
 
-            {/* 🚀 OVERLAY DE ZOOM DA IMAGEM */}
+            {/* 🚀 OVERLAY DE ZOOM DA IMAGEM - MANTIDO ORIGINAL */}
             {previewImagem && (
                 <div className="fixed inset-0 pointer-events-none z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-fade-in">
                     <img
@@ -597,7 +708,6 @@ export const Produtos = () => {
                         alt="Zoom do Produto"
                         className="max-w-xl max-h-[70vh] rounded-3xl shadow-2xl border-4 border-white object-contain"
                         onError={(e) => {
-                            // Se a imagem falhar ao carregar no zoom, fecha ele
                             setPreviewImagem(null);
                         }}
                     />
