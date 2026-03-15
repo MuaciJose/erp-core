@@ -66,7 +66,7 @@ public class ImportacaoResumoDTO {
         // 🚀 NOVOS CAMPOS: Para o Espelho da Nota no React ficar completo
         private String sku;
         private BigDecimal quantidade;
-
+        private Integer estoqueAtual;
         // Construtor antigo mantido para não quebrar o  Service
         public ProdutoImportadoDTO(Long id, String nome, BigDecimal precoCusto, BigDecimal precoVenda) {
             this.id = id;

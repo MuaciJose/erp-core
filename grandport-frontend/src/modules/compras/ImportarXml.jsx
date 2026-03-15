@@ -3,7 +3,8 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import {
     UploadCloud, Search, PackagePlus, Calculator, Printer,
     CheckCircle, ArrowLeft, FileText, DollarSign, Package,
-    Info, Percent, HelpCircle, Trash2, AlertTriangle, X
+    Info, Percent, HelpCircle, Trash2, AlertTriangle, X,
+    Link as LinkIcon, ArrowRightLeft, Boxes, ArrowDownToLine, ArrowUpFromLine
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
@@ -15,10 +16,20 @@ export const ImportarXml = () => {
     const [loading, setLoading] = useState(true);
     const [notaSelecionada, setNotaSelecionada] = useState(null);
 
-    // 🚀 NOVO: Estado para controlar o Modal Customizado de Exclusão
     const [modalExclusao, setModalExclusao] = useState({ aberto: false, nota: null });
 
+    const [vinculos, setVinculos] = useState({});
+    const [modalVinculo, setModalVinculo] = useState({ aberto: false, itemIndex: null, item: null });
+    const [termoBuscaVinculo, setTermoBuscaVinculo] = useState('');
+    const [resultadosBuscaEstoque, setResultadosBuscaEstoque] = useState([]);
+    const [buscandoEstoque, setBuscandoEstoque] = useState(false);
+
     const [precosVenda, setPrecosVenda] = useState({});
+
+    // ESTADO PARA A CONVERSÃO DE EMBALAGEM
+    const [conversaoEmbalagem, setConversaoEmbalagem] = useState({});
+    const [modalConversao, setModalConversao] = useState({ aberto: false, itemIndex: null, item: null, fatorInput: '', tipo: 'DESMEMBRAR' });
+
     const searchInputRef = useRef(null);
 
     const tratarErro = (acao, err) => {
@@ -55,21 +66,15 @@ export const ImportarXml = () => {
         finally { e.target.value = ''; }
     };
 
-    // 🚀 LÓGICA DO MODAL PROFISSIONAL
-    const abrirModalExclusao = (nota) => {
-        setModalExclusao({ aberto: true, nota });
-    };
-
-    const fecharModalExclusao = () => {
-        setModalExclusao({ aberto: false, nota: null });
-    };
+    const abrirModalExclusao = (nota) => setModalExclusao({ aberto: true, nota });
+    const fecharModalExclusao = () => setModalExclusao({ aberto: false, nota: null });
 
     const confirmarExclusao = async () => {
         if (!modalExclusao.nota) return;
         const toastId = toast.loading("Excluindo nota e limpando financeiro...");
         const idParaExcluir = modalExclusao.nota.id;
 
-        fecharModalExclusao(); // Fecha o modal imediatamente
+        fecharModalExclusao();
 
         try {
             await api.delete(`/api/compras/${idParaExcluir}`);
@@ -83,17 +88,22 @@ export const ImportarXml = () => {
 
     const abrirEspelho = (nota) => {
         setNotaSelecionada(nota);
+        setVinculos({});
+        setConversaoEmbalagem({});
+
         const precosIniciais = {};
         (nota.produtosImportados || []).forEach((item, idx) => {
             const custo = Number(item.precoCusto || 0);
             precosIniciais[idx] = item.precoVenda && item.precoVenda > 0 ? item.precoVenda.toFixed(2) : (custo * 1.4).toFixed(2);
         });
+
         setPrecosVenda(precosIniciais);
         setModoAtual('ESPELHO');
     };
 
     const voltarParaLista = () => {
         setNotaSelecionada(null);
+        setVinculos({});
         setModoAtual('LISTA');
     };
 
@@ -102,12 +112,38 @@ export const ImportarXml = () => {
             return toast.success("Esta nota já foi conferida!");
         }
 
-        const toastId = toast.loading("Atualizando preços e salvando auditoria...");
+        const toastId = toast.loading("Atualizando estoque, vínculos e salvando auditoria...");
+
         const payload = {
-            itens: (notaSelecionada.produtosImportados || []).map((item, idx) => ({
-                produtoId: item.id || item.produtoId,
-                precoVenda: parseFloat(precosVenda[idx]) || 0
-            }))
+            itens: (notaSelecionada.produtosImportados || []).map((item, idx) => {
+                const conversao = conversaoEmbalagem[idx] || null;
+                let qtdXml = Number(item.quantidade || 1);
+                let custoXml = Number(item.precoCusto || 0);
+
+                let qtdFinal = qtdXml;
+                let custoFinal = custoXml;
+
+                if (conversao && conversao.fator > 1) {
+                    if (conversao.tipo === 'DESMEMBRAR') {
+                        qtdFinal = qtdXml * conversao.fator;
+                        custoFinal = custoXml / conversao.fator;
+                    } else if (conversao.tipo === 'AGRUPAR') {
+                        qtdFinal = qtdXml / conversao.fator;
+                        custoFinal = custoXml * conversao.fator;
+                    }
+                }
+
+                return {
+                    idImportacao: item.id,
+                    produtoId: vinculos[idx] ? vinculos[idx].id : item.produtoId,
+                    precoVenda: parseFloat(precosVenda[idx]) || 0,
+                    vinculoManual: !!vinculos[idx],
+                    conversaoTipo: conversao?.tipo || 'NENHUMA',
+                    fatorConversao: conversao?.fator || 1,
+                    quantidadeFinal: qtdFinal,
+                    custoFinal: custoFinal
+                };
+            })
         };
 
         try {
@@ -121,102 +157,102 @@ export const ImportarXml = () => {
         }
     };
 
-    const imprimirEspelho = () => {
-        const itens = notaSelecionada.produtosImportados || [];
-        const duplicatas = notaSelecionada.parcelasGeradas || [];
-        const printWindow = window.open('', '_blank');
-
-        printWindow.document.write(`
-            <html>
-            <head>
-                <title>Espelho de Conferência - NF ${notaSelecionada.numero}</title>
-                <style>
-                    body { font-family: 'Arial', sans-serif; padding: 20px; color: #333; }
-                    .header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-                    .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; }
-                    .header p { margin: 5px 0 0 0; color: #555; }
-                    .total { text-align: right; }
-                    .total h2 { margin: 0; font-size: 28px; color: #000; }
-                    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; }
-                    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-                    th { background-color: #f4f4f4; text-transform: uppercase; }
-                    .text-right { text-align: right; }
-                    .text-center { text-align: center; }
-                    .section-title { margin-bottom: 10px; font-size: 16px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
-                    .financeiro-grid { display: flex; gap: 15px; }
-                    .boleto { border: 1px solid #000; padding: 15px; width: 200px; text-align: center; border-radius: 8px; }
-                    @media print { body { -webkit-print-color-adjust: exact; } }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <div>
-                        <h1>${notaSelecionada.fornecedorNome}</h1>
-                        <p><strong>Nota Fiscal:</strong> #${notaSelecionada.numero}</p>
-                        <p><strong>Data de Emissão:</strong> ${notaSelecionada.dataEmissao ? new Date(notaSelecionada.dataEmissao).toLocaleDateString() : '-'}</p>
-                    </div>
-                    <div class="total">
-                        <p>Valor Total da Nota</p>
-                        <h2>${formatarMoeda(notaSelecionada.valorTotalNota)}</h2>
-                    </div>
-                </div>
-
-                <h3 class="section-title">Itens da Nota e Precificação</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>SKU</th>
-                            <th>Descrição do Produto</th>
-                            <th class="text-center">Qtd</th>
-                            <th class="text-right">Custo Unit.</th>
-                            <th class="text-center">Markup</th>
-                            <th class="text-right">Preço de Venda</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${itens.map((item, idx) => {
-            const custo = Number(item.precoCusto || 0);
-            const venda = Number(precosVenda[idx] || 0);
-            const markup = custo > 0 ? (((venda / custo) - 1) * 100).toFixed(2) : '0.00';
-            return `
-                            <tr>
-                                <td>${item.sku || '-'}</td>
-                                <td>${item.nome}</td>
-                                <td class="text-center">${item.quantidade || 1}</td>
-                                <td class="text-right">${formatarMoeda(custo)}</td>
-                                <td class="text-center">${markup}%</td>
-                                <td class="text-right"><strong>${formatarMoeda(venda)}</strong></td>
-                            </tr>`;
-        }).join('')}
-                    </tbody>
-                </table>
-
-                <h3 class="section-title">Contas a Pagar Geradas (Duplicatas)</h3>
-                ${duplicatas.length > 0 ? `
-                    <div class="financeiro-grid">
-                        ${duplicatas.map(dup => `
-                            <div class="boleto">
-                                <p style="margin:0; color:#666; font-size: 10px;">PARCELA ${dup.numero}</p>
-                                <h3 style="margin: 10px 0;">${formatarMoeda(dup.valor)}</h3>
-                                <p style="margin:0; font-size: 12px; font-weight: bold;">Venc: ${dup.vencimento ? new Date(dup.vencimento).toLocaleDateString() : '-'}</p>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : '<p>Nenhuma duplicata registrada nesta nota.</p>'}
-            </body>
-            </html>
-        `);
-        printWindow.document.close();
-        setTimeout(() => { printWindow.print(); }, 300);
+    // =========================================================================
+    // LÓGICA DO MODAL DE CONVERSÃO (CAIXA <-> UNIDADE)
+    // =========================================================================
+    const abrirModalConversao = (item, idx) => {
+        const conversaoExistente = conversaoEmbalagem[idx];
+        setModalConversao({
+            aberto: true,
+            itemIndex: idx,
+            item: item,
+            fatorInput: conversaoExistente ? conversaoExistente.fator.toString() : '',
+            tipo: conversaoExistente ? conversaoExistente.tipo : 'DESMEMBRAR'
+        });
     };
 
-    useHotkeys('f2', (e) => { e.preventDefault(); if (modoAtual === 'LISTA') searchInputRef.current?.focus(); }, [modoAtual]);
-    useHotkeys('esc', (e) => {
-        if (modalExclusao.aberto) fecharModalExclusao();
-        else if (modoAtual === 'ESPELHO') voltarParaLista();
-    }, [modoAtual, modalExclusao]);
-    useHotkeys('f8', (e) => { e.preventDefault(); if (modoAtual === 'ESPELHO') imprimirEspelho(); }, [modoAtual, notaSelecionada]);
-    useHotkeys('f10', (e) => { e.preventDefault(); if (modoAtual === 'ESPELHO') confirmarConferencia(); }, [modoAtual, notaSelecionada, precosVenda]);
+    const fecharModalConversao = () => {
+        setModalConversao({ aberto: false, itemIndex: null, item: null, fatorInput: '', tipo: 'DESMEMBRAR' });
+    };
+
+    const confirmarAplicacaoConversao = () => {
+        const fatorNum = Number(modalConversao.fatorInput);
+
+        if (!fatorNum || fatorNum <= 1) {
+            toast.error("O fator de conversão deve ser maior que 1.");
+            return;
+        }
+
+        if (modalConversao.tipo === 'AGRUPAR') {
+            const qtdXml = Number(modalConversao.item.quantidade || 1);
+            if (qtdXml % fatorNum !== 0) {
+                toast.error(`Atenção: Agrupar ${qtdXml} unidades de ${fatorNum} em ${fatorNum} não resulta em caixas exatas. Revise os números.`);
+                return;
+            }
+        }
+
+        setConversaoEmbalagem(prev => ({
+            ...prev,
+            [modalConversao.itemIndex]: {
+                tipo: modalConversao.tipo,
+                fator: fatorNum
+            }
+        }));
+
+        toast.success(`Conversão aplicada: ${modalConversao.tipo === 'DESMEMBRAR' ? 'Desmembramento' : 'Agrupamento'} (x${fatorNum})`);
+        fecharModalConversao();
+    };
+
+    const removerConversao = (idx) => {
+        const novaConversao = { ...conversaoEmbalagem };
+        delete novaConversao[idx];
+        setConversaoEmbalagem(novaConversao);
+    };
+
+    // =========================================================================
+    // LÓGICA DO MODAL DE VÍNCULO (DE-PARA)
+    // =========================================================================
+    const abrirModalVinculo = (item, idx) => {
+        setModalVinculo({ aberto: true, itemIndex: idx, item });
+        setTermoBuscaVinculo(item.nome);
+        setResultadosBuscaEstoque([]);
+        buscarProdutoNoEstoque(item.nome);
+    };
+
+    const fecharModalVinculo = () => {
+        setModalVinculo({ aberto: false, itemIndex: null, item: null });
+        setTermoBuscaVinculo('');
+    };
+
+    const buscarProdutoNoEstoque = async (termo) => {
+        if (!termo || termo.length < 2) return;
+        setBuscandoEstoque(true);
+        try {
+            const res = await api.get(`/api/produtos?busca=${termo}`);
+            const dados = Array.isArray(res.data) ? res.data : (res.data.content || []);
+            setResultadosBuscaEstoque(dados);
+        } catch (error) {
+            toast.error("Falha ao buscar produtos no estoque.");
+        } finally {
+            setBuscandoEstoque(false);
+        }
+    };
+
+    // 🚀 ATUALIZADO: Salva o estoque atual junto no vínculo manual
+    const selecionarVinculo = (produto) => {
+        setVinculos(prev => ({
+            ...prev,
+            [modalVinculo.itemIndex]: { id: produto.id, nome: produto.nome, estoqueAtual: produto.quantidadeEstoque }
+        }));
+        toast.success(`Peça vinculada ao produto #${produto.id}!`);
+        fecharModalVinculo();
+    };
+
+    const removerVinculo = (idx) => {
+        const novosVinculos = { ...vinculos };
+        delete novosVinculos[idx];
+        setVinculos(novosVinculos);
+    };
 
     const formatarMoeda = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 
@@ -230,11 +266,21 @@ export const ImportarXml = () => {
         return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valorDecimal);
     };
 
-    const alterarMarkup = (idx, custo, novoMarkupPercentual) => {
+    const alterarMarkup = (idx, custoRealUnitario, novoMarkupPercentual) => {
         const markupNum = Number(novoMarkupPercentual) || 0;
-        const novoPrecoVenda = custo * (1 + (markupNum / 100));
+        const novoPrecoVenda = custoRealUnitario * (1 + (markupNum / 100));
         setPrecosVenda({ ...precosVenda, [idx]: novoPrecoVenda.toFixed(2) });
     };
+
+    useHotkeys('f2', (e) => { e.preventDefault(); if (modoAtual === 'LISTA') searchInputRef.current?.focus(); }, [modoAtual]);
+    useHotkeys('esc', (e) => {
+        if (modalConversao.aberto) fecharModalConversao();
+        else if (modalVinculo.aberto) fecharModalVinculo();
+        else if (modalExclusao.aberto) fecharModalExclusao();
+        else if (modoAtual === 'ESPELHO') voltarParaLista();
+    }, [modoAtual, modalExclusao, modalVinculo, modalConversao]);
+    useHotkeys('f10', (e) => { e.preventDefault(); if (modoAtual === 'ESPELHO') confirmarConferencia(); }, [modoAtual, notaSelecionada, precosVenda, vinculos, conversaoEmbalagem]);
+
 
     const notasFiltradas = historico.filter(n => n.numero?.includes(busca) || n.fornecedorNome?.toLowerCase().includes(busca.toLowerCase()));
 
@@ -242,33 +288,18 @@ export const ImportarXml = () => {
         return (
             <div className="p-8 max-w-7xl mx-auto animate-fade-in relative">
 
-                {/* 🚀 MODAL DE EXCLUSÃO CUSTOMIZADO */}
                 {modalExclusao.aberto && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-fade-in">
                         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 transform transition-all">
                             <div className="flex justify-between items-start mb-6">
-                                <div className="bg-red-100 p-3 rounded-2xl text-red-600">
-                                    <AlertTriangle size={32} />
-                                </div>
-                                <button onClick={fecharModalExclusao} className="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition-colors">
-                                    <X size={20} />
-                                </button>
+                                <div className="bg-red-100 p-3 rounded-2xl text-red-600"><AlertTriangle size={32} /></div>
+                                <button onClick={fecharModalExclusao} className="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition-colors"><X size={20} /></button>
                             </div>
-
                             <h2 className="text-2xl font-black text-slate-800 mb-2">Excluir Nota Fiscal?</h2>
-                            <p className="text-slate-500 font-medium mb-6">
-                                Tem certeza que deseja apagar a nota <strong className="text-slate-800">#{modalExclusao.nota?.numero}</strong> do fornecedor <strong className="text-slate-800 uppercase">{modalExclusao.nota?.fornecedorNome}</strong>?
-                                <br/><br/>
-                                Isso removerá o registro do histórico e <span className="text-red-600 font-bold">cancelará todos os títulos a pagar</span> gerados por ela.
-                            </p>
-
+                            <p className="text-slate-500 font-medium mb-6">Tem certeza que deseja apagar a nota <strong className="text-slate-800">#{modalExclusao.nota?.numero}</strong>?</p>
                             <div className="flex gap-4">
-                                <button onClick={fecharModalExclusao} className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">
-                                    Cancelar (ESC)
-                                </button>
-                                <button onClick={confirmarExclusao} className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl shadow-lg shadow-red-600/30 hover:-translate-y-0.5 transition-all">
-                                    Sim, Excluir Nota
-                                </button>
+                                <button onClick={fecharModalExclusao} className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">Cancelar</button>
+                                <button onClick={confirmarExclusao} className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl shadow-lg">Sim, Excluir</button>
                             </div>
                         </div>
                     </div>
@@ -277,14 +308,14 @@ export const ImportarXml = () => {
                 <div className="flex justify-between items-end mb-8">
                     <div>
                         <h1 className="text-3xl font-black text-slate-800 flex items-center gap-3"><PackagePlus className="text-blue-600 bg-blue-50 p-2 rounded-xl" size={40} />Entrada de Notas (XML)</h1>
-                        <p className="text-slate-500 font-medium mt-1">Importe XMLs, audite o financeiro e atualize os preços de venda.</p>
+                        <p className="text-slate-500 font-medium mt-1">Importe XMLs, audite o financeiro e faça a conversão de caixas e pacotes.</p>
                     </div>
                     <div className="flex gap-4">
-                        <div className="relative w-72" title="Pressione F2 para focar na busca rapidamente.">
+                        <div className="relative w-72">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                             <input ref={searchInputRef} type="text" placeholder="Buscar nota (F2)..." value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-12 pr-4 py-3 border rounded-xl font-bold outline-none shadow-sm transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100" />
                         </div>
-                        <label className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-black flex items-center gap-2 cursor-pointer shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-1" title="Clique para procurar um arquivo .xml no seu computador">
+                        <label className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-black flex items-center gap-2 cursor-pointer shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-1">
                             <UploadCloud size={20} /> IMPORTAR XML
                             <input type="file" accept=".xml" className="hidden" onChange={handleUpload} />
                         </label>
@@ -299,7 +330,7 @@ export const ImportarXml = () => {
                             <th className="p-5">Fornecedor</th>
                             <th className="p-5 text-right">Valor Total</th>
                             <th className="p-5 text-center">Status</th>
-                            <th className="p-5 text-center" title="Ações disponíveis para a nota">Ações <HelpCircle size={12} className="inline mb-1 text-slate-400"/></th>
+                            <th className="p-5 text-center">Ações</th>
                         </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -309,7 +340,6 @@ export const ImportarXml = () => {
                                     <div className="flex flex-col items-center justify-center text-slate-400">
                                         <PackagePlus size={48} className="mb-4 text-slate-300" />
                                         <p className="font-black text-lg text-slate-500">Nenhuma nota encontrada.</p>
-                                        <p className="text-sm">Importe um arquivo XML para começar.</p>
                                     </div>
                                 </td>
                             </tr>
@@ -323,14 +353,14 @@ export const ImportarXml = () => {
                                 <td className="p-5 text-center flex justify-center gap-3">
                                     <button
                                         onClick={() => abrirEspelho(nota)}
-                                        title="Editar Preços e Conferir Nota"
+                                        title="Editar Preços, Converter Embalagens e Conferir"
                                         className="border-2 border-blue-100 p-2 rounded-xl text-blue-500 hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-all shadow-sm"
                                     >
                                         <Calculator size={18} />
                                     </button>
                                     <button
                                         onClick={() => abrirModalExclusao(nota)}
-                                        title="Excluir Nota e Financeiro"
+                                        title="Excluir Nota"
                                         className="border-2 border-red-100 p-2 rounded-xl text-red-500 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all shadow-sm"
                                     >
                                         <Trash2 size={18} />
@@ -346,96 +376,232 @@ export const ImportarXml = () => {
     }
 
     const itensNota = notaSelecionada.produtosImportados || [];
-    const duplicatasNota = notaSelecionada.parcelasGeradas || notaSelecionada.duplicatas || notaSelecionada.parcelas || [];
 
     return (
         <div className="flex-1 bg-slate-50 flex flex-col animate-fade-in min-h-screen">
-            <div className="p-6 bg-white border-b flex justify-between items-center shadow-sm sticky top-0 z-20">
-                <button onClick={voltarParaLista} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-black transition-colors" title="Pressione ESC para voltar"><ArrowLeft size={20} /> VOLTAR (ESC)</button>
-                <div className="flex items-center gap-3">
-                    <FileText className="text-blue-500" size={28} />
-                    <div><h2 className="text-xl font-black text-slate-800 leading-none">Espelho de Conferência</h2><p className="text-[10px] text-slate-400 font-black tracking-widest uppercase mt-1">NF: {notaSelecionada.numero}</p></div>
+
+            {modalConversao.aberto && (
+                <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                        <div className="bg-slate-800 p-6 text-white flex justify-between items-center">
+                            <div>
+                                <h3 className="text-xl font-black flex items-center gap-2"><ArrowRightLeft size={20}/> Conversão de Embalagem</h3>
+                                <p className="text-sm text-slate-400 mt-1">{modalConversao.item?.nome}</p>
+                            </div>
+                            <button onClick={fecharModalConversao} className="text-slate-400 hover:text-white transition-colors"><X size={24}/></button>
+                        </div>
+
+                        <div className="p-8 bg-slate-50">
+
+                            <div className="flex gap-4 mb-6">
+                                <button
+                                    onClick={() => setModalConversao(p => ({ ...p, tipo: 'DESMEMBRAR' }))}
+                                    className={`flex-1 p-4 rounded-xl border-2 font-black flex flex-col items-center justify-center gap-2 transition-all ${modalConversao.tipo === 'DESMEMBRAR' ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md' : 'border-slate-200 bg-white text-slate-400 hover:border-blue-300'}`}
+                                >
+                                    <ArrowDownToLine size={24}/>
+                                    DESMEMBRAR (Caixa ➔ Unidade)
+                                    <span className="text-[10px] font-bold mt-1 text-center">Multiplica QTD<br/>Divide Custo</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setModalConversao(p => ({ ...p, tipo: 'AGRUPAR' }))}
+                                    className={`flex-1 p-4 rounded-xl border-2 font-black flex flex-col items-center justify-center gap-2 transition-all ${modalConversao.tipo === 'AGRUPAR' ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-md' : 'border-slate-200 bg-white text-slate-400 hover:border-orange-300'}`}
+                                >
+                                    <ArrowUpFromLine size={24}/>
+                                    AGRUPAR (Unidade ➔ Caixa)
+                                    <span className="text-[10px] font-bold mt-1 text-center">Divide QTD<br/>Multiplica Custo</span>
+                                </button>
+                            </div>
+
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center">
+                                <label className="block text-sm font-black text-slate-500 uppercase mb-4">
+                                    {modalConversao.tipo === 'DESMEMBRAR' ? 'Quantas unidades vêm dentro da Caixa/Jogo?' : 'Quantas unidades formam 1 Caixa/Jogo?'}
+                                </label>
+                                <div className="flex items-center justify-center gap-4">
+                                    <input
+                                        type="number"
+                                        autoFocus
+                                        min="2"
+                                        value={modalConversao.fatorInput}
+                                        onChange={(e) => setModalConversao(p => ({...p, fatorInput: e.target.value}))}
+                                        placeholder="Ex: 24"
+                                        className="w-32 text-center text-4xl font-black py-4 border-b-4 border-slate-300 focus:border-blue-500 outline-none text-slate-800 transition-colors"
+                                    />
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div className="p-6 bg-white border-t border-slate-100 flex gap-4">
+                            <button onClick={fecharModalConversao} className="flex-1 py-4 font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Cancelar (ESC)</button>
+                            <button onClick={confirmarAplicacaoConversao} className="flex-1 py-4 font-black text-white bg-slate-900 hover:bg-blue-600 rounded-xl shadow-lg transition-colors flex justify-center items-center gap-2">
+                                <CheckCircle size={20}/> APLICAR MATEMÁTICA
+                            </button>
+                        </div>
+                    </div>
                 </div>
+            )}
+
+            {modalVinculo.aberto && (
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] animate-fade-in p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                        <div className="bg-blue-600 p-6 text-white flex justify-between items-center">
+                            <div><h3 className="text-xl font-black flex items-center gap-2"><LinkIcon size={20}/> Vincular ao Estoque</h3><p className="text-sm text-blue-200 mt-1">{modalVinculo.item?.nome}</p></div>
+                            <button onClick={fecharModalVinculo} className="text-blue-200 hover:text-white"><X size={24}/></button>
+                        </div>
+                        <div className="p-6 border-b border-slate-100 bg-slate-50">
+                            <div className="relative">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20}/>
+                                <input type="text" autoFocus value={termoBuscaVinculo} onChange={(e) => { setTermoBuscaVinculo(e.target.value); buscarProdutoNoEstoque(e.target.value); }} placeholder="Buscar produto..." className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-200 rounded-xl font-bold text-lg outline-none focus:border-blue-500 shadow-sm" />
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 bg-white space-y-3 min-h-[300px]">
+                            {buscandoEstoque ? <div className="text-center text-blue-500 py-10 font-bold">Buscando...</div> : resultadosBuscaEstoque.length === 0 ? <div className="text-center text-slate-400 py-10 font-bold">Nenhum produto encontrado.</div> : (
+                                resultadosBuscaEstoque.map(prod => (
+                                    <div key={prod.id} className="flex justify-between items-center p-4 border-2 border-slate-100 rounded-xl hover:border-blue-300 transition-all">
+                                        <div><h4 className="font-black text-slate-800">#{prod.id} - {prod.nome}</h4><p className="text-xs font-bold text-slate-500 mt-1">Estoque: {prod.quantidadeEstoque || 0}</p></div>
+                                        <button onClick={() => selecionarVinculo(prod)} className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-5 py-3 rounded-xl font-black text-xs transition-colors">VINCULAR</button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="p-6 bg-white border-b flex justify-between items-center shadow-sm sticky top-0 z-20">
+                <button onClick={voltarParaLista} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-black transition-colors"><ArrowLeft size={20} /> VOLTAR</button>
                 <div className="flex gap-4">
-                    <button onClick={imprimirEspelho} className="flex items-center gap-2 bg-white border-2 border-slate-200 px-6 py-2 rounded-xl font-black text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm" title="Pressione F8 para imprimir o espelho da nota"><Printer size={18} /> IMPRIMIR (F8)</button>
-                    <button onClick={confirmarConferencia} disabled={notaSelecionada.status === 'Finalizado'} className={`flex items-center gap-2 px-6 py-2 rounded-xl font-black shadow-lg transition-all ${notaSelecionada.status === 'Finalizado' ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600 shadow-green-500/30 hover:-translate-y-1'}`} title="Pressione F10 para confirmar e salvar no banco">
-                        <CheckCircle size={20} /> {notaSelecionada.status === 'Finalizado' ? 'NOTA FINALIZADA' : 'SALVAR PREÇOS (F10)'}
+                    <button onClick={confirmarConferencia} disabled={notaSelecionada.status === 'Finalizado'} className={`flex items-center gap-2 px-6 py-2 rounded-xl font-black shadow-lg transition-all ${notaSelecionada.status === 'Finalizado' ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600 shadow-green-500/30 hover:-translate-y-1'}`}>
+                        <CheckCircle size={20} /> {notaSelecionada.status === 'Finalizado' ? 'NOTA FINALIZADA' : 'SALVAR PREÇOS E VÍNCULOS (F10)'}
                     </button>
                 </div>
             </div>
 
-            <div className="flex-1 p-8 max-w-7xl mx-auto w-full space-y-8">
+            <div className="flex-1 p-8 max-w-[1400px] mx-auto w-full space-y-8">
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/50 border flex flex-col justify-center">
                         <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Fornecedor</p>
                         <p className="text-xl font-black uppercase text-slate-800 leading-tight">{notaSelecionada.fornecedorNome}</p>
-                        <p className="text-sm font-bold text-slate-500 mt-2">Emissão: {notaSelecionada.dataEmissao ? new Date(notaSelecionada.dataEmissao).toLocaleDateString() : '-'}</p>
                     </div>
-                    <div className="bg-slate-900 p-8 rounded-3xl shadow-xl shadow-slate-900/20 text-white flex justify-between items-center relative overflow-hidden">
-                        <div className="relative z-10">
+                    <div className="bg-slate-900 p-8 rounded-3xl shadow-xl shadow-slate-900/20 text-white flex justify-between items-center">
+                        <div>
                             <p className="text-xs text-slate-400 font-black uppercase tracking-widest mb-1">Valor Total Importado</p>
                             <p className="text-5xl font-black text-emerald-400 tracking-tighter">{formatarMoeda(notaSelecionada.valorTotalNota)}</p>
                         </div>
-                        <DollarSign size={120} className="text-white opacity-5 absolute -right-4 -bottom-4" />
                     </div>
                 </div>
 
                 <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border overflow-hidden">
-                    <div className="p-6 border-b flex items-center justify-between bg-slate-50/80">
-                        <div className="flex items-center gap-3">
-                            <Package className="text-blue-500" size={24} />
-                            <h3 className="text-lg font-black text-slate-800">Ajuste de Preços de Venda</h3>
-                        </div>
-                        <span className="text-xs font-bold text-slate-400 bg-white px-3 py-1 rounded-full border">Two-Way Binding Ativo</span>
-                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-black tracking-widest border-b">
+                            <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-black tracking-widest border-b border-slate-200">
                             <tr>
-                                <th className="p-4" title="Código Interno ou do Fornecedor">SKU / Peça <HelpCircle size={10} className="inline mb-1"/></th>
-                                <th className="p-4 text-center">QTD</th>
-                                <th className="p-4 text-right" title="Custo Real (Valor do XML + Impostos)">Custo Unit. <HelpCircle size={10} className="inline mb-1"/></th>
-                                <th className="p-4 w-40 text-right bg-blue-50/50" title="Margem de Lucro. Digite a % para calcular o Preço final">Margem (Markup) <HelpCircle size={10} className="inline mb-1"/></th>
-                                <th className="p-4 w-56 text-right bg-emerald-50/50" title="Valor final de prateleira. Se alterar, o Markup recalcula sozinho">Novo Preço Venda <HelpCircle size={10} className="inline mb-1"/></th>
+                                <th className="p-4 min-w-[250px]">SKU / Peça (De-Para)</th>
+                                <th className="p-4 text-center border-l border-slate-200 bg-slate-100">XML (Origem)</th>
+                                <th className="p-4 text-center bg-slate-800 text-white">Conversão de Embalagem</th>
+                                <th className="p-4 text-right bg-blue-50">Entrada Real no Estoque</th>
+                                <th className="p-4 w-32 text-right border-l border-slate-200">Margem %</th>
+                                <th className="p-4 w-48 text-right bg-emerald-50">Preço Venda Unit.</th>
                             </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                             {itensNota.map((item, idx) => {
-                                const custo = Number(item.precoCusto || 0);
+
+                                const conversao = conversaoEmbalagem[idx] || null;
+                                let qtdXml = Number(item.quantidade || 1);
+                                let custoXml = Number(item.precoCusto || 0);
+
+                                let qtdFinal = qtdXml;
+                                let custoUnitarioFinal = custoXml;
+
+                                if (conversao && conversao.fator > 1) {
+                                    if (conversao.tipo === 'DESMEMBRAR') {
+                                        qtdFinal = qtdXml * conversao.fator;
+                                        custoUnitarioFinal = custoXml / conversao.fator;
+                                    } else if (conversao.tipo === 'AGRUPAR') {
+                                        qtdFinal = qtdXml / conversao.fator;
+                                        custoUnitarioFinal = custoXml * conversao.fator;
+                                    }
+                                }
+
                                 const vendaAtual = Number(precosVenda[idx] || 0);
-                                const markupAtual = custo > 0 ? (((vendaAtual / custo) - 1) * 100).toFixed(2) : "0.00";
+                                const markupAtual = custoUnitarioFinal > 0 ? (((vendaAtual / custoUnitarioFinal) - 1) * 100).toFixed(2) : "0.00";
 
                                 return (
-                                    <tr key={idx} className="hover:bg-slate-50 transition-colors group">
-                                        <td className="p-4">
-                                            <p className="font-black text-slate-700 uppercase text-sm">{item.nome}</p>
-                                            <p className="text-xs font-mono text-slate-400 mt-1">{item.sku || 'S/N'}</p>
-                                        </td>
-                                        <td className="p-4 text-center font-black text-slate-600 bg-slate-50/50">{item.quantidade || 1}</td>
-                                        <td className="p-4 text-right font-black text-slate-600">{formatarMoeda(custo)}</td>
+                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
 
-                                        <td className="p-4 bg-blue-50/20">
-                                            <div className="relative group-hover:scale-105 transition-transform origin-right">
-                                                <input
-                                                    type="number" step="0.1"
-                                                    value={markupAtual}
-                                                    onChange={(e) => alterarMarkup(idx, custo, e.target.value)}
-                                                    className={`w-full pl-3 pr-8 py-2.5 border-2 rounded-xl font-black focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none text-right transition-all shadow-sm ${Number(markupAtual) < 20 ? 'border-red-300 text-red-600 bg-red-50' : 'border-slate-200 text-slate-700'}`}
-                                                    title="Digite a margem desejada (%)"
-                                                />
-                                                <Percent className={`absolute right-3 top-1/2 -translate-y-1/2 ${Number(markupAtual) < 20 ? 'text-red-400' : 'text-slate-400'}`} size={14} />
+                                        {/* 🚀 ATUALIZADO: Mostra o Nome do Banco e o Estoque Atual! */}
+                                        <td className="p-4">
+                                            <p className="font-black text-slate-700 uppercase text-sm leading-tight mb-2">
+                                                {vinculos[idx] ? vinculos[idx].nome : item.nome}
+                                            </p>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Ref: {item.sku || 'S/N'}</span>
+
+                                                {vinculos[idx] ? (
+                                                    <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold flex items-center gap-1 border border-indigo-200">
+                                                        <LinkIcon size={10}/> Vinculado (Estoque: {vinculos[idx].estoqueAtual})
+                                                        <button onClick={() => removerVinculo(idx)} className="ml-1 text-indigo-400 hover:text-red-500"><X size={12}/></button>
+                                                    </span>
+                                                ) : item.produtoId ? (
+                                                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold flex items-center gap-1 border border-green-200">
+                                                        <CheckCircle size={10}/> Conhecido (Estoque: {item.estoqueAtual || 0})
+                                                    </span>
+                                                ) : (
+                                                    <button onClick={() => abrirModalVinculo(item, idx)} className="text-[10px] bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white px-3 py-1 rounded font-bold transition-all flex items-center gap-1 border border-blue-200"><Search size={10}/> Vincular Estoque</button>
+                                                )}
                                             </div>
                                         </td>
 
-                                        <td className="p-4 bg-emerald-50/30">
-                                            <div className="relative group-hover:scale-105 transition-transform origin-right">
+                                        <td className="p-4 text-center border-l border-slate-200 bg-slate-50">
+                                            <p className="font-black text-slate-500 text-lg">{qtdXml} <span className="text-xs uppercase">{item.unidadeMedida || 'UN'}</span></p>
+                                            <p className="text-[10px] font-bold text-slate-400 mt-1">{formatarMoeda(custoXml)}</p>
+                                        </td>
+
+                                        <td className="p-4 text-center">
+                                            {conversao ? (
+                                                <div className="flex flex-col items-center gap-1 animate-fade-in">
+                                                    <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-md flex items-center gap-1 ${conversao.tipo === 'DESMEMBRAR' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-orange-100 text-orange-700 border border-orange-200'}`}>
+                                                        {conversao.tipo === 'DESMEMBRAR' ? <ArrowDownToLine size={12}/> : <ArrowUpFromLine size={12}/>}
+                                                        {conversao.tipo} (x{conversao.fator})
+                                                    </span>
+                                                    <button onClick={() => removerConversao(idx)} className="text-[10px] text-slate-400 font-bold hover:text-red-500 hover:underline">Remover</button>
+                                                </div>
+                                            ) : (
+                                                <button onClick={() => abrirModalConversao(item, idx)} className="mx-auto flex flex-col items-center justify-center p-2 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-all w-24 h-16 group">
+                                                    <ArrowRightLeft size={16} className="group-hover:scale-110 transition-transform" />
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Converter</span>
+                                                </button>
+                                            )}
+                                        </td>
+
+                                        <td className="p-4 text-right bg-blue-50/30">
+                                            <p className="font-black text-blue-600 text-xl tracking-tighter">
+                                                +{qtdFinal} <span className="text-xs uppercase">UN</span>
+                                            </p>
+                                            <p className="text-xs font-bold text-slate-500 mt-1 bg-white inline-block px-2 py-0.5 rounded shadow-sm border border-slate-100">
+                                                Custo: {formatarMoeda(custoUnitarioFinal)}
+                                            </p>
+                                        </td>
+
+                                        <td className="p-4 border-l border-slate-200">
+                                            <div className="relative">
+                                                <input
+                                                    type="number" step="0.1" value={markupAtual} onChange={(e) => alterarMarkup(idx, custoUnitarioFinal, e.target.value)}
+                                                    className={`w-full pl-2 pr-6 py-3 border-2 rounded-xl font-black focus:border-blue-500 outline-none text-right shadow-sm ${Number(markupAtual) < 20 ? 'border-red-300 text-red-600 bg-red-50' : 'border-slate-200'}`}
+                                                />
+                                                <Percent className={`absolute right-2 top-1/2 -translate-y-1/2 ${Number(markupAtual) < 20 ? 'text-red-400' : 'text-slate-400'}`} size={12} />
+                                            </div>
+                                        </td>
+
+                                        <td className="p-4 bg-emerald-50/50">
+                                            <div className="relative">
                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">R$</span>
                                                 <input
-                                                    type="text"
-                                                    value={formatMaskDisplay(precosVenda[idx] || 0)}
-                                                    onChange={(e) => handlePrecoChangeMask(idx, e.target.value)}
-                                                    className="w-full pl-8 pr-3 py-2.5 border-2 border-slate-200 rounded-xl font-black text-slate-800 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition-all text-right shadow-sm bg-white"
-                                                    title="Preço Final na Prateleira"
+                                                    type="text" value={formatMaskDisplay(precosVenda[idx] || 0)} onChange={(e) => handlePrecoChangeMask(idx, e.target.value)}
+                                                    className="w-full pl-8 pr-3 py-3 border-2 border-slate-200 rounded-xl font-black text-slate-800 focus:border-emerald-500 focus:ring-2 outline-none text-right shadow-sm bg-white"
                                                 />
                                             </div>
                                         </td>
@@ -444,38 +610,6 @@ export const ImportarXml = () => {
                             })}
                             </tbody>
                         </table>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-                    <div className="p-6 border-b flex justify-between items-center bg-slate-50">
-                        <div className="flex items-center gap-3">
-                            <DollarSign className="text-amber-500 bg-amber-50 p-1.5 rounded-lg" size={32} />
-                            <h3 className="text-lg font-black text-slate-800">Contas a Pagar Geradas</h3>
-                        </div>
-                        <span className="text-xs font-bold text-slate-400 bg-white px-3 py-1 rounded-full border shadow-sm">Duplicatas do XML</span>
-                    </div>
-                    <div className="p-8">
-                        {duplicatasNota.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                                {duplicatasNota.map((dup, idx) => (
-                                    <div key={idx} className="bg-white p-6 rounded-2xl border-2 border-slate-100 shadow-sm hover:shadow-md hover:border-amber-300 hover:-translate-y-1 transition-all relative overflow-hidden group">
-                                        <div className="absolute top-0 left-0 w-1 h-full bg-amber-400 group-hover:bg-amber-500 transition-colors"></div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Parcela {dup.numero}</p>
-                                        <p className="text-2xl font-black text-slate-800 mb-4 tracking-tighter">{formatarMoeda(dup.valor)}</p>
-                                        <p className="text-xs font-bold text-amber-600 uppercase bg-amber-50 inline-block px-2 py-1 rounded-md">
-                                            Venc: {dup.vencimento ? new Date(dup.vencimento).toLocaleDateString() : '-'}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center py-10 text-slate-400">
-                                <Info size={48} className="text-slate-200 mb-3" />
-                                <p className="font-black text-lg text-slate-500">Nenhum título financeiro.</p>
-                                <p className="text-sm">O fornecedor emitiu esta nota sem registro de duplicatas.</p>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>

@@ -44,10 +44,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/parceiros/consulta-cep/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/configuracoes/backup").permitAll()
 
-                        // 🚀 NOVO: Rota de compras liberada explicitamente para evitar o Erro 403 no PUT
-                        .requestMatchers("/api/compras/**").permitAll()
-
                         // ================= ROTAS PRIVADAS (Requerem Token) =================
+                        // 🚀 COMPRAS: Voltei para autenticado. Se o GET/POST funciona, o PUT tem que funcionar.
+                        .requestMatchers("/api/compras/**").authenticated()
+
                         .requestMatchers("/api/whatsapp/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/vendas/*/whatsapp").authenticated()
 
@@ -67,11 +67,14 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Origem do seu frontend (Vite) - Lembre-se de acessar sempre por localhost!
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
-        configuration.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE", "PATCH", "OPTIONS"));
+
+        // 🚀 O SEGREDO AQUI: Liberando padrões de origem em vez de string exata
+        // Isso impede que o Vite trave o PUT por causa de mudança de IP ou 127.0.0.1
+        configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:*", "http://127.0.0.1:*", "http://192.168.*.*:*"));
+
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setExposedHeaders(Arrays.asList("Authorization"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
