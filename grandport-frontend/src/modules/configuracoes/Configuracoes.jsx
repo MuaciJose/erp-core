@@ -3,7 +3,8 @@ import api from '../../api/axios';
 import {
     Settings, Building2, Printer, Sliders, Save, CheckCircle,
     AlertTriangle, Info, X, Store, Percent, Search, Loader2, Camera, Plus,
-    Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode, RefreshCw, Receipt
+    Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode, RefreshCw, Receipt,
+    ToggleLeft, ToggleRight // 🚀 Adicionado os ícones do Toggle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
@@ -40,7 +41,7 @@ export const Configuracoes = () => {
     const [statusEmail, setStatusEmail] = useState('DESCONHECIDO');
     const [testandoEmail, setTestandoEmail] = useState(false);
 
-    // 🚀 ESTADO ATUALIZADO COM OS NOVOS CAMPOS DE NFC-e E E-MAIL SMTP
+    // 🚀 ESTADO ATUALIZADO COM OS NOVOS CAMPOS DE NFC-e E E-MAIL SMTP E IVA
     const [config, setConfig] = useState({
         nomeFantasia: '',
         razaoSocial: '',
@@ -82,7 +83,9 @@ export const Configuracoes = () => {
         smtpHost: 'smtp.gmail.com',
         smtpPort: 587,
         emailRemetente: '',
-        senhaEmailRemetente: ''
+        senhaEmailRemetente: '',
+        // 🚀 CHAVE DO IVA DUAL
+        exibirIvaDual: false
     });
 
     const [usuariosEquipe, setUsuariosEquipe] = useState([]);
@@ -129,11 +132,12 @@ export const Configuracoes = () => {
                     whatsappApiUrl: data.whatsappApiUrl || '',
                     tamanhoImpressora: data.tamanhoImpressora || '80mm',
                     mensagemRodape: data.mensagemRodape || '',
-                    // 🚀 CARREGANDO DADOS E-MAIL SMTP
+                    // 🚀 CARREGANDO DADOS E-MAIL SMTP E IVA
                     smtpHost: data.smtpHost || 'smtp.gmail.com',
                     smtpPort: data.smtpPort || 587,
                     emailRemetente: data.emailRemetente || '',
-                    senhaEmailRemetente: data.senhaEmailRemetente || ''
+                    senhaEmailRemetente: data.senhaEmailRemetente || '',
+                    exibirIvaDual: data.exibirIvaDual || false
                 }));
             }
             setUsuariosEquipe(resUsuarios.data || []);
@@ -515,7 +519,7 @@ export const Configuracoes = () => {
                     <button onClick={() => setAbaAtiva('SISTEMA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'SISTEMA' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Database size={20} /> Sistema</button>
                 </div>
 
-                <div className="flex-1 bg-white p-8 rounded-3xl shadow-sm border border-slate-200 min-h-[500px]">
+                <div className="flex-1 bg-white p-8 rounded-3xl shadow-sm border border-slate-200 min-h-[500px] overflow-y-auto">
 
                     {/* ABA: DADOS DA EMPRESA */}
                     {abaAtiva === 'EMPRESA' && (
@@ -624,7 +628,7 @@ export const Configuracoes = () => {
                                     <Receipt className="text-blue-500" /> Parâmetros Fiscais (NF-e)
                                 </h2>
 
-                                {/* 🚀 BOTÃO DE TESTAR CONEXÃO SEFAZ */}
+                                {/* BOTÃO DE TESTAR CONEXÃO SEFAZ */}
                                 <button
                                     onClick={verificarConexaoSefaz}
                                     disabled={testandoSefaz}
@@ -643,6 +647,25 @@ export const Configuracoes = () => {
                                     }
                                     {testandoSefaz ? 'CONSULTANDO...' : 'TESTAR STATUS SEFAZ'}
                                 </button>
+                            </div>
+
+                            {/* 🚀 O TOGGLE / CHAVE DE VIRADA DO IVA DUAL */}
+                            <div
+                                className={`mt-6 mb-8 p-6 rounded-2xl border-4 transition-all flex items-center justify-between group cursor-pointer ${config.exibirIvaDual ? 'bg-white border-green-500 shadow-lg shadow-green-500/20' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`}
+                                onClick={() => setConfig({...config, exibirIvaDual: !config.exibirIvaDual})}
+                            >
+                                <div>
+                                    <h4 className={`font-black text-lg ${config.exibirIvaDual ? 'text-green-700' : 'text-slate-600'}`}>
+                                        Transparência Fiscal (IVA Dual / Padrão Americano) no Caixa
+                                    </h4>
+                                    <p className="text-sm font-medium text-slate-500 mt-1">
+                                        {config.exibirIvaDual ? 'Ativado. O cliente verá o imposto separado no recibo e na tela de pagamento.' : 'Desativado. O imposto continuará embutido no preço total.'}
+                                    </p>
+                                </div>
+
+                                <div className={`w-16 h-8 rounded-full flex items-center p-1 transition-colors ${config.exibirIvaDual ? 'bg-green-500 justify-end' : 'bg-slate-300 justify-start'}`}>
+                                    <div className="w-6 h-6 bg-white rounded-full shadow-sm"></div>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -916,7 +939,7 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            {/* 🚀 NOVO BLOCO: CONFIGURAÇÃO DE E-MAIL INSERIDO AQUI */}
+                            {/* NOVO BLOCO: CONFIGURAÇÃO DE E-MAIL INSERIDO AQUI */}
                             <div className="mt-8 p-6 bg-slate-50 border border-slate-200 rounded-3xl shadow-sm">
                                 <div className="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
                                     <div>
@@ -924,7 +947,7 @@ export const Configuracoes = () => {
                                         <p className="text-sm text-slate-500 font-medium">Configure a conta que fará o envio dos XMLs para o contador e clientes.</p>
                                     </div>
 
-                                    {/* 🚀 NOVO BOTÃO DE TESTAR CONEXÃO DE E-MAIL */}
+                                    {/* NOVO BOTÃO DE TESTAR CONEXÃO DE E-MAIL */}
                                     <button
                                         onClick={verificarConexaoEmail}
                                         disabled={testandoEmail}

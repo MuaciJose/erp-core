@@ -56,6 +56,10 @@ public class ConfiguracaoSistema {
     private String tipoCertificado = "A1";
     private String senhaCertificado = "";
 
+    // 🚀 REFORMA TRIBUTÁRIA / LEI DA TRANSPARÊNCIA
+    @Column(name = "exibir_iva_dual", columnDefinition = "boolean default false")
+    private Boolean exibirIvaDual = false;
+
     // ================= VISUAL =================
     private String logoUrl = "";
 

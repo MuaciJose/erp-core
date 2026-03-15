@@ -19,7 +19,10 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const buscaInputRef = useRef(null);
     const valorRecebidoRef = useRef(null);
 
-    // 🚀 ESTADOS DO PAGAMENTO MÚLTIPLO (SPLIT)
+    // 🚀 ESTADO DO IVA DUAL PUXADO DAS CONFIGURAÇÕES DO SERVIDOR
+    const [exibirIvaDual, setExibirIvaDual] = useState(false);
+
+    // ESTADOS DO PAGAMENTO MÚLTIPLO (SPLIT)
     const [metodoPagamento, setMetodoPagamento] = useState('DINHEIRO');
     const [valorRecebidoInput, setValorRecebidoInput] = useState('');
     const [numeroParcelas, setNumeroParcelas] = useState(1);
@@ -34,13 +37,10 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const [loadingCaixa, setLoadingCaixa] = useState(true);
     const [processandoNfce, setProcessandoNfce] = useState(false);
 
-    // =======================================================================
-    // 🚀 CORREÇÃO DO STATUS: Verifica se o Java devolveu CONCLUIDA
-    // =======================================================================
     const isPago = pedidoSelecionado?.status === 'CONCLUIDA' || pedidoSelecionado?.status === 'PAGA';
 
     // =======================================================================
-    // MÁSCARAS E CALCULADORA DE MÚLTIPLOS PAGAMENTOS
+    // MÁSCARAS E CÁLCULOS FISCAIS (IVA)
     // =======================================================================
     const formatarMoeda = (valor) => {
         if (valor === undefined || valor === null || isNaN(Number(valor))) return '0,00';
@@ -53,7 +53,13 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         setValorRecebidoInput(valorRealFloat > 0 ? valorRealFloat.toString() : '');
     };
 
+    // VALORES BASE
     const valorCobrado = pedidoSelecionado?.valorTotal || 0;
+
+    // CÁLCULO ESTIMADO DO IVA DUAL (Apenas exibido se configurado pelo Admin)
+    const valorIvaEstimado = valorCobrado * 0.01;
+    const valorSubtotalLimpo = valorCobrado - valorIvaEstimado;
+
     const totalJaPago = pagamentosAdicionados.reduce((acc, p) => acc + p.valor, 0);
     const valorRestante = Math.max(0, valorCobrado - totalJaPago);
 
@@ -76,6 +82,19 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         }
     };
 
+    const carregarConfiguracoes = async () => {
+        try {
+            const res = await api.get('/api/configuracoes/empresa');
+            const data = Array.isArray(res.data) ? res.data[0] : res.data;
+            // O Caixa apenas OBEDECE o que veio do servidor. Zero botões na tela.
+            if (data && data.exibirIvaDual !== undefined) {
+                setExibirIvaDual(data.exibirIvaDual);
+            }
+        } catch (e) {
+            console.log("Não foi possível carregar config do IVA.");
+        }
+    };
+
     const carregarPedidos = async (silencioso = false) => {
         try {
             const res = await api.get('/api/vendas/fila-caixa');
@@ -93,6 +112,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
     useEffect(() => {
         verificarCaixa();
+        carregarConfiguracoes();
         carregarPedidos();
         const intervalId = setInterval(() => {
             if(caixaStatus !== 'FECHADO' && !modoRecebimento && !modalDevolucaoAberto && !pedidoPago) {
@@ -132,7 +152,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     };
 
     // =======================================================================
-    // 🚀 MÁQUINA DE ESTADOS E ATALHOS INTELIGENTES
+    // MÁQUINA DE ESTADOS E ATALHOS INTELIGENTES
     // =======================================================================
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -161,7 +181,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                 return;
             }
 
-            // 🚀 ATALHOS QUANDO O PEDIDO ESTÁ PAGO (TELA DE SUCESSO)
             if (isPago) {
                 if (e.key === 'F10') {
                     e.preventDefault();
@@ -311,17 +330,14 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                 cpfConsumidorFinal: cpfAvulso
             }));
 
-            // O Java processa a venda e devolve a venda atualizada com status CONCLUIDA
             const response = await api.post(`/api/vendas/${pedidoSelecionado.id}/pagar`, payload);
 
             toast.success('Caixa Recebido com Sucesso!', { id: idVendaToast });
 
-            // Atualiza o pedido selecionado com os dados que voltaram do banco
             setPedidoSelecionado(response.data);
             setModoRecebimento(false);
             setBusca('');
 
-            // Atualiza a fila oculta atrás da tela
             carregarPedidos(true);
         } catch (error) {
             toast.error(`Falha: ${error.response?.data?.message || error.message}`, { id: idVendaToast });
@@ -343,7 +359,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
             const fileURL = URL.createObjectURL(new Blob([resPdf.data], { type: 'application/pdf' }));
             window.open(fileURL, '_blank');
 
-            // Depois de emitir a nota fiscal oficial, podemos limpar a tela se desejar:
             setPedidoSelecionado(null);
             carregarPedidos(true);
         } catch (error) {
@@ -384,7 +399,8 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
     return (
         <>
-            <div className="p-8 max-w-7xl mx-auto h-[90vh] flex gap-6 animate-fade-in">
+            <div className="p-8 max-w-7xl mx-auto h-[90vh] flex gap-6 animate-fade-in relative">
+
                 {/* FILA LATERAL */}
                 <div className="w-1/3 bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative">
                     <div className="p-6 bg-slate-900 text-white">
@@ -446,13 +462,32 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                     <h2 className="text-4xl font-black text-slate-800">#{pedidoSelecionado.id}</h2>
                                     <p className="text-slate-500 font-bold mt-1 flex items-center gap-1"><User size={16}/> {pedidoSelecionado.cliente?.nome || 'Consumidor Final'}</p>
                                 </div>
-                                <div className="text-right bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{isPago ? 'Valor Pago' : 'Total a Pagar'}</p>
-                                    <h1 className="text-5xl font-black text-green-500 tracking-tighter leading-none">R$ {valorCobrado.toFixed(2)}</h1>
+
+                                {/* RESUMO FINANCEIRO HÍBRIDO (IVA LIGADO OU DESLIGADO VIA CONFIG) */}
+                                <div className="text-right bg-white p-4 rounded-2xl shadow-sm border border-slate-200 min-w-[220px]">
+                                    {exibirIvaDual ? (
+                                        <div className="animate-fade-in flex flex-col items-end">
+                                            <div className="flex justify-between w-full text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 border-b border-slate-100 pb-1">
+                                                <span>Subtotal:</span>
+                                                <span className="text-slate-600">R$ {valorSubtotalLimpo.toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between w-full text-[10px] font-black text-orange-500 uppercase tracking-widest mb-2 border-b border-orange-100 pb-1">
+                                                <span title="Imposto sobre Bens e Serviços + Contrib. sobre Bens e Serviços">Tributo Incidente (IVA):</span>
+                                                <span>+ R$ {valorIvaEstimado.toFixed(2)}</span>
+                                            </div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 mt-1">{isPago ? 'Valor Pago' : 'Total a Pagar'}</p>
+                                            <h1 className="text-4xl font-black text-green-500 tracking-tighter leading-none">R$ {valorCobrado.toFixed(2)}</h1>
+                                        </div>
+                                    ) : (
+                                        <div className="animate-fade-in">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{isPago ? 'Valor Pago' : 'Total a Pagar'}</p>
+                                            <h1 className="text-5xl font-black text-green-500 tracking-tighter leading-none">R$ {valorCobrado.toFixed(2)}</h1>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* 🚀 DETALHES OU PAGAMENTO SPLIT */}
+                            {/* DETALHES OU PAGAMENTO SPLIT */}
                             {!modoRecebimento ? (
                                 <>
                                     <div className="flex-1 p-8 overflow-y-auto bg-white">
@@ -477,7 +512,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                         </table>
                                     </div>
 
-                                    {/* 🚀 BOTÕES DE AÇÃO: ALTERNA BASEADO NO STATUS */}
+                                    {/* BOTÕES DE AÇÃO */}
                                     <div className="p-6 bg-slate-900 border-t-4 border-blue-500 flex gap-4">
                                         {!isPago ? (
                                             <>
@@ -489,7 +524,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                                 </button>
                                             </>
                                         ) : (
-                                            // 🚀 NOVOS BOTÕES APÓS O PAGAMENTO (SUCESSO)
                                             <div className="flex w-full gap-4 animate-fade-in">
                                                 <button
                                                     onClick={() => setPedidoPago(pedidoSelecionado)}
@@ -511,7 +545,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                             ) : (
                                 <div className="flex-1 flex flex-col bg-slate-50 animate-fade-in border-t border-slate-200">
 
-                                    {/* 🚀 BOTÕES DE MÉTODOS DE PAGAMENTO */}
+                                    {/* BOTÕES DE MÉTODOS DE PAGAMENTO */}
                                     <div className="p-4 bg-white border-b border-slate-200 grid grid-cols-5 gap-2">
                                         <button onClick={() => { setMetodoPagamento('DINHEIRO'); setNumeroParcelas(1); valorRecebidoRef.current?.focus(); }} className={`p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${metodoPagamento === 'DINHEIRO' ? 'border-green-500 bg-green-50 text-green-700 shadow-sm transform scale-[1.02]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
                                             <Banknote size={20} /><span className="font-black text-[10px]">DINHEIRO (D)</span>
@@ -550,7 +584,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                                 </div>
                                             </div>
 
-                                            {/* 🚀 OPÇÕES DE PARCELAMENTO */}
+                                            {/* OPÇÕES DE PARCELAMENTO */}
                                             {(metodoPagamento === 'CARTAO_CREDITO' || metodoPagamento === 'A_PRAZO') && (
                                                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-orange-200 animate-fade-in">
                                                     <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest block mb-2">Dividir em quantas parcelas?</label>
