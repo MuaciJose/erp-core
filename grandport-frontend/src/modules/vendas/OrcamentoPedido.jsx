@@ -4,7 +4,7 @@ import {
     Search, FileText, Printer, CheckCircle, Package, User,
     Trash2, ArrowRight, Save, FolderOpen, Car, X, RefreshCw,
     AlertTriangle, MessageCircle, XCircle, Smartphone, Loader2, ArrowLeft, Receipt, FileDown,
-    Image as ImageIcon
+    Image as ImageIcon, Ban, Info
 } from 'lucide-react';
 
 import toast from 'react-hot-toast';
@@ -33,9 +33,31 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
     const [previewImagemPeca, setPreviewImagemPeca] = useState(null);
 
+    // 🚀 ESTADOS DO MODAL DE APLICAÇÃO
+    const [modalAplicacao, setModalAplicacao] = useState({ aberto: false, texto: '', nome: '' });
+    const [filtroModal, setFiltroModal] = useState('');
+
     const inputPecaRef = useRef(null);
     const inputClienteRef = useRef(null);
     const inputDescontoRef = useRef(null);
+
+    // 🚀 DEVOLVENDO O FOCO AO FECHAR O MODAL
+    const fecharModalConsulta = () => {
+        setModalAplicacao({ aberto: false, texto: '', nome: '' });
+        setFiltroModal('');
+        // Assim que fechar a aplicação, o cursor volta pra pesquisa de peças automaticamente
+        setTimeout(() => {
+            if (inputPecaRef.current) {
+                inputPecaRef.current.focus();
+            }
+        }, 50);
+    };
+
+    const todasAsLinhasApp = modalAplicacao.texto
+        ? modalAplicacao.texto.split(/[;|\n,\/]/).map(i => i.trim()).filter(i => i.length > 1)
+        : [];
+
+    const linhasFiltradasApp = todasAsLinhasApp.filter(l => l.toLowerCase().includes(filtroModal.toLowerCase()));
 
     const [descontoTipo, setDescontoTipo] = useState('VALOR');
     const [descontoInput, setDescontoInput] = useState('');
@@ -125,7 +147,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 qtdBaixada: isBaixadoNoBanco ? qtd : 0,
                 ncm: getNcmString(i.produto?.ncm) || getNcmString(i.ncm),
                 origem: i.produto?.origemMercadoria || 0,
-                cest: i.produto?.cest || ''
+                cest: i.produto?.cest || '',
+                fotoUrl: i.produto?.fotoUrl || i.fotoUrl || '',
+                fotoLocalPath: i.produto?.fotoLocalPath || i.fotoLocalPath || ''
             };
         });
     };
@@ -226,13 +250,27 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
     useEffect(() => {
         const timer = setTimeout(async () => {
-            if (buscaPeca.length > 1) {
+            if (buscaPeca.trim().length > 1) {
                 try {
-                    const res = await api.get(`/api/produtos?busca=${buscaPeca}`);
-                    setResultadosPecas(res.data);
-                    setIndexFocadoPeca(0);
-                } catch (e) { setResultadosPecas([]); }
-            } else { setResultadosPecas([]); setIndexFocadoPeca(-1); }
+                    const termosBusca = buscaPeca.toLowerCase().split(' ').filter(t => t.trim() !== '');
+                    const termoPrincipal = encodeURIComponent(termosBusca[0]);
+                    const res = await api.get(`/api/produtos?busca=${termoPrincipal}`);
+
+                    const resultadosInteligentes = res.data.filter(peca => {
+                        const textoDaPeca = `${peca.nome || ''} ${peca.sku || ''} ${peca.aplicacao || ''}`.toLowerCase();
+                        return termosBusca.every(termo => textoDaPeca.includes(termo));
+                    });
+
+                    setResultadosPecas(resultadosInteligentes);
+                    setIndexFocadoPeca(resultadosInteligentes.length > 0 ? 0 : -1);
+                } catch (e) {
+                    setResultadosPecas([]);
+                    setIndexFocadoPeca(-1);
+                }
+            } else {
+                setResultadosPecas([]);
+                setIndexFocadoPeca(-1);
+            }
         }, 300);
         return () => clearTimeout(timer);
     }, [buscaPeca]);
@@ -304,7 +342,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 qtdBaixada: 0,
                 ncm: getNcmString(peca.ncm),
                 origem: peca.origemMercadoria || 0,
-                cest: peca.cest || ''
+                cest: peca.cest || '',
+                fotoUrl: peca.fotoUrl || '',
+                fotoLocalPath: peca.fotoLocalPath || ''
             }]);
         }
         toast.success("Item adicionado");
@@ -507,13 +547,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         sincronizarEstoqueSilencioso(itensFormatados).catch(console.error);
     };
 
-    // =======================================================================
-    // 🚀 NOVO MOTOR DE IMPRESSÃO: IFRAME INVISÍVEL
-    // =======================================================================
     const imprimirViaIframe = () => {
         if (itens.length === 0) return toast.error("Adicione itens para imprimir.");
 
-        // Cria o Iframe e esconde ele 100% da tela
         const iframe = document.createElement('iframe');
         iframe.style.position = 'absolute';
         iframe.style.width = '0px';
@@ -524,7 +560,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
         const doc = iframe.contentWindow.document;
 
-        // Monta as linhas da tabela
         const linhasItens = itens.map(item => `
             <tr style="border-bottom: 1px solid #f1f5f9;">
                 <td style="padding: 6px; font-family: monospace; font-size: 10px; color: #475569;">${item.codigo}</td>
@@ -634,7 +669,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         doc.write(htmlContent);
         doc.close();
 
-        // O Iframe se auto-destrói após 10 segundos para não deixar lixo na RAM
         setTimeout(() => {
             if (document.body.contains(iframe)) {
                 document.body.removeChild(iframe);
@@ -644,123 +678,136 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
-
-            if (modalListaAberto) {
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    setIndexFocadoLista(p => Math.min(orcamentosSalvos.length - 1, p + 1));
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    setIndexFocadoLista(p => Math.max(0, p - 1));
-                } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (indexFocadoLista >= 0 && orcamentosSalvos[indexFocadoLista]) {
-                        carregarOrcamentoLocal(orcamentosSalvos[indexFocadoLista]);
-                    }
-                } else if (e.key === 'Escape') {
-                    setModalListaAberto(false);
-                }
+            if (modalAplicacao.aberto) {
+                if (e.key === 'Escape') fecharModalConsulta();
                 return;
             }
-
+            if (modalListaAberto) {
+                if (e.key === 'ArrowDown') { e.preventDefault(); setIndexFocadoLista(p => Math.min(orcamentosSalvos.length - 1, p + 1)); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); setIndexFocadoLista(p => Math.max(0, p - 1)); }
+                else if (e.key === 'Enter') { e.preventDefault(); if (indexFocadoLista >= 0 && orcamentosSalvos[indexFocadoLista]) carregarOrcamentoLocal(orcamentosSalvos[indexFocadoLista]); }
+                else if (e.key === 'Escape') setModalListaAberto(false);
+                return;
+            }
             if (modalVendaPerdidaAberto) {
                 if (e.key === 'Escape') setModalVendaPerdidaAberto(false);
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') registrarVendaPerdida();
                 return;
             }
-
             if (modalCancelamentoAberto) {
                 if (e.key === 'Escape') setModalCancelamentoAberto(false);
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') cancelarNFe();
                 return;
             }
 
+            if (e.altKey && (e.key === 'a' || e.key === 'A')) {
+                if (!modalAplicacao.aberto && resultadosPecas.length > 0 && indexFocadoPeca >= 0) {
+                    e.preventDefault();
+                    const pecaFocada = resultadosPecas[indexFocadoPeca];
+                    setModalAplicacao({ aberto: true, texto: pecaFocada.aplicacao, nome: pecaFocada.nome });
+                }
+            }
+
             switch (e.key) {
-                case 'F2':
-                    e.preventDefault();
-                    inputClienteRef.current?.focus();
-                    break;
-                case 'F3':
-                    e.preventDefault();
-                    inputPecaRef.current?.focus();
-                    break;
-                case 'F4':
-                    e.preventDefault();
-                    inputDescontoRef.current?.focus();
-                    break;
-                case 'F5':
-                    e.preventDefault();
-                    forcarSincronizacaoEstoque();
-                    break;
-                case 'F6':
-                    e.preventDefault();
-                    setModalListaAberto(true);
-                    setIndexFocadoLista(0);
-                    break;
-                case 'F7':
-                    e.preventDefault();
-                    setModalVendaPerdidaAberto(true);
-                    break;
-                case 'F8':
-                    e.preventDefault();
-                    processarVendaAPI(modo);
-                    break;
+                case 'F2': e.preventDefault(); inputClienteRef.current?.focus(); break;
+                case 'F3': e.preventDefault(); inputPecaRef.current?.focus(); break;
+                case 'F4': e.preventDefault(); inputDescontoRef.current?.focus(); break;
+                case 'F5': e.preventDefault(); forcarSincronizacaoEstoque(); break;
+                case 'F6': e.preventDefault(); setModalListaAberto(true); setIndexFocadoLista(0); break;
+                case 'F7': e.preventDefault(); setModalVendaPerdidaAberto(true); break;
+                case 'F8': e.preventDefault(); processarVendaAPI(modo); break;
                 case 'F9':
                     e.preventDefault();
                     if (!notaFiscalInfo) {
-                        if (e.ctrlKey || e.metaKey) {
-                            processarVendaAPI('AGUARDANDO_PAGAMENTO');
-                        } else {
-                            processarVendaAPI('PEDIDO');
-                        }
+                        if (e.ctrlKey || e.metaKey) processarVendaAPI('AGUARDANDO_PAGAMENTO');
+                        else processarVendaAPI('PEDIDO');
                     }
                     break;
-                case 'F10':
-                    e.preventDefault();
-                    if (orcamentoId && !notaFiscalInfo) emitirNFe();
-                    break;
-                case 'F11':
-                    e.preventDefault();
-                    acionarWhatsApp();
-                    break;
+                case 'F10': e.preventDefault(); if (orcamentoId && !notaFiscalInfo) emitirNFe(); break;
+                case 'F11': e.preventDefault(); acionarWhatsApp(); break;
                 case 'p':
                 case 'P':
-                    if (e.ctrlKey || e.metaKey) {
-                        e.preventDefault();
-                        // 🚀 ATUALIZADO PARA IFRAME
-                        imprimirViaIframe();
-                    }
+                    if (e.ctrlKey || e.metaKey) { e.preventDefault(); imprimirViaIframe(); }
                     break;
                 case 'Escape':
                     if (resultadosClientes.length > 0) { setResultadosClientes([]); setIndexFocadoCliente(-1); }
                     if (resultadosPecas.length > 0) { setResultadosPecas([]); setIndexFocadoPeca(-1); }
                     else if (onVoltar && !notaFiscalInfo) onVoltar();
                     break;
-                default:
-                    break;
+                default: break;
             }
 
-            if (e.altKey && (e.key === 'l' || e.key === 'L')) {
-                e.preventDefault();
-                limparEcra();
-            }
-            if (e.altKey && (e.key === 'v' || e.key === 'V')) {
-                e.preventDefault();
-                document.getElementById('select-veiculo')?.focus();
-            }
+            if (e.altKey && (e.key === 'l' || e.key === 'L')) { e.preventDefault(); limparEcra(); }
+            if (e.altKey && (e.key === 'v' || e.key === 'V')) { e.preventDefault(); document.getElementById('select-veiculo')?.focus(); }
         };
 
         window.addEventListener('keydown', handleGlobalKeyDown);
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-    }, [
-        modalListaAberto, modalVendaPerdidaAberto, modalCancelamentoAberto, modo, orcamentoId, notaFiscalInfo,
-        itens, clienteSelecionado, veiculoDetalhado, subtotal, valorDescontoReal, totalFinal,
-        orcamentosSalvos, indexFocadoLista, resultadosClientes, resultadosPecas, justificativaCancelamento, cancelandoNfe
-    ]);
+    }, [modalListaAberto, modalVendaPerdidaAberto, modalCancelamentoAberto, modo, orcamentoId, notaFiscalInfo, itens, clienteSelecionado, veiculoDetalhado, subtotal, valorDescontoReal, totalFinal, orcamentosSalvos, indexFocadoLista, resultadosClientes, resultadosPecas, justificativaCancelamento, cancelandoNfe, modalAplicacao.aberto]);
 
     return (
         <div className="flex flex-col h-full bg-white relative z-[15]">
             <div className="p-8 max-w-7xl mx-auto flex flex-col h-full animate-fade-in relative">
+
+                {/* 🚀 MODAL CENTRAL DE CONSULTA DE APLICAÇÃO */}
+                {modalAplicacao.aberto && (
+                    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-fade-in p-4 text-left">
+                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 flex flex-col max-h-[85vh]">
+                            <div className="bg-blue-600 p-6 text-white flex justify-between items-center shrink-0">
+                                <div>
+                                    <h3 className="font-black text-lg flex items-center gap-2"><Car size={20}/> Consultar Veículos</h3>
+                                    <p className="text-[10px] text-blue-100 font-bold uppercase tracking-widest">{modalAplicacao.nome}</p>
+                                </div>
+                                <button onClick={fecharModalConsulta} className="bg-blue-500 hover:bg-red-500 p-2 rounded-xl transition-colors">
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="p-4 bg-slate-100 border-b shrink-0">
+                                <div className="relative">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                    <input
+                                        type="text"
+                                        autoFocus
+                                        placeholder="Pesquisar modelo, ano ou motor..."
+                                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-blue-500 shadow-sm transition-all"
+                                        value={filtroModal}
+                                        onChange={(e) => setFiltroModal(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="p-6 overflow-y-auto bg-slate-50 custom-scrollbar flex-1">
+                                {linhasFiltradasApp.length > 0 ? (
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {linhasFiltradasApp.map((linha, idx) => (
+                                            <div key={idx} className="p-4 bg-white border border-slate-200 rounded-2xl font-bold text-slate-700 text-sm flex items-center gap-3 shadow-sm hover:border-blue-400 hover:bg-blue-50 transition-all group animate-fade-in">
+                                                <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center shrink-0">
+                                                    <Car size={16} />
+                                                </div>
+                                                {linha}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="py-20 text-center text-slate-400">
+                                        <Ban className="mx-auto mb-4 opacity-20" size={60} />
+                                        <p className="font-black text-lg">Nada encontrado.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="p-4 bg-white border-t flex justify-between items-center px-8 shrink-0">
+                                <span className="text-[10px] font-black text-slate-400 uppercase">
+                                    {linhasFiltradasApp.length} encontrados
+                                </span>
+                                <button onClick={fecharModalConsulta} className="px-8 py-3 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all text-xs tracking-widest uppercase">
+                                    FECHAR (ESC)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {onVoltar && (
                     <div className="mb-4">
@@ -776,9 +823,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 )}
 
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 mb-6 z-40">
-
                     <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
-
                         <div className="flex items-center gap-4">
                             <div className={`p-3 rounded-xl text-white shadow-inner ${modo === 'PEDIDO' ? 'bg-orange-500' : 'bg-blue-600'}`}>
                                 <FileText size={24}/>
@@ -826,7 +871,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
                             <button onClick={() => processarVendaAPI(modo)} title="Salvar progresso atual (F8)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Save size={14}/> SALVAR (F8)</button>
 
-                            {/* 🚀 ATUALIZADO PARA IFRAME */}
                             <button onClick={imprimirViaIframe} title="Gerar impressão A4 do documento atual (Ctrl+P)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Printer size={14}/> IMPRIMIR (Ctrl+P)</button>
 
                             <div className="flex items-center rounded-lg border border-green-200 bg-green-50 overflow-hidden ml-1">
@@ -878,9 +922,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                     </div>
                 </div>
 
-                <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col z-30 overflow-hidden">
+                <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col z-[60] relative overflow-visible">
 
-                    <div className="relative border-b border-slate-200 bg-slate-50 p-2">
+                    <div className="relative border-b border-slate-200 bg-slate-50 p-2 z-[70] rounded-t-3xl">
                         <Search className="absolute left-6 top-5 text-blue-500" size={20} />
                         <input
                             ref={inputPecaRef}
@@ -892,31 +936,35 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                                 if (e.key === 'ArrowDown') { e.preventDefault(); setIndexFocadoPeca(p => Math.min(resultadosPecas.length - 1, p + 1)); }
                                 else if (e.key === 'ArrowUp') { e.preventDefault(); setIndexFocadoPeca(p => Math.max(0, p - 1)); }
                                 else if (e.key === 'Enter' && indexFocadoPeca >= 0 && resultadosPecas[indexFocadoPeca]) { adicionarItem(resultadosPecas[indexFocadoPeca]); }
+                                else if (e.altKey && (e.key === 'a' || e.key === 'A') && indexFocadoPeca >= 0 && resultadosPecas[indexFocadoPeca]) {
+                                    e.preventDefault();
+                                    setModalAplicacao({ aberto: true, texto: resultadosPecas[indexFocadoPeca].aplicacao, nome: resultadosPecas[indexFocadoPeca].nome });
+                                }
                             }}
                             placeholder={notaFiscalInfo ? "Venda fiscalizada. Não é possível alterar itens." : "Pesquisar peça (F3)..."}
                             className="w-full pl-12 pr-6 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold shadow-inner focus:border-blue-600 outline-none transition-all disabled:bg-slate-100 disabled:cursor-not-allowed"
                         />
 
                         {resultadosPecas.length > 0 && (
-                            <div className="absolute top-full left-0 w-full mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-72 overflow-y-auto mx-2 w-[calc(100%-16px)]">
+                            <div className="absolute top-[calc(100%+4px)] left-0 w-full mt-1 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.4)] border-2 border-blue-500 z-[100] max-h-[40vh] overflow-y-auto mx-2 w-[calc(100%-16px)] custom-scrollbar">
                                 {resultadosPecas.map((peca, idx) => {
                                     const temFoto = peca.fotoUrl || peca.fotoLocalPath;
                                     return (
                                         <div
                                             key={peca.id}
-                                            onClick={() => adicionarItem(peca)}
-                                            onMouseEnter={() => {
-                                                if(temFoto) setPreviewImagemPeca(temFoto);
-                                            }}
-                                            onMouseLeave={() => setPreviewImagemPeca(null)}
-                                            className={`p-4 border-b flex justify-between items-center cursor-pointer transition-colors ${idx === indexFocadoPeca ? 'bg-blue-600 text-white' : 'hover:bg-slate-50'}`}
+                                            className={`p-4 border-b flex justify-between items-center cursor-pointer transition-colors ${idx === indexFocadoPeca ? 'bg-blue-600 text-white' : 'hover:bg-blue-50'}`}
+                                            onMouseEnter={() => setIndexFocadoPeca(idx)}
                                         >
-                                            <div className="flex items-center gap-4">
-                                                <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 overflow-hidden ${idx === indexFocadoPeca ? 'bg-blue-500/30' : 'bg-slate-100 border border-slate-200'}`}>
+                                            <div className="flex items-center gap-4 flex-1" onClick={() => adicionarItem(peca)}>
+                                                <div
+                                                    className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 overflow-hidden ${idx === indexFocadoPeca ? 'bg-white/20' : 'bg-slate-100 border border-slate-200'}`}
+                                                    onMouseEnter={() => { if(temFoto) setPreviewImagemPeca(temFoto); }}
+                                                    onMouseLeave={() => setPreviewImagemPeca(null)}
+                                                >
                                                     {temFoto ? (
                                                         <img src={temFoto} alt="Peca" className="w-full h-full object-cover" />
                                                     ) : (
-                                                        <ImageIcon size={20} className={idx === indexFocadoPeca ? 'text-blue-200' : 'text-slate-300'} />
+                                                        <ImageIcon size={20} className={idx === indexFocadoPeca ? 'text-white' : 'text-slate-300'} />
                                                     )}
                                                 </div>
 
@@ -927,11 +975,20 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                                                     <div className="flex items-center gap-3 mt-1">
                                                         <p className={`text-xs font-mono ${idx === indexFocadoPeca ? 'text-blue-200' : 'text-slate-500'}`}>{peca.sku}</p>
                                                         <span className={`text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-widest ${idx === indexFocadoPeca ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'}`}>ESTOQUE: {peca.quantidadeEstoque ?? 0}</span>
-                                                        {peca.ncm && <span className={`text-[9px] px-1.5 py-0.5 rounded font-black border ${idx === indexFocadoPeca ? 'border-purple-300 text-purple-100' : 'border-purple-200 text-purple-600 bg-purple-50'}`}>NCM {getNcmString(peca.ncm)}</span>}
                                                     </div>
                                                 </div>
                                             </div>
-                                            <p className="font-black text-lg">R$ {formatarMoeda(peca.precoVenda)}</p>
+
+                                            <div className="flex items-center gap-4">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setModalAplicacao({ aberto: true, texto: peca.aplicacao, nome: peca.nome }); }}
+                                                    className={`p-2 rounded-lg transition-colors border ${idx === indexFocadoPeca ? 'bg-white/20 border-white/40 text-white hover:bg-white/30' : 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white'}`}
+                                                    title="Ver Aplicação (Alt + A)"
+                                                >
+                                                    <Info size={20} />
+                                                </button>
+                                                <p className="font-black text-lg min-w-[100px] text-right" onClick={() => adicionarItem(peca)}>R$ {formatarMoeda(peca.precoVenda)}</p>
+                                            </div>
                                         </div>
                                     )
                                 })}
@@ -939,15 +996,22 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                         )}
                     </div>
 
-                    <div className="overflow-y-auto flex-1">
+                    <div className="overflow-y-auto flex-1 z-10">
                         <table className="w-full text-left">
-                            <thead className="bg-white text-[10px] font-black uppercase text-slate-400 sticky top-0 border-b border-slate-100 z-10">
-                            <tr><th className="p-4 w-24">SKU</th><th className="p-4">Descrição da Peça</th><th className="p-4 text-center w-24">Qtd</th><th className="p-4 text-right pr-6 w-32">Subtotal</th><th className="p-4 w-12"></th></tr>
+                            <thead className="bg-white text-[10px] font-black uppercase text-slate-400 sticky top-0 border-b border-slate-100 z-10 shadow-sm">
+                            <tr>
+                                <th className="p-4 w-16 text-center">Foto</th>
+                                <th className="p-4 w-24">SKU</th>
+                                <th className="p-4">Descrição da Peça</th>
+                                <th className="p-4 text-center w-24">Qtd</th>
+                                <th className="p-4 text-right pr-6 w-32">Subtotal</th>
+                                <th className="p-4 w-12"></th>
+                            </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                             {itens.length === 0 && (
                                 <tr>
-                                    <td colSpan="5" className="p-10 text-center text-slate-400 font-bold bg-slate-50/50">
+                                    <td colSpan="6" className="p-10 text-center text-slate-400 font-bold bg-slate-50/50">
                                         Nenhum item adicionado ao documento ainda.
                                     </td>
                                 </tr>
@@ -958,6 +1022,22 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
                                 return (
                                     <tr key={item.id} className={`hover:bg-slate-50 transition-colors ${faltaEstoque ? 'bg-red-50/30' : ''}`}>
+                                        <td className="p-4 text-center">
+                                            <div
+                                                className="w-10 h-10 mx-auto rounded-lg overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-colors"
+                                                onMouseEnter={() => {
+                                                    const img = item.fotoUrl || item.fotoLocalPath;
+                                                    if(img) setPreviewImagemPeca(img);
+                                                }}
+                                                onMouseLeave={() => setPreviewImagemPeca(null)}
+                                            >
+                                                {item.fotoUrl || item.fotoLocalPath ? (
+                                                    <img src={item.fotoUrl || item.fotoLocalPath} alt="Peca" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <ImageIcon size={16} className="text-slate-300" />
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="p-4 font-mono text-xs text-slate-500">{item.codigo}</td>
                                         <td className="p-4 font-bold text-slate-800 text-sm">
                                             <div className="flex items-center gap-2">
@@ -969,7 +1049,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                                                 )}
                                             </div>
                                             <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Disponível no sistema: {disponivelFinal}</p>
-                                            {faltaEstoque && <span className="text-[10px] font-black text-red-600 flex items-center gap-1 uppercase tracking-tighter mt-1"><AlertTriangle size={10}/> Faltam {item.qtd - disponivelFinal} para fechar pedido</span>}
+                                            {faltaEstoque && <span className="text-[10px] font-black text-red-600 flex items-center gap-1 uppercase tracking-tighter mt-1"><AlertTriangle size={10}/> Faltam {item.qtd - disponivelFinal}</span>}
                                         </td>
                                         <td className="p-4 text-center">
                                             <input
@@ -997,7 +1077,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                     </div>
 
                     {itens.length > 0 && (
-                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-col md:flex-row justify-end items-end md:items-center gap-6">
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-col md:flex-row justify-end items-end md:items-center gap-6 z-10">
                             <div className="text-right">
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Subtotal dos Itens</p>
                                 <p className="font-black text-xl text-slate-700">R$ {formatarMoeda(subtotal)}</p>
@@ -1069,7 +1149,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
             {/* MODAL DE CANCELAMENTO DE NF-E */}
             {modalCancelamentoAberto && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 text-left">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in border-4 border-red-600">
                         <div className="bg-red-600 p-6 flex justify-between items-center text-white">
                             <h2 className="font-black tracking-widest flex items-center gap-2"><AlertTriangle /> CANCELAR NF-E</h2>
@@ -1108,7 +1188,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
             {/* MODAL DE VENDA PERDIDA */}
             {modalVendaPerdidaAberto && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 text-left">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
                         <div className="bg-red-600 p-6 flex justify-between items-center text-white">
                             <h2 className="font-black tracking-widest flex items-center gap-2"><XCircle /> REGISTRAR PERDA</h2>
@@ -1136,7 +1216,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
             {/* MODAL LISTA DE ORÇAMENTOS */}
             {modalListaAberto && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in">
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in text-left">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[80vh]">
                         <div className="bg-slate-900 p-6 flex justify-between items-center text-white"><h2 className="text-xl font-black tracking-widest flex items-center gap-2"><FolderOpen /> ORÇAMENTOS PENDENTES (Use as setas para navegar)</h2><button onClick={() => setModalListaAberto(false)} title="Fechar lista de orçamentos (Esc)"><X size={24}/></button></div>
                         <div className="overflow-y-auto p-6 bg-slate-50 flex-1">
