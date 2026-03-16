@@ -42,26 +42,54 @@ public class VendaService {
     @Autowired private EstoqueService estoqueService;
 
     // =========================================================================
-    // MÉTODO AUXILIAR: COMISSÃO (MANTIDO 100%)
+    // 🚀 NOVO MOTOR DE COMISSÃO: ITEM POR ITEM (MISTO)
     // =========================================================================
     private void aplicarComissaoVendedor(Venda venda) {
         if (venda.getVendedorId() == null) return;
 
         ConfiguracaoSistema configs = configService.obterConfiguracao();
-        BigDecimal percentual = configs.getVendedores().stream()
+
+        // Pega a comissão padrão geral (Ex: 3%) associada a esse vendedor
+        BigDecimal comissaoPadraoLoja = configs.getVendedores().stream()
                 .filter(v -> v.getUsuarioId().equals(venda.getVendedorId()))
                 .map(VendedorComissao::getComissao)
                 .findFirst()
                 .orElse(BigDecimal.ZERO);
 
-        if (percentual.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal valorCalculado = venda.getValorTotal()
-                    .multiply(percentual)
-                    .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
-            venda.setValorComissao(valorCalculado);
-        } else {
-            venda.setValorComissao(BigDecimal.ZERO);
+        BigDecimal valorTotalComissao = BigDecimal.ZERO;
+
+        for (ItemVenda item : venda.getItens()) {
+            Produto produto = item.getProduto();
+            BigDecimal percentualAplicado;
+
+            // 🚀 A REGRA DE OURO:
+            // Se o produto tiver uma comissão > 0 preenchida no cadastro, ganha prioridade!
+            if (produto.getComissao() != null && produto.getComissao().compareTo(BigDecimal.ZERO) > 0) {
+                percentualAplicado = produto.getComissao();
+            } else {
+                // Se o produto tiver comissão 0 ou null, cai pra comissão padrão da loja
+                percentualAplicado = comissaoPadraoLoja;
+            }
+
+            // Calcula o valor financeiro da comissão SÓ DESTE ITEM e soma no montante da venda
+            if (percentualAplicado.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal valorTotalItem = item.getPrecoUnitario().multiply(BigDecimal.valueOf(item.getQuantidade()));
+                BigDecimal valorComissaoDoItem = valorTotalItem
+                        .multiply(percentualAplicado)
+                        .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+
+                valorTotalComissao = valorTotalComissao.add(valorComissaoDoItem);
+            }
         }
+
+        // Se houver desconto na venda inteira, deduz proporcionalmente da comissão
+        // (Opção de negócio: muitos ERPs fazem isso para o vendedor não dar desconto do dinheiro da loja)
+        if (venda.getDesconto() != null && venda.getDesconto().compareTo(BigDecimal.ZERO) > 0 && venda.getValorSubtotal().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal proporcaoDesconto = venda.getValorTotal().divide(venda.getValorSubtotal(), 4, RoundingMode.HALF_UP);
+            valorTotalComissao = valorTotalComissao.multiply(proporcaoDesconto).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        venda.setValorComissao(valorTotalComissao);
     }
 
     // =========================================================================
@@ -72,7 +100,6 @@ public class VendaService {
         String documento = venda.getId() != null ? "VENDA #" + venda.getId() : "PDV";
 
         for (ItemVenda item : venda.getItens()) {
-            // O estoqueService já faz o p.setQuantidadeEstoque e o produtoRepository.save(p)
             estoqueService.registrarMovimentacao(
                     item.getProduto(),
                     item.getQuantidade(),
