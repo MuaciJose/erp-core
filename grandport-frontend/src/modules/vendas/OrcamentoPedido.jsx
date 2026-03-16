@@ -270,7 +270,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                     const res = await api.get(`/api/produtos?busca=${termoPrincipal}`);
 
                     const resultadosInteligentes = res.data.filter(peca => {
-                        const textoDaPeca = `${peca.nome || ''} ${peca.sku || ''} ${peca.aplicacao || ''}`.toLowerCase();
+                        // 🚀 CORREÇÃO: Agora o filtro local do React também lê as Referências Cruzadas e Código de Barras!
+                        const textoDaPeca = `${peca.nome || ''} ${peca.sku || ''} ${peca.codigoBarras || ''} ${peca.referenciaOriginal || ''} ${peca.aplicacao || ''}`.toLowerCase();
                         return termosBusca.every(termo => textoDaPeca.includes(termo));
                     });
 
@@ -287,7 +288,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         }, 300);
         return () => clearTimeout(timer);
     }, [buscaPeca]);
-
     const selecionarCliente = (cliente) => {
         setClienteSelecionado(cliente);
         setBuscaCliente(cliente.nome);
