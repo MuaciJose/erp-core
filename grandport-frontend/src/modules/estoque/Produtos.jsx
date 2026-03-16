@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
     Package, Plus, Search, Edit, Trash2, CheckCircle, Ban, X, Save,
     FileText, DollarSign, Box, ShieldAlert, Image as ImageIcon, Info, ArrowLeft,
-    History, Car
+    History, Car, Upload, FileJson, Loader2
 } from 'lucide-react';
 
 import { ExtratoEstoque } from './ExtratoEstoque';
@@ -31,12 +31,15 @@ export const Produtos = () => {
     const [novaCategoriaNome, setNovaCategoriaNome] = useState('');
     const [salvandoCategoria, setSalvandoCategoria] = useState(false);
 
-    // 🚀 ESTADOS PARA O MODAL DE CONSULTA "TOP"
     const [modalAplicacao, setModalAplicacao] = useState({ aberto: false, texto: '', nome: '' });
     const [filtroModal, setFiltroModal] = useState('');
 
-    // 🚀 NOVO ESTADO: Guarda a URL da imagem para o Zoom
     const [previewImagem, setPreviewImagem] = useState(null);
+
+    // 🚀 NOVOS ESTADOS PARA O MODAL EXPRESSO DE CARGA DE NCM
+    const [modalUploadNcmAberto, setModalUploadNcmAberto] = useState(false);
+    const [arquivoNcm, setArquivoNcm] = useState(null);
+    const [carregandoNcm, setCarregandoNcm] = useState(false);
 
     const formInicial = {
         id: '', nome: '', sku: '', codigoBarras: '', referenciaOriginal: '', aplicacao: '',
@@ -50,7 +53,6 @@ export const Produtos = () => {
 
     const [form, setForm] = useState(formInicial);
 
-    // 🚀 ATALHO DE TECLADO (ESC) PARA FECHAR O MODAL INSTANTANEAMENTE
     useEffect(() => {
         const handleEsc = (event) => {
             if (event.key === 'Escape') fecharModalConsulta();
@@ -64,10 +66,9 @@ export const Produtos = () => {
         setFiltroModal('');
     };
 
-    // 🚀 MOTOR DE BUSCA INTERNO: Quebra o "blocão" de texto em uma lista organizada
     const todasAsLinhas = modalAplicacao.texto
         ? modalAplicacao.texto
-            .split(/[;|\n,\/]/) // Aceita Enter, Vírgula, Ponto e Vírgula ou Barra
+            .split(/[;|\n,\/]/)
             .map(item => item.trim())
             .filter(item => item.length > 1)
         : [];
@@ -108,15 +109,20 @@ export const Produtos = () => {
         return () => clearTimeout(delayDebounceFn);
     }, [busca]);
 
+    // 🚀 Lógica inteligente para forçar a busca do NCM após um upload bem sucedido
+    const buscarNcmNoBackend = async (termoDeBusca) => {
+        try {
+            const res = await api.get(`/api/ncm?busca=${termoDeBusca}`);
+            setResultadosNcm(res.data);
+        } catch (error) {
+            setResultadosNcm([]);
+        }
+    };
+
     useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
             if (abaAtiva === 'fiscal' && buscandoNcm && form.ncm && form.ncm.length > 2) {
-                try {
-                    const res = await api.get(`/api/ncm?busca=${form.ncm}`);
-                    setResultadosNcm(res.data);
-                } catch (error) {
-                    setResultadosNcm([]);
-                }
+                await buscarNcmNoBackend(form.ncm);
             } else {
                 setResultadosNcm([]);
             }
@@ -243,6 +249,52 @@ export const Produtos = () => {
         }
     };
 
+    // 🚀 FUNÇÕES DE CARGA EXPRESSA DE NCM
+    const selecionarArquivoNcmExpresso = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.type === "application/json" || file.name.endsWith('.json')) {
+                setArquivoNcm(file);
+            } else {
+                toast.error("Formato inválido. Selecione um arquivo .json do Siscomex.");
+            }
+        }
+    };
+
+    const realizarUploadExpressoNcm = async () => {
+        if (!arquivoNcm) return;
+
+        const formData = new FormData();
+        formData.append('file', arquivoNcm);
+
+        setCarregandoNcm(true);
+        const toastId = toast.loading("Enviando e atualizando base NCM. Por favor aguarde...");
+
+        try {
+            await api.post('/api/ncm/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            toast.success("Base NCM atualizada com sucesso!", { id: toastId, duration: 5000 });
+
+            // Fecha o modal limpa o input
+            setArquivoNcm(null);
+            setModalUploadNcmAberto(false);
+
+            // 🚀 Pulo do Gato: Refaz a busca automaticamente se já tinha algo digitado no NCM
+            if (form.ncm && form.ncm.length > 2) {
+                setBuscandoNcm(true);
+                await buscarNcmNoBackend(form.ncm);
+            }
+
+        } catch (err) {
+            const erroMsg = err.response?.data || err.message;
+            toast.error("Falha ao processar o arquivo: " + erroMsg, { id: toastId, duration: 6000 });
+        } finally {
+            setCarregandoNcm(false);
+        }
+    };
+
     const Tooltip = ({ texto }) => (
         <div className="relative group cursor-pointer inline-block ml-2 align-middle">
             <Info size={16} className="text-slate-400 hover:text-blue-500 transition-colors" />
@@ -263,7 +315,6 @@ export const Produtos = () => {
                 />
             )}
 
-            {/* 🚀 NOVO MODAL DE CONSULTA "TOP" COM FILTRO EM TEMPO REAL */}
             {modalAplicacao.aberto && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-fade-in p-4 text-left">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 flex flex-col max-h-[85vh]">
@@ -321,9 +372,6 @@ export const Produtos = () => {
                 </div>
             )}
 
-            {/* ========================================================= */}
-            {/* TELA 1: LISTA                                             */}
-            {/* ========================================================= */}
             {telaAtual === 'lista' && (
                 <div className="animate-fade-in">
                     <div className="flex justify-between items-center mb-8">
@@ -384,7 +432,6 @@ export const Produtos = () => {
                                     <td className="p-4 text-center">{p.ativo ? <span className="text-green-500" title="Produto Ativo"><CheckCircle size={16} className="mx-auto"/></span> : <span className="text-red-500" title="Produto Inativo"><Ban size={16} className="mx-auto"/></span>}</td>
                                     <td className="p-4 pr-6 text-center">
                                         <div className="flex items-center justify-center gap-1">
-                                            {/* 🚀 BOTÃO INFO QUE ABRE O MODAL TOP DE APLICAÇÃO */}
                                             <button onClick={() => setModalAplicacao({ aberto: true, texto: p.aplicacao, nome: p.nome })} title="Consultar Aplicação" className="text-blue-600 hover:bg-blue-100 p-2 rounded-lg transition-colors border border-blue-100"><Info size={18}/></button>
 
                                             <button
@@ -413,9 +460,6 @@ export const Produtos = () => {
                 </div>
             )}
 
-            {/* ========================================================= */}
-            {/* TELA 2: FORMULÁRIO                                        */}
-            {/* ========================================================= */}
             {telaAtual === 'formulario' && (
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-visible animate-fade-in flex flex-col relative mb-10">
                     <div className="bg-slate-900 p-6 flex justify-between items-center text-white rounded-t-3xl">
@@ -470,7 +514,6 @@ export const Produtos = () => {
                                     </div>
                                 </div>
 
-                                {/* 🚀 CAMPO DE APLICAÇÃO "TOP" COM AUTO-EXPAND NO FORMULÁRIO */}
                                 <div className="group/app">
                                     <label className="text-xs font-bold text-slate-500 uppercase flex justify-between">
                                         Aplicação (Compatibilidade)
@@ -566,6 +609,27 @@ export const Produtos = () => {
 
                         {abaAtiva === 'fiscal' && (
                             <div className="space-y-6 animate-fade-in max-w-5xl bg-white p-8 border-2 border-slate-200 rounded-2xl shadow-sm">
+
+                                {/* 🚀 HEADER INFORMATIVO SOBRE NCM E UPLOAD EXPRESSO */}
+                                <div className="flex flex-col md:flex-row md:items-center justify-between bg-purple-50 border border-purple-100 p-4 rounded-xl gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-purple-200 text-purple-700 rounded-lg shrink-0">
+                                            <FileJson size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-black text-purple-900 uppercase tracking-widest">Base Nacional NCM/IBPT</p>
+                                            <p className="text-[10px] font-bold text-purple-600 mt-0.5">Seu NCM não está na lista? Você pode carregar o arquivo oficial agora.</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setModalUploadNcmAberto(true)}
+                                        className="bg-white border-2 border-purple-200 text-purple-700 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-colors flex items-center justify-center gap-2 shrink-0"
+                                    >
+                                        <Upload size={14} /> Carregar Tabela .JSON
+                                    </button>
+                                </div>
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="relative">
                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center">NCM (Pesquisa Inteligente)</label>
@@ -602,6 +666,13 @@ export const Produtos = () => {
                                                         </div>
                                                     );
                                                 })}
+                                            </div>
+                                        )}
+                                        {buscandoNcm && form.ncm.length > 2 && resultadosNcm.length === 0 && (
+                                            <div className="absolute z-50 w-full mt-2 bg-white border-2 border-red-200 rounded-xl shadow-2xl p-4 text-center">
+                                                <Ban className="mx-auto text-red-400 mb-2" size={24} />
+                                                <p className="text-xs font-black text-red-600 uppercase">NCM NÃO ENCONTRADO</p>
+                                                <p className="text-[10px] font-bold text-slate-500 mt-1">Use o botão "Carregar Tabela" acima.</p>
                                             </div>
                                         )}
                                     </div>
@@ -660,7 +731,7 @@ export const Produtos = () => {
                 </div>
             )}
 
-            {/* MINI-MODAL DE MARCA - MANTIDO ORIGINAL */}
+            {/* MARCA */}
             {modalMarcaAberto && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4 text-left">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in border border-slate-100">
@@ -680,7 +751,7 @@ export const Produtos = () => {
                 </div>
             )}
 
-            {/* MINI-MODAL DE CATEGORIA - MANTIDO ORIGINAL */}
+            {/* CATEGORIA */}
             {modalCategoriaAberto && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4 text-left">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in border border-slate-100">
@@ -700,7 +771,47 @@ export const Produtos = () => {
                 </div>
             )}
 
-            {/* 🚀 OVERLAY DE ZOOM DA IMAGEM - MANTIDO ORIGINAL */}
+            {/* 🚀 MODAL UPLOAD EXPRESSO DE NCM */}
+            {modalUploadNcmAberto && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
+                        <div className="p-6 bg-purple-600 flex justify-between items-center text-white">
+                            <h3 className="font-black text-lg flex items-center gap-2"><Upload size={20}/> Carga Expressa de NCM</h3>
+                            <button onClick={() => { setModalUploadNcmAberto(false); setArquivoNcm(null); }} disabled={carregandoNcm} className="hover:text-red-400 transition-colors"><X size={20}/></button>
+                        </div>
+
+                        <div className="p-6 bg-slate-50 text-center">
+                            <p className="text-sm font-medium text-slate-600 mb-6">
+                                Baixe o arquivo <strong>JSON</strong> do Portal do Siscomex e faça o upload aqui para atualizar a base inteira agora mesmo.
+                            </p>
+
+                            <div className={`relative border-2 border-dashed rounded-2xl p-8 transition-colors ${arquivoNcm ? 'border-purple-500 bg-purple-50' : 'border-slate-300 hover:bg-slate-100 hover:border-purple-300'}`}>
+                                <input
+                                    type="file"
+                                    accept=".json"
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    onChange={selecionarArquivoNcmExpresso}
+                                    disabled={carregandoNcm}
+                                />
+                                <Upload className={`mx-auto mb-2 ${arquivoNcm ? 'text-purple-600' : 'text-slate-400'}`} size={32}/>
+                                <p className="font-black text-slate-700">{arquivoNcm ? arquivoNcm.name : 'Clique para buscar o arquivo'}</p>
+                                {!arquivoNcm && <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Apenas formato .JSON</p>}
+                            </div>
+
+                            <button
+                                onClick={realizarUploadExpressoNcm}
+                                disabled={!arquivoNcm || carregandoNcm}
+                                className="w-full mt-6 py-4 bg-purple-600 text-white font-black rounded-xl hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                            >
+                                {carregandoNcm ? <Loader2 className="animate-spin" size={20} /> : <FileJson size={20}/>}
+                                {carregandoNcm ? 'PROCESSANDO...' : 'ATUALIZAR BASE NCM'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* OVERLAY DE ZOOM DA IMAGEM */}
             {previewImagem && (
                 <div className="fixed inset-0 pointer-events-none z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-fade-in">
                     <img

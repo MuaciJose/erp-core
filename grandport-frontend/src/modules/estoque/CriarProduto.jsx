@@ -60,7 +60,7 @@ export const CriarProduto = ({ onSucesso, onCancelar, produtoParaEditar }) => {
     };
 
     const buscarNcm = async (termo) => {
-        const res = await api.get(`/api/ncm/busca?q=${termo}`);
+        const res = await api.get(`/api/ncm?busca=${termo}`);
         return res.data;
     };
 
