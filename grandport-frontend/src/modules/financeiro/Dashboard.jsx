@@ -3,7 +3,8 @@ import api from '../../api/axios';
 import {
     DollarSign, TrendingUp, PackageSearch, AlertTriangle,
     Calendar, ArrowRight, Activity, Layers,
-    BarChart3, PieChart as PieIcon, Printer
+    BarChart3, PieChart as PieIcon, Printer,
+    CalendarClock, CheckCircle // 🚀 Adicionados ícones para o CRM
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -229,6 +230,7 @@ export const Dashboard = ({ setPaginaAtiva }) => {
 
             {abaAtiva === 'geral' ? (
                 <div className="animate-fade-in">
+                    {/* 🚀 4 KPIs PRINCIPAIS */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
                         <div className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100 text-left">
                             <div className="flex justify-between items-start mb-6"><div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl"><TrendingUp size={28} /></div></div>
@@ -236,7 +238,7 @@ export const Dashboard = ({ setPaginaAtiva }) => {
                             <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-wider">Receita Mensal</p>
                         </div>
 
-                        <div onClick={() => setPaginaAtiva('contas-receber')} className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100 cursor-pointer text-left">
+                        <div onClick={() => setPaginaAtiva('contas-receber')} className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100 cursor-pointer text-left hover:border-red-200 hover:shadow-md transition-all">
                             <div className="flex justify-between items-start mb-6"><div className="p-4 bg-red-50 text-red-600 rounded-2xl"><DollarSign size={28} /></div></div>
                             <h2 className="text-3xl font-black text-red-600 tracking-tighter">R$ {(resumo.receberAtrasado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h2>
                             <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-wider">Em Atraso</p>
@@ -248,13 +250,47 @@ export const Dashboard = ({ setPaginaAtiva }) => {
                             <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-wider">Pedidos Hoje</p>
                         </div>
 
-                        <div onClick={() => setPaginaAtiva('previsao')} className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100 cursor-pointer text-left">
+                        <div onClick={() => setPaginaAtiva('previsao')} className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100 cursor-pointer text-left hover:border-orange-200 hover:shadow-md transition-all">
                             <div className="flex justify-between items-start mb-6"><div className="p-4 bg-orange-50 text-orange-600 rounded-2xl"><AlertTriangle size={28} /></div></div>
                             <h2 className="text-3xl font-black text-orange-600 tracking-tighter">{resumo.produtosBaixoEstoque || 0}</h2>
                             <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-wider">Peças em Falta</p>
                         </div>
                     </div>
 
+                    {/* 🚀 NOVO CARD DE DESTAQUE: PÓS-VENDA CRM */}
+                    <div className="mb-10 animate-fade-in">
+                        <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 relative overflow-hidden group text-left">
+                            <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-50/50 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700 pointer-events-none"></div>
+
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 relative z-10 gap-4">
+                                <div>
+                                    <h3 className="font-black text-slate-800 text-xl flex items-center gap-3">
+                                        <CalendarClock className="text-indigo-600" size={26} /> Pós-Venda (CRM)
+                                    </h3>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Oportunidades de retorno e revisão de veículos</p>
+                                </div>
+                                <button onClick={() => setPaginaAtiva('revisoes')} className="text-xs font-black text-indigo-700 hover:text-white flex items-center gap-2 bg-indigo-50 hover:bg-indigo-600 px-4 py-2.5 rounded-xl transition-all shadow-sm">
+                                    VER PAINEL DE CRM <ArrowRight size={16}/>
+                                </button>
+                            </div>
+
+                            <div className="flex flex-col md:flex-row gap-4 relative z-10">
+                                <div onClick={() => setPaginaAtiva('revisoes')} className="flex-1 bg-red-50 p-6 rounded-2xl border border-red-100 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-red-100 hover:shadow-md transition-all">
+                                    <AlertTriangle size={24} className="text-red-500 mb-2" />
+                                    <span className="text-4xl font-black text-red-600 leading-none mb-1">{resumo?.crmAtrasados || 0}</span>
+                                    <span className="text-[10px] font-black text-red-400 uppercase tracking-[0.15em]">Revisões Atrasadas</span>
+                                </div>
+
+                                <div onClick={() => setPaginaAtiva('crm')} className="flex-1 bg-indigo-50 p-6 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-indigo-100 hover:shadow-md transition-all">
+                                    <CheckCircle size={24} className="text-indigo-500 mb-2" />
+                                    <span className="text-4xl font-black text-indigo-600 leading-none mb-1">{resumo?.crmHoje || 0}</span>
+                                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.15em]">Agendadas para Hoje</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 🚀 TOP PERFORMANCE E LOGS */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 text-left">
                         <div className="lg:col-span-2 bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
                             <div className="flex justify-between items-center mb-10">

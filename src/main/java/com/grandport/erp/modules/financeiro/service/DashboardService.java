@@ -6,6 +6,8 @@ import com.grandport.erp.modules.financeiro.repository.ContaReceberRepository;
 import com.grandport.erp.modules.estoque.model.Produto;
 import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
+// 🚀 IMPORT DO REPOSITÓRIO DE REVISÃO (Ajuste o pacote se a sua pasta se chamar diferente de 'crm')
+import com.grandport.erp.modules.vendas.repository.RevisaoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +27,9 @@ public class DashboardService {
     @Autowired private ContaReceberRepository contaReceberRepository;
     @Autowired private ProdutoRepository produtoRepository;
 
+    // 🚀 INJEÇÃO DO NOVO REPOSITÓRIO
+    @Autowired private RevisaoRepository revisaoRepository;
+
     public DashboardResumoDTO getResumoDashboard() {
         DashboardResumoDTO resumo = new DashboardResumoDTO();
 
@@ -43,12 +48,31 @@ public class DashboardService {
         Long baixoEstoque = produtoRepository.countProdutosBaixoEstoque();
         resumo.setProdutosBaixoEstoque(baixoEstoque != null ? baixoEstoque : 0L);
 
+        // =========================================================================
+        // 🚀 NOVO: KPIs DO CRM (Pós-Venda)
+        // =========================================================================
+        try {
+            Long crmAtrasados = revisaoRepository.countRevisoesAtrasadas();
+            resumo.setCrmAtrasados(crmAtrasados != null ? crmAtrasados : 0L);
+
+            Long crmHoje = revisaoRepository.countRevisoesParaHoje();
+            resumo.setCrmHoje(crmHoje != null ? crmHoje : 0L);
+
+            // 🚀 BÔNUS: Adiciona um Alerta se tiver revisão atrasada!
+            if (crmAtrasados != null && crmAtrasados > 0) {
+                if (resumo.getAlertas() == null) resumo.setAlertas(new ArrayList<>());
+                resumo.getAlertas().add(new DashboardResumoDTO.AlertaDTO("CRM / PÓS-VENDA", "Você tem " + crmAtrasados + " clientes aguardando contato de revisão. Não perca vendas!"));
+            }
+        } catch (Exception e) {
+            System.err.println("Aviso: Falha ao buscar dados do CRM no Dashboard - " + e.getMessage());
+        }
+
         // Top Produtos (Garante lista não nula)
         List<DashboardResumoDTO.TopProdutoDTO> top = vendaRepository.findTop5ProdutosMaisVendidosMes();
         resumo.setTopProdutos(top != null ? top : new ArrayList<>());
 
         // Alertas
-        resumo.setAlertas(new ArrayList<>());
+        if (resumo.getAlertas() == null) resumo.setAlertas(new ArrayList<>()); // Garante inicialização
         if (resumo.getReceberAtrasado().compareTo(BigDecimal.ZERO) > 0) {
             resumo.getAlertas().add(new DashboardResumoDTO.AlertaDTO("FINANCEIRO", "Existem contas a receber vencidas. Verifique o relatório."));
         }
@@ -57,10 +81,10 @@ public class DashboardService {
         }
 
         // =========================================================================
-        // 🚀 NOVO: DADOS PARA OS GRÁFICOS DO REACT
+        // DADOS PARA OS GRÁFICOS DO REACT
         // =========================================================================
 
-        // 1. Gráfico Semanal (Calculando os últimos 7 dias usando o SEU método de soma)
+        // 1. Gráfico Semanal (Calculando os últimos 7 dias)
         List<DashboardResumoDTO.VendaSemanalDTO> graficoSemanal = new ArrayList<>();
         LocalDate hoje = LocalDate.now();
         for (int i = 6; i >= 0; i--) {
@@ -77,7 +101,7 @@ public class DashboardService {
         }
         resumo.setVendasSemanal(graficoSemanal);
 
-        // 2. Gráfico de Categorias (Por enquanto fixo, para não quebrar até você criar as Categorias no BD)
+        // 2. Gráfico de Categorias
         List<DashboardResumoDTO.CategoriaVendaDTO> categorias = new ArrayList<>();
         categorias.add(new DashboardResumoDTO.CategoriaVendaDTO("Suspensão", 350));
         categorias.add(new DashboardResumoDTO.CategoriaVendaDTO("Freios", 420));

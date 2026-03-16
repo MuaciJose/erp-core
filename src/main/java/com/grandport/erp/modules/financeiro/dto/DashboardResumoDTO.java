@@ -20,6 +20,10 @@ public class DashboardResumoDTO {
     private List<VendaSemanalDTO> vendasSemanal;
     private List<CategoriaVendaDTO> vendasPorCategoria;
 
+
+    private Long crmAtrasados;
+    private Long crmHoje;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

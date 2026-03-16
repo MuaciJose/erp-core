@@ -19,6 +19,7 @@ export const GestaoUsuarios = () => {
         permissoes: []
     });
 
+    // 🚀 ATUALIZADO: Todos os módulos do Java agora estão disponíveis aqui!
     const modulosPermissoes = [
         {
             grupo: 'Vendas & Frente de Loja',
@@ -26,15 +27,25 @@ export const GestaoUsuarios = () => {
                 { acao: 'dash', nome: 'Dashboard Inicial (Gráficos)' },
                 { acao: 'pdv', nome: 'Ponto de Venda Rápido (PDV)' },
                 { acao: 'vendas', nome: 'Balcão de Peças / Central' },
+                { acao: 'orcamentos', nome: 'Orçamentos e Pedidos' },
                 { acao: 'fila-caixa', nome: 'Fila do Caixa (Receber Pagamentos)' },
                 { acao: 'caixa', nome: 'Controle de Caixa (Abrir/Fechar Turno)' },
                 { acao: 'relatorio-comissoes', nome: 'Relatório de Comissões' }
             ]
         },
         {
+            grupo: 'CRM & Relacionamento', // 🚀 NOVO GRUPO
+            telas: [
+                { acao: 'crm', nome: 'Painel de CRM / Pós-Venda' },
+                { acao: 'revisoes', nome: 'Gestão de Revisões' },
+                { acao: 'whatsapp', nome: 'Integração WhatsApp' }
+            ]
+        },
+        {
             grupo: 'Estoque & Compras',
             telas: [
                 { acao: 'estoque', nome: 'Buscar Peças / Consulta' },
+                { acao: 'categorias', nome: 'Gestão de Categorias' },
                 { acao: 'marcas', nome: 'Gestão de Marcas' },
                 { acao: 'ajuste_estoque', nome: 'Ajuste de Estoque / Inventário' },
                 { acao: 'compras', nome: 'Importar NF-e (XML)' },
@@ -51,18 +62,30 @@ export const GestaoUsuarios = () => {
                 { acao: 'conciliacao', nome: 'Conciliação Bancária' },
                 { acao: 'plano-contas', nome: 'Plano de Contas' },
                 { acao: 'dre', nome: 'Resultado e Lucro (DRE)' },
-                { acao: 'recibo-avulso', nome: 'Gerador de Recibo Avulso' } // 🚀 ADICIONADO AQUI
+                { acao: 'recibo-avulso', nome: 'Gerador de Recibo Avulso' },
+                { acao: 'historico-recibos', nome: 'Histórico de Recibos' }
             ]
         },
         {
-            grupo: 'Administrativo',
+            grupo: 'Fiscal & Notas NF-e', // 🚀 NOVO GRUPO PARA O FISCAL
+            telas: [
+                { acao: 'gerenciador-nfe', nome: 'Gerenciador de NF-e' },
+                { acao: 'emitir-nfe-avulsa', nome: 'Emitir NF-e Avulsa' },
+                { acao: 'fiscal', nome: 'Painel Fiscal Geral' },
+                { acao: 'ncm', nome: 'Tabela NCM' },
+                { acao: 'regras-fiscais', nome: 'Regras Fiscais' }
+            ]
+        },
+        {
+            grupo: 'Administrativo & Sistema',
             telas: [
                 { acao: 'parceiros', nome: 'Cadastros (Clientes/Fornecedores)' },
                 { acao: 'usuarios', nome: 'Gestão de Usuários e Permissões' },
                 { acao: 'auditoria', nome: 'Auditoria de Sistema (Logs)' },
                 { acao: 'calculadora', nome: 'Calculadora de Markup' },
-                { acao: 'fiscal', nome: 'Fiscal / NCM' },
-                { acao: 'configuracoes', nome: 'Configurações do Sistema' }
+                { acao: 'configuracoes', nome: 'Configurações do Sistema' },
+                { acao: 'backup', nome: 'Rotinas de Backup' },
+                { acao: 'manual', nome: 'Manual do Sistema' }
             ]
         }
     ];
