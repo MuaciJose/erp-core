@@ -15,6 +15,20 @@ public record ProdutoRequestDTO(
         Long marcaId,
         String ncmCodigo,
         String fotoUrl,
+        String referenciaOriginal,
+
+        // 🚀 CAMPOS QUE ESTAVAM FALTANDO PARA A FERRARI FUNCIONAR
+        Long categoriaId,
+        Boolean ativo,
+        BigDecimal margemLucro,
+        BigDecimal precoMinimo,
+        BigDecimal comissao,
+        String unidadeMedida,
+        Integer estoqueMaximo,
+        String localizacao,
+        BigDecimal pesoLiquido,
+        BigDecimal pesoBruto,
+        Boolean permitirEstoqueNegativo,
 
         // 🚀 NOVOS CAMPOS FISCAIS ABERTOS PARA O REACT SALVAR
         String cest,

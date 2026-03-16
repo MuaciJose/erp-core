@@ -29,18 +29,20 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long> {
             "AND p.id NOT IN (SELECT iv.produto.id FROM ItemVenda iv WHERE iv.venda.dataHora >= :dataCorte)")
     List<Produto> findProdutosSemVendaDesde(@Param("dataCorte") LocalDateTime dataCorte);
 
+    // 🚀 ATUALIZADO: Agora usa LOWER() em TUDO. Busca imbatível para a Referência Cruzada!
     @Query("SELECT p FROM Produto p WHERE " +
             "LOWER(p.nome) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
             "LOWER(p.aplicacao) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
-            "p.referenciaOriginal LIKE CONCAT('%', :termo, '%') OR " +
-            "p.sku LIKE CONCAT('%', :termo, '%') OR " +
-            "p.codigoBarras LIKE CONCAT('%', :termo, '%')")
+            "LOWER(p.referenciaOriginal) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
+            "LOWER(p.sku) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
+            "LOWER(p.codigoBarras) LIKE LOWER(CONCAT('%', :termo, '%'))")
     List<Produto> buscarPorTermo(@Param("termo") String termo);
 
+    // 🚀 ATUALIZADO: Busca Inteligente também blindada contra letras maiúsculas/minúsculas
     @Query("SELECT p FROM Produto p WHERE " +
             "LOWER(p.nome) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
             "LOWER(p.aplicacao) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
-            "p.referenciaOriginal LIKE CONCAT('%', :termo, '%') OR " +
+            "LOWER(p.referenciaOriginal) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
             "p.codigoBarras = :termo")
     List<Produto> buscaInteligente(@Param("termo") String termo);
 

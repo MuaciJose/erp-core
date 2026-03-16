@@ -29,7 +29,6 @@ public class ProdutoService {
 
     @Transactional
     public Produto cadastrar(ProdutoRequestDTO dto, String imagePath) {
-        // 🚀 BLINDAGEM: Se vier nulo, ele não quebra, ele apenas deixa a variável "null"
         Marca marca = null;
         if (dto.marcaId() != null) {
             marca = marcaRepository.findById(dto.marcaId()).orElse(null);
@@ -45,7 +44,6 @@ public class ProdutoService {
 
         Produto salvo = produtoRepository.save(produto);
 
-        // Proteção extra caso a quantidade venha nula do React
         registrarMovimentacao(salvo, dto.quantidadeEstoque() != null ? dto.quantidadeEstoque() : 0, "ENTRADA", "Cadastro Inicial");
 
         auditoriaService.registrar("ESTOQUE", "CRIACAO", "Cadastrou o produto: " + salvo.getNome());
@@ -57,7 +55,6 @@ public class ProdutoService {
     public Produto atualizar(Long id, ProdutoRequestDTO dto, String imagePath) {
         Produto produto = findById(id);
 
-        // 🚀 BLINDAGEM NA EDIÇÃO TAMBÉM
         Marca marca = null;
         if (dto.marcaId() != null) {
             marca = marcaRepository.findById(dto.marcaId()).orElse(null);
@@ -76,22 +73,47 @@ public class ProdutoService {
         return salvo;
     }
 
-    // 🚀 O MOTOR QUE CONECTA O DTO COM O BANCO DE DADOS (AGORA COM FISCAL)
+    // 🚀 O MOTOR COMPLETO: OPERACIONAL + FISCAL + FÍSICO
     private void updateProdutoFromDto(Produto p, ProdutoRequestDTO dto, Marca marca, Ncm ncm, String imagePath) {
-        // Dados Básicos
+        // 1. Dados Básicos e Identificação
         p.setSku(dto.sku());
         p.setNome(dto.nome());
         p.setDescricao(dto.descricao());
         p.setAplicacao(dto.aplicacao());
         p.setCodigoBarras(dto.codigoBarras());
-        p.setPrecoCusto(dto.precoCusto());
-        p.setPrecoVenda(dto.precoVenda());
-        p.setEstoqueMinimo(dto.estoqueMinimo());
+        p.setReferenciaOriginal(dto.referenciaOriginal());
         p.setMarca(marca);
-        p.setNcm(ncm);
+        p.setAtivo(dto.ativo() != null ? dto.ativo() : true);
         p.setFotoUrl(dto.fotoUrl());
 
-        // 🚀 DADOS FISCAIS
+        if (imagePath != null) {
+            p.setFotoLocalPath("/uploads/produtos/" + imagePath);
+        }
+
+        // 2. Precificação Financeira
+        p.setPrecoCusto(dto.precoCusto());
+        p.setPrecoVenda(dto.precoVenda());
+        p.setMargemLucro(dto.margemLucro() != null ? dto.margemLucro() : BigDecimal.ZERO);
+        p.setPrecoMinimo(dto.precoMinimo() != null ? dto.precoMinimo() : BigDecimal.ZERO);
+        p.setComissao(dto.comissao() != null ? dto.comissao() : BigDecimal.ZERO);
+
+        // 3. Estoque e Logística
+        p.setUnidadeMedida(dto.unidadeMedida() != null ? dto.unidadeMedida() : "UN");
+        p.setEstoqueMinimo(dto.estoqueMinimo() != null ? dto.estoqueMinimo() : 0);
+        p.setEstoqueMaximo(dto.estoqueMaximo() != null ? dto.estoqueMaximo() : 0);
+        p.setPermitirEstoqueNegativo(dto.permitirEstoqueNegativo() != null ? dto.permitirEstoqueNegativo() : false);
+        p.setLocalizacao(dto.localizacao());
+
+        if (p.getId() == null) {
+            p.setQuantidadeEstoque(dto.quantidadeEstoque() != null ? dto.quantidadeEstoque() : 0);
+        }
+
+        // Peso (tratando como BigDecimal, mas se no seu DTO for Double, o Java converte automaticamente ou você pode usar .doubleValue())
+        p.setPesoLiquido(dto.pesoLiquido() != null ? dto.pesoLiquido() : BigDecimal.ZERO);
+        p.setPesoBruto(dto.pesoBruto() != null ? dto.pesoBruto() : BigDecimal.ZERO);
+
+        // 4. Dados Fiscais e Impostos (100% Sincronizado)
+        p.setNcm(ncm);
         p.setCest(dto.cest());
         p.setOrigemMercadoria(dto.origemMercadoria() != null ? dto.origemMercadoria() : 0);
         p.setCfopPadrao(dto.cfopPadrao() != null ? dto.cfopPadrao() : "5102");
@@ -101,19 +123,10 @@ public class ProdutoService {
         p.setCstPisCofins(dto.cstPisCofins());
         p.setCstIpi(dto.cstIpi());
 
-        // Tratamento seguro para as alíquotas numéricas
         p.setAliquotaIcms(dto.aliquotaIcms() != null ? dto.aliquotaIcms() : BigDecimal.ZERO);
         p.setAliquotaIpi(dto.aliquotaIpi() != null ? dto.aliquotaIpi() : BigDecimal.ZERO);
         p.setAliquotaPis(dto.aliquotaPis() != null ? dto.aliquotaPis() : BigDecimal.ZERO);
         p.setAliquotaCofins(dto.aliquotaCofins() != null ? dto.aliquotaCofins() : BigDecimal.ZERO);
-
-        // Uploads e Estoque Incial
-        if (imagePath != null) {
-            p.setFotoLocalPath("/uploads/produtos/" + imagePath);
-        }
-        if (p.getId() == null) {
-            p.setQuantidadeEstoque(dto.quantidadeEstoque());
-        }
     }
 
     @Transactional

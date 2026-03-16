@@ -28,44 +28,20 @@ public class ProdutoController {
     @Autowired private ProdutoService service;
     @Autowired private FileStorageService fileService;
     @Autowired private ProdutoRepository produtoRepository;
-
-    // Injeção do repositório para o histórico de estoque
     @Autowired private MovimentacaoEstoqueRepository movimentacaoRepository;
 
     // =========================================================================================
-    // 1. ROTAS WEB (JSON PADRÃO) - O React usa estas rotas!
+    // 1. ROTAS HÍBRIDAS DE CADASTRO/EDIÇÃO (JSON + IMAGEM NO MESMO PACOTE)
     // =========================================================================================
 
-    @PostMapping
-    public ResponseEntity<Produto> cadastrar(@RequestBody ProdutoRequestDTO dto) {
-        // Envia null na foto, pois o React já envia a fotoUrl/fotoLocalPath direto no DTO
-        return ResponseEntity.ok(service.cadastrar(dto, null));
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<Produto> atualizar(@PathVariable Long id, @RequestBody ProdutoRequestDTO dto) {
-        return ResponseEntity.ok(service.atualizar(id, dto, null));
-    }
-
-    // =========================================================================================
-    // NOVA ROTA ADICIONADA: Busca produto por ID (Crucial para o Balcão atualizar estoque no estorno)
-    // =========================================================================================
-    @GetMapping("/{id}")
-    @Operation(summary = "Busca produto por ID para sincronizar estoque no Front-end")
-    public ResponseEntity<Produto> buscarPorId(@PathVariable Long id) {
-        return ResponseEntity.ok(service.findById(id));
-    }
-
-    // =========================================================================================
-    // 2. ROTAS MOBILE/AVANÇADAS (MULTIPART) - Para envio físico de arquivos
-    // =========================================================================================
-
-    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<Produto> cadastrarComFoto(
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Cadastra um novo produto aceitando JSON e Arquivo de Imagem opcional")
+    public ResponseEntity<Produto> cadastrar(
             @RequestPart("produto") ProdutoRequestDTO dto,
             @RequestPart(value = "image", required = false) MultipartFile file) {
 
         String imagePath = null;
+        // Se a imagem veio do React, salva ela e pega o caminho
         if (file != null && !file.isEmpty()) {
             imagePath = fileService.salvarArquivo(file);
         }
@@ -73,13 +49,15 @@ public class ProdutoController {
         return ResponseEntity.ok(service.cadastrar(dto, imagePath));
     }
 
-    @PutMapping(value = "/{id}/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<Produto> atualizarComFoto(
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Atualiza o produto aceitando JSON e Arquivo de Imagem opcional")
+    public ResponseEntity<Produto> atualizar(
             @PathVariable Long id,
             @RequestPart("produto") ProdutoRequestDTO dto,
             @RequestPart(value = "image", required = false) MultipartFile file) {
 
         String imagePath = null;
+        // Se a imagem veio do React, salva ela e pega o novo caminho
         if (file != null && !file.isEmpty()) {
             imagePath = fileService.salvarArquivo(file);
         }
@@ -88,8 +66,14 @@ public class ProdutoController {
     }
 
     // =========================================================================================
-    // 3. DEMAIS ROTAS (MANTIDAS INTACTAS)
+    // 2. BUSCAS E DEMAIS ROTAS
     // =========================================================================================
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Busca produto por ID para sincronizar estoque no Front-end")
+    public ResponseEntity<Produto> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(service.findById(id));
+    }
 
     @PutMapping("/atualizar-precos")
     public ResponseEntity<Void> atualizarPrecos(@RequestBody List<AtualizarPrecoRequestDTO> precos) {
@@ -113,23 +97,22 @@ public class ProdutoController {
     }
 
     // =========================================================================================
-    // ROTA PARA O HISTÓRICO DE INVENTÁRIO E AJUSTES
+    // 3. HISTÓRICO, ALERTAS E COMPATIBILIDADE
     // =========================================================================================
+
     @GetMapping("/movimentacoes")
     @Operation(summary = "Lista o histórico de movimentações e ajustes de estoque")
     public ResponseEntity<List<Map<String, Object>>> listarMovimentacoes() {
         List<com.grandport.erp.modules.estoque.model.MovimentacaoEstoque> movs = movimentacaoRepository.findAll();
 
         List<Map<String, Object>> dados = movs.stream().map(m -> {
-            Map<String, Object> map = new java.util.HashMap<>();
+            Map<String, Object> map = new HashMap<>();
             map.put("id", m.getId());
             map.put("tipo", m.getTipo());
             map.put("quantidade", m.getQuantidade());
             map.put("saldoAnterior", m.getSaldoAnterior());
             map.put("saldoAtual", m.getSaldoAtual());
             map.put("motivo", m.getMotivo());
-
-            // CORREÇÃO AQUI: Usa o nome exato do campo no seu Model (dataMovimentacao)
             map.put("dataHora", m.getDataMovimentacao());
 
             if (m.getProduto() != null) {
@@ -137,7 +120,7 @@ public class ProdutoController {
                 map.put("produtoSku", m.getProduto().getSku());
             }
             return map;
-        }).collect(java.util.stream.Collectors.toList());
+        }).collect(Collectors.toList());
 
         return ResponseEntity.ok(dados);
     }

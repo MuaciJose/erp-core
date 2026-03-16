@@ -29,7 +29,8 @@ public class Produto {
 
     private String codigoBarras;
 
-    @Column(name = "ref_original", length = 50)
+    // 🚀 AUMENTAMOS O TAMANHO PARA 500 PARA CABER MÚLTIPLAS TAGS DE REF CRUZADA SEM QUEBRAR O BANCO
+    @Column(name = "ref_original", length = 500)
     private String referenciaOriginal;
 
     @ManyToOne

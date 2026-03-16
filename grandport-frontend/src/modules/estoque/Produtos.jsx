@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import {
     Package, Plus, Search, Edit, Trash2, CheckCircle, Ban, X, Save,
     FileText, DollarSign, Box, ShieldAlert, Image as ImageIcon, Info, ArrowLeft,
-    History, Car, Upload, FileJson, Loader2
+    History, Car, Upload, FileJson, Loader2, UploadCloud, Link as LinkIcon
 } from 'lucide-react';
 
 import { ExtratoEstoque } from './ExtratoEstoque';
@@ -34,12 +34,20 @@ export const Produtos = () => {
     const [modalAplicacao, setModalAplicacao] = useState({ aberto: false, texto: '', nome: '' });
     const [filtroModal, setFiltroModal] = useState('');
 
-    const [previewImagem, setPreviewImagem] = useState(null);
+    const [previewImagemModal, setPreviewImagemModal] = useState(null);
 
-    // 🚀 NOVOS ESTADOS PARA O MODAL EXPRESSO DE CARGA DE NCM
+    // 🚀 ESTADOS DO MOTOR HÍBRIDO DE IMAGENS
+    const [arquivoImagem, setArquivoImagem] = useState(null);
+    const [previewLocal, setPreviewLocal] = useState(null);
+    const fileInputRef = useRef(null);
+
+    // ESTADOS PARA O MODAL EXPRESSO DE CARGA DE NCM
     const [modalUploadNcmAberto, setModalUploadNcmAberto] = useState(false);
     const [arquivoNcm, setArquivoNcm] = useState(null);
     const [carregandoNcm, setCarregandoNcm] = useState(false);
+
+    // ESTADO LOCAL PARA REFERÊNCIAS CRUZADAS (TAGS)
+    const [inputRefCruzada, setInputRefCruzada] = useState('');
 
     const formInicial = {
         id: '', nome: '', sku: '', codigoBarras: '', referenciaOriginal: '', aplicacao: '',
@@ -109,7 +117,6 @@ export const Produtos = () => {
         return () => clearTimeout(delayDebounceFn);
     }, [busca]);
 
-    // 🚀 Lógica inteligente para forçar a busca do NCM após um upload bem sucedido
     const buscarNcmNoBackend = async (termoDeBusca) => {
         try {
             const res = await api.get(`/api/ncm?busca=${termoDeBusca}`);
@@ -130,10 +137,18 @@ export const Produtos = () => {
         return () => clearTimeout(delayDebounceFn);
     }, [form.ncm, abaAtiva, buscandoNcm]);
 
+    const resetarMidias = () => {
+        setArquivoImagem(null);
+        setPreviewLocal(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
     const abrirNovo = () => {
         setForm(formInicial);
         setBuscandoNcm(false);
         setResultadosNcm([]);
+        setInputRefCruzada('');
+        resetarMidias();
         setAbaAtiva('geral');
         setTelaAtual('formulario');
     };
@@ -151,6 +166,8 @@ export const Produtos = () => {
         setForm(formSeguro);
         setBuscandoNcm(false);
         setResultadosNcm([]);
+        setInputRefCruzada('');
+        resetarMidias();
         setAbaAtiva('geral');
         setTelaAtual('formulario');
     };
@@ -168,6 +185,35 @@ export const Produtos = () => {
         const c = parseFloat(custo) || 0;
         const m = parseFloat(margem) || 0;
         return (c + (c * (m / 100))).toFixed(2);
+    };
+
+    // 🚀 LÓGICA DE REFERÊNCIAS CRUZADAS (TAGS)
+    const referenciasArray = form.referenciaOriginal ? form.referenciaOriginal.split(',').map(r => r.trim()).filter(r => r !== '') : [];
+
+    const adicionarReferenciaCruzada = (e) => {
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            const novaRef = inputRefCruzada.trim().toUpperCase();
+            if (novaRef && !referenciasArray.includes(novaRef)) {
+                const novoTexto = [...referenciasArray, novaRef].join(', ');
+                setForm({ ...form, referenciaOriginal: novoTexto });
+            }
+            setInputRefCruzada('');
+        }
+    };
+
+    const removerReferenciaCruzada = (refRemover) => {
+        const novasRefs = referenciasArray.filter(r => r !== refRemover).join(', ');
+        setForm({ ...form, referenciaOriginal: novasRefs });
+    };
+
+    const lidarComUploadLocal = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setArquivoImagem(file);
+            setPreviewLocal(URL.createObjectURL(file));
+            setForm({ ...form, fotoUrl: '' });
+        }
     };
 
     const salvarNovaMarcaRapida = async () => {
@@ -198,16 +244,30 @@ export const Produtos = () => {
         finally { setSalvandoCategoria(false); }
     };
 
+    // 🚀 ENVIO DO PRODUTO
     const salvarProduto = async (e) => {
         e.preventDefault();
 
-        if (!form.nome || !form.sku) return notificar('aviso', 'Campos Incompletos', 'Nome e SKU são obrigatórios.');
+        if (!form.nome || !form.sku || !form.marca?.id) {
+            return notificar('aviso', 'Campos Incompletos', 'Nome, SKU e Marca são obrigatórios para salvar.');
+        }
 
-        const toastId = toast.loading('Salvando produto...');
+        const toastId = toast.loading('Salvando produto na base...');
+
+        // 🚀 CORREÇÃO DE USABILIDADE: Se o usuário digitou uma tag mas esqueceu de dar Enter, a gente salva pra ele!
+        let refFinal = form.referenciaOriginal;
+        if (inputRefCruzada.trim()) {
+            const tagEsquecida = inputRefCruzada.trim().toUpperCase();
+            if (!referenciasArray.includes(tagEsquecida)) {
+                refFinal = refFinal ? `${refFinal}, ${tagEsquecida}` : tagEsquecida;
+            }
+            setInputRefCruzada(''); // Limpa pro próximo uso
+        }
 
         try {
             const payload = {
                 ...form,
+                referenciaOriginal: refFinal, // Usando o texto com a correção anti-esquecimento
                 quantidadeEstoque: parseInt(form.quantidadeEstoque) || 0,
                 estoqueMinimo: parseInt(form.estoqueMinimo) || 0,
                 estoqueMaximo: parseInt(form.estoqueMaximo) || 0,
@@ -234,11 +294,18 @@ export const Produtos = () => {
             delete payload.categoria;
             delete payload.ncm;
 
+            const formData = new FormData();
+            formData.append('produto', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+
+            if (arquivoImagem) {
+                formData.append('image', arquivoImagem);
+            }
+
             if (form.id) {
-                await api.put(`/api/produtos/${form.id}`, payload);
+                await api.put(`/api/produtos/${form.id}`, formData);
                 toast.success('Produto Atualizado com sucesso!', { id: toastId });
             } else {
-                await api.post('/api/produtos', payload);
+                await api.post('/api/produtos', formData);
                 toast.success('Novo produto adicionado ao estoque!', { id: toastId });
             }
 
@@ -249,7 +316,6 @@ export const Produtos = () => {
         }
     };
 
-    // 🚀 FUNÇÕES DE CARGA EXPRESSA DE NCM
     const selecionarArquivoNcmExpresso = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -271,17 +337,11 @@ export const Produtos = () => {
         const toastId = toast.loading("Enviando e atualizando base NCM. Por favor aguarde...");
 
         try {
-            await api.post('/api/ncm/upload', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-
+            await api.post('/api/ncm/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
             toast.success("Base NCM atualizada com sucesso!", { id: toastId, duration: 5000 });
-
-            // Fecha o modal limpa o input
             setArquivoNcm(null);
             setModalUploadNcmAberto(false);
 
-            // 🚀 Pulo do Gato: Refaz a busca automaticamente se já tinha algo digitado no NCM
             if (form.ncm && form.ncm.length > 2) {
                 setBuscandoNcm(true);
                 await buscarNcmNoBackend(form.ncm);
@@ -315,6 +375,7 @@ export const Produtos = () => {
                 />
             )}
 
+            {/* MODAL CONSULTA DE APLICAÇÃO */}
             {modalAplicacao.aberto && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-fade-in p-4 text-left">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 flex flex-col max-h-[85vh]">
@@ -406,10 +467,10 @@ export const Produtos = () => {
                                         className="p-4 pl-6 relative"
                                         onMouseEnter={() => {
                                             if (p.fotoUrl || p.fotoLocalPath) {
-                                                setPreviewImagem(p.fotoUrl || p.fotoLocalPath);
+                                                setPreviewImagemModal(p.fotoUrl || p.fotoLocalPath);
                                             }
                                         }}
-                                        onMouseLeave={() => setPreviewImagem(null)}
+                                        onMouseLeave={() => setPreviewImagemModal(null)}
                                     >
                                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-200 border border-slate-300 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-colors">
                                             {p.fotoUrl || p.fotoLocalPath ? (
@@ -485,14 +546,40 @@ export const Produtos = () => {
                         {abaAtiva === 'geral' && (
                             <div className="space-y-6 animate-fade-in max-w-5xl">
                                 <div><label className="text-xs font-bold text-slate-500 uppercase">Nome do Produto *</label><input type="text" value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} className="w-full p-4 border-2 rounded-xl font-bold bg-white outline-none focus:border-blue-500" placeholder="Ex: Amortecedor Dianteiro Cofap" /></div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div><label className="text-xs font-bold text-slate-500 uppercase">Cód Interno (SKU) *</label><input type="text" value={form.sku} onChange={e => setForm({...form, sku: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-white outline-none focus:border-blue-500 uppercase font-mono" placeholder="Ex: AMORT-001" /></div>
                                     <div><label className="text-xs font-bold text-slate-500 uppercase">EAN (Cód. Barras)</label><input type="text" value={form.codigoBarras} onChange={e => setForm({...form, codigoBarras: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-white outline-none focus:border-blue-500 font-mono" placeholder="Código numérico do leitor" /></div>
-                                    <div><label className="text-xs font-bold text-slate-500 uppercase">Ref. Original / Fabricante</label><input type="text" value={form.referenciaOriginal} onChange={e => setForm({...form, referenciaOriginal: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-white outline-none focus:border-blue-500 uppercase font-mono" placeholder="Ex: 51920-SWA-A01" /></div>
                                 </div>
+
+                                {/* 🚀 SISTEMA DE REFERÊNCIA CRUZADA INTELIGENTE */}
+                                <div className="bg-white p-6 border-2 border-slate-200 rounded-2xl shadow-sm">
+                                    <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">
+                                        Referências Cruzadas (Fabricantes / Originais) <Tooltip texto="Digite o código da concorrência ou da montadora e aperte Enter para adicionar. Ex: VW-98765" />
+                                    </label>
+
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                        {referenciasArray.map((ref, idx) => (
+                                            <span key={idx} className="bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold font-mono flex items-center gap-2 shadow-sm animate-fade-in">
+                                                {ref}
+                                                <X size={14} className="cursor-pointer hover:text-red-400 transition-colors" onClick={() => removerReferenciaCruzada(ref)} />
+                                            </span>
+                                        ))}
+                                    </div>
+
+                                    <input
+                                        type="text"
+                                        value={inputRefCruzada}
+                                        onChange={e => setInputRefCruzada(e.target.value)}
+                                        onKeyDown={adicionarReferenciaCruzada}
+                                        className="w-full p-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 outline-none focus:border-blue-500 focus:bg-white uppercase font-mono transition-colors"
+                                        placeholder="Digite o código e aperte ENTER para adicionar..."
+                                    />
+                                </div>
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Marca</label>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Marca Principal</label>
                                         <div className="flex items-center gap-2">
                                             <select value={form.marca.id} onChange={e => setForm({...form, marca: { id: e.target.value }})} className="w-full p-4 border-2 rounded-xl bg-white outline-none font-bold focus:border-blue-500">
                                                 <option value="">-- Selecione uma Marca --</option>
@@ -516,15 +603,15 @@ export const Produtos = () => {
 
                                 <div className="group/app">
                                     <label className="text-xs font-bold text-slate-500 uppercase flex justify-between">
-                                        Aplicação (Compatibilidade)
+                                        Aplicação (Compatibilidade de Veículos)
                                         <span className="text-[10px] text-blue-500 font-black animate-pulse group-hover/app:hidden">
-                                            Passe o mouse para expandir a lista
+                                            Passe o mouse para expandir
                                         </span>
                                     </label>
                                     <textarea
                                         value={form.aplicacao}
                                         onChange={e => setForm({...form, aplicacao: e.target.value})}
-                                        placeholder="Digite os veículos compatíveis. Use ENTER para separar a lista..."
+                                        placeholder="Ex: Gol G5 1.0 8v (2008 a 2012) - Dianteiro"
                                         className="w-full p-4 border-2 rounded-xl bg-white outline-none
                                                    transition-all duration-500 ease-in-out
                                                    h-14 min-h-[56px] overflow-hidden
@@ -534,7 +621,7 @@ export const Produtos = () => {
                                     />
                                 </div>
 
-                                <div><label className="text-xs font-bold text-slate-500 uppercase">Descrição Completa</label><textarea value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-white outline-none h-32 focus:border-blue-500" placeholder="Detalhes técnicos da peça..." /></div>
+                                <div><label className="text-xs font-bold text-slate-500 uppercase">Descrição Técnica Completa</label><textarea value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-white outline-none h-32 focus:border-blue-500" placeholder="Detalhes técnicos, medidas, observações do mecânico..." /></div>
                                 <label title="Desmarque para esconder este produto na tela de Vendas" className="flex items-center gap-3 cursor-pointer font-bold text-slate-700 bg-white p-5 border-2 border-slate-200 rounded-xl w-max hover:bg-slate-50 transition-colors">
                                     <input type="checkbox" checked={form.ativo} onChange={e => setForm({...form, ativo: e.target.checked})} className="w-6 h-6 rounded cursor-pointer accent-blue-600" /> Produto Ativo (Aparecerá no PDV)
                                 </label>
@@ -610,7 +697,6 @@ export const Produtos = () => {
                         {abaAtiva === 'fiscal' && (
                             <div className="space-y-6 animate-fade-in max-w-5xl bg-white p-8 border-2 border-slate-200 rounded-2xl shadow-sm">
 
-                                {/* 🚀 HEADER INFORMATIVO SOBRE NCM E UPLOAD EXPRESSO */}
                                 <div className="flex flex-col md:flex-row md:items-center justify-between bg-purple-50 border border-purple-100 p-4 rounded-xl gap-4">
                                     <div className="flex items-center gap-3">
                                         <div className="p-2 bg-purple-200 text-purple-700 rounded-lg shrink-0">
@@ -707,17 +793,85 @@ export const Produtos = () => {
                                 </div>
                             </div>
                         )}
+
+                        {/* 🚀 NOVO MOTOR HÍBRIDO DE IMAGEM */}
                         {abaAtiva === 'midia' && (
                             <div className="animate-fade-in flex flex-col md:flex-row gap-8 bg-white p-8 border-2 border-slate-200 rounded-2xl shadow-sm max-w-5xl">
                                 <div className="flex-1 space-y-6">
-                                    <div className="bg-indigo-50 border border-indigo-100 p-5 rounded-xl">
+                                    <div className="bg-indigo-50 border border-indigo-100 p-5 rounded-xl mb-4">
                                         <h4 className="font-black text-indigo-800 flex items-center gap-2 text-lg"><ImageIcon size={20}/> Exibição no Ponto de Venda</h4>
+                                        <p className="text-xs text-indigo-600 font-medium mt-1">Escolha <strong>uma</strong> das duas opções abaixo para exibir a foto do produto.</p>
                                     </div>
-                                    <div><label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">URL da Foto (Cole o Link)</label><input type="text" value={form.fotoUrl} onChange={e => setForm({...form, fotoUrl: e.target.value})} className="w-full p-4 border-2 bg-slate-50 rounded-xl outline-none focus:border-indigo-500 font-mono text-sm" placeholder="https://..." /></div>
+
+                                    {/* OPÇÃO 1: UPLOAD LOCAL */}
+                                    <div className={`p-6 border-2 border-dashed rounded-2xl transition-colors ${previewLocal ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-indigo-300'}`}>
+                                        <label className="flex flex-col items-center justify-center cursor-pointer w-full h-full relative">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                onChange={lidarComUploadLocal}
+                                                ref={fileInputRef}
+                                            />
+                                            <UploadCloud className={`mb-3 ${previewLocal ? 'text-indigo-600' : 'text-slate-400'}`} size={40} />
+                                            <span className="font-black text-slate-700 text-base">Fazer Upload de Foto do Computador</span>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Formatos: JPG, PNG, WEBP</span>
+                                        </label>
+                                    </div>
+
+                                    <div className="flex items-center gap-4 my-2">
+                                        <hr className="flex-1 border-slate-200" />
+                                        <span className="text-xs font-black text-slate-400 uppercase">OU</span>
+                                        <hr className="flex-1 border-slate-200" />
+                                    </div>
+
+                                    {/* OPÇÃO 2: URL DA WEB */}
+                                    <div className={`p-6 border-2 rounded-2xl transition-colors ${form.fotoUrl && !previewLocal ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 bg-white'}`}>
+                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                            <LinkIcon size={14} /> Usar Link da Web (URL)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={form.fotoUrl}
+                                            onChange={e => {
+                                                setForm({...form, fotoUrl: e.target.value});
+                                                if (e.target.value) resetarMidias(); // Se digitar URL, remove a foto local
+                                            }}
+                                            className="w-full p-4 border-2 bg-slate-50 rounded-xl outline-none focus:border-indigo-500 focus:bg-white font-mono text-sm transition-colors"
+                                            placeholder="https://site.com/foto-da-peca.jpg"
+                                        />
+                                    </div>
                                 </div>
+
+                                {/* PREVIEW DA IMAGEM */}
                                 <div className="w-full md:w-80 flex flex-col items-center">
-                                    <div className="w-72 h-72 border-4 border-dashed border-slate-200 rounded-3xl flex items-center justify-center bg-slate-50 overflow-hidden shadow-inner">
-                                        {form.fotoUrl || form.fotoLocalPath ? <img src={form.fotoUrl || form.fotoLocalPath} alt="Preview" className="w-full h-full object-cover" onError={(e) => e.target.src = 'https://via.placeholder.com/250?text=Imagem+Indisponível'} /> : <ImageIcon size={72} className="mx-auto mb-3 opacity-50"/>}
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Pré-visualização</p>
+                                    <div className="w-72 h-72 border-4 border-slate-100 rounded-3xl flex items-center justify-center bg-slate-50 overflow-hidden shadow-inner relative group">
+
+                                        {(previewLocal || form.fotoUrl || form.fotoLocalPath) ? (
+                                            <>
+                                                <img
+                                                    src={previewLocal || form.fotoUrl || form.fotoLocalPath}
+                                                    alt="Preview"
+                                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                                    onError={(e) => e.target.src = 'https://via.placeholder.com/250?text=Indisponível'}
+                                                />
+                                                {(previewLocal || form.fotoUrl) && (
+                                                    <button
+                                                        onClick={() => {
+                                                            resetarMidias();
+                                                            setForm({...form, fotoUrl: ''});
+                                                        }}
+                                                        className="absolute top-4 right-4 bg-red-500 text-white p-2 rounded-xl shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                                        title="Remover Foto"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <ImageIcon size={72} className="mx-auto text-slate-300"/>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -812,14 +966,14 @@ export const Produtos = () => {
             )}
 
             {/* OVERLAY DE ZOOM DA IMAGEM */}
-            {previewImagem && (
+            {previewImagemModal && (
                 <div className="fixed inset-0 pointer-events-none z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-fade-in">
                     <img
-                        src={previewImagem}
+                        src={previewImagemModal}
                         alt="Zoom do Produto"
                         className="max-w-xl max-h-[70vh] rounded-3xl shadow-2xl border-4 border-white object-contain"
                         onError={(e) => {
-                            setPreviewImagem(null);
+                            setPreviewImagemModal(null);
                         }}
                     />
                 </div>
