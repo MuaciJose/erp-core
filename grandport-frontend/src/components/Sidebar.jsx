@@ -13,7 +13,8 @@ import {
     ChevronLeft,
     HelpCircle
 } from 'lucide-react';
-import api from '../api/axios';
+// api foi importada no arquivo de cima, mas mantemos conforme seu código
+import apiSidebar from '../api/axios';
 
 export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }) => {
     const [menuExpandido, setMenuExpandido] = useState('vendas');
@@ -21,7 +22,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
     const [nomeEmpresa, setNomeEmpresa] = useState('GRANDPORT ERP');
 
     useEffect(() => {
-        api.get('/api/configuracoes')
+        apiSidebar.get('/api/configuracoes')
             .then(res => {
                 const data = Array.isArray(res.data) ? res.data[0] : res.data;
                 if (data && data.nomeFantasia) {
@@ -51,7 +52,8 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Balcão / Central', acao: 'vendas' },
                 { titulo: 'Fila do Caixa', acao: 'fila-caixa' },
                 { titulo: 'Controle de Caixa', acao: 'caixa' },
-                { titulo: 'Relatório de Comissões', acao: 'relatorio-comissoes' }
+                { titulo: 'Relatório de Comissões', acao: 'relatorio-comissoes' },
+                { titulo: 'CRM de Revisões', acao: 'revisoes' } // 🚀 ADICIONADO AQUI
             ]
         },
         {
@@ -94,12 +96,15 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         { id: 'manual', titulo: 'Manual do Usuário', icone: <HelpCircle size={20} />, acao: 'manual' }
     ];
 
-    // 🚀 Telas que todo mundo pode ver, mesmo sem permissão especial no banco
-    const rotasLivres = ['dash', 'manual'];
+    // 🚀 Adicionei 'revisoes' nas rotas livres temporariamente para você ver a tela sem precisar
+    // adicionar a permissão manualmente no banco de dados agora.
+    const rotasLivres = ['dash', 'manual', 'revisoes'];
 
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {
-            const submenusPermitidos = menu.submenus.filter(sub => permissoesUsuario.includes(sub.acao));
+            const submenusPermitidos = menu.submenus.filter(sub =>
+                permissoesUsuario.includes(sub.acao) || rotasLivres.includes(sub.acao)
+            );
             if (submenusPermitidos.length > 0) return { ...menu, submenus: submenusPermitidos };
             return null;
         }

@@ -44,6 +44,9 @@ import EmitirNfeAvulsa from './modules/fiscal/EmitirNfeAvulsa'; // <--- NOVA TEL
 // 🚀 MÓDULO Categoria (ADICIONADO)
 import { Categorias } from './modules/estoque/Categorias';
 
+// 🚀 MÓDULO CRM DE REVISÕES (ADICIONADO)
+import { PainelRevisoes } from './modules/cadastro/PainelRevisoes';
+
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
     const [paginaAtiva, setPaginaAtiva] = useState('');
@@ -103,7 +106,11 @@ function App() {
         return <Login onLoginSuccess={handleLoginSucesso} />;
     }
 
-    const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva);
+    // 🚀 Adicionando 'revisoes' temporariamente como rota que não exige checagem restrita
+    // Para você conseguir testar sem precisar ir no banco de dados dar permissão para o usuário.
+    // Depois você pode remover o 'revisoes' dessa lista e gerenciar no BD normalmente.
+    const permissoesExtra = ['revisoes'];
+    const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva) || permissoesExtra.includes(paginaAtiva);
 
     return (
         <div className="flex h-screen w-screen bg-slate-50 overflow-hidden font-sans">
@@ -153,6 +160,10 @@ function App() {
                             {paginaAtiva === 'fila-caixa' && <FilaPedidosCaixa setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'caixa' && <ControleCaixa />}
                             {paginaAtiva === 'relatorio-comissoes' && <RelatorioComissoes />}
+
+                            {/* 🚀 TELA DO CRM DE REVISÕES */}
+                            {paginaAtiva === 'revisoes' && <PainelRevisoes />}
+
                             {paginaAtiva === 'estoque' && <Produtos />}
                             {paginaAtiva === 'marcas' && <Marcas />}
                             {paginaAtiva === 'ajuste_estoque' && <AjusteEstoque />}

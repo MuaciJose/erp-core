@@ -58,6 +58,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/**").authenticated()
                         .requestMatchers("/auth/logout").authenticated()
 
+                        .requestMatchers("/api/veiculos/**").authenticated()
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)

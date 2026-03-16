@@ -4,10 +4,15 @@ import {
     Search, FileText, Printer, CheckCircle, Package, User,
     Trash2, ArrowRight, Save, FolderOpen, Car, X, RefreshCw,
     AlertTriangle, MessageCircle, XCircle, Smartphone, Loader2, ArrowLeft, Receipt, FileDown,
-    Image as ImageIcon, Ban, Info
+    Image as ImageIcon, Ban, Info, Calendar,Plus // 🚀 Ícone Calendar importado para o botão do CRM
 } from 'lucide-react';
 
 import toast from 'react-hot-toast';
+
+// 🚀 IMPORTAÇÃO DO NOVO MODAL DO CRM
+import { ModalAgendarRevisao } from '../cadastro/ModalAgendarRevisao';
+
+import { ModalCadastroVeiculoRapido } from '../cadastro/ModalCadastroVeiculoRapido';
 
 export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota }) => {
     const [modo, setModo] = useState('ORCAMENTO');
@@ -33,19 +38,19 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
     const [previewImagemPeca, setPreviewImagemPeca] = useState(null);
 
-    // 🚀 ESTADOS DO MODAL DE APLICAÇÃO
     const [modalAplicacao, setModalAplicacao] = useState({ aberto: false, texto: '', nome: '' });
     const [filtroModal, setFiltroModal] = useState('');
+
+    // 🚀 ESTADO PARA O MODAL DE CRM (NOVO)
+    const [modalCrmAberto, setModalCrmAberto] = useState(false);
 
     const inputPecaRef = useRef(null);
     const inputClienteRef = useRef(null);
     const inputDescontoRef = useRef(null);
 
-    // 🚀 DEVOLVENDO O FOCO AO FECHAR O MODAL
     const fecharModalConsulta = () => {
         setModalAplicacao({ aberto: false, texto: '', nome: '' });
         setFiltroModal('');
-        // Assim que fechar a aplicação, o cursor volta pra pesquisa de peças automaticamente
         setTimeout(() => {
             if (inputPecaRef.current) {
                 inputPecaRef.current.focus();
@@ -77,6 +82,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
     const [statusZap, setStatusZap] = useState(null);
     const [checandoZap, setChecandoZap] = useState(false);
 
+    const [modalVeiculoAberto, setModalVeiculoAberto] = useState(false);
     const extrairErroBackend = (error, mensagemPadrao) => {
         if (error?.response?.status === 403) return "Acesso Negado: Rota bloqueada pelo servidor (Erro 403).";
         if (error?.response?.status === 401) return "Sessão expirada. Por favor, recarregue a página e faça login novamente.";
@@ -678,6 +684,11 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
+            // 🚀 SE O MODAL DO CRM ESTIVER ABERTO, ELE MANDA NO ESCAPE
+            if (modalCrmAberto) {
+                if (e.key === 'Escape') setModalCrmAberto(false);
+                return;
+            }
             if (modalAplicacao.aberto) {
                 if (e.key === 'Escape') fecharModalConsulta();
                 return;
@@ -725,6 +736,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                     break;
                 case 'F10': e.preventDefault(); if (orcamentoId && !notaFiscalInfo) emitirNFe(); break;
                 case 'F11': e.preventDefault(); acionarWhatsApp(); break;
+                case 'F12': e.preventDefault(); setModalCrmAberto(true); break; // 🚀 ATALHO PARA O CRM
                 case 'p':
                 case 'P':
                     if (e.ctrlKey || e.metaKey) { e.preventDefault(); imprimirViaIframe(); }
@@ -743,13 +755,28 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
         window.addEventListener('keydown', handleGlobalKeyDown);
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-    }, [modalListaAberto, modalVendaPerdidaAberto, modalCancelamentoAberto, modo, orcamentoId, notaFiscalInfo, itens, clienteSelecionado, veiculoDetalhado, subtotal, valorDescontoReal, totalFinal, orcamentosSalvos, indexFocadoLista, resultadosClientes, resultadosPecas, justificativaCancelamento, cancelandoNfe, modalAplicacao.aberto]);
+    }, [modalListaAberto, modalVendaPerdidaAberto, modalCancelamentoAberto, modo, orcamentoId, notaFiscalInfo, itens, clienteSelecionado, veiculoDetalhado, subtotal, valorDescontoReal, totalFinal, orcamentosSalvos, indexFocadoLista, resultadosClientes, resultadosPecas, justificativaCancelamento, cancelandoNfe, modalAplicacao.aberto, modalCrmAberto]);
 
     return (
         <div className="flex flex-col h-full bg-white relative z-[15]">
             <div className="p-8 max-w-7xl mx-auto flex flex-col h-full animate-fade-in relative">
 
-                {/* 🚀 MODAL CENTRAL DE CONSULTA DE APLICAÇÃO */}
+                {/* 🚀 MODAL DO CRM (NOVO) */}
+                {/* 🚀 MODAL DO CRM (AGORA MANDA OS IDs PARA VINCULAR NO BANCO) */}
+                <ModalAgendarRevisao
+                    isOpen={modalCrmAberto}
+                    onClose={() => setModalCrmAberto(false)}
+                    clientePreSelecionado={clienteSelecionado ? {
+                        id: clienteSelecionado.id,          // <--- Isso aqui garante a ligação com o BD
+                        nome: clienteSelecionado.nome,
+                        telefone: clienteSelecionado.telefone,
+                        veiculoId: veiculoDetalhado?.id,    // <--- Isso aqui vincula ao carro certo
+                        veiculo: veiculoDetalhado ? `${veiculoDetalhado.marca} ${veiculoDetalhado.modelo}` : '',
+                        placa: veiculoDetalhado?.placa || ''
+                    } : null}
+                />
+
+                {/* MODAL CENTRAL DE CONSULTA DE APLICAÇÃO */}
                 {modalAplicacao.aberto && (
                     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-fade-in p-4 text-left">
                         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 flex flex-col max-h-[85vh]">
@@ -842,6 +869,11 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                             <button onClick={limparEcra} title="Limpar todos os campos (Alt+L)" className="px-3 py-2 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-transparent hover:border-slate-200"><Trash2 size={14} /> LIMPAR (Alt+L)</button>
                             <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block"></div>
 
+                            {/* 🚀 BOTÃO DO CRM AQUI! */}
+                            <button onClick={() => setModalCrmAberto(true)} title="Agendar próxima revisão do cliente (F12)" className="px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-lg text-xs font-black flex items-center gap-2 transition-all shadow-sm border border-indigo-200 hover:border-indigo-600">
+                                <Calendar size={14} /> CRM (F12)
+                            </button>
+
                             {orcamentoId && !notaFiscalInfo && (
                                 <button onClick={emitirNFe} title="Ajustar e Emitir NF-e (F10)" className="px-4 py-2 bg-purple-100 text-purple-700 hover:bg-purple-600 hover:text-white rounded-lg text-xs font-black flex items-center gap-2 transition-all shadow-sm border border-purple-200 hover:border-purple-600">
                                     <Receipt size={16} /> EMITIR NF-E (F10)
@@ -912,12 +944,31 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                                 </div>
                             )}
                         </div>
-                        <div className="relative">
-                            <Car className="absolute left-3 top-3 text-slate-400" size={20} />
-                            <select id="select-veiculo" title="Alt+V para focar" value={veiculoSelecionado} onChange={(e) => setVeiculoSelecionado(e.target.value)} disabled={!clienteSelecionado || notaFiscalInfo} className="w-full pl-10 pr-4 py-3 border-2 rounded-xl font-bold bg-slate-50 outline-none appearance-none focus:border-blue-500 transition-all disabled:opacity-50">
-                                <option value="">Selecione o Veículo...</option>
-                                {clienteSelecionado?.veiculos?.map(v => <option key={v.id} value={v.id}>{v.marca} {v.modelo} - {v.placa}</option>)}
-                            </select>
+                        <div className="relative flex gap-2"> {/* Adicionado flex e gap aqui */}
+                            <div className="relative flex-1">
+                                <Car className="absolute left-3 top-3 text-slate-400" size={20} />
+                                <select
+                                    id="select-veiculo"
+                                    value={veiculoSelecionado}
+                                    onChange={(e) => setVeiculoSelecionado(e.target.value)}
+                                    disabled={!clienteSelecionado || notaFiscalInfo}
+                                    className="w-full pl-10 pr-4 py-3 border-2 rounded-xl font-bold bg-slate-50 outline-none appearance-none focus:border-blue-500 transition-all disabled:opacity-50"
+                                >
+                                    <option value="">Selecione o Veículo...</option>
+                                    {clienteSelecionado?.veiculos?.map(v => <option key={v.id} value={v.id}>{v.marca} {v.modelo} - {v.placa}</option>)}
+                                </select>
+                            </div>
+
+                            {/* 🚀 BOTÃO DE ADICIONAR VEÍCULO RÁPIDO */}
+                            {clienteSelecionado && !notaFiscalInfo && (
+                                <button
+                                    onClick={() => setModalVeiculoAberto(true)}
+                                    title="Cadastrar novo veículo para este cliente"
+                                    className="px-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20"
+                                >
+                                    <Plus size={20} />
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1236,6 +1287,33 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                     </div>
                 </div>
             )}
+
+
+            {/* 🚀 MODAL DE CADASTRO DE VEÍCULO RÁPIDO */}
+            <ModalCadastroVeiculoRapido
+                isOpen={modalVeiculoAberto}
+                onClose={() => setModalVeiculoAberto(false)}
+                clienteId={clienteSelecionado?.id}
+                onSucesso={(veiculoNovo) => {
+                    // 1. Atualiza a lista e seleciona o carro novo no orçamento
+                    setClienteSelecionado(prev => ({
+                        ...prev,
+                        veiculos: [...(prev.veiculos || []), veiculoNovo]
+                    }));
+                    setVeiculoSelecionado(veiculoNovo.id.toString());
+
+                    // 2. Fecha o modal de cadastro de veículo
+                    setModalVeiculoAberto(false);
+
+                    // 3. A MÁGICA: Abre o modal de CRM logo em seguida!
+                    // Usamos um pequeno timeout (300ms) para o navegador fechar um modal
+                    // suavemente antes de abrir o outro, evitando bugs visuais.
+                    setTimeout(() => {
+                        setModalCrmAberto(true);
+                        toast.success("Veículo pronto! Agora agende a revisão sugerida.", { icon: '📅' });
+                    }, 400);
+                }}
+            />
 
             {/* OVERLAY DE ZOOM DA IMAGEM DA PEÇA */}
             {previewImagemPeca && (
