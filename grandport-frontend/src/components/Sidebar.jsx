@@ -13,7 +13,6 @@ import {
     ChevronLeft,
     HelpCircle
 } from 'lucide-react';
-// api foi importada no arquivo de cima, mas mantemos conforme seu código
 import apiSidebar from '../api/axios';
 
 export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }) => {
@@ -50,6 +49,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             submenus: [
                 { titulo: 'Ponto de Venda (PDV)', acao: 'pdv' },
                 { titulo: 'Balcão / Central', acao: 'vendas' },
+                { titulo: 'Painel de OS (Kanban)', acao: 'os' },
                 { titulo: 'Fila do Caixa', acao: 'fila-caixa' },
                 { titulo: 'Controle de Caixa', acao: 'caixa' },
                 { titulo: 'Relatório de Comissões', acao: 'relatorio-comissoes' },
@@ -62,7 +62,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Buscar Peças', acao: 'estoque' },
                 { titulo: 'Marcas', acao: 'marcas' },
                 { titulo: 'Categorias', acao: 'categorias' },
-                { titulo: 'Gerador de Etiquetas', acao: 'etiquetas' }, // 🚀 ADICIONADO AQUI
+                { titulo: 'Gerador de Etiquetas', acao: 'etiquetas' },
                 { titulo: 'Ajuste de Estoque', acao: 'ajuste_estoque' },
                 { titulo: 'Importar NF-e (XML)', acao: 'compras' },
                 { titulo: 'Previsão de Compras', acao: 'previsao' },
@@ -85,6 +85,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             id: 'cadastros', titulo: 'Administrativo', icone: <Users size={20} />,
             submenus: [
                 { titulo: 'Clientes & Fornecedores', acao: 'parceiros' },
+                { titulo: 'Tabela de Mão de Obra', acao: 'servicos' },
                 { titulo: 'Equipe e Acessos', acao: 'usuarios' },
                 { titulo: 'Auditoria de Sistema', acao: 'auditoria' },
                 { titulo: 'Fiscal / NCM', acao: 'fiscal' },
@@ -97,8 +98,8 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         { id: 'manual', titulo: 'Manual do Usuário', icone: <HelpCircle size={20} />, acao: 'manual' }
     ];
 
-    // 🚀 Adicionei 'etiquetas' nas rotas livres temporariamente
-    const rotasLivres = ['dash', 'manual', 'revisoes', 'etiquetas'];
+    // 🚀 Incluindo rotas livres provisórias
+    const rotasLivres = ['manual'];
 
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {
@@ -109,7 +110,6 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             return null;
         }
 
-        // Verifica se é uma rota livre OU se o usuário tem a permissão específica
         if (rotasLivres.includes(menu.acao) || permissoesUsuario.includes(menu.acao)) {
             return menu;
         }

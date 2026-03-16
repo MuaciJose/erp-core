@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
-import { Users, UserPlus, Edit, ShieldCheck, Ban, CheckCircle, X, AlertTriangle, Info } from 'lucide-react';
+import { Users, UserPlus, Edit, ShieldCheck, Ban, CheckCircle, X, AlertTriangle, Info, Wrench } from 'lucide-react';
 
 export const GestaoUsuarios = () => {
     const [usuarios, setUsuarios] = useState([]);
@@ -16,10 +16,12 @@ export const GestaoUsuarios = () => {
         email: '',
         senha: '',
         ativo: true,
+        isMecanico: false,     // 🚀 NOVO: Define se aparece na OS
+        comissaoServico: '',   // 🚀 NOVO: Comissão sobre mão de obra
         permissoes: []
     });
 
-    // 🚀 ATUALIZADO: Todos os módulos da "Ferrari" agora estão mapeados aqui para dar permissão!
+    // 🚀 ATUALIZADO: Todos os módulos da "Ferrari", agora com o Catálogo de Serviços!
     const modulosPermissoes = [
         {
             grupo: 'Vendas & Frente de Loja',
@@ -27,6 +29,7 @@ export const GestaoUsuarios = () => {
                 { acao: 'dash', nome: 'Dashboard Inicial (Gráficos)' },
                 { acao: 'pdv', nome: 'Ponto de Venda Rápido (PDV)' },
                 { acao: 'vendas', nome: 'Balcão de Peças / Central' },
+                { acao: 'os', nome: 'Ordem de Serviço (OS)' },
                 { acao: 'orcamentos', nome: 'Orçamentos e Pedidos' },
                 { acao: 'fila-caixa', nome: 'Fila do Caixa (Receber Pagamentos)' },
                 { acao: 'caixa', nome: 'Controle de Caixa (Abrir/Fechar Turno)' },
@@ -47,7 +50,7 @@ export const GestaoUsuarios = () => {
                 { acao: 'estoque', nome: 'Buscar Peças / Consulta' },
                 { acao: 'categorias', nome: 'Gestão de Categorias' },
                 { acao: 'marcas', nome: 'Gestão de Marcas' },
-                { acao: 'etiquetas', nome: 'Gerador de Etiquetas' }, // 🚀 ADICIONADO AQUI
+                { acao: 'etiquetas', nome: 'Gerador de Etiquetas' },
                 { acao: 'ajuste_estoque', nome: 'Ajuste de Estoque / Inventário' },
                 { acao: 'compras', nome: 'Importar NF-e (XML)' },
                 { acao: 'previsao', nome: 'Previsão de Compras' },
@@ -80,6 +83,7 @@ export const GestaoUsuarios = () => {
             grupo: 'Administrativo & Sistema',
             telas: [
                 { acao: 'parceiros', nome: 'Cadastros (Clientes/Fornecedores)' },
+                { acao: 'servicos', nome: 'Tabela de Serviços (Mão de Obra)' }, // 🚀 ADICIONADO AQUI
                 { acao: 'usuarios', nome: 'Gestão de Usuários e Permissões' },
                 { acao: 'auditoria', nome: 'Auditoria de Sistema (Logs)' },
                 { acao: 'configuracoes', nome: 'Configurações do Sistema' },
@@ -136,23 +140,38 @@ export const GestaoUsuarios = () => {
     };
 
     const abrirModalNovo = () => {
-        setUsuarioForm({ id: null, nome: '', email: '', senha: '', ativo: true, permissoes: todasAsPermissoes });
+        setUsuarioForm({
+            id: null, nome: '', email: '', senha: '', ativo: true,
+            isMecanico: false, comissaoServico: '', permissoes: todasAsPermissoes
+        });
         setModalAberto(true);
     };
 
     const abrirModalEditar = (user) => {
-        setUsuarioForm({ ...user, senha: '' });
+        setUsuarioForm({
+            ...user,
+            senha: '',
+            isMecanico: user.isMecanico || false,
+            comissaoServico: user.comissaoServico || ''
+        });
         setModalAberto(true);
     };
 
     const salvarUsuario = async (e) => {
         e.preventDefault();
+
+        // Formata o payload para garantir que comissao seja número ou nulo
+        const payload = {
+            ...usuarioForm,
+            comissaoServico: usuarioForm.isMecanico && usuarioForm.comissaoServico ? parseFloat(usuarioForm.comissaoServico) : 0
+        };
+
         try {
             if (usuarioForm.id) {
-                await api.put(`/api/usuarios/${usuarioForm.id}`, usuarioForm);
+                await api.put(`/api/usuarios/${usuarioForm.id}`, payload);
                 showToast('sucesso', 'Acessos Atualizados', 'As permissões do usuário foram salvas com sucesso!');
             } else {
-                await api.post('/api/usuarios', usuarioForm);
+                await api.post('/api/usuarios', payload);
                 showToast('sucesso', 'Usuário Cadastrado', 'Novo membro adicionado à equipe com sucesso!');
             }
             setModalAberto(false);
@@ -211,7 +230,7 @@ export const GestaoUsuarios = () => {
                         <Users className="text-blue-600 bg-blue-100 p-1 rounded-lg" size={36} />
                         EQUIPE E ACESSOS
                     </h1>
-                    <p className="text-slate-500 mt-1">Gerencie os funcionários e os níveis de permissão</p>
+                    <p className="text-slate-500 mt-1">Gerencie os funcionários, mecânicos e níveis de permissão</p>
                 </div>
                 <button onClick={abrirModalNovo} title="Cadastrar um novo membro na equipe" className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg">
                     <UserPlus size={20} /> NOVO USUÁRIO
@@ -232,10 +251,20 @@ export const GestaoUsuarios = () => {
                     {usuarios.map(user => (
                         <tr key={user.id} className={`border-b transition-colors ${!user.ativo ? 'bg-slate-50 opacity-60' : 'hover:bg-slate-50'}`}>
                             <td className="p-4 pl-6 font-bold text-slate-800 flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-black">
+                                <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-black shrink-0">
                                     {user.nome?.substring(0, 2).toUpperCase()}
                                 </div>
-                                {user.nome}
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        {user.nome}
+                                        {user.isMecanico && (
+                                            <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-black uppercase border border-orange-200 flex items-center gap-1">
+                                                <Wrench size={10}/> Mecânico
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-slate-400 font-medium">{user.email}</p>
+                                </div>
                             </td>
                             <td className="p-4 text-sm text-slate-500 font-mono">{user.email}</td>
                             <td className="p-4 text-center">
@@ -262,7 +291,8 @@ export const GestaoUsuarios = () => {
                             <button onClick={() => setModalAberto(false)} title="Fechar janela" className="hover:text-red-400 font-bold uppercase text-xs">Fechar</button>
                         </div>
 
-                        <div className="overflow-y-auto p-8 space-y-6 custom-scrollbar">
+                        <div className="overflow-y-auto p-8 space-y-4 custom-scrollbar">
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
@@ -282,7 +312,43 @@ export const GestaoUsuarios = () => {
                                 <input type="password" value={usuarioForm.senha} onChange={e => setUsuarioForm({...usuarioForm, senha: e.target.value})} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-600 outline-none text-slate-700" placeholder="******" />
                             </div>
 
-                            <div>
+                            {/* 🚀 CONFIGURAÇÕES DE MECÂNICO */}
+                            <div className="bg-orange-50 p-5 rounded-2xl border border-orange-200 mt-2 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shadow-inner">
+                                <label className="flex items-center gap-3 cursor-pointer group">
+                                    <div className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${usuarioForm.isMecanico ? 'bg-orange-600 border-orange-600 text-white' : 'bg-white border-orange-300'}`}>
+                                        {usuarioForm.isMecanico && <CheckCircle size={16} />}
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="hidden"
+                                        checked={usuarioForm.isMecanico}
+                                        onChange={(e) => setUsuarioForm({...usuarioForm, isMecanico: e.target.checked})}
+                                    />
+                                    <div>
+                                        <span className="font-black text-orange-900 block group-hover:text-orange-700">Este usuário é um Mecânico?</span>
+                                        <span className="text-[10px] text-orange-600 uppercase font-bold tracking-widest block">Aparecerá na lista da Ordem de Serviço</span>
+                                    </div>
+                                </label>
+
+                                {usuarioForm.isMecanico && (
+                                    <div className="w-full sm:w-auto sm:min-w-[180px] animate-fade-in">
+                                        <label className="block text-[10px] font-black text-orange-600 uppercase mb-1">Comissão de Mão de Obra (%)</label>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={usuarioForm.comissaoServico}
+                                                onChange={(e) => setUsuarioForm({...usuarioForm, comissaoServico: e.target.value})}
+                                                className="w-full p-2.5 bg-white border-2 border-orange-200 rounded-xl focus:border-orange-500 outline-none font-black text-orange-800 text-right pr-8"
+                                                placeholder="Ex: 40.0"
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 font-black text-orange-400">%</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-4 pt-4 border-t border-slate-100">
                                 <div className="flex justify-between items-end mb-4 border-b pb-3">
                                     <h3 className="text-sm font-black text-slate-800 uppercase">Controle de Acesso às Telas</h3>
                                     <div className="flex gap-2">
@@ -316,7 +382,7 @@ export const GestaoUsuarios = () => {
 
                         <div className="p-6 bg-slate-50 border-t flex gap-4">
                             <button onClick={() => setModalAberto(false)} title="Sair sem salvar alterações" className="flex-1 py-4 font-bold text-slate-500 rounded-xl hover:bg-slate-100 transition-colors">CANCELAR</button>
-                            <button onClick={salvarUsuario} title="Confirmar dados e gravar permissões no banco de dados" className="flex-1 bg-blue-600 text-white py-4 rounded-xl font-black shadow-lg hover:bg-blue-700 transition-colors">SALVAR USUÁRIO</button>
+                            <button onClick={salvarUsuario} title="Confirmar dados e gravar no banco de dados" className="flex-1 bg-blue-600 text-white py-4 rounded-xl font-black shadow-lg hover:bg-blue-700 transition-colors">SALVAR USUÁRIO</button>
                         </div>
                     </div>
                 </div>

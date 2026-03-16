@@ -6,6 +6,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -29,6 +30,12 @@ public class Usuario implements UserDetails {
     private String nomeCompleto;
 
     private boolean ativo = true;
+
+    @Column(name = "is_mecanico")
+    private Boolean isMecanico = false;
+
+    @Column(name = "comissao_servico", precision = 5, scale = 2)
+    private BigDecimal comissaoServico = BigDecimal.ZERO; // Ex: 40.00 para 40%
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "usuario_permissoes", joinColumns = @JoinColumn(name = "usuario_id"))

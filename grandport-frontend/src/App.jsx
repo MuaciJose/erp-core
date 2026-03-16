@@ -36,19 +36,25 @@ import { ManualUsuario } from './modules/manual/ManualUsuario';
 import { ReciboAvulso } from './modules/financeiro/ReciboAvulso';
 import { HistoricoRecibos } from './modules/financeiro/HistoricoRecibos';
 
-// 🚀 MÓDULO FISCAL (ADICIONADO)
+// 🚀 MÓDULO FISCAL
 import { RegrasFiscais } from './modules/fiscal/RegrasFiscais';
 import { GerenciadorFiscal } from './modules/fiscal/GerenciadorFiscal';
 import EmitirNfeAvulsa from './modules/fiscal/EmitirNfeAvulsa';
 
-// 🚀 MÓDULO Categoria (ADICIONADO)
+// 🚀 MÓDULO Categoria
 import { Categorias } from './modules/estoque/Categorias';
 
-// 🚀 MÓDULO CRM DE REVISÕES (ADICIONADO)
+// 🚀 MÓDULO CRM DE REVISÕES
 import { PainelRevisoes } from './modules/cadastro/PainelRevisoes';
 
-// 🚀 MÓDULO GERADOR DE ETIQUETAS (ADICIONADO AGORA)
+// 🚀 MÓDULO GERADOR DE ETIQUETAS
 import { GeradorEtiquetas } from './modules/estoque/GeradorEtiquetas';
+
+// 🚀 MÓDULO KANBAN DE ORDEM DE SERVIÇO (PAINEL GERAL)
+import { PainelOs } from './modules/os/PainelOs';
+
+// 🚀 MÓDULO SERVIÇOS / MÃO DE OBRA
+import { GestaoServicos } from './modules/servicos/GestaoServicos';
 
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
@@ -89,61 +95,26 @@ function App() {
     };
 
     const handleLogout = async () => {
-        try {
-            await api.post('/auth/logout');
-        } catch (e) {
-            console.error("Erro ao registrar logout", e);
-        } finally {
-            localStorage.removeItem('grandport_token');
-            localStorage.removeItem('grandport_user');
+        try { await api.post('/auth/logout'); } catch (e) {} finally {
+            localStorage.removeItem('grandport_token'); localStorage.removeItem('grandport_user');
             api.defaults.headers.common['Authorization'] = '';
-            setUsuarioLogado(null);
-            setPaginaAtiva('');
-            window.location.reload();
+            setUsuarioLogado(null); setPaginaAtiva(''); window.location.reload();
         }
     };
 
     if (carregandoApp) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white font-black tracking-widest">CARREGANDO GRANDPORT ERP...</div>;
+    if (!usuarioLogado) return <Login onLoginSuccess={handleLoginSucesso} />;
 
-    if (!usuarioLogado) {
-        return <Login onLoginSuccess={handleLoginSucesso} />;
-    }
-
-    // 🚀 'etiquetas' e 'revisoes' liberados sem precisar de restrição de banco temporariamente
-    const permissoesExtra = ['revisoes', 'etiquetas'];
-    const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva) || permissoesExtra.includes(paginaAtiva);
+    // 🚀 CORREÇÃO DE SEGURANÇA: Agora SOMENTE 'dash' e 'manual' são livres. O resto puxa do banco!
+    const rotasLivresGerais = ['dash', 'manual'];
+    const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva) || rotasLivresGerais.includes(paginaAtiva);
 
     return (
         <div className="flex h-screen w-screen bg-slate-50 overflow-hidden font-sans">
-
-            {/* 🚀 TOASTER GLOBAL */}
-            <Toaster
-                position="top-right"
-                reverseOrder={false}
-                toastOptions={{
-                    duration: 4000,
-                    style: {
-                        background: '#1e293b',
-                        color: '#fff',
-                        borderRadius: '12px',
-                        fontWeight: 'bold'
-                    },
-                    success: {
-                        iconTheme: { primary: '#22c55e', secondary: '#fff' }
-                    },
-                    error: {
-                        iconTheme: { primary: '#ef4444', secondary: '#fff' }
-                    }
-                }}
-            />
+            <Toaster position="top-right" reverseOrder={false} toastOptions={{ duration: 4000, style: { background: '#1e293b', color: '#fff', borderRadius: '12px', fontWeight: 'bold' } }} />
 
             {!isFullScreen && (
-                <Sidebar
-                    paginaAtiva={paginaAtiva}
-                    setPaginaAtiva={setPaginaAtiva}
-                    usuarioLogado={usuarioLogado}
-                    onLogout={handleLogout}
-                />
+                <Sidebar paginaAtiva={paginaAtiva} setPaginaAtiva={setPaginaAtiva} usuarioLogado={usuarioLogado} onLogout={handleLogout} />
             )}
 
             <main className={`flex-1 h-full overflow-y-auto ${isFullScreen ? 'p-0' : 'p-4'}`}>
@@ -161,12 +132,10 @@ function App() {
                             {paginaAtiva === 'fila-caixa' && <FilaPedidosCaixa setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'caixa' && <ControleCaixa />}
                             {paginaAtiva === 'relatorio-comissoes' && <RelatorioComissoes />}
-
                             {paginaAtiva === 'revisoes' && <PainelRevisoes />}
-
-                            {/* 🚀 TELA DO GERADOR DE ETIQUETAS */}
                             {paginaAtiva === 'etiquetas' && <GeradorEtiquetas />}
-
+                            {paginaAtiva === 'os' && <PainelOs />}
+                            {paginaAtiva === 'servicos' && <GestaoServicos />}
                             {paginaAtiva === 'estoque' && <Produtos />}
                             {paginaAtiva === 'marcas' && <Marcas />}
                             {paginaAtiva === 'ajuste_estoque' && <AjusteEstoque />}
@@ -185,20 +154,16 @@ function App() {
                             {paginaAtiva === 'auditoria' && <Auditoria />}
                             {paginaAtiva === 'configuracoes' && <Configuracoes />}
                             {paginaAtiva === 'manual' && <ManualUsuario onVoltar={() => setPaginaAtiva('dash')} />}
-
                             {paginaAtiva === 'recibo-avulso' && <ReciboAvulso setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'historico-recibos' && <HistoricoRecibos setPaginaAtiva={setPaginaAtiva} />}
-
                             {paginaAtiva === 'regras-fiscais' && <RegrasFiscais setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'categorias' && <Categorias />}
                             {paginaAtiva === 'gerenciador-nfe' && <GerenciadorFiscal setPaginaAtiva={setPaginaAtiva} />}
-
                             {paginaAtiva === 'emitir-nfe-avulsa' && <EmitirNfeAvulsa setPaginaAtiva={setPaginaAtiva} />}
                         </>
                     )}
                 </div>
             </main>
-
             <WidgetCalculadora />
         </div>
     );
