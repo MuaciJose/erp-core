@@ -4,14 +4,14 @@ import {
     Search, FileText, Printer, CheckCircle, Package, User,
     Trash2, ArrowRight, Save, FolderOpen, Car, X, RefreshCw,
     AlertTriangle, MessageCircle, XCircle, Smartphone, Loader2, ArrowLeft, Receipt, FileDown,
-    Image as ImageIcon, Ban, Info, Calendar,Plus // 🚀 Ícone Calendar importado para o botão do CRM
+    Image as ImageIcon, Ban, Info, Calendar, Plus,
+    Gauge // 🚀 Ícone de quilometragem mantido
 } from 'lucide-react';
 
 import toast from 'react-hot-toast';
 
 // 🚀 IMPORTAÇÃO DO NOVO MODAL DO CRM
 import { ModalAgendarRevisao } from '../cadastro/ModalAgendarRevisao';
-
 import { ModalCadastroVeiculoRapido } from '../cadastro/ModalCadastroVeiculoRapido';
 
 export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota }) => {
@@ -27,6 +27,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
     const [indexFocadoCliente, setIndexFocadoCliente] = useState(-1);
 
     const [veiculoSelecionado, setVeiculoSelecionado] = useState('');
+    const [kmVeiculo, setKmVeiculo] = useState('');
 
     const [empresaConfig, setEmpresaConfig] = useState({
         nomeFantasia: '', razaoSocial: '', enderecoString: '', cnpj: '', telefone: '', mensagemRodape: ''
@@ -41,8 +42,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
     const [modalAplicacao, setModalAplicacao] = useState({ aberto: false, texto: '', nome: '' });
     const [filtroModal, setFiltroModal] = useState('');
 
-    // 🚀 ESTADO PARA O MODAL DE CRM (NOVO)
     const [modalCrmAberto, setModalCrmAberto] = useState(false);
+    const [modalVeiculoAberto, setModalVeiculoAberto] = useState(false);
 
     const inputPecaRef = useRef(null);
     const inputClienteRef = useRef(null);
@@ -82,7 +83,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
     const [statusZap, setStatusZap] = useState(null);
     const [checandoZap, setChecandoZap] = useState(false);
 
-    const [modalVeiculoAberto, setModalVeiculoAberto] = useState(false);
     const extrairErroBackend = (error, mensagemPadrao) => {
         if (error?.response?.status === 403) return "Acesso Negado: Rota bloqueada pelo servidor (Erro 403).";
         if (error?.response?.status === 401) return "Sessão expirada. Por favor, recarregue a página e faça login novamente.";
@@ -126,6 +126,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         setClienteSelecionado(null);
         setBuscaCliente('');
         setVeiculoSelecionado('');
+        setKmVeiculo('');
         setIndexFocadoCliente(-1);
     };
 
@@ -199,6 +200,10 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 setNotaFiscalInfo(null);
             }
 
+            if (orcamentoParaEditar.kmVeiculo) {
+                setKmVeiculo(orcamentoParaEditar.kmVeiculo.toString());
+            }
+
             const itensMapeados = extrairItensBackend(orcamentoParaEditar.itens, orcamentoParaEditar.status);
             setItens(itensMapeados);
 
@@ -215,7 +220,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                             setBuscaCliente(clienteFull.nome);
                             const resV = await api.get(`/api/veiculos/cliente/${clienteFull.id}`);
                             setClienteSelecionado(prev => ({ ...prev, veiculos: resV.data || [] }));
-                            if (orcamentoParaEditar.veiculo?.id) setVeiculoSelecionado(orcamentoParaEditar.veiculo.id.toString());
+                            if (orcamentoParaEditar.veiculo?.id) {
+                                setVeiculoSelecionado(orcamentoParaEditar.veiculo.id.toString());
+                            }
                         }
                     } catch (e) { console.error(e); }
                 }
@@ -288,7 +295,13 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         setIndexFocadoCliente(-1);
         api.get(`/api/veiculos/cliente/${cliente.id}`).then(res => {
             setClienteSelecionado(prev => ({ ...prev, veiculos: res.data || [] }));
-            if(res.data?.length === 1) setVeiculoSelecionado(res.data[0].id.toString());
+            // 🚀 MÁGICA 1: Se o cliente tem apenas 1 veículo, já seleciona ele e puxa o KM
+            if(res.data?.length === 1) {
+                setVeiculoSelecionado(res.data[0].id.toString());
+                if (res.data[0].km) {
+                    setKmVeiculo(res.data[0].km.toString());
+                }
+            }
         });
     };
 
@@ -459,7 +472,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
             itens: itens.map(i => ({ produtoId: i.produtoId || i.id, quantidade: i.qtd, precoUnitario: i.preco })),
             desconto: valorDescontoReal,
             parceiroId: clienteSelecionado?.id || null,
-            veiculoId: veiculoSelecionado ? parseInt(veiculoSelecionado) : null
+            veiculoId: veiculoSelecionado ? parseInt(veiculoSelecionado) : null,
+            kmVeiculo: kmVeiculo ? parseInt(kmVeiculo) : null
         };
 
         try {
@@ -629,7 +643,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                         <p class="box-title">Veículo em Atendimento</p>
                         ${veiculoDetalhado ? `
                             <p class="box-value">${veiculoDetalhado.marca} ${veiculoDetalhado.modelo}</p>
-                            <p class="box-sub">PLACA: ${veiculoDetalhado.placa} | KM: ${veiculoDetalhado.km}</p>
+                            <p class="box-sub">PLACA: ${veiculoDetalhado.placa} | KM: ${kmVeiculo || '---'}</p>
                         ` : `<p class="box-value" style="color: #64748b; font-style: italic; margin-top: 5px;">VENDA BALCÃO</p>`}
                     </div>
                 </div>
@@ -761,16 +775,15 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         <div className="flex flex-col h-full bg-white relative z-[15]">
             <div className="p-8 max-w-7xl mx-auto flex flex-col h-full animate-fade-in relative">
 
-                {/* 🚀 MODAL DO CRM (NOVO) */}
                 {/* 🚀 MODAL DO CRM (AGORA MANDA OS IDs PARA VINCULAR NO BANCO) */}
                 <ModalAgendarRevisao
                     isOpen={modalCrmAberto}
                     onClose={() => setModalCrmAberto(false)}
                     clientePreSelecionado={clienteSelecionado ? {
-                        id: clienteSelecionado.id,          // <--- Isso aqui garante a ligação com o BD
+                        id: clienteSelecionado.id,
                         nome: clienteSelecionado.nome,
                         telefone: clienteSelecionado.telefone,
-                        veiculoId: veiculoDetalhado?.id,    // <--- Isso aqui vincula ao carro certo
+                        veiculoId: veiculoDetalhado?.id,
                         veiculo: veiculoDetalhado ? `${veiculoDetalhado.marca} ${veiculoDetalhado.modelo}` : '',
                         placa: veiculoDetalhado?.placa || ''
                     } : null}
@@ -869,7 +882,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                             <button onClick={limparEcra} title="Limpar todos os campos (Alt+L)" className="px-3 py-2 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-transparent hover:border-slate-200"><Trash2 size={14} /> LIMPAR (Alt+L)</button>
                             <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block"></div>
 
-                            {/* 🚀 BOTÃO DO CRM AQUI! */}
                             <button onClick={() => setModalCrmAberto(true)} title="Agendar próxima revisão do cliente (F12)" className="px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-lg text-xs font-black flex items-center gap-2 transition-all shadow-sm border border-indigo-200 hover:border-indigo-600">
                                 <Calendar size={14} /> CRM (F12)
                             </button>
@@ -944,13 +956,29 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                                 </div>
                             )}
                         </div>
-                        <div className="relative flex gap-2"> {/* Adicionado flex e gap aqui */}
+
+                        <div className="relative flex gap-2">
                             <div className="relative flex-1">
                                 <Car className="absolute left-3 top-3 text-slate-400" size={20} />
                                 <select
                                     id="select-veiculo"
                                     value={veiculoSelecionado}
-                                    onChange={(e) => setVeiculoSelecionado(e.target.value)}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setVeiculoSelecionado(val);
+                                        // 🚀 MÁGICA 2: Quando escolhe na lista, preenche o KM automático
+                                        if (val && clienteSelecionado?.veiculos) {
+                                            const veic = clienteSelecionado.veiculos.find(v => String(v.id) === String(val));
+                                            if (veic && veic.km) {
+                                                setKmVeiculo(veic.km.toString());
+                                                toast.success(`Último KM (${veic.km}) carregado!`, { icon: '⏱️', id: 'toast-km' });
+                                            } else {
+                                                setKmVeiculo('');
+                                            }
+                                        } else {
+                                            setKmVeiculo('');
+                                        }
+                                    }}
                                     disabled={!clienteSelecionado || notaFiscalInfo}
                                     className="w-full pl-10 pr-4 py-3 border-2 rounded-xl font-bold bg-slate-50 outline-none appearance-none focus:border-blue-500 transition-all disabled:opacity-50"
                                 >
@@ -959,7 +987,18 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                                 </select>
                             </div>
 
-                            {/* 🚀 BOTÃO DE ADICIONAR VEÍCULO RÁPIDO */}
+                            <div className="relative w-32">
+                                <Gauge className="absolute left-3 top-3 text-slate-400" size={18} />
+                                <input
+                                    type="number"
+                                    placeholder="KM..."
+                                    value={kmVeiculo}
+                                    onChange={(e) => setKmVeiculo(e.target.value)}
+                                    disabled={notaFiscalInfo}
+                                    className="w-full pl-10 pr-2 py-3 border-2 rounded-xl font-bold bg-white focus:border-blue-600 outline-none transition-all disabled:bg-slate-50"
+                                />
+                            </div>
+
                             {clienteSelecionado && !notaFiscalInfo && (
                                 <button
                                     onClick={() => setModalVeiculoAberto(true)}
@@ -1295,19 +1334,19 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 onClose={() => setModalVeiculoAberto(false)}
                 clienteId={clienteSelecionado?.id}
                 onSucesso={(veiculoNovo) => {
-                    // 1. Atualiza a lista e seleciona o carro novo no orçamento
                     setClienteSelecionado(prev => ({
                         ...prev,
                         veiculos: [...(prev.veiculos || []), veiculoNovo]
                     }));
                     setVeiculoSelecionado(veiculoNovo.id.toString());
 
-                    // 2. Fecha o modal de cadastro de veículo
+                    // 🚀 MÁGICA 3: Se o carro novo recém-criado já tiver KM preenchido, carrega ele aqui
+                    if (veiculoNovo.km) {
+                        setKmVeiculo(veiculoNovo.km.toString());
+                    }
+
                     setModalVeiculoAberto(false);
 
-                    // 3. A MÁGICA: Abre o modal de CRM logo em seguida!
-                    // Usamos um pequeno timeout (300ms) para o navegador fechar um modal
-                    // suavemente antes de abrir o outro, evitando bugs visuais.
                     setTimeout(() => {
                         setModalCrmAberto(true);
                         toast.success("Veículo pronto! Agora agende a revisão sugerida.", { icon: '📅' });
