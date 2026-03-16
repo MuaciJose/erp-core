@@ -39,13 +39,16 @@ import { HistoricoRecibos } from './modules/financeiro/HistoricoRecibos';
 // 🚀 MÓDULO FISCAL (ADICIONADO)
 import { RegrasFiscais } from './modules/fiscal/RegrasFiscais';
 import { GerenciadorFiscal } from './modules/fiscal/GerenciadorFiscal';
-import EmitirNfeAvulsa from './modules/fiscal/EmitirNfeAvulsa'; // <--- NOVA TELA AQUI
+import EmitirNfeAvulsa from './modules/fiscal/EmitirNfeAvulsa';
 
 // 🚀 MÓDULO Categoria (ADICIONADO)
 import { Categorias } from './modules/estoque/Categorias';
 
 // 🚀 MÓDULO CRM DE REVISÕES (ADICIONADO)
 import { PainelRevisoes } from './modules/cadastro/PainelRevisoes';
+
+// 🚀 MÓDULO GERADOR DE ETIQUETAS (ADICIONADO AGORA)
+import { GeradorEtiquetas } from './modules/estoque/GeradorEtiquetas';
 
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
@@ -106,10 +109,8 @@ function App() {
         return <Login onLoginSuccess={handleLoginSucesso} />;
     }
 
-    // 🚀 Adicionando 'revisoes' temporariamente como rota que não exige checagem restrita
-    // Para você conseguir testar sem precisar ir no banco de dados dar permissão para o usuário.
-    // Depois você pode remover o 'revisoes' dessa lista e gerenciar no BD normalmente.
-    const permissoesExtra = ['revisoes'];
+    // 🚀 'etiquetas' e 'revisoes' liberados sem precisar de restrição de banco temporariamente
+    const permissoesExtra = ['revisoes', 'etiquetas'];
     const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva) || permissoesExtra.includes(paginaAtiva);
 
     return (
@@ -161,8 +162,10 @@ function App() {
                             {paginaAtiva === 'caixa' && <ControleCaixa />}
                             {paginaAtiva === 'relatorio-comissoes' && <RelatorioComissoes />}
 
-                            {/* 🚀 TELA DO CRM DE REVISÕES */}
                             {paginaAtiva === 'revisoes' && <PainelRevisoes />}
+
+                            {/* 🚀 TELA DO GERADOR DE ETIQUETAS */}
+                            {paginaAtiva === 'etiquetas' && <GeradorEtiquetas />}
 
                             {paginaAtiva === 'estoque' && <Produtos />}
                             {paginaAtiva === 'marcas' && <Marcas />}

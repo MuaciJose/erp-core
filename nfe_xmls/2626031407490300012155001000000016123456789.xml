@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe2626031407490300012155001000000016123456789" versao="4.00">
+      <emit>
+        <CNPJ>14074903000121</CNPJ>
+        <xNome>ROSELI MARQUES DOS SANTOS FUNILARIA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>08115476000180</CNPJ>
+        <xNome>PRIMAS COMERCIO DE FLORES LTDA</xNome>
+      </dest>
+      <total>
+        <ICMSTot>
+          <vProd>360</vProd>
+          <vFrete>0</vFrete>
+          <vSeg>0</vSeg>
+          <vDesc>0</vDesc>
+          <vOutro>0</vOutro>
+          <vNF>360</vNF>
+          <vIBS>0.00</vIBS>
+          <vCBS>0.00</vCBS>
+        </ICMSTot>
+      </total>
+      <transp>
+        <modFrete>9</modFrete>
+        <vol>
+          <qVol>1</qVol>
+          <esp>CAIXA</esp>
+          <pesoL>0</pesoL>
+          <pesoB>0</pesoB>
+        </vol>
+      </transp>
+    </infNFe>
+  </NFe>
+</nfeProc>

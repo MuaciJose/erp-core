@@ -53,7 +53,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Fila do Caixa', acao: 'fila-caixa' },
                 { titulo: 'Controle de Caixa', acao: 'caixa' },
                 { titulo: 'Relatório de Comissões', acao: 'relatorio-comissoes' },
-                { titulo: 'CRM de Revisões', acao: 'revisoes' } // 🚀 ADICIONADO AQUI
+                { titulo: 'CRM de Revisões', acao: 'revisoes' }
             ]
         },
         {
@@ -62,6 +62,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Buscar Peças', acao: 'estoque' },
                 { titulo: 'Marcas', acao: 'marcas' },
                 { titulo: 'Categorias', acao: 'categorias' },
+                { titulo: 'Gerador de Etiquetas', acao: 'etiquetas' }, // 🚀 ADICIONADO AQUI
                 { titulo: 'Ajuste de Estoque', acao: 'ajuste_estoque' },
                 { titulo: 'Importar NF-e (XML)', acao: 'compras' },
                 { titulo: 'Previsão de Compras', acao: 'previsao' },
@@ -96,9 +97,8 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         { id: 'manual', titulo: 'Manual do Usuário', icone: <HelpCircle size={20} />, acao: 'manual' }
     ];
 
-    // 🚀 Adicionei 'revisoes' nas rotas livres temporariamente para você ver a tela sem precisar
-    // adicionar a permissão manualmente no banco de dados agora.
-    const rotasLivres = ['dash', 'manual', 'revisoes'];
+    // 🚀 Adicionei 'etiquetas' nas rotas livres temporariamente
+    const rotasLivres = ['dash', 'manual', 'revisoes', 'etiquetas'];
 
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {

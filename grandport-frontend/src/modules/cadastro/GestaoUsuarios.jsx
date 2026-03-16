@@ -19,7 +19,7 @@ export const GestaoUsuarios = () => {
         permissoes: []
     });
 
-    // 🚀 ATUALIZADO: Todos os módulos do Java agora estão disponíveis aqui!
+    // 🚀 ATUALIZADO: Todos os módulos da "Ferrari" agora estão mapeados aqui para dar permissão!
     const modulosPermissoes = [
         {
             grupo: 'Vendas & Frente de Loja',
@@ -34,10 +34,10 @@ export const GestaoUsuarios = () => {
             ]
         },
         {
-            grupo: 'CRM & Relacionamento', // 🚀 NOVO GRUPO
+            grupo: 'CRM & Relacionamento',
             telas: [
                 { acao: 'crm', nome: 'Painel de CRM / Pós-Venda' },
-                { acao: 'revisoes', nome: 'Gestão de Revisões' },
+                { acao: 'revisoes', nome: 'Gestão de Revisões (Agendamentos)' },
                 { acao: 'whatsapp', nome: 'Integração WhatsApp' }
             ]
         },
@@ -47,6 +47,7 @@ export const GestaoUsuarios = () => {
                 { acao: 'estoque', nome: 'Buscar Peças / Consulta' },
                 { acao: 'categorias', nome: 'Gestão de Categorias' },
                 { acao: 'marcas', nome: 'Gestão de Marcas' },
+                { acao: 'etiquetas', nome: 'Gerador de Etiquetas' }, // 🚀 ADICIONADO AQUI
                 { acao: 'ajuste_estoque', nome: 'Ajuste de Estoque / Inventário' },
                 { acao: 'compras', nome: 'Importar NF-e (XML)' },
                 { acao: 'previsao', nome: 'Previsão de Compras' },
@@ -67,13 +68,12 @@ export const GestaoUsuarios = () => {
             ]
         },
         {
-            grupo: 'Fiscal & Notas NF-e', // 🚀 NOVO GRUPO PARA O FISCAL
+            grupo: 'Fiscal & Notas NF-e',
             telas: [
                 { acao: 'gerenciador-nfe', nome: 'Gerenciador de NF-e' },
                 { acao: 'emitir-nfe-avulsa', nome: 'Emitir NF-e Avulsa' },
-                { acao: 'fiscal', nome: 'Painel Fiscal Geral' },
-                { acao: 'ncm', nome: 'Tabela NCM' },
-                { acao: 'regras-fiscais', nome: 'Regras Fiscais' }
+                { acao: 'fiscal', nome: 'Painel Fiscal Geral / Carga NCM' },
+                { acao: 'regras-fiscais', nome: 'Regras Fiscais de Tributação' }
             ]
         },
         {
@@ -82,9 +82,7 @@ export const GestaoUsuarios = () => {
                 { acao: 'parceiros', nome: 'Cadastros (Clientes/Fornecedores)' },
                 { acao: 'usuarios', nome: 'Gestão de Usuários e Permissões' },
                 { acao: 'auditoria', nome: 'Auditoria de Sistema (Logs)' },
-                { acao: 'calculadora', nome: 'Calculadora de Markup' },
                 { acao: 'configuracoes', nome: 'Configurações do Sistema' },
-                { acao: 'backup', nome: 'Rotinas de Backup' },
                 { acao: 'manual', nome: 'Manual do Sistema' }
             ]
         }
@@ -264,7 +262,7 @@ export const GestaoUsuarios = () => {
                             <button onClick={() => setModalAberto(false)} title="Fechar janela" className="hover:text-red-400 font-bold uppercase text-xs">Fechar</button>
                         </div>
 
-                        <div className="overflow-y-auto p-8 space-y-6">
+                        <div className="overflow-y-auto p-8 space-y-6 custom-scrollbar">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
@@ -296,7 +294,7 @@ export const GestaoUsuarios = () => {
                                 <div className="space-y-4">
                                     {modulosPermissoes.map((modulo, index) => (
                                         <div key={index} className="bg-slate-50 border rounded-xl p-4">
-                                            <div className="flex justify-between items-center mb-3">
+                                            <div className="flex justify-between items-center mb-3 border-b border-slate-200 pb-2">
                                                 <h4 className="font-bold text-blue-800">{modulo.grupo}</h4>
                                                 <button type="button" onClick={() => handleToggleGrupo(modulo.telas)} title="Selecionar ou desmarcar todas as telas deste grupo de uma vez" className="text-[10px] font-bold text-blue-600 uppercase hover:underline">Marcar/Desmarcar Grupo</button>
                                             </div>
@@ -306,7 +304,7 @@ export const GestaoUsuarios = () => {
                                                         <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${usuarioForm.permissoes.includes(tela.acao) ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white group-hover:border-blue-400'}`}>
                                                             {usuarioForm.permissoes.includes(tela.acao) && <CheckCircle size={14} />}
                                                         </div>
-                                                        <span className="text-sm font-medium text-slate-700 select-none">{tela.nome}</span>
+                                                        <span className="text-sm font-medium text-slate-700 select-none group-hover:text-blue-800">{tela.nome}</span>
                                                     </label>
                                                 ))}
                                             </div>

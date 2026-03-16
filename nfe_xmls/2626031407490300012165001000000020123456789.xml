@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe2626031407490300012165001000000020123456789" versao="4.00">
+      <ide>
+        <natOp>VENDA DE MERCADORIA</natOp>
+        <mod>65</mod>
+        <serie>1</serie>
+        <tpNF>1</tpNF>
+        <indFinal>1</indFinal>
+        <indPres>1</indPres>
+      </ide>
+      <emit>
+        <CNPJ>14074903000121</CNPJ>
+        <xNome>ROSELI MARQUES DOS SANTOS FUNILARIA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>08115476000180</CNPJ>
+        <xNome>PRIMAS COMERCIO DE FLORES LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>AM-SP055</cProd>
+          <xProd>AMORTECEDOR DIANTEIRO - MONROE SP055</xProd>
+          <CFOP>5102</CFOP>
+          <qCom>1</qCom>
+          <vUnCom>360.00</vUnCom>
+        </prod>
+        <imposto>
+          <IBS>
+            <IBS01>
+              <cstIBS>50</cstIBS>
+              <vIBS>0.00</vIBS>
+            </IBS01>
+          </IBS>
+          <CBS>
+            <CBS01>
+              <cstCBS>50</cstCBS>
+              <vCBS>0.00</vCBS>
+            </CBS01>
+          </CBS>
+        </imposto>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>360.00</vNF>
+          <vIBS>0.00</vIBS>
+          <vCBS>0.00</vCBS>
+        </ICMSTot>
+      </total>
+      <pag>
+        <detPag>
+          <tPag>01</tPag>
+          <vPag>360.00</vPag>
+        </detPag>
+      </pag>
+    </infNFe>
+    <infNFeSupl>
+      <qrCode>URL_COM_HASH_GERADO_AQUI</qrCode>
+      <urlChave>https://nfce.sefaz.pe.gov.br/nfce/consulta</urlChave>
+    </infNFeSupl>
+  </NFe>
+</nfeProc>
