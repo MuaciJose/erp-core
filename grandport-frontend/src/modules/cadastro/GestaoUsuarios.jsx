@@ -7,7 +7,6 @@ export const GestaoUsuarios = () => {
     const [loading, setLoading] = useState(true);
     const [modalAberto, setModalAberto] = useState(false);
 
-    // Estado para mensagens profissionais
     const [notificacao, setNotificacao] = useState(null);
 
     const [usuarioForm, setUsuarioForm] = useState({
@@ -16,12 +15,11 @@ export const GestaoUsuarios = () => {
         email: '',
         senha: '',
         ativo: true,
-        isMecanico: false,     // 🚀 NOVO: Define se aparece na OS
-        comissaoServico: '',   // 🚀 NOVO: Comissão sobre mão de obra
+        isMecanico: false,
+        comissaoServico: '',
         permissoes: []
     });
 
-    // 🚀 ATUALIZADO: Todos os módulos da "Ferrari", agora com o Catálogo de Serviços!
     const modulosPermissoes = [
         {
             grupo: 'Vendas & Frente de Loja',
@@ -30,6 +28,7 @@ export const GestaoUsuarios = () => {
                 { acao: 'pdv', nome: 'Ponto de Venda Rápido (PDV)' },
                 { acao: 'vendas', nome: 'Balcão de Peças / Central' },
                 { acao: 'os', nome: 'Ordem de Serviço (OS)' },
+                { acao: 'listagem-os', nome: 'Consulta de OS (Histórico)' }, // 🚀 ADICIONADO AQUI
                 { acao: 'orcamentos', nome: 'Orçamentos e Pedidos' },
                 { acao: 'fila-caixa', nome: 'Fila do Caixa (Receber Pagamentos)' },
                 { acao: 'caixa', nome: 'Controle de Caixa (Abrir/Fechar Turno)' },
@@ -83,7 +82,7 @@ export const GestaoUsuarios = () => {
             grupo: 'Administrativo & Sistema',
             telas: [
                 { acao: 'parceiros', nome: 'Cadastros (Clientes/Fornecedores)' },
-                { acao: 'servicos', nome: 'Tabela de Serviços (Mão de Obra)' }, // 🚀 ADICIONADO AQUI
+                { acao: 'servicos', nome: 'Tabela de Serviços (Mão de Obra)' },
                 { acao: 'usuarios', nome: 'Gestão de Usuários e Permissões' },
                 { acao: 'auditoria', nome: 'Auditoria de Sistema (Logs)' },
                 { acao: 'configuracoes', nome: 'Configurações do Sistema' },
@@ -94,9 +93,6 @@ export const GestaoUsuarios = () => {
 
     const todasAsPermissoes = modulosPermissoes.flatMap(modulo => modulo.telas.map(tela => tela.acao));
 
-    // =================================================================================
-    // SISTEMA DE NOTIFICAÇÕES PROFISSIONAIS
-    // =================================================================================
     const showToast = (tipo, titulo, mensagem) => {
         setNotificacao({ tipo, titulo, mensagem });
         setTimeout(() => setNotificacao(null), 4000);
@@ -160,7 +156,6 @@ export const GestaoUsuarios = () => {
     const salvarUsuario = async (e) => {
         e.preventDefault();
 
-        // Formata o payload para garantir que comissao seja número ou nulo
         const payload = {
             ...usuarioForm,
             comissaoServico: usuarioForm.isMecanico && usuarioForm.comissaoServico ? parseFloat(usuarioForm.comissaoServico) : 0
@@ -202,7 +197,6 @@ export const GestaoUsuarios = () => {
     return (
         <div className="p-8 max-w-6xl mx-auto animate-fade-in relative">
 
-            {/* NOTIFICAÇÃO PROFISSIONAL FLUTUANTE */}
             {notificacao && (
                 <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-[9999] animate-fade-in w-full max-w-lg px-4">
                     <div className={`p-4 rounded-2xl shadow-2xl flex items-start gap-4 border-l-4 ${
@@ -219,7 +213,7 @@ export const GestaoUsuarios = () => {
                             <h4 className="font-black text-lg">{notificacao.titulo}</h4>
                             <p className="text-sm font-medium mt-1 whitespace-pre-line leading-relaxed">{notificacao.mensagem}</p>
                         </div>
-                        <button onClick={() => setNotificacao(null)} title="Fechar notificação" className="text-slate-400 hover:text-slate-700 transition-colors p-1"><X size={20}/></button>
+                        <button onClick={() => setNotificacao(null)} className="text-slate-400 hover:text-slate-700 transition-colors p-1"><X size={20}/></button>
                     </div>
                 </div>
             )}
@@ -232,7 +226,7 @@ export const GestaoUsuarios = () => {
                     </h1>
                     <p className="text-slate-500 mt-1">Gerencie os funcionários, mecânicos e níveis de permissão</p>
                 </div>
-                <button onClick={abrirModalNovo} title="Cadastrar um novo membro na equipe" className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg">
+                <button onClick={abrirModalNovo} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg">
                     <UserPlus size={20} /> NOVO USUÁRIO
                 </button>
             </div>
@@ -288,7 +282,7 @@ export const GestaoUsuarios = () => {
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in">
                         <div className="bg-slate-900 p-6 flex justify-between items-center text-white">
                             <h2 className="text-xl font-black tracking-widest flex items-center gap-2"><ShieldCheck className="text-blue-400" /> {usuarioForm.id ? 'EDITAR USUÁRIO' : 'NOVO USUÁRIO'}</h2>
-                            <button onClick={() => setModalAberto(false)} title="Fechar janela" className="hover:text-red-400 font-bold uppercase text-xs">Fechar</button>
+                            <button onClick={() => setModalAberto(false)} className="hover:text-red-400 font-bold uppercase text-xs">Fechar</button>
                         </div>
 
                         <div className="overflow-y-auto p-8 space-y-4 custom-scrollbar">
@@ -312,7 +306,6 @@ export const GestaoUsuarios = () => {
                                 <input type="password" value={usuarioForm.senha} onChange={e => setUsuarioForm({...usuarioForm, senha: e.target.value})} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-600 outline-none text-slate-700" placeholder="******" />
                             </div>
 
-                            {/* 🚀 CONFIGURAÇÕES DE MECÂNICO */}
                             <div className="bg-orange-50 p-5 rounded-2xl border border-orange-200 mt-2 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shadow-inner">
                                 <label className="flex items-center gap-3 cursor-pointer group">
                                     <div className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${usuarioForm.isMecanico ? 'bg-orange-600 border-orange-600 text-white' : 'bg-white border-orange-300'}`}>
@@ -352,8 +345,8 @@ export const GestaoUsuarios = () => {
                                 <div className="flex justify-between items-end mb-4 border-b pb-3">
                                     <h3 className="text-sm font-black text-slate-800 uppercase">Controle de Acesso às Telas</h3>
                                     <div className="flex gap-2">
-                                        <button type="button" onClick={limparTudo} title="Remover todas as seleções de permissão" className="text-[10px] font-black tracking-widest bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-300 transition-colors">LIMPAR TUDO</button>
-                                        <button type="button" onClick={marcarTudoAdmin} title="Conceder acesso total a todos os módulos do GrandPort" className="text-[10px] font-black tracking-widest bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition-colors">MARCAR TUDO (ADMIN)</button>
+                                        <button type="button" onClick={limparTudo} className="text-[10px] font-black tracking-widest bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-300 transition-colors">LIMPAR TUDO</button>
+                                        <button type="button" onClick={marcarTudoAdmin} className="text-[10px] font-black tracking-widest bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition-colors">MARCAR TUDO (ADMIN)</button>
                                     </div>
                                 </div>
 
@@ -362,7 +355,7 @@ export const GestaoUsuarios = () => {
                                         <div key={index} className="bg-slate-50 border rounded-xl p-4">
                                             <div className="flex justify-between items-center mb-3 border-b border-slate-200 pb-2">
                                                 <h4 className="font-bold text-blue-800">{modulo.grupo}</h4>
-                                                <button type="button" onClick={() => handleToggleGrupo(modulo.telas)} title="Selecionar ou desmarcar todas as telas deste grupo de uma vez" className="text-[10px] font-bold text-blue-600 uppercase hover:underline">Marcar/Desmarcar Grupo</button>
+                                                <button type="button" onClick={() => handleToggleGrupo(modulo.telas)} className="text-[10px] font-bold text-blue-600 uppercase hover:underline">Marcar/Desmarcar Grupo</button>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 {modulo.telas.map(tela => (
@@ -381,8 +374,8 @@ export const GestaoUsuarios = () => {
                         </div>
 
                         <div className="p-6 bg-slate-50 border-t flex gap-4">
-                            <button onClick={() => setModalAberto(false)} title="Sair sem salvar alterações" className="flex-1 py-4 font-bold text-slate-500 rounded-xl hover:bg-slate-100 transition-colors">CANCELAR</button>
-                            <button onClick={salvarUsuario} title="Confirmar dados e gravar no banco de dados" className="flex-1 bg-blue-600 text-white py-4 rounded-xl font-black shadow-lg hover:bg-blue-700 transition-colors">SALVAR USUÁRIO</button>
+                            <button onClick={() => setModalAberto(false)} className="flex-1 py-4 font-bold text-slate-500 rounded-xl hover:bg-slate-100 transition-colors">CANCELAR</button>
+                            <button onClick={salvarUsuario} className="flex-1 bg-blue-600 text-white py-4 rounded-xl font-black shadow-lg hover:bg-blue-700 transition-colors">SALVAR USUÁRIO</button>
                         </div>
                     </div>
                 </div>

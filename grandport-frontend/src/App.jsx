@@ -50,8 +50,9 @@ import { PainelRevisoes } from './modules/cadastro/PainelRevisoes';
 // 🚀 MÓDULO GERADOR DE ETIQUETAS
 import { GeradorEtiquetas } from './modules/estoque/GeradorEtiquetas';
 
-// 🚀 MÓDULO KANBAN DE ORDEM DE SERVIÇO (PAINEL GERAL)
+// 🚀 MÓDULOS DE ORDEM DE SERVIÇO
 import { PainelOs } from './modules/os/PainelOs';
+import { ListagemOs } from './modules/os/ListagemOs'; // 🚀 ADICIONADO
 
 // 🚀 MÓDULO SERVIÇOS / MÃO DE OBRA
 import { GestaoServicos } from './modules/servicos/GestaoServicos';
@@ -95,26 +96,51 @@ function App() {
     };
 
     const handleLogout = async () => {
-        try { await api.post('/auth/logout'); } catch (e) {} finally {
-            localStorage.removeItem('grandport_token'); localStorage.removeItem('grandport_user');
+        try {
+            await api.post('/auth/logout');
+        } catch (e) {
+            console.error("Erro ao registrar logout", e);
+        } finally {
+            localStorage.removeItem('grandport_token');
+            localStorage.removeItem('grandport_user');
             api.defaults.headers.common['Authorization'] = '';
-            setUsuarioLogado(null); setPaginaAtiva(''); window.location.reload();
+            setUsuarioLogado(null);
+            setPaginaAtiva('');
+            window.location.reload();
         }
     };
 
     if (carregandoApp) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white font-black tracking-widest">CARREGANDO GRANDPORT ERP...</div>;
-    if (!usuarioLogado) return <Login onLoginSuccess={handleLoginSucesso} />;
 
-    // 🚀 CORREÇÃO DE SEGURANÇA: Agora SOMENTE 'dash' e 'manual' são livres. O resto puxa do banco!
-    const rotasLivresGerais = ['dash', 'manual'];
-    const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva) || rotasLivresGerais.includes(paginaAtiva);
+    if (!usuarioLogado) {
+        return <Login onLoginSuccess={handleLoginSucesso} />;
+    }
+
+    // 🚀 Liberando as rotas extras para acesso temporário/testes
+    const permissoesExtra = ['revisoes', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual'];
+    const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva) || permissoesExtra.includes(paginaAtiva);
 
     return (
         <div className="flex h-screen w-screen bg-slate-50 overflow-hidden font-sans">
-            <Toaster position="top-right" reverseOrder={false} toastOptions={{ duration: 4000, style: { background: '#1e293b', color: '#fff', borderRadius: '12px', fontWeight: 'bold' } }} />
+
+            <Toaster
+                position="top-right"
+                reverseOrder={false}
+                toastOptions={{
+                    duration: 4000,
+                    style: { background: '#1e293b', color: '#fff', borderRadius: '12px', fontWeight: 'bold' },
+                    success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
+                    error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } }
+                }}
+            />
 
             {!isFullScreen && (
-                <Sidebar paginaAtiva={paginaAtiva} setPaginaAtiva={setPaginaAtiva} usuarioLogado={usuarioLogado} onLogout={handleLogout} />
+                <Sidebar
+                    paginaAtiva={paginaAtiva}
+                    setPaginaAtiva={setPaginaAtiva}
+                    usuarioLogado={usuarioLogado}
+                    onLogout={handleLogout}
+                />
             )}
 
             <main className={`flex-1 h-full overflow-y-auto ${isFullScreen ? 'p-0' : 'p-4'}`}>
@@ -132,10 +158,16 @@ function App() {
                             {paginaAtiva === 'fila-caixa' && <FilaPedidosCaixa setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'caixa' && <ControleCaixa />}
                             {paginaAtiva === 'relatorio-comissoes' && <RelatorioComissoes />}
+
                             {paginaAtiva === 'revisoes' && <PainelRevisoes />}
                             {paginaAtiva === 'etiquetas' && <GeradorEtiquetas />}
+
+                            {/* 🚀 TELAS DE OS */}
                             {paginaAtiva === 'os' && <PainelOs />}
+                            {paginaAtiva === 'listagem-os' && <ListagemOs setPaginaAtiva={setPaginaAtiva} />} {/* 🚀 ADICIONADO */}
+
                             {paginaAtiva === 'servicos' && <GestaoServicos />}
+
                             {paginaAtiva === 'estoque' && <Produtos />}
                             {paginaAtiva === 'marcas' && <Marcas />}
                             {paginaAtiva === 'ajuste_estoque' && <AjusteEstoque />}
@@ -154,8 +186,10 @@ function App() {
                             {paginaAtiva === 'auditoria' && <Auditoria />}
                             {paginaAtiva === 'configuracoes' && <Configuracoes />}
                             {paginaAtiva === 'manual' && <ManualUsuario onVoltar={() => setPaginaAtiva('dash')} />}
+
                             {paginaAtiva === 'recibo-avulso' && <ReciboAvulso setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'historico-recibos' && <HistoricoRecibos setPaginaAtiva={setPaginaAtiva} />}
+
                             {paginaAtiva === 'regras-fiscais' && <RegrasFiscais setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'categorias' && <Categorias />}
                             {paginaAtiva === 'gerenciador-nfe' && <GerenciadorFiscal setPaginaAtiva={setPaginaAtiva} />}
@@ -164,6 +198,7 @@ function App() {
                     )}
                 </div>
             </main>
+
             <WidgetCalculadora />
         </div>
     );

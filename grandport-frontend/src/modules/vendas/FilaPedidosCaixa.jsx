@@ -2,14 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Search, Clock, User, FileText, CheckCircle, DollarSign,
     Package, AlertCircle, Lock, Undo, X, Receipt, Loader2,
-    CreditCard, Banknote, QrCode, Trash2, FileSignature, Printer
+    CreditCard, Banknote, QrCode, Trash2, FileSignature, Printer, Wrench
 } from 'lucide-react';
 import { CupomReciboModal } from './CupomReciboModal';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 
 export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
-    const [pedidos, setPedidos] = useState([]);
+    const [pedidos, setPedidos] = useState([]); // Agora guarda Vendas e OS juntas
     const [busca, setBusca] = useState('');
     const [pedidoSelecionado, setPedidoSelecionado] = useState(null);
 
@@ -37,7 +37,8 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const [loadingCaixa, setLoadingCaixa] = useState(true);
     const [processandoNfce, setProcessandoNfce] = useState(false);
 
-    const isPago = pedidoSelecionado?.status === 'CONCLUIDA' || pedidoSelecionado?.status === 'PAGA';
+    // O status de OS é FATURADA (Pronta para Pagar), e de Venda é AGUARDANDO_PAGAMENTO
+    const isPago = pedidoSelecionado?.status === 'CONCLUIDA' || pedidoSelecionado?.status === 'PAGA' || pedidoSelecionado?.status === 'FINALIZADA_PAGA';
 
     // =======================================================================
     // MÁSCARAS E CÁLCULOS FISCAIS (IVA)
@@ -53,10 +54,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         setValorRecebidoInput(valorRealFloat > 0 ? valorRealFloat.toString() : '');
     };
 
-    // VALORES BASE
     const valorCobrado = pedidoSelecionado?.valorTotal || 0;
-
-    // CÁLCULO ESTIMADO DO IVA DUAL (Apenas exibido se configurado pelo Admin)
     const valorIvaEstimado = valorCobrado * 0.01;
     const valorSubtotalLimpo = valorCobrado - valorIvaEstimado;
 
@@ -68,7 +66,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const faltaPagarTotal = (totalJaPago + valorDigitadoAtual) < valorCobrado;
 
     // =======================================================================
-    // LÓGICA DE DADOS
+    // 🚀 O NOVO MOTOR QUE JUNTA VENDAS E ORDEM DE SERVIÇO NA MESMA FILA
     // =======================================================================
     const verificarCaixa = async () => {
         setLoadingCaixa(true);
@@ -86,25 +84,61 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         try {
             const res = await api.get('/api/configuracoes/empresa');
             const data = Array.isArray(res.data) ? res.data[0] : res.data;
-            // O Caixa apenas OBEDECE o que veio do servidor. Zero botões na tela.
             if (data && data.exibirIvaDual !== undefined) {
                 setExibirIvaDual(data.exibirIvaDual);
             }
-        } catch (e) {
-            console.log("Não foi possível carregar config do IVA.");
-        }
+        } catch (e) { console.log("Não foi possível carregar config do IVA."); }
     };
 
     const carregarPedidos = async (silencioso = false) => {
         try {
-            const res = await api.get('/api/vendas/fila-caixa');
-            if (Array.isArray(res.data)) {
-                const pedidosComHora = res.data.map(p => ({ ...p, horaEnvio: p.dataHora ? new Date(p.dataHora) : new Date() }));
-                pedidosComHora.sort((a, b) => a.horaEnvio - b.horaEnvio);
-                setPedidos(pedidosComHora);
-            } else {
-                setPedidos([]);
+            // Busca as duas filas ao mesmo tempo
+            const [resVendas, resOs] = await Promise.all([
+                api.get('/api/vendas/fila-caixa').catch(() => ({ data: [] })),
+                api.get('/api/os').catch(() => ({ data: [] }))
+            ]);
+
+            let filaUnificada = [];
+
+            // 1. Processa Vendas Normais
+            if (Array.isArray(resVendas.data)) {
+                const vendasFormatadas = resVendas.data.map(p => ({
+                    ...p,
+                    tipoFila: 'VENDA',
+                    horaEnvio: p.dataHora ? new Date(p.dataHora) : new Date()
+                }));
+                filaUnificada = [...filaUnificada, ...vendasFormatadas];
             }
+
+            // 2. Processa Ordens de Serviço (Filtra só as FATURADAS que ainda não foram pagas)
+            if (Array.isArray(resOs.data)) {
+                const osFaturadas = resOs.data.filter(os => os.status === 'FATURADA');
+
+                const osFormatadas = osFaturadas.map(os => ({
+                    ...os,
+                    tipoFila: 'OS', // Marca (Sinalizador) para o Caixa saber que é OS
+                    horaEnvio: os.dataEntrada ? new Date(os.dataEntrada) : new Date(),
+                    // Unifica os itens (peças e serviços) para exibir na listagem do Caixa
+                    itensUnificados: [
+                        ...(os.itensPecas || []).map(p => ({
+                            produto: { nome: p.produto?.nome || 'Peça (Sem Nome)' },
+                            quantidade: p.quantidade,
+                            precoUnitario: p.precoUnitario
+                        })),
+                        ...(os.itensServicos || []).map(s => ({
+                            produto: { nome: `[SERVIÇO] ${s.servico?.nome || 'Mão de Obra'}` },
+                            quantidade: s.quantidade,
+                            precoUnitario: s.precoUnitario
+                        }))
+                    ]
+                }));
+                filaUnificada = [...filaUnificada, ...osFormatadas];
+            }
+
+            // Ordena pela hora que chegou no caixa
+            filaUnificada.sort((a, b) => a.horaEnvio - b.horaEnvio);
+            setPedidos(filaUnificada);
+
         } catch (error) {
             setPedidos([]);
         }
@@ -124,9 +158,13 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
     const pedidosFiltrados = pedidos.filter(p =>
         p?.id?.toString().includes(busca) ||
-        (p?.cliente && p?.cliente?.nome?.toLowerCase().includes(busca.toLowerCase()))
+        (p?.cliente && p?.cliente?.nome?.toLowerCase().includes(busca.toLowerCase())) ||
+        (p?.tipoFila === 'OS' && p?.veiculo?.placa?.toLowerCase().includes(busca.toLowerCase()))
     );
 
+    // =======================================================================
+    // AÇÕES DE PAGAMENTO E INTERFACE
+    // =======================================================================
     const abrirPagamentoDireto = (pedido) => {
         setPedidoSelecionado(pedido);
         setModoRecebimento(true);
@@ -151,9 +189,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         buscaInputRef.current?.blur();
     };
 
-    // =======================================================================
-    // MÁQUINA DE ESTADOS E ATALHOS INTELIGENTES
-    // =======================================================================
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (pedidoPago || modalDevolucaoAberto) {
@@ -265,7 +300,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     };
 
     // =======================================================================
-    // LÓGICA DE CASCATA COM PROMISSÓRIA E PARCELAS
+    // 🚀 LÓGICA DE PAGAMENTO FINAL (ROTEAMENTO INTELIGENTE)
     // =======================================================================
     const adicionarPagamentoEVerificar = async () => {
         if (valorDigitadoAtual <= 0 && faltaPagarTotal) return toast.error("Digite um valor válido.");
@@ -321,7 +356,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
     const confirmarRecebimentoFinal = async (listaPagamentos) => {
         setProcessandoPagamento(true);
-        const idVendaToast = toast.loading("Finalizando no Caixa...");
+        const idVendaToast = toast.loading("Finalizando recebimento...");
         try {
             const payload = listaPagamentos.map(pag => ({
                 metodo: pag.metodo,
@@ -330,7 +365,18 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                 cpfConsumidorFinal: cpfAvulso
             }));
 
-            const response = await api.post(`/api/vendas/${pedidoSelecionado.id}/pagar`, payload);
+            let response;
+            // 🚀 ROTEADOR DE PAGAMENTO
+            if (pedidoSelecionado.tipoFila === 'OS') {
+                // Se for OS, manda pra rota de Pagar OS
+                response = await api.post(`/api/os/${pedidoSelecionado.id}/pagar`, payload);
+                // Força o status simulado para a tela mostrar o Recibo
+                response.data = { ...response.data, status: 'FINALIZADA_PAGA', tipoFila: 'OS', itensUnificados: pedidoSelecionado.itensUnificados };
+            } else {
+                // Se for Venda Normal, manda pra rota de Vendas
+                response = await api.post(`/api/vendas/${pedidoSelecionado.id}/pagar`, payload);
+                response.data = { ...response.data, tipoFila: 'VENDA' };
+            }
 
             toast.success('Caixa Recebido com Sucesso!', { id: idVendaToast });
 
@@ -346,7 +392,14 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         }
     };
 
+    // =======================================================================
+    // DEVOLUÇÃO E CUPOM FISCAL
+    // =======================================================================
     const emitirCupomFiscal = async () => {
+        if (pedidoSelecionado.tipoFila === 'OS') {
+            return toast.error("A emissão de NFC-e para OS (Serviços) deve ser feita pelo Gerenciador Fiscal ou Módulo de Serviços (NFS-e). O caixa emite apenas Recibo/NF-e de Peças.", { duration: 5000 });
+        }
+
         setProcessandoNfce(true);
         const loadId = toast.loading('Transmitindo para a SEFAZ...');
         try {
@@ -369,10 +422,17 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     };
 
     const confirmarDevolucaoAoVendedor = async () => {
-        const idToast = toast.loading("Devolvendo pedido...");
+        const idToast = toast.loading("Devolvendo/Revertendo...");
         try {
-            await api.post(`/api/vendas/${pedidoSelecionado.id}/devolver`);
-            toast.success('Pedido retornado para a área de vendas!', { id: idToast });
+            if (pedidoSelecionado.tipoFila === 'OS') {
+                // Reverte a OS para Em Execução ou Aguardando Aprovação
+                await api.patch(`/api/os/${pedidoSelecionado.id}/status?status=EM_EXECUCAO`);
+                toast.success('OS devolvida para a produção (Em Execução)!', { id: idToast });
+            } else {
+                await api.post(`/api/vendas/${pedidoSelecionado.id}/devolver`);
+                toast.success('Pedido retornado para a área de vendas!', { id: idToast });
+            }
+
             setPedidoSelecionado(null);
             setModalDevolucaoAberto(false);
             setBusca('');
@@ -406,14 +466,14 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                     <div className="p-6 bg-slate-900 text-white">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-black flex items-center gap-2"><Clock className="text-blue-400" /> FILA DO CAIXA</h2>
-                            <span className="text-xs bg-slate-800 px-2 py-1 rounded text-slate-400 font-bold">{pedidos.length} PENDENTES</span>
+                            <span className="text-xs bg-slate-800 px-2 py-1 rounded text-slate-400 font-bold">{pedidos.length} CONTAS</span>
                         </div>
                         <div className="relative">
                             <Search size={18} className="absolute left-3 top-3 text-slate-400"/>
                             <input
                                 ref={buscaInputRef}
                                 type="text"
-                                placeholder="Buscar pedido (F2)..."
+                                placeholder="Buscar pedido ou placa..."
                                 value={busca}
                                 onChange={(e) => { setBusca(e.target.value); setIndexFocadoFila(-1); }}
                                 className="w-full pl-10 pr-4 py-3 bg-slate-800 rounded-xl outline-none text-sm font-bold text-white focus:ring-2 focus:ring-blue-500 transition-all"
@@ -428,14 +488,22 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                         )}
                         {pedidosFiltrados.map((pedido, idx) => (
                             <div
-                                key={pedido.id}
+                                key={`${pedido.tipoFila}-${pedido.id}`}
                                 onClick={() => selecionarPedido(pedido)}
                                 onMouseEnter={() => setIndexFocadoFila(idx)}
-                                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all transform ${pedidoSelecionado?.id === pedido.id || indexFocadoFila === idx ? 'bg-blue-50 border-blue-500 scale-[1.02] shadow-md z-10 relative' : 'bg-white border-slate-200 hover:border-blue-300'}`}
+                                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all transform ${pedidoSelecionado?.id === pedido.id && pedidoSelecionado?.tipoFila === pedido.tipoFila || indexFocadoFila === idx ? 'bg-blue-50 border-blue-500 scale-[1.02] shadow-md z-10 relative' : 'bg-white border-slate-200 hover:border-blue-300'}`}
                             >
                                 <div className="flex justify-between items-start">
-                                    <p className="font-bold text-slate-800 text-sm truncate pr-2">#{pedido.id} - {pedido.cliente?.nome || 'Consumidor'}</p>
+                                    {pedido.tipoFila === 'OS' ? (
+                                        <p className="font-black text-purple-700 text-sm truncate pr-2 flex items-center gap-1 bg-purple-100 px-2 py-0.5 rounded border border-purple-200"><Wrench size={12}/> OS #{pedido.id}</p>
+                                    ) : (
+                                        <p className="font-bold text-slate-800 text-sm truncate pr-2 flex items-center gap-1"><Package size={14}/> PEDIDO #{pedido.id}</p>
+                                    )}
                                     <p className="font-black text-green-600 text-lg leading-none">R$ {(pedido.valorTotal || 0).toFixed(2)}</p>
+                                </div>
+                                <div className="mt-2 text-xs font-bold text-slate-500 truncate">
+                                    {pedido.cliente?.nome || 'Consumidor Final'}
+                                    {pedido.veiculo?.placa && <span className="ml-2 bg-slate-200 px-1.5 py-0.5 rounded font-mono text-[9px] uppercase">{pedido.veiculo.placa}</span>}
                                 </div>
                                 <div className="mt-2 flex justify-between items-center">
                                     {getTempoEsperaBadge(pedido.horaEnvio)}
@@ -454,16 +522,18 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                         </div>
                     ) : (
                         <>
-                            {/* CABEÇALHO DO PEDIDO */}
-                            <div className="p-8 border-b border-slate-100 bg-slate-50 flex justify-between items-center relative z-10">
+                            {/* CABEÇALHO DO PEDIDO / OS */}
+                            <div className={`p-8 border-b border-slate-100 flex justify-between items-center relative z-10 ${pedidoSelecionado.tipoFila === 'OS' ? 'bg-purple-50/50' : 'bg-slate-50'}`}>
                                 <button onClick={() => selecionarPedido(null)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition-colors" title="Fechar (Esc)"><X size={24}/></button>
                                 <div>
-                                    <p className="text-xs font-black text-blue-500 uppercase tracking-widest mb-1">Pedido</p>
+                                    <p className={`text-xs font-black uppercase tracking-widest mb-1 flex items-center gap-1 ${pedidoSelecionado.tipoFila === 'OS' ? 'text-purple-500' : 'text-blue-500'}`}>
+                                        {pedidoSelecionado.tipoFila === 'OS' ? <><Wrench size={14}/> Ordem de Serviço</> : <><Package size={14}/> Venda Balcão</>}
+                                    </p>
                                     <h2 className="text-4xl font-black text-slate-800">#{pedidoSelecionado.id}</h2>
                                     <p className="text-slate-500 font-bold mt-1 flex items-center gap-1"><User size={16}/> {pedidoSelecionado.cliente?.nome || 'Consumidor Final'}</p>
                                 </div>
 
-                                {/* RESUMO FINANCEIRO HÍBRIDO (IVA LIGADO OU DESLIGADO VIA CONFIG) */}
+                                {/* RESUMO FINANCEIRO HÍBRIDO */}
                                 <div className="text-right bg-white p-4 rounded-2xl shadow-sm border border-slate-200 min-w-[220px]">
                                     {exibirIvaDual ? (
                                         <div className="animate-fade-in flex flex-col items-end">
@@ -491,19 +561,24 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                             {!modoRecebimento ? (
                                 <>
                                     <div className="flex-1 p-8 overflow-y-auto bg-white">
-                                        <h3 className="font-black text-slate-400 uppercase tracking-widest text-xs mb-4">Itens da Venda</h3>
+                                        <h3 className="font-black text-slate-400 uppercase tracking-widest text-xs mb-4">
+                                            {pedidoSelecionado.tipoFila === 'OS' ? 'Peças e Serviços' : 'Itens da Venda'}
+                                        </h3>
                                         <table className="w-full text-left text-sm">
                                             <thead className="bg-slate-50">
                                             <tr className="text-[10px] text-slate-400 uppercase font-black tracking-widest border-y border-slate-200">
-                                                <th className="p-3">Produto</th>
+                                                <th className="p-3">Produto / Serviço</th>
                                                 <th className="p-3 text-center w-24">Qtd</th>
                                                 <th className="p-3 text-right w-32">Total</th>
                                             </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
-                                            {pedidoSelecionado.itens?.map((item, idx) => (
+                                            {/* Usa a lista de itens normal (Vendas) ou a lista unificada (OS) */}
+                                            {(pedidoSelecionado.itensUnificados || pedidoSelecionado.itens || []).map((item, idx) => (
                                                 <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-3 font-bold text-slate-700">{item.produto?.nome}</td>
+                                                    <td className={`p-3 font-bold ${item.produto?.nome?.includes('[SERVIÇO]') ? 'text-orange-600' : 'text-slate-700'}`}>
+                                                        {item.produto?.nome}
+                                                    </td>
                                                     <td className="p-3 text-center font-bold text-slate-500">{item.quantidade}</td>
                                                     <td className="p-3 text-right font-black text-slate-800">R$ {(item.precoUnitario * item.quantidade).toFixed(2)}</td>
                                                 </tr>
@@ -513,10 +588,10 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                     </div>
 
                                     {/* BOTÕES DE AÇÃO */}
-                                    <div className="p-6 bg-slate-900 border-t-4 border-blue-500 flex gap-4">
+                                    <div className={`p-6 border-t-4 flex gap-4 ${pedidoSelecionado.tipoFila === 'OS' ? 'bg-slate-900 border-purple-500' : 'bg-slate-900 border-blue-500'}`}>
                                         {!isPago ? (
                                             <>
-                                                <button onClick={() => setModalDevolucaoAberto(true)} title="Devolver pedido (F8)" className="px-6 py-5 bg-slate-800 text-red-400 font-bold rounded-xl hover:bg-red-950 transition-colors flex items-center gap-2">
+                                                <button onClick={() => setModalDevolucaoAberto(true)} title="Devolver pedido/Reverter OS (F8)" className="px-6 py-5 bg-slate-800 text-red-400 font-bold rounded-xl hover:bg-red-950 transition-colors flex items-center gap-2">
                                                     <Undo size={20}/> DEVOLVER (F8)
                                                 </button>
                                                 <button onClick={() => abrirPagamentoDireto(pedidoSelecionado)} title="Avançar para pagamento (Enter / F12)" className="flex-1 py-5 bg-green-500 hover:bg-green-400 text-slate-900 font-black text-lg rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2">
@@ -531,10 +606,13 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                                 >
                                                     <Printer size={24} /> IMPRIMIR RECIBO (F10)
                                                 </button>
+
+                                                {/* Somente Vendas Normais habilitam o botão de NFC-e */}
                                                 <button
                                                     onClick={emitirCupomFiscal}
-                                                    disabled={processandoNfce}
-                                                    className="flex-1 py-5 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-black text-lg rounded-xl flex items-center justify-center gap-3 transition-transform transform hover:-translate-y-1 shadow-lg shadow-emerald-500/30 disabled:opacity-50"
+                                                    disabled={processandoNfce || pedidoSelecionado.tipoFila === 'OS'}
+                                                    className="flex-1 py-5 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-black text-lg rounded-xl flex items-center justify-center gap-3 transition-transform transform hover:-translate-y-1 shadow-lg shadow-emerald-500/30 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    title={pedidoSelecionado.tipoFila === 'OS' ? "Emissão Fiscal de OS deve ser feita pelo Gerenciador Fiscal" : "Emitir Nota"}
                                                 >
                                                     {processandoNfce ? <Loader2 size={24} className="animate-spin" /> : <Receipt size={24} />} EMITIR NFC-e (F12)
                                                 </button>
@@ -676,13 +754,19 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                 </div>
             </div>
 
-            {/* Modal de Devolução */}
+            {/* Modal de Devolução / Reversão */}
             {modalDevolucaoAberto && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] animate-fade-in">
                     <div className="bg-white p-8 rounded-3xl max-w-sm text-center border-4 border-red-500 shadow-2xl">
                         <AlertCircle size={48} className="text-red-500 mx-auto mb-4"/>
-                        <h2 className="text-2xl font-black mb-2 text-slate-800">Devolver Pedido?</h2>
-                        <p className="text-sm font-bold text-slate-500 mb-6">O pedido voltará para o Balcão de Vendas para correção ou exclusão.</p>
+                        <h2 className="text-2xl font-black mb-2 text-slate-800">
+                            {pedidoSelecionado?.tipoFila === 'OS' ? 'Reverter OS?' : 'Devolver Pedido?'}
+                        </h2>
+                        <p className="text-sm font-bold text-slate-500 mb-6">
+                            {pedidoSelecionado?.tipoFila === 'OS'
+                                ? 'A OS sairá da Fila do Caixa e voltará para o status "Em Execução" no Kanban.'
+                                : 'O pedido voltará para o Balcão de Vendas para correção ou exclusão.'}
+                        </p>
                         <div className="flex gap-4">
                             <button onClick={() => setModalDevolucaoAberto(false)} className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">CANCELAR (Esc)</button>
                             <button onClick={confirmarDevolucaoAoVendedor} className="flex-1 py-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl shadow-lg">SIM, DEVOLVER</button>
