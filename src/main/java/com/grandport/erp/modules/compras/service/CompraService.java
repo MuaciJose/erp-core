@@ -10,6 +10,8 @@ import com.grandport.erp.modules.financeiro.model.ContaPagar;
 import com.grandport.erp.modules.financeiro.service.FinanceiroService;
 import com.grandport.erp.modules.parceiro.model.*;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
+// 🚀 1. IMPORTAÇÃO DA AUDITORIA
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,9 @@ public class CompraService {
     @Autowired private CompraXMLRepository compraXMLRepository;
     @Autowired private EstoqueService estoqueService;
 
+    // 🚀 2. INJEÇÃO DO MOTOR DE AUDITORIA
+    @Autowired private AuditoriaService auditoriaService;
+
     public List<ImportacaoResumoDTO> listarHistorico() {
         return compraXMLRepository.findAll().stream().map(entidade -> {
             ImportacaoResumoDTO dto = new ImportacaoResumoDTO();
@@ -50,13 +55,12 @@ public class CompraService {
                         pDto.setId(i.getId());
                         pDto.setSku(i.getCodigoFornecedor());
                         pDto.setQuantidade(i.getQuantidade());
-                        pDto.setEstoqueAtual(0); // Padrão
+                        pDto.setEstoqueAtual(0);
 
-                        // 🚀 A MÁGICA AQUI: Se a peça for conhecida, puxa o nome limpo e o estoque do banco!
                         if (i.getProdutoId() != null) {
                             produtoRepository.findById(i.getProdutoId()).ifPresent(prod -> {
-                                pDto.setNome(prod.getNome()); // Sobrescreve o nome sujo do XML!
-                                pDto.setEstoqueAtual(prod.getQuantidadeEstoque()); // Envia o estoque atual pra tela
+                                pDto.setNome(prod.getNome());
+                                pDto.setEstoqueAtual(prod.getQuantidadeEstoque());
                             });
                         }
 
@@ -100,23 +104,19 @@ public class CompraService {
         historico.setValorTotal(total);
         historico.setStatus("Pendente Revisão");
 
-        // 🚀 FASE 1: APENAS RASCUNHA OS ITENS E FAZ O RECONHECIMENTO.
         for (NfeDTO.Detalhe detalhe : info.getDetalhes()) {
             ItemNotaDTO itemXml = detalhe.getProduto();
 
-            // 🚀 INTELIGÊNCIA DE RECONHECIMENTO AUTOMÁTICO (EAN + SKU)
             Optional<Produto> prodOpt = Optional.empty();
             String codigoEan = itemXml.getEan();
             String codigoFornecedor = itemXml.getCodigoProduto();
 
-            // Tentativa 1: Busca pelo Código de Barras (se for um código de verdade)
             if (codigoEan != null && !codigoEan.equalsIgnoreCase("SEM GTIN") && !codigoEan.trim().isEmpty()) {
                 try {
                     prodOpt = produtoRepository.findByCodigoBarras(codigoEan);
                 } catch (Exception e) {}
             }
 
-            // Tentativa 2: Se não achou pelo EAN (ou era SEM GTIN), busca pelo SKU (Código do Fornecedor)
             if (prodOpt.isEmpty() && codigoFornecedor != null && !codigoFornecedor.trim().isEmpty()) {
                 try {
                     prodOpt = produtoRepository.findBySku(codigoFornecedor);
@@ -124,7 +124,7 @@ public class CompraService {
             }
 
             CompraItem item = new CompraItem();
-            item.setProdutoId(prodOpt.map(Produto::getId).orElse(null)); // Se achou no estoque, preenche!
+            item.setProdutoId(prodOpt.map(Produto::getId).orElse(null));
             item.setNome(itemXml.getNomeProduto());
             item.setPrecoCusto(itemXml.getValorUnitario());
             item.setCodigoFornecedor(itemXml.getCodigoProduto());
@@ -143,6 +143,9 @@ public class CompraService {
         historico = compraXMLRepository.save(historico);
         final Long idSalvo = historico.getId();
 
+        // 🚀 3. AUDITORIA: Registro de Criação do Rascunho
+        auditoriaService.registrar("COMPRAS", "IMPORTACAO_XML", "Rascunho de importação criado: NF-e " + info.getIde().getNumeroNota() + " | Fornecedor: " + fornecedor.getNome());
+
         return listarHistorico().stream().filter(n -> n.getId().equals(idSalvo)).findFirst().orElse(null);
     }
 
@@ -155,28 +158,20 @@ public class CompraService {
             throw new RuntimeException("Esta nota já está finalizada.");
         }
 
-        // 🚀 FASE 2: AQUI SIM APLICAMOS A MATEMÁTICA E O ESTOQUE!
         if (dto != null && dto.getItens() != null) {
             for (ConfirmacaoNotaDTO.ItemConfirmacao itemDto : dto.getItens()) {
 
-                // Busca o item original do XML
                 CompraItem itemXml = nota.getItens().stream()
                         .filter(i -> i.getId().equals(itemDto.getIdImportacao()))
                         .findFirst().orElseThrow(() -> new RuntimeException("Item do XML não encontrado."));
 
-
-
-                // Se o usuário vinculou ou já tinha ID, usa ele. Se for nulo, cria um novo agora!
                 Produto produtoFinal;
 
-                // Se o usuário vinculou ou já tinha ID do Rascunho, usa ele.
                 if (itemDto.getProdutoId() != null) {
                     produtoFinal = produtoRepository.findById(itemDto.getProdutoId())
                             .orElseThrow(() -> new RuntimeException("Produto vinculado não encontrado no banco."));
 
                 } else {
-                    // 🛡️ PROTEÇÃO CONTRA A CONSTRAINT UNIQUE (Evita tentar criar produto duplicado)
-                    // Tenta achar pelo EAN ou SKU uma última vez antes de mandar criar.
                     Optional<Produto> prodOpt = Optional.empty();
                     String codigoEan = itemXml.getEanBarras();
                     String skuFornecedor = itemXml.getCodigoFornecedor();
@@ -188,16 +183,13 @@ public class CompraService {
                         try { prodOpt = produtoRepository.findBySku(skuFornecedor); } catch (Exception e) {}
                     }
 
-                    // Se achou na repescagem, usa ele! Se não achou mesmo, aí sim cria o novo.
                     produtoFinal = prodOpt.orElseGet(() -> criarNovoProdutoPelaNota(itemXml, itemDto.getPrecoVenda()));
                 }
 
-                // Atualiza o custo e preço de venda com base na matemática da tela (Caixa -> Unidade)
                 produtoFinal.setPrecoCusto(itemDto.getCustoFinal());
                 produtoFinal.setPrecoVenda(itemDto.getPrecoVenda());
                 produtoFinal = produtoRepository.save(produtoFinal);
 
-                // Dá entrada no estoque usando a Quantidade Final (já multiplicada pelo fator de conversão)
                 int quantidadeRealEntrada = itemDto.getQuantidadeFinal().intValue();
                 estoqueService.registrarMovimentacao(
                         produtoFinal,
@@ -208,13 +200,11 @@ public class CompraService {
                         nota.getNumero()
                 );
 
-                // Atualiza o rascunho com as decisões finais
                 itemXml.setProdutoId(produtoFinal.getId());
                 itemXml.setPrecoVenda(itemDto.getPrecoVenda());
             }
         }
 
-        // 🚀 AGORA SIM GERA O CONTAS A PAGAR! (Evita criar boleto se o cara excluir a nota antes)
         Parceiro fornecedor = parceiroRepository.findByDocumento(nota.getCnpjFornecedor())
                 .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
 
@@ -227,6 +217,9 @@ public class CompraService {
                     descricao
             );
         }
+
+        // 🚀 4. AUDITORIA: Finalização da Nota e Entrada de Estoque
+        auditoriaService.registrar("COMPRAS", "FECHAMENTO_NOTA", "NF-e " + nota.getNumero() + " finalizada. Estoque atualizado (" + dto.getItens().size() + " itens processados) e Contas a Pagar gerado no valor de R$ " + nota.getValorTotal());
 
         nota.setStatus("Finalizado");
         compraXMLRepository.save(nota);
@@ -274,7 +267,7 @@ public class CompraService {
         novo.setSku(item.getCodigoFornecedor());
         novo.setCodigoBarras(item.getEanBarras());
         novo.setPrecoCusto(item.getPrecoCusto());
-        novo.setQuantidadeEstoque(0); // Inicia com zero, o registrarMovimentacao fará a adição
+        novo.setQuantidadeEstoque(0);
         novo.setPrecoVenda(precoVenda != null ? precoVenda : item.getPrecoCusto().multiply(new BigDecimal("1.40")));
 
         Ncm ncm = ncmRepository.findById(item.getNcm())
@@ -299,43 +292,38 @@ public class CompraService {
 
     @Transactional
     public void excluirImportacao(Long id) {
-        // 1. Busca a nota antes de apagar para saber o que tinha nela
         CompraXML nota = compraXMLRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Nota não encontrada para exclusão."));
 
-        // 2. Se a nota já foi finalizada, precisamos ESTORNAR o estoque
         if ("Finalizado".equals(nota.getStatus())) {
             for (CompraItem item : nota.getItens()) {
                 if (item.getProdutoId() != null) {
                     produtoRepository.findById(item.getProdutoId()).ifPresent(produto -> {
-
-                        // 🚀 IMPORTANTE: Aqui usamos a quantidade que foi salva no item.
-                        // Se você usou conversão (ex: 24 frascos), o item.getQuantidade()
-                        // deve refletir o que foi somado.
-                        // Se no seu banco o 'item' guarda a quantidade convertida, usamos ela:
                         int quantidadeParaSubtrair = item.getQuantidade().intValue();
 
-                        // Registra a saída de estorno para o histórico ficar perfeito
                         estoqueService.registrarMovimentacao(
                                 produto,
                                 quantidadeParaSubtrair,
-                                "SAIDA", // Ou crie um tipo "ESTORNO" no seu sistema
+                                "SAIDA",
                                 "ESTORNO: Exclusão da NF-e " + nota.getNumero(),
                                 nota.getFornecedor(),
                                 nota.getNumero()
                         );
 
-                        // Atualiza o saldo do produto (O registrarMovimentacao já deve fazer isso,
-                        // mas garantimos aqui se necessário)
                         int novoEstoque = produto.getQuantidadeEstoque() - quantidadeParaSubtrair;
-                        produto.setQuantidadeEstoque(Math.max(0, novoEstoque)); // Evita estoque negativo se não permitido
+                        produto.setQuantidadeEstoque(Math.max(0, novoEstoque));
                         produtoRepository.save(produto);
+
+                        // 🚀 5. AUDITORIA: Estorno de estoque individual
+                        auditoriaService.registrar("ESTOQUE", "ESTORNO_AUTOMATICO", "Estorno (Remoção) via exclusão de NF-e " + nota.getNumero() + ": " + produto.getNome() + " | Qtd removida: " + quantidadeParaSubtrair);
                     });
                 }
             }
         }
 
-        // 3. Agora sim, depois de limpar o estoque, apaga a nota do banco
+        // 🚀 6. AUDITORIA: Exclusão definitiva da nota
+        auditoriaService.registrar("COMPRAS", "EXCLUSAO_NFE", "Exclusão definitiva da Importação NF-e nº " + nota.getNumero() + " do Fornecedor " + nota.getFornecedor());
+
         compraXMLRepository.delete(nota);
     }
 }

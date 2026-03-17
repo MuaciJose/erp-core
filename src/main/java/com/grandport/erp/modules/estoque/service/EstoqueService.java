@@ -6,6 +6,8 @@ import com.grandport.erp.modules.estoque.model.Produto;
 import com.grandport.erp.modules.estoque.repository.MovimentacaoEstoqueRepository;
 import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
 import com.grandport.erp.modules.vendas.repository.ItemVendaRepository;
+// 🚀 1. IMPORTAÇÃO DA AUDITORIA
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,9 @@ public class EstoqueService {
 
     // 🚀 Repositório para gravar o extrato
     @Autowired private MovimentacaoEstoqueRepository movimentacaoRepository;
+
+    // 🚀 2. INJEÇÃO DO MOTOR DE AUDITORIA
+    @Autowired private AuditoriaService auditoriaService;
 
     /**
      * REGISTRA UMA MOVIMENTAÇÃO NO EXTRATO E ATUALIZA O SALDO REAL
@@ -53,6 +58,13 @@ public class EstoqueService {
 
         // 2. Grava a movimentação no histórico
         movimentacaoRepository.save(mov);
+
+        // 🚀 3. AUDITORIA: Monitoramento universal de saldo
+        String acao = tipo.equalsIgnoreCase("ENTRADA") ? "ENTRADA_ESTOQUE" : "SAIDA_ESTOQUE";
+        String detalhes = String.format("Movimentação: Produto '%s' | Qtd: %d | Saldo: %d -> %d | Motivo: %s | Doc: %s",
+                produto.getNome(), qtd, saldoAnterior, novoSaldo, motivo, (documento != null ? documento : "N/A"));
+
+        auditoriaService.registrar("ESTOQUE", acao, detalhes);
     }
 
     /**

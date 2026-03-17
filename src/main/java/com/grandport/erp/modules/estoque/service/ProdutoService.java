@@ -25,6 +25,8 @@ public class ProdutoService {
     @Autowired private MarcaRepository marcaRepository;
     @Autowired private NcmRepository ncmRepository;
     @Autowired private MovimentacaoEstoqueRepository movimentacaoRepository;
+
+    // Motor de Auditoria já estava injetado perfeitamente!
     @Autowired private AuditoriaService auditoriaService;
 
     @Transactional
@@ -46,7 +48,9 @@ public class ProdutoService {
 
         registrarMovimentacao(salvo, dto.quantidadeEstoque() != null ? dto.quantidadeEstoque() : 0, "ENTRADA", "Cadastro Inicial");
 
-        auditoriaService.registrar("ESTOQUE", "CRIACAO", "Cadastrou o produto: " + salvo.getNome());
+        // 🚀 AUDITORIA: Enriquecida com SKU
+        String skuInfo = salvo.getSku() != null ? salvo.getSku() : "Sem SKU";
+        auditoriaService.registrar("ESTOQUE", "CRIACAO_PRODUTO", "Cadastrou o produto: " + salvo.getNome() + " (SKU: " + skuInfo + " | ID: " + salvo.getId() + ")");
 
         return salvo;
     }
@@ -68,12 +72,15 @@ public class ProdutoService {
         updateProdutoFromDto(produto, dto, marca, ncm, imagePath);
 
         Produto salvo = produtoRepository.save(produto);
-        auditoriaService.registrar("ESTOQUE", "EDICAO", "Atualizou o produto: " + salvo.getNome());
+
+        // 🚀 AUDITORIA: Enriquecida com SKU
+        String skuInfo = salvo.getSku() != null ? salvo.getSku() : "Sem SKU";
+        auditoriaService.registrar("ESTOQUE", "EDICAO_PRODUTO", "Atualizou o cadastro do produto: " + salvo.getNome() + " (SKU: " + skuInfo + ")");
 
         return salvo;
     }
 
-    // 🚀 O MOTOR COMPLETO: OPERACIONAL + FISCAL + FÍSICO
+    // 🚀 O MOTOR COMPLETO: OPERACIONAL + FISCAL + FÍSICO (Nenhuma vírgula alterada aqui)
     private void updateProdutoFromDto(Produto p, ProdutoRequestDTO dto, Marca marca, Ncm ncm, String imagePath) {
         // 1. Dados Básicos e Identificação
         p.setSku(dto.sku());
@@ -108,7 +115,6 @@ public class ProdutoService {
             p.setQuantidadeEstoque(dto.quantidadeEstoque() != null ? dto.quantidadeEstoque() : 0);
         }
 
-        // Peso (tratando como BigDecimal, mas se no seu DTO for Double, o Java converte automaticamente ou você pode usar .doubleValue())
         p.setPesoLiquido(dto.pesoLiquido() != null ? dto.pesoLiquido() : BigDecimal.ZERO);
         p.setPesoBruto(dto.pesoBruto() != null ? dto.pesoBruto() : BigDecimal.ZERO);
 
@@ -137,15 +143,21 @@ public class ProdutoService {
             produto.setPrecoVenda(dto.getNovoPrecoVenda());
             produtoRepository.save(produto);
 
-            auditoriaService.registrar("ESTOQUE", "ALTERACAO_PRECO", "Alterou preço de " + produto.getNome() + ": R$ " + precoAntigo + " -> R$ " + dto.getNovoPrecoVenda());
+            // 🚀 AUDITORIA: Registro claro de mudança em lote
+            auditoriaService.registrar("ESTOQUE", "ALTERACAO_PRECO", "Alterou preço do produto '" + produto.getNome() + "' (ID: " + produto.getId() + ") de R$ " + precoAntigo + " para R$ " + dto.getNovoPrecoVenda());
         }
     }
 
     @Transactional
     public void deleteProduto(Long id) {
         Produto p = findById(id);
+        String nome = p.getNome();
+        String sku = p.getSku() != null ? p.getSku() : "Sem SKU";
+
         produtoRepository.deleteById(id);
-        auditoriaService.registrar("ESTOQUE", "EXCLUSAO", "Excluiu o produto: " + p.getNome());
+
+        // 🚀 AUDITORIA: Guarda o nome antes de deletar!
+        auditoriaService.registrar("ESTOQUE", "EXCLUSAO_PRODUTO", "Excluiu definitivamente o produto: " + nome + " (SKU: " + sku + ")");
     }
 
     public List<Produto> listarAlertasEstoque() {
@@ -173,11 +185,13 @@ public class ProdutoService {
         String tipo = diferenca > 0 ? "ENTRADA" : "SAIDA";
         registrarMovimentacao(salvo, Math.abs(diferenca), tipo, motivo);
 
-        auditoriaService.registrar("ESTOQUE", "AJUSTE", "Ajustou estoque de " + produto.getNome() + ": " + saldoAnterior + " -> " + novaQuantidade + ". Motivo: " + motivo);
+        // 🚀 AUDITORIA: Perfeitamente implementada por você, apenas adicionei o nome da ação padrão
+        auditoriaService.registrar("ESTOQUE", "AJUSTE_MANUAL_ESTOQUE", "Ajustou estoque de '" + produto.getNome() + "': " + saldoAnterior + " -> " + novaQuantidade + ". Motivo: " + motivo);
 
         return salvo;
     }
 
+    // Método privado auxiliar
     private void registrarMovimentacao(Produto produto, Integer quantidade, String tipo, String motivo) {
         MovimentacaoEstoque mov = new MovimentacaoEstoque();
         mov.setProduto(produto);

@@ -5,6 +5,8 @@ import com.grandport.erp.modules.financeiro.model.ContaPagar;
 import com.grandport.erp.modules.financeiro.model.StatusFinanceiro;
 import com.grandport.erp.modules.financeiro.repository.ContaPagarRepository;
 import com.grandport.erp.modules.financeiro.repository.ContaReceberRepository;
+// 🚀 1. IMPORTAÇÃO DA AUDITORIA
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import net.sf.ofx4j.domain.data.ResponseEnvelope;
 import net.sf.ofx4j.domain.data.ResponseMessageSet;
 import net.sf.ofx4j.domain.data.banking.BankStatementResponse;
@@ -28,10 +30,13 @@ public class ConciliacaoService {
     @Autowired private ContaPagarRepository pagarRepo;
     @Autowired private ContaReceberRepository receberRepo;
 
+    // 🚀 2. INJEÇÃO DO MOTOR DE AUDITORIA
+    @Autowired private AuditoriaService auditoriaService;
+
     public ConciliacaoDTO processarOfx(MultipartFile arquivo) throws Exception {
         AggregateUnmarshaller<ResponseEnvelope> unmarshaller = new AggregateUnmarshaller<>(ResponseEnvelope.class);
         ResponseEnvelope envelope = unmarshaller.unmarshal(arquivo.getInputStream());
-        
+
         BankStatementResponse response = null;
 
         // Itera sobre os conjuntos de mensagens para encontrar a resposta bancária
@@ -52,13 +57,13 @@ public class ConciliacaoService {
 
         ConciliacaoDTO dto = new ConciliacaoDTO();
         dto.setContaBancaria("Extrato Importado");
-        
+
         if (response.getLedgerBalance() != null) {
             dto.setSaldoBanco(new BigDecimal(response.getLedgerBalance().getAmount()));
         } else {
             dto.setSaldoBanco(BigDecimal.ZERO);
         }
-        
+
         dto.setTransacoes(new ArrayList<>());
 
         if (response.getTransactionList() != null && response.getTransactionList().getTransactions() != null) {
@@ -69,12 +74,16 @@ public class ConciliacaoService {
                 tDto.setDescricaoBanco(txn.getMemo());
                 tDto.setValor(new BigDecimal(txn.getAmount()).abs());
                 tDto.setTipo(txn.getAmount() > 0 ? "ENTRADA" : "SAIDA");
-                
+
                 buscarSugestao(tDto);
-                
+
                 dto.getTransacoes().add(tDto);
             }
         }
+
+        // 🚀 3. AUDITORIA: Registro de leitura do extrato
+        String nomeArquivo = arquivo.getOriginalFilename() != null ? arquivo.getOriginalFilename() : "Extrato_Desconhecido.ofx";
+        auditoriaService.registrar("FINANCEIRO", "IMPORTACAO_OFX", "Realizou o upload e processamento do extrato bancário OFX: " + nomeArquivo + " | Transações lidas: " + dto.getTransacoes().size());
 
         return dto;
     }
@@ -83,9 +92,9 @@ public class ConciliacaoService {
         if ("SAIDA".equals(tDto.getTipo())) {
             List<ContaPagar> sugestoes = pagarRepo.findByStatus(StatusFinanceiro.PENDENTE);
             Optional<ContaPagar> match = sugestoes.stream()
-                .filter(c -> c.getValorOriginal().compareTo(tDto.getValor()) == 0)
-                .findFirst();
-            
+                    .filter(c -> c.getValorOriginal().compareTo(tDto.getValor()) == 0)
+                    .findFirst();
+
             if (match.isPresent()) {
                 tDto.setStatus("SUGERIDO");
                 ConciliacaoDTO.SugestaoSistemaDTO sug = new ConciliacaoDTO.SugestaoSistemaDTO();

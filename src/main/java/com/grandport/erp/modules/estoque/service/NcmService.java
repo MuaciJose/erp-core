@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.grandport.erp.modules.estoque.model.Ncm;
 import com.grandport.erp.modules.estoque.repository.NcmRepository;
+// 🚀 1. IMPORTAÇÃO DA AUDITORIA
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -24,6 +26,10 @@ public class NcmService {
 
     @Autowired
     private NcmRepository repository;
+
+    // 🚀 2. INJEÇÃO DO MOTOR DE AUDITORIA
+    @Autowired
+    private AuditoriaService auditoriaService;
 
     @Transactional
     public void importarNcmDoJson(MultipartFile arquivo) throws IOException {
@@ -67,7 +73,7 @@ public class NcmService {
         // Limpa NCMs inválidos do JSON
         ncmsJson.removeIf(n -> n.getCodigo() == null || n.getCodigo().trim().isEmpty());
 
-        // 🚀 LÓGICA DE UPSERT (Update ou Insert)
+        // LÓGICA DE UPSERT (Update ou Insert)
 
         // 1. Remove duplicatas que possam vir dentro do próprio JSON (mantém o último)
         Map<String, Ncm> mapaJson = new LinkedHashMap<>();
@@ -98,6 +104,10 @@ public class NcmService {
 
         // Salva tudo de uma vez (novos e atualizados)
         repository.saveAll(ncmsParaSalvar);
+
+        // 🚀 3. AUDITORIA: Rastreamento de atualização da base fiscal (Extremamente útil)
+        String nomeArq = arquivo.getOriginalFilename() != null ? arquivo.getOriginalFilename() : "Desconhecido";
+        auditoriaService.registrar("SISTEMA", "IMPORTACAO_NCM", "A base fiscal de NCMs foi atualizada em lote via JSON (" + nomeArq + "). Total processado: " + ncmsParaSalvar.size() + " registros.");
     }
 
     public List<Ncm> buscarNcm(String termo) {
@@ -109,6 +119,10 @@ public class NcmService {
     public void limparTabela() {
         try {
             repository.deleteAllInBatch();
+
+            // 🚀 4. AUDITORIA: Rastreamento de exclusão perigosa
+            auditoriaService.registrar("SISTEMA", "EXCLUSAO_NCM_LOTE", "ALERTA: A tabela de NCMs foi completamente esvaziada pelo usuário.");
+
         } catch (DataIntegrityViolationException e) {
             // Captura o erro do banco e devolve uma mensagem limpa para o Frontend
             throw new RuntimeException("Não é possível limpar a tabela pois existem produtos ou notas usando estes NCMs. Apenas faça o upload do novo arquivo para atualizar os dados.");

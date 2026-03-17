@@ -32,6 +32,8 @@ public class FinanceiroService {
     @Autowired private VendaRepository vendaRepository;
     @Autowired private ContaBancariaRepository bancoRepo;
     @Autowired private PlanoContaRepository planoRepo;
+
+    // Motor de Auditoria já estava perfeitamente injetado por você!
     @Autowired private AuditoriaService auditoriaService;
 
     public List<ContaReceberDTO> listarContasAReceber() {
@@ -152,7 +154,7 @@ public class FinanceiroService {
 
         parceiroRepository.findByNome(dto.getFornecedor()).ifPresent(conta::setParceiro);
         ContaPagar salva = pagarRepo.save(conta);
-        auditoriaService.registrar("FINANCEIRO", "CRIACAO_DESPESA", "Registrou despesa manual: " + salva.getDescricao());
+        auditoriaService.registrar("FINANCEIRO", "CRIACAO_DESPESA", "Registrou despesa manual: " + salva.getDescricao() + " no valor de R$ " + dto.getValor());
         return salva;
     }
 
@@ -185,7 +187,13 @@ public class FinanceiroService {
         conta.setValorOriginal(valor);
         conta.setDataVencimento(dataVencimento);
         conta.setStatus(StatusFinanceiro.PENDENTE);
-        return pagarRepo.save(conta);
+
+        ContaPagar salva = pagarRepo.save(conta);
+
+        // 🚀 AUDITORIA: Adicionada
+        auditoriaService.registrar("FINANCEIRO", "GERACAO_PAGAR", "Gerou conta a pagar (ID: " + salva.getId() + ") para '" + (fornecedor != null ? fornecedor.getNome() : "Desconhecido") + "' no valor de R$ " + valor);
+
+        return salva;
     }
 
     public ExtratoParceiroDTO gerarExtratoParceiro(Long parceiroId) {
@@ -208,6 +216,9 @@ public class FinanceiroService {
         mov.setTipo("ENTRADA");
         mov.setCategoria("VENDA_PDV");
         caixaRepo.save(mov);
+
+        // 🚀 AUDITORIA: Adicionada
+        auditoriaService.registrar("CAIXA", "ENTRADA_AVULSA", "Entrada imediata de R$ " + valor + " via " + metodo);
     }
 
     @Transactional
@@ -220,6 +231,9 @@ public class FinanceiroService {
             conta.setStatus(StatusFinanceiro.PENDENTE);
             recebaRepo.save(conta);
         }
+
+        // 🚀 AUDITORIA: Adicionada
+        auditoriaService.registrar("FINANCEIRO", "GERACAO_RECEBER_CARTAO", "Gerou " + parcelas + " parcela(s) a receber em Cartão totalizando R$ " + valor);
     }
 
     // =========================================================================
@@ -245,6 +259,10 @@ public class FinanceiroService {
 
             recebaRepo.save(conta);
         }
+
+        // 🚀 AUDITORIA: CRÍTICA! Adicionada para rastrear geração de fiado/promissórias
+        String nomeCliente = cliente != null ? cliente.getNome() : "Desconhecido";
+        auditoriaService.registrar("FINANCEIRO", "GERACAO_PROMISSORIAS", "Gerou " + parcelas + " promissória(s) para o cliente '" + nomeCliente + "' ref. Venda #" + venda.getId() + " totalizando R$ " + venda.getValorTotal());
     }
 
     // =========================================================================
@@ -262,7 +280,6 @@ public class FinanceiroService {
             map.put("dataVencimento", c.getDataVencimento().toString());
             map.put("valor", c.getValorOriginal());
 
-            // Lógica de atraso
             boolean atrasado = c.getDataVencimento().isBefore(LocalDateTime.now());
             map.put("atrasado", atrasado);
 
@@ -283,18 +300,15 @@ public class FinanceiroService {
             throw new RuntimeException("Esta conta já foi baixada anteriormente.");
         }
 
-        // Pega o valor recebido que veio do Front (com Juros/Multa se houver)
         BigDecimal valorRecebido = new BigDecimal(payload.getOrDefault("valorRecebido", conta.getValorOriginal()).toString());
         String metodo = payload.getOrDefault("metodoPagamento", "DINHEIRO").toString();
 
         conta.setStatus(StatusFinanceiro.PAGO);
         conta.setDataPagamento(LocalDateTime.now());
-        conta.setValorPago(valorRecebido); // Salva o valor real com juros
+        conta.setValorPago(valorRecebido);
 
-        // 🚀 MÁGICA: Devolve o limite de crédito para o cliente
         Parceiro cliente = conta.getParceiro();
         if (cliente != null) {
-            // Desconta o valor ORIGINAL do Saldo Devedor (Juros é lucro, não devolve limite extra)
             BigDecimal novoSaldo = cliente.getSaldoDevedor().subtract(conta.getValorOriginal());
             if(novoSaldo.compareTo(BigDecimal.ZERO) < 0) novoSaldo = BigDecimal.ZERO;
 
@@ -304,7 +318,6 @@ public class FinanceiroService {
 
         recebaRepo.save(conta);
 
-        // Registra o dinheiro no caixa/banco da loja
         MovimentacaoCaixa mov = new MovimentacaoCaixa();
         mov.setDescricao("Recebimento C/R: " + conta.getDescricao() + " (" + metodo + ")");
         mov.setValor(valorRecebido);
@@ -312,8 +325,11 @@ public class FinanceiroService {
         mov.setCategoria("RECEBIMENTO_CONTA");
         caixaRepo.save(mov);
 
-        try {
-            auditoriaService.registrar("FINANCEIRO", "BAIXA_RECEBER", "Baixou a conta #" + contaId + " no valor de R$ " + valorRecebido);
-        } catch(Exception e){}
+        // 🚀 AUDITORIA: Melhorada para exibir informações cruciais (se teve juros ou desconto)
+        String nomeCliente = cliente != null ? cliente.getNome() : "Desconhecido";
+        String detalhesLog = String.format("Baixou conta a receber (ID: %d) de '%s' via %s. Valor Original: R$ %s | Valor Recebido: R$ %s",
+                contaId, nomeCliente, metodo, conta.getValorOriginal(), valorRecebido);
+
+        auditoriaService.registrar("FINANCEIRO", "BAIXA_RECEBER", detalhesLog);
     }
 }

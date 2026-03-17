@@ -2,6 +2,8 @@ package com.grandport.erp.modules.configuracoes.service;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
+// 🚀 1. IMPORTAÇÃO DA AUDITORIA
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
@@ -39,6 +41,10 @@ public class ConfiguracaoService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    // 🚀 2. INJEÇÃO DO MOTOR DE AUDITORIA
+    @Autowired
+    private AuditoriaService auditoriaService;
+
     private ScheduledFuture<?> tarefaAgendada;
 
     @org.springframework.beans.factory.annotation.Value("${spring.datasource.username}")
@@ -62,13 +68,11 @@ public class ConfiguracaoService {
             configPadrao.setHorarioBackupAuto("03:00");
             configPadrao.setSerieNfe(1);
             configPadrao.setNumeroProximaNfe(1L);
-            // 🚀 Campos NFC-e iniciados por padrão
             configPadrao.setSerieNfce(1);
             configPadrao.setNumeroProximaNfce(1L);
             return repository.save(configPadrao);
         });
 
-        // 🚀 Garantindo que campos novos não voltem nulos para o React
         if (config.getHorarioBackupAuto() == null) config.setHorarioBackupAuto("03:00");
         if (config.getTipoCertificado() == null) config.setTipoCertificado("A1");
         if (config.getSerieNfce() == null) config.setSerieNfce(1);
@@ -83,6 +87,10 @@ public class ConfiguracaoService {
         dadosAtualizados.setId(1L);
         ConfiguracaoSistema salva = repository.save(dadosAtualizados);
         reagendarBackup();
+
+        // 🚀 3. AUDITORIA: Alteração de Configurações Globais
+        auditoriaService.registrar("SISTEMA", "ALTERACAO_CONFIGURACAO", "As configurações globais do sistema e parâmetros fiscais foram atualizados.");
+
         return salva;
     }
 
@@ -96,10 +104,7 @@ public class ConfiguracaoService {
             throw new Exception("Preencha e salve o CNPJ da empresa antes de enviar o certificado.");
         }
 
-        // Limpa o CNPJ (remove pontos e traços) para o nome do arquivo ficar limpo
         String cnpjLimpo = config.getCnpj().replaceAll("[^0-9]", "");
-
-        // Caminho da pasta: /certificados na raiz do projeto
         String diretorioDestino = System.getProperty("user.dir") + File.separator + "certificados";
         File pasta = new File(diretorioDestino);
 
@@ -107,13 +112,13 @@ public class ConfiguracaoService {
             pasta.mkdirs();
         }
 
-        // Define o nome final do arquivo como: 12345678000199.pfx
         Path caminhoCompleto = Paths.get(diretorioDestino + File.separator + cnpjLimpo + ".pfx");
-
-        // Salva o arquivo substituindo se já existir
         Files.copy(arquivo.getInputStream(), caminhoCompleto, StandardCopyOption.REPLACE_EXISTING);
 
         System.out.println("✅ Certificado salvo com sucesso: " + caminhoCompleto.getFileName());
+
+        // 🚀 4. AUDITORIA: Upload de Certificado (Crítico)
+        auditoriaService.registrar("SISTEMA", "UPLOAD_CERTIFICADO", "Um novo Certificado Digital A1 foi carregado para o CNPJ: " + cnpjLimpo);
     }
 
     // =======================================================================
@@ -122,8 +127,7 @@ public class ConfiguracaoService {
     @Transactional
     public void resetarBancoDeDados() {
         try {
-            // 1. O Java pergunta ao Postgres: "Quais tabelas existem aí?" (ignorando as de segurança)
-            String sqlBuscaTabelas = "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('usuario', 'configuracoes_sistema')";
+            String sqlBuscaTabelas = "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('usuario', 'configuracoes_sistema', 'logs_auditoria')";
 
             List<String> tabelasParaApagar = jdbcTemplate.queryForList(sqlBuscaTabelas, String.class);
 
@@ -132,14 +136,16 @@ public class ConfiguracaoService {
                 return;
             }
 
-            // 2. Monta o comando TRUNCATE perfeitamente de acordo com o que existe no banco
             String tabelasJuntas = String.join(", ", tabelasParaApagar);
             String sqlTruncate = "TRUNCATE TABLE " + tabelasJuntas + " RESTART IDENTITY CASCADE;";
 
-            // 3. Executa a limpeza cirúrgica
             jdbcTemplate.execute(sqlTruncate);
 
             System.out.println("✅ Banco de dados resetado com sucesso! (Tabelas limpas: " + tabelasJuntas + ")");
+
+            // 🚀 5. AUDITORIA: Reset de Banco (Extremamente Crítico)
+            auditoriaService.registrar("SISTEMA", "RESET_BANCO_DADOS", "ALERTA CRÍTICO: O banco de dados foi completamente resetado (TRUNCATE). As tabelas limpas foram: " + tabelasJuntas);
+
         } catch (Exception e) {
             throw new RuntimeException("Falha crítica ao resetar o banco de dados: " + e.getMessage());
         }
@@ -182,15 +188,12 @@ public class ConfiguracaoService {
             String dbUser = dbUserProp;
             String dbPass = dbPassProp;
 
-            // 1. Limpa o terreno
             jdbcTemplate.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;");
             System.out.println("♻️ Esquema public recriado. Iniciando injeção do arquivo...");
 
-            // 2. Identifica o sistema operacional
             boolean isWindows = System.getProperty("os.name").toLowerCase().startsWith("windows");
             String comandoPsql = isWindows ? "psql.exe" : "psql";
 
-            // 3. Monta o comando
             ProcessBuilder pb = new ProcessBuilder(
                     comandoPsql,
                     "-h", "localhost",
@@ -223,6 +226,9 @@ public class ConfiguracaoService {
 
             System.out.println("✅ Backup restaurado com sucesso absoluto!");
 
+            // 🚀 6. AUDITORIA: Restauração de Backup (Crítico)
+            auditoriaService.registrar("SISTEMA", "RESTAURACAO_BACKUP", "ALERTA CRÍTICO: Um backup externo foi restaurado no banco de dados sobrescrevendo os dados atuais.");
+
         } finally {
             tempFile.delete();
         }
@@ -251,6 +257,10 @@ public class ConfiguracaoService {
             pb.redirectErrorStream(false);
 
             Process process = pb.start();
+
+            // 🚀 7. AUDITORIA: Geração de Backup Manual
+            auditoriaService.registrar("SISTEMA", "GERACAO_BACKUP", "O usuário solicitou e baixou um arquivo de backup completo do banco de dados.");
+
             return new InputStreamResource(process.getInputStream());
         } catch (IOException e) {
             throw new RuntimeException("Erro ao gerar backup: " + e.getMessage());
@@ -271,6 +281,9 @@ public class ConfiguracaoService {
 
             limparBackupsAntigos(caminhoPasta, 30);
             System.out.println("### [SISTEMA] Manutenção concluída.");
+
+            // Nota: O Backup Automático não recebe log de auditoria de usuário, pois é o próprio servidor (TaskScheduler) que executa.
+
         } catch (Exception e) {
             System.err.println("### [ERRO] Falha no agendamento: " + e.getMessage());
         }
@@ -297,5 +310,8 @@ public class ConfiguracaoService {
 
     public void limparLogsTecnicos() {
         System.out.println("### SISTEMA: Logs limpos e Cache esvaziado.");
+
+        // 🚀 8. AUDITORIA: Limpeza de Logs
+        auditoriaService.registrar("SISTEMA", "LIMPEZA_LOGS", "Os logs técnicos internos (console/cache) foram limpos pelo administrador.");
     }
 }
