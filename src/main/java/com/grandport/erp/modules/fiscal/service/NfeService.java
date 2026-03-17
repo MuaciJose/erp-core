@@ -8,6 +8,8 @@ import com.grandport.erp.modules.vendas.model.StatusVenda;
 import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.model.ItemVenda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
+// 🚀 1. IMPORTAÇÃO DA AUDITORIA
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,10 @@ public class NfeService {
 
     @Autowired
     private MotorFiscalService motorFiscalService;
+
+    // 🚀 2. INJEÇÃO DO MOTOR DE AUDITORIA
+    @Autowired
+    private AuditoriaService auditoriaService;
 
     // =========================================================================
     // 🤖 ROBÔ DE CONTINGÊNCIA (MANTIDO INTACTO)
@@ -109,6 +115,9 @@ public class NfeService {
         config.setNumeroProximaNfce(numeroNfce + 1);
         configuracaoService.atualizarConfiguracao(config);
 
+        // 🚀 3. AUDITORIA: Emissão de Cupom Fiscal
+        auditoriaService.registrar("FISCAL", "EMISSAO_NFCE", "Emitiu Cupom Fiscal (NFC-e) Nº " + numeroNfce + " para a Venda ID " + vendaId + ". Chave: " + chaveAcessoReal);
+
         return Map.of(
                 "status", novaNota.getStatus(),
                 "chaveAcesso", chaveAcessoReal,
@@ -121,7 +130,6 @@ public class NfeService {
     private void validarConfiguracaoFiscal(ConfiguracaoSistema config) throws Exception {
         if (config == null) throw new Exception("Configurações do sistema não encontradas.");
 
-        // Verifica strings antes de tentar converter ou usar regex
         if (config.getCnpj() == null || config.getCnpj().trim().isEmpty())
             throw new Exception("Configuração Incompleta: O CNPJ da empresa é obrigatório.");
 
@@ -244,7 +252,7 @@ public class NfeService {
 
     public Map<String, Object> emitirNfeAvancada(com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO dto) throws Exception {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
-        validarConfiguracaoFiscal(config); // 🛡️ Proteção também na avançada
+        validarConfiguracaoFiscal(config);
 
         var parceiroOpt = parceiroRepository.findById(dto.getClienteId());
         com.grandport.erp.modules.parceiro.model.Parceiro clienteDestinatario = parceiroOpt.orElseThrow(() -> new Exception("Cliente não encontrado."));
@@ -278,45 +286,40 @@ public class NfeService {
         config.setNumeroProximaNfe(numeroNfe + 1);
         configuracaoService.atualizarConfiguracao(config);
 
+        // 🚀 4. AUDITORIA: Emissão de NF-e Avulsa (Modelo 55)
+        auditoriaService.registrar("FISCAL", "EMISSAO_NFE", "Emitiu NF-e (Modelo 55) Nº " + numeroNfe + " para o cliente '" + clienteDestinatario.getNome() + "'. Chave: " + chaveAcessoReal);
+
         return Map.of("status", "AUTORIZADA", "chaveAcesso", chaveAcessoReal, "numero", numeroNfe);
     }
 
     // =========================================================================
     // 🚀 NOVO MÉTODO: CANCELAR NFE DA VENDA
     // =========================================================================
-    // =========================================================================
-    // 🚀 NOVO MÉTODO: CANCELAR NFE DA VENDA
-    // =========================================================================
     public void cancelarNfeDaVenda(Long vendaId, String justificativa) throws Exception {
-        // 1. Busca a Venda no banco de dados
         Venda venda = vendaRepository.findById(vendaId)
                 .orElseThrow(() -> new Exception("Venda não encontrada."));
 
-        // 2. Verifica se existe nota atrelada
         NotaFiscal nota = venda.getNotaFiscal();
         if (nota == null || nota.getChaveAcesso() == null) {
             throw new Exception("Esta venda não possui uma Nota Fiscal emitida ou autorizada para ser cancelada.");
         }
 
-        // 3. Simula a chamada para o Motor Fiscal SEFAZ (Substituir pela chamada real depois)
+        // Simula a chamada para o Motor Fiscal SEFAZ (Substituir pela chamada real depois)
         // motorFiscalService.enviarEventoCancelamento(nota.getChaveAcesso(), justificativa);
         System.out.println(">>> Enviando evento de CANCELAMENTO para a SEFAZ...");
         System.out.println("Chave: " + nota.getChaveAcesso());
         System.out.println("Justificativa: " + justificativa);
 
-        // 4. Marca a nota como cancelada no banco de dados
         nota.setStatus("CANCELADA");
         notaFiscalRepository.save(nota);
 
-        // 5. Devolve a Venda para o status de PEDIDO
-        // para que o vendedor possa corrigir itens e faturar de novo, se precisar.
         venda.setStatus(StatusVenda.PEDIDO);
-
-        // 6. Desvincula a nota cancelada da venda para não dar erro de "chave duplicada"
-        // se ele for emitir de novo.
         venda.setNotaFiscal(null);
 
         vendaRepository.save(venda);
+
+        // 🚀 5. AUDITORIA EXTREMA: O Cancelamento é o evento fiscal mais sensível da loja!
+        auditoriaService.registrar("FISCAL", "CANCELAMENTO_NOTA", "ALERTA: Cancelou a Nota Fiscal vinculada à Venda #" + vendaId + ". Chave: " + nota.getChaveAcesso() + " | Motivo informado: " + justificativa);
     }
 
     // =========================================================================

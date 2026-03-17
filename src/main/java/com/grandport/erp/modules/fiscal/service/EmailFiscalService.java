@@ -3,6 +3,8 @@ package com.grandport.erp.modules.fiscal.service;
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
+// 🚀 1. IMPORTAÇÃO DA AUDITORIA
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
@@ -25,7 +27,11 @@ public class EmailFiscalService {
     private ConfiguracaoService configuracaoService;
 
     @Autowired
-    private DanfeService danfeService; // 🚀 INJETAMOS O MOTOR DE PDF AQUI
+    private DanfeService danfeService;
+
+    // 🚀 2. INJEÇÃO DO MOTOR DE AUDITORIA
+    @Autowired
+    private AuditoriaService auditoriaService;
 
     // =========================================================================
     // 🚀 O "MOTOR" DO E-MAIL: CRIA A CONEXÃO USANDO OS DADOS DO BANCO
@@ -57,7 +63,6 @@ public class EmailFiscalService {
 
     // Função Antiga (1 por 1) - Mantida por precaução
     public void enviarXmlContador(NotaFiscal nota, String emailContador) throws Exception {
-        // 1. Busca configurações e cria o carteiro dinâmico
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
         JavaMailSenderImpl mailSender = criarMailSenderDinamico(config);
 
@@ -75,11 +80,13 @@ public class EmailFiscalService {
         helper.addAttachment("NFe_" + nota.getChaveAcesso() + ".xml", new FileSystemResource(arquivoXml));
 
         mailSender.send(mensagem);
+
+        // 🚀 3. AUDITORIA: Registro de envio individual
+        auditoriaService.registrar("FISCAL", "ENVIO_EMAIL_NFE", "Enviou o XML da NF-e " + nota.getNumero() + " para o e-mail do contador: " + emailContador);
     }
 
     // 🚀 FUNÇÃO NOVA: ENVIO EM LOTE (ZIP COM XML + PDF) MENSAL
     public void enviarLoteXmlContador(List<NotaFiscal> notas, String emailContador, String mesAno, String mensagemCustomizada) throws Exception {
-        // 1. Busca configurações e cria o carteiro dinâmico
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
         JavaMailSenderImpl mailSender = criarMailSenderDinamico(config);
 
@@ -92,7 +99,6 @@ public class EmailFiscalService {
             for (NotaFiscal nota : notas) {
                 if (nota.getChaveAcesso() != null) {
 
-                    // 1. Puxa e anexa o arquivo XML físico
                     File xml = new File(System.getProperty("user.dir") + "/nfe_xmls/" + nota.getChaveAcesso() + ".xml");
                     if (xml.exists()) {
                         zos.putNextEntry(new ZipEntry("NFe_" + nota.getChaveAcesso() + ".xml"));
@@ -101,10 +107,8 @@ public class EmailFiscalService {
                         quantidadeArquivos++;
                     }
 
-                    // 2. 🚀 Gera e anexa o arquivo PDF (DANFE) no mesmo ZIP!
                     try {
                         byte[] pdfBytes;
-                        // Verifica se é nota do PDV (tem venda) ou Avulsa
                         if (nota.getVenda() != null) {
                             pdfBytes = danfeService.gerarDanfePdf(nota);
                         } else {
@@ -136,7 +140,6 @@ public class EmailFiscalService {
         helper.setTo(emailContador);
         helper.setSubject("Fechamento Fiscal (XML e PDF) - " + mesAno);
 
-        // 🚀 Transforma as quebras de linha digitadas no React em quebras de linha no E-mail (HTML)
         String textoFormatado = mensagemCustomizada.replace("\n", "<br>");
 
         String corpo = "<div style='font-family: sans-serif; color: #333;'>"
@@ -150,6 +153,9 @@ public class EmailFiscalService {
 
         mailSender.send(mensagem);
         arquivoZip.delete();
+
+        // 🚀 4. AUDITORIA: Registro de envio em lote (O mais importante!)
+        auditoriaService.registrar("FISCAL", "ENVIO_LOTE_FISCAL", "Enviou arquivo ZIP de fechamento fiscal (" + mesAno + ") para o contador (" + emailContador + "). Total de arquivos gerados no lote: " + quantidadeArquivos);
     }
 
     // 🚀 TESTAR CONEXÃO DE E-MAIL
@@ -157,7 +163,9 @@ public class EmailFiscalService {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
         JavaMailSenderImpl mailSender = criarMailSenderDinamico(config);
 
-        // Tenta fazer o login no servidor SMTP com os dados do cliente
         mailSender.testConnection();
+
+        // 🚀 5. AUDITORIA: Registro de teste de SMTP
+        auditoriaService.registrar("SISTEMA", "TESTE_SMTP", "Realizou com sucesso um teste de conexão com o servidor de envio de e-mails (SMTP).");
     }
 }

@@ -4,6 +4,8 @@ import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 import com.grandport.erp.modules.vendas.model.ItemVenda;
+// 🚀 1. IMPORTAÇÃO DA AUDITORIA
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import net.sf.jasperreports.engine.*;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
 import net.sf.jasperreports.engine.data.JRMapCollectionDataSource;
@@ -28,6 +30,10 @@ public class DanfeService {
 
     @Autowired
     private ConfiguracaoService configuracaoService;
+
+    // 🚀 2. INJEÇÃO DO MOTOR DE AUDITORIA
+    @Autowired
+    private AuditoriaService auditoriaService;
 
     public byte[] gerarDanfePdf(NotaFiscal nota) throws Exception {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
@@ -99,24 +105,27 @@ public class DanfeService {
             parametros.put("NUMERO_NOTA", String.valueOf(nota.getNumero()));
             parametros.put("DATA_EMISSAO", new SimpleDateFormat("dd/MM/yyyy HH:mm").format(new Date()));
 
-            // Dados do Cliente (pegando da Venda)
             if (nota.getVenda() != null && nota.getVenda().getCliente() != null) {
                 parametros.put("CLIENTE_NOME", nota.getVenda().getCliente().getNome());
                 parametros.put("CLIENTE_DOC", nota.getVenda().getCliente().getDocumento());
             }
 
-            // Totais
             BigDecimal totalVenda = (nota.getVenda() != null) ? nota.getVenda().getValorTotal() : BigDecimal.ZERO;
             parametros.put("VALOR_TOTAL", totalVenda);
 
             parametros.put("INF_COMPLEMENTARES", "Documento autorizado por meio do protocolo oficial da SEFAZ.");
 
-            // O DataSource para os itens (SKU, Nome, Qtd, Preço)
             dataSource = new JRBeanCollectionDataSource(nota.getVenda() != null ? nota.getVenda().getItens() : List.of());
         }
 
         JasperReport jr = JasperCompileManager.compileReport(reportStream);
-        return JasperExportManager.exportReportToPdf(JasperFillManager.fillReport(jr, parametros, dataSource));
+        byte[] relatorioFinal = JasperExportManager.exportReportToPdf(JasperFillManager.fillReport(jr, parametros, dataSource));
+
+        // 🚀 3. AUDITORIA: Registro da impressão/geração do documento
+        String tipoDoc = isCupomFiscal ? "NFC-e (Cupom)" : "NF-e (A4)";
+        auditoriaService.registrar("FISCAL", "IMPRESSAO_DANFE", "Gerou o PDF da " + tipoDoc + " número " + nota.getNumero() + ". Chave: " + nota.getChaveAcesso());
+
+        return relatorioFinal;
     }
 
     public byte[] gerarDanfeAvulsaPdf(NotaFiscal nota) throws Exception {
@@ -149,6 +158,11 @@ public class DanfeService {
         }
 
         JasperReport jr = JasperCompileManager.compileReport(new ClassPathResource("reports/danfe.jrxml").getInputStream());
-        return JasperExportManager.exportReportToPdf(JasperFillManager.fillReport(jr, p, new JRMapCollectionDataSource(itList)));
+        byte[] relatorioFinal = JasperExportManager.exportReportToPdf(JasperFillManager.fillReport(jr, p, new JRMapCollectionDataSource(itList)));
+
+        // 🚀 4. AUDITORIA: Registro da impressão avulsa via XML
+        auditoriaService.registrar("FISCAL", "IMPRESSAO_DANFE_AVULSA", "Gerou PDF da DANFE avulsa lendo diretamente do XML. Nota: " + nota.getNumero() + " | Chave: " + nota.getChaveAcesso());
+
+        return relatorioFinal;
     }
 }
