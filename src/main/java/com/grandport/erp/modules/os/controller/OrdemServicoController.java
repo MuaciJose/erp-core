@@ -29,12 +29,12 @@ public class OrdemServicoController {
 
     @PostMapping
     public OrdemServico criarNovaOS(@RequestBody OsRequestDTO dto) {
-        return osService.salvarRascunho(dto, null);
+        return osService.salvarRascunho(dto, null); // 🚀 Passa pelo motor com Auditoria
     }
 
     @PutMapping("/{id}")
     public OrdemServico atualizarOS(@PathVariable Long id, @RequestBody OsRequestDTO dto) {
-        return osService.salvarRascunho(dto, id);
+        return osService.salvarRascunho(dto, id); // 🚀 Passa pelo motor com Auditoria
     }
 
     @PatchMapping("/{id}/status")
@@ -44,17 +44,13 @@ public class OrdemServicoController {
         return osRepository.save(os);
     }
 
-    // Rota que o Gerente usa na tela de OS
+    // Rota que o Gerente usa na tela de OS (Aguardando Pagamento)
     @PostMapping("/{id}/enviar-caixa")
     public OrdemServico enviarParaCaixa(@PathVariable Long id) {
         OrdemServico os = osRepository.findById(id).orElseThrow(() -> new RuntimeException("OS não encontrada"));
 
-        // 1. Baixar o Estoque Fisicamente aqui
-        for (com.grandport.erp.modules.os.model.OsItemPeca item : os.getItensPecas()) {
-            com.grandport.erp.modules.estoque.model.Produto p = item.getProduto();
-            p.setQuantidadeEstoque(p.getQuantidadeEstoque() - item.getQuantidade());
-        }
-
+        // 🚀 Removemos a baixa de estoque daqui para não duplicar,
+        // pois a baixa real e a auditoria ocorrem no momento do faturamento final (Caixa).
         os.setStatus(com.grandport.erp.modules.os.model.StatusOS.AGUARDANDO_PAGAMENTO);
         return osRepository.save(os);
     }
@@ -62,20 +58,22 @@ public class OrdemServicoController {
     // Rota que o Operador de Caixa usa
     @PostMapping("/{id}/pagar")
     public OrdemServico pagarOS(@PathVariable Long id, @RequestBody Object pagamentos) {
-        OrdemServico os = osRepository.findById(id).orElseThrow(() -> new RuntimeException("OS não encontrada"));
-        os.setStatus(com.grandport.erp.modules.os.model.StatusOS.FATURADA);
-        // Obs: Futuramente aqui você chama o CaixaService para registrar os R$ de fato no banco
-        return osRepository.save(os);
+        // 🚀 Agora sim! Chama o nosso motor blindado que baixa o estoque,
+        // checa quantidades e grava na Auditoria.
+        return osService.faturarOS(id);
     }
 
     // ==========================================
-    // 🚀 MÓDULO FISCAL (SEPARAÇÃO DE IMPOSTOS)
+    // 🚀 MÓDULO FISCAL (CHAVE SELETORA: 55 OU 65)
     // ==========================================
 
-    @PostMapping("/{id}/fiscal/nfe-pecas")
-    public org.springframework.http.ResponseEntity<?> emitirNfePecas(@PathVariable Long id) {
+    @PostMapping("/{id}/fiscal/emitir-pecas")
+    public org.springframework.http.ResponseEntity<?> emitirNfePecas(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "55") String modelo) { // 🚀 CHAVE SELETORA AQUI!
         try {
-            return org.springframework.http.ResponseEntity.ok(osFiscalService.emitirNfePecas(id));
+            // O React vai enviar o modelo via URL: /api/os/1/fiscal/emitir-pecas?modelo=65
+            return org.springframework.http.ResponseEntity.ok(osFiscalService.emitirFiscalPecas(id, modelo));
         } catch (Exception e) {
             return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage()));
         }

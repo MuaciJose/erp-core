@@ -9,6 +9,8 @@ import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 import com.grandport.erp.modules.servicos.repository.ServicoRepository;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
 import com.grandport.erp.modules.veiculo.repository.VeiculoRepository;
+// 🚀 1. IMPORTAÇÃO DA AUDITORIA
+import com.grandport.erp.modules.admin.service.AuditoriaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,8 +26,14 @@ public class OrdemServicoService {
     @Autowired private ServicoRepository servicoRepository;
     @Autowired private UsuarioRepository usuarioRepository;
 
+    // 🚀 2. INJEÇÃO DO MOTOR DE AUDITORIA
+    @Autowired private AuditoriaService auditoriaService;
+
     @Transactional
     public OrdemServico salvarRascunho(OsRequestDTO dto, Long osId) {
+        // Marca se é uma OS nova ou edição para o log de auditoria
+        boolean isNovaOs = (osId == null);
+
         OrdemServico os = (osId != null) ? osRepository.findById(osId).orElse(new OrdemServico()) : new OrdemServico();
 
         // 1. Preenche a Capa (Dados do Cliente e Carro)
@@ -79,7 +87,16 @@ public class OrdemServicoService {
         os.setTotalServicos(somaServicos);
         os.setValorTotal(somaPecas.add(somaServicos).subtract(os.getDesconto()));
 
-        return osRepository.save(os);
+        OrdemServico salva = osRepository.save(os);
+
+        // 🚀 3. AUDITORIA: Rastreamento de Criação/Edição da OS
+        String acao = isNovaOs ? "CRIACAO_OS" : "EDICAO_OS";
+        String verbo = isNovaOs ? "Criou" : "Editou e salvou";
+        String clienteNome = salva.getCliente() != null ? salva.getCliente().getNome() : "Sem cliente";
+
+        auditoriaService.registrar("ORDEM_SERVICO", acao, verbo + " o rascunho da OS #" + salva.getId() + " para o cliente '" + clienteNome + "'. Valor Atual: R$ " + salva.getValorTotal());
+
+        return salva;
     }
 
     @Transactional
@@ -99,11 +116,19 @@ public class OrdemServicoService {
             }
             p.setQuantidadeEstoque(p.getQuantidadeEstoque() - item.getQuantidade());
             produtoRepository.save(p);
+
+            // 🚀 4. AUDITORIA: Baixa de peças no estoque vinculadas a esta OS
+            auditoriaService.registrar("ESTOQUE", "SAIDA_OS", "Baixa de " + item.getQuantidade() + "un de '" + p.getNome() + "' ref. OS #" + os.getId());
         }
 
         // 2. Travar a OS como Faturada
         os.setStatus(com.grandport.erp.modules.os.model.StatusOS.FATURADA);
 
-        return osRepository.save(os);
+        OrdemServico salva = osRepository.save(os);
+
+        // 🚀 5. AUDITORIA: Faturamento Final
+        auditoriaService.registrar("ORDEM_SERVICO", "FATURAMENTO_OS", "Faturou e fechou a OS #" + salva.getId() + ". Peças baixadas do estoque e valor consolidado de R$ " + salva.getValorTotal());
+
+        return salva;
     }
 }

@@ -286,16 +286,18 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
     };
 
     // =========================================================================
-    // 🚀 LÓGICA FISCAL DE OS (AGORA COM O TRATAMENTO DE ERRO CORRETO)
+    // 🚀 LÓGICA FISCAL DE OS (AGORA COM A CHAVE SELETORA E ATUALIZAÇÃO DA TELA)
     // =========================================================================
-    const emitirNfePecas = async (osId) => {
-        setProcessandoId(`pecas-${osId}`);
-        const toastId = toast.loading(`Transmitindo NF-e (Peças) da OS #${osId} para a SEFAZ...`);
+    const emitirFiscalPecas = async (osId, modelo) => {
+        setProcessandoId(`pecas-${modelo}-${osId}`);
+        const nomeDoc = modelo === '55' ? 'NF-e (A4)' : 'NFC-e (Cupom)';
+        const toastId = toast.loading(`Transmitindo ${nomeDoc} de Peças da OS #${osId}...`);
         try {
-            const res = await api.post(`/api/os/${osId}/fiscal/nfe-pecas`);
-            toast.success(res.data.message || 'NF-e de Peças autorizada pela SEFAZ!', { id: toastId });
+            // A API foi atualizada no Java para receber o ?modelo=
+            const res = await api.post(`/api/os/${osId}/fiscal/emitir-pecas?modelo=${modelo}`);
+            toast.success(res.data.message || `${nomeDoc} autorizada pela SEFAZ!`, { id: toastId });
+            carregarDadosFiscais(); // 🚀 Atualiza os registros para aparecer na aba de Vendas na hora
         } catch (error) {
-            // 🚀 USANDO O TRADUTOR DE ERROS AQUI
             toast.error(extrairErroBackend(error, 'Erro ao comunicar com a SEFAZ.'), { id: toastId, duration: 6000 });
         } finally {
             setProcessandoId(null);
@@ -308,8 +310,8 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
         try {
             const res = await api.post(`/api/os/${osId}/fiscal/nfse-servicos`);
             toast.success(res.data.message || 'NFS-e autorizada pela Prefeitura!', { id: toastId });
+            carregarDadosFiscais(); // 🚀 Atualiza a tela se necessário
         } catch (error) {
-            // 🚀 USANDO O TRADUTOR DE ERROS AQUI
             toast.error(extrairErroBackend(error, 'Erro ao comunicar com a Prefeitura.'), { id: toastId, duration: 6000 });
         } finally {
             setProcessandoId(null);
@@ -554,14 +556,27 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                                                         {temPecas ? (
                                                             <div className="flex flex-col items-center justify-center gap-2">
                                                                 <span className="font-black text-blue-700 text-lg">R$ {formatarMoeda(os.totalPecas)}</span>
-                                                                <button
-                                                                    onClick={() => emitirNfePecas(os.id)}
-                                                                    disabled={processandoId === `pecas-${os.id}`}
-                                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-black uppercase tracking-widest text-[9px] shadow-md flex items-center gap-2 transition-transform hover:scale-105 disabled:opacity-50"
-                                                                >
-                                                                    {processandoId === `pecas-${os.id}` ? <Loader2 size={12} className="animate-spin"/> : <FileArchive size={12}/>}
-                                                                    Emitir NF-e (Peças)
-                                                                </button>
+                                                                <div className="flex gap-2">
+                                                                    {/* 🚀 CHAVE SELETORA: NFC-e e NF-e */}
+                                                                    <button
+                                                                        onClick={() => emitirFiscalPecas(os.id, '65')}
+                                                                        disabled={processandoId === `pecas-65-${os.id}`}
+                                                                        title="Emitir Cupom Fiscal (Termal)"
+                                                                        className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg font-black uppercase tracking-widest text-[9px] shadow-sm flex items-center gap-1 transition-transform hover:scale-105 disabled:opacity-50"
+                                                                    >
+                                                                        {processandoId === `pecas-65-${os.id}` ? <Loader2 size={12} className="animate-spin"/> : <Receipt size={12}/>}
+                                                                        NFC-e
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => emitirFiscalPecas(os.id, '55')}
+                                                                        disabled={processandoId === `pecas-55-${os.id}`}
+                                                                        title="Emitir Nota Fiscal Grande (A4)"
+                                                                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-black uppercase tracking-widest text-[9px] shadow-sm flex items-center gap-1 transition-transform hover:scale-105 disabled:opacity-50"
+                                                                    >
+                                                                        {processandoId === `pecas-55-${os.id}` ? <Loader2 size={12} className="animate-spin"/> : <FileText size={12}/>}
+                                                                        NF-e
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         ) : (<span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sem peças</span>)}
                                                     </td>

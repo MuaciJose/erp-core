@@ -37,9 +37,11 @@ public class VendaService {
     @Autowired private ParceiroRepository parceiroRepository;
     @Autowired private VeiculoRepository veiculoRepository;
     @Autowired private CaixaService caixaService;
-    @Autowired private AuditoriaService auditoriaService;
     @Autowired private ConfiguracaoService configService;
     @Autowired private EstoqueService estoqueService;
+
+    // 🚀 O MOTOR DE AUDITORIA ESTÁ AQUI
+    @Autowired private AuditoriaService auditoriaService;
 
     // =========================================================================
     // 🚀 NOVO MOTOR DE COMISSÃO: ITEM POR ITEM (MISTO)
@@ -49,7 +51,6 @@ public class VendaService {
 
         ConfiguracaoSistema configs = configService.obterConfiguracao();
 
-        // Pega a comissão padrão geral (Ex: 3%) associada a esse vendedor
         BigDecimal comissaoPadraoLoja = configs.getVendedores().stream()
                 .filter(v -> v.getUsuarioId().equals(venda.getVendedorId()))
                 .map(VendedorComissao::getComissao)
@@ -62,16 +63,12 @@ public class VendaService {
             Produto produto = item.getProduto();
             BigDecimal percentualAplicado;
 
-            // 🚀 A REGRA DE OURO:
-            // Se o produto tiver uma comissão > 0 preenchida no cadastro, ganha prioridade!
             if (produto.getComissao() != null && produto.getComissao().compareTo(BigDecimal.ZERO) > 0) {
                 percentualAplicado = produto.getComissao();
             } else {
-                // Se o produto tiver comissão 0 ou null, cai pra comissão padrão da loja
                 percentualAplicado = comissaoPadraoLoja;
             }
 
-            // Calcula o valor financeiro da comissão SÓ DESTE ITEM e soma no montante da venda
             if (percentualAplicado.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal valorTotalItem = item.getPrecoUnitario().multiply(BigDecimal.valueOf(item.getQuantidade()));
                 BigDecimal valorComissaoDoItem = valorTotalItem
@@ -82,8 +79,6 @@ public class VendaService {
             }
         }
 
-        // Se houver desconto na venda inteira, deduz proporcionalmente da comissão
-        // (Opção de negócio: muitos ERPs fazem isso para o vendedor não dar desconto do dinheiro da loja)
         if (venda.getDesconto() != null && venda.getDesconto().compareTo(BigDecimal.ZERO) > 0 && venda.getValorSubtotal().compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal proporcaoDesconto = venda.getValorTotal().divide(venda.getValorSubtotal(), 4, RoundingMode.HALF_UP);
             valorTotalComissao = valorTotalComissao.multiply(proporcaoDesconto).setScale(2, RoundingMode.HALF_UP);
@@ -93,7 +88,7 @@ public class VendaService {
     }
 
     // =========================================================================
-    // 🔄 MÉTODOS DE ESTOQUE (AGORA COM REGISTRO NO EXTRATO)
+    // 🔄 MÉTODOS DE ESTOQUE
     // =========================================================================
     private void baixarEstoque(Venda venda) {
         String clienteNome = venda.getCliente() != null ? venda.getCliente().getNome() : "CONSUMIDOR FINAL";
@@ -154,13 +149,16 @@ public class VendaService {
     }
 
     // =========================================================================
-    // CRIAÇÃO E EDIÇÃO DE DOCUMENTOS (TODOS OS LOGS DE VOLTA!)
+    // CRIAÇÃO E EDIÇÃO DE DOCUMENTOS (AUDITORIA VIP)
     // =========================================================================
     @Transactional
     public Venda salvarOrcamento(VendaRequestDTO dto) {
         Venda venda = new Venda();
         venda.setStatus(StatusVenda.ORCAMENTO);
-        return preencherESalvarVenda(venda, dto);
+        Venda salva = preencherESalvarVenda(venda, dto);
+
+        auditoriaService.registrar("VENDAS", "CRIACAO_ORCAMENTO", "Gerou orçamento no valor de R$ " + salva.getValorTotal() + " pelo vendedor " + salva.getVendedorNome());
+        return salva;
     }
 
     @Transactional
@@ -170,6 +168,8 @@ public class VendaService {
         venda.setStatus(StatusVenda.AGUARDANDO_PAGAMENTO);
         Venda salva = preencherESalvarVenda(venda, dto);
         baixarEstoque(salva);
+
+        auditoriaService.registrar("VENDAS", "CRIACAO_PEDIDO", "Enviou pedido #" + salva.getId() + " para o Caixa (Aguardando Pagamento). Valor: R$ " + salva.getValorTotal());
         return salva;
     }
 
@@ -185,7 +185,6 @@ public class VendaService {
         StatusVenda statusAntigo = venda.getStatus();
         StatusVenda statusNovo = dto.status() != null ? dto.status() : statusAntigo;
 
-        // Devolve estoque antes de recalcular
         if (statusAntigo == StatusVenda.PEDIDO || statusAntigo == StatusVenda.AGUARDANDO_PAGAMENTO) {
             devolverEstoque(venda);
         }
@@ -207,10 +206,7 @@ public class VendaService {
             baixarEstoque(salva);
         }
 
-        // 🚀 LOG DE AUDITORIA RESTAURADO
-        if (statusNovo == StatusVenda.AGUARDANDO_PAGAMENTO) {
-            try { auditoriaService.registrar("VENDAS", "CONVERSAO", "Documento #" + salva.getId() + " enviado para o Caixa."); } catch(Exception e){}
-        }
+        auditoriaService.registrar("VENDAS", "EDICAO", "Documento #" + salva.getId() + " alterado. Status atual: " + statusNovo.name() + " | Novo Valor: R$ " + salva.getValorTotal());
 
         return salva;
     }
@@ -228,9 +224,12 @@ public class VendaService {
             devolverEstoque(venda);
         }
 
+        String status = venda.getStatus().name();
+        BigDecimal valor = venda.getValorTotal();
+
         vendaRepository.delete(venda);
-        // 🚀 LOG DE AUDITORIA RESTAURADO
-        try { auditoriaService.registrar("VENDAS", "EXCLUSAO", "Documento #" + id + " excluído com sucesso."); } catch(Exception e){}
+
+        auditoriaService.registrar("VENDAS", "EXCLUSAO", "Documento #" + id + " excluído definitivamente. (Status anterior: " + status + " | Valor: R$ " + valor + ")");
     }
 
     // =========================================================================
@@ -277,6 +276,9 @@ public class VendaService {
         return vendaRepository.save(venda);
     }
 
+    // =========================================================================
+    // 💰 FINALIZAÇÃO E FATURAMENTO
+    // =========================================================================
     @Transactional
     public Venda finalizarPagamentoPedido(Long vendaId, List<PagamentoVendaDTO> pagamentos) {
         Venda venda = vendaRepository.findById(vendaId).orElseThrow();
@@ -302,7 +304,10 @@ public class VendaService {
 
         aplicarComissaoVendedor(venda);
         venda.setStatus(StatusVenda.CONCLUIDA);
-        return vendaRepository.save(venda);
+        Venda salva = vendaRepository.save(venda);
+
+        auditoriaService.registrar("VENDAS", "FINALIZACAO_CAIXA", "O Caixa faturou e concluiu o Pedido #" + salva.getId() + ". Total Pago: R$ " + salva.getValorTotal());
+        return salva;
     }
 
     @Transactional
@@ -313,7 +318,11 @@ public class VendaService {
         Venda salva = preencherESalvarVenda(venda, dto);
         baixarEstoque(salva);
         aplicarComissaoVendedor(salva);
-        return vendaRepository.save(salva);
+
+        Venda finalizada = vendaRepository.save(salva);
+
+        auditoriaService.registrar("VENDAS", "VENDA_DIRETA_PDV", "Venda Direta de Balcão (PDV) concluída e faturada. Valor: R$ " + finalizada.getValorTotal());
+        return finalizada;
     }
 
     private void processarVendaAPrazo(Venda venda, Long parceiroId, Integer parcelas) {
@@ -335,8 +344,8 @@ public class VendaService {
             throw new RuntimeException("Apenas pedidos na fila do caixa podem ser devolvidos.");
         }
         venda.setStatus(StatusVenda.PEDIDO);
-        // 🚀 LOG DE AUDITORIA RESTAURADO
-        try { auditoriaService.registrar("VENDAS", "DEVOLUCAO", "Pedido #" + vendaId + " devolvido pelo Caixa."); } catch (Exception e) {}
+
+        auditoriaService.registrar("VENDAS", "DEVOLUCAO_CAIXA", "Pedido #" + vendaId + " foi devolvido/rejeitado pelo operador do Caixa.");
         return vendaRepository.save(venda);
     }
 }
