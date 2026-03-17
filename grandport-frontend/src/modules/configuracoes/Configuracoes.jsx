@@ -4,10 +4,9 @@ import {
     Settings, Building2, Printer, Sliders, Save, CheckCircle,
     AlertTriangle, Info, X, Store, Percent, Search, Loader2, Camera, Plus,
     Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode, RefreshCw, Receipt,
-    ToggleLeft, ToggleRight // 🚀 Adicionado os ícones do Toggle
+    ToggleLeft, ToggleRight, Landmark, Wrench
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios';
 
 // 🚀 LISTA OFICIAL PARA GARANTIR QUE O DADO ENVIADO AO JAVA SEJA SEMPRE VÁLIDO
 const ESTADOS_BRASIL = [
@@ -28,7 +27,7 @@ export const Configuracoes = () => {
     const [salvando, setSalvando] = useState(false);
     const [buscandoCnpj, setBuscandoCnpj] = useState(false);
 
-    // 🚀 ESTADOS PARA A MÁGICA DO WHATSAPP E E-MAIL
+    // ESTADOS PARA A MÁGICA DO WHATSAPP E E-MAIL
     const [qrCodeBase64, setQrCodeBase64] = useState(null);
     const [statusWhatsapp, setStatusWhatsapp] = useState('DESCONHECIDO');
     const [gerandoQr, setGerandoQr] = useState(false);
@@ -37,11 +36,9 @@ export const Configuracoes = () => {
     const [statusSefaz, setStatusSefaz] = useState('DESCONHECIDO');
     const [testandoSefaz, setTestandoSefaz] = useState(false);
 
-    // 🚀 NOVOS ESTADOS PARA O STATUS DO E-MAIL
     const [statusEmail, setStatusEmail] = useState('DESCONHECIDO');
     const [testandoEmail, setTestandoEmail] = useState(false);
 
-    // 🚀 ESTADO ATUALIZADO COM OS NOVOS CAMPOS DE NFC-e E E-MAIL SMTP E IVA
     const [config, setConfig] = useState({
         nomeFantasia: '',
         razaoSocial: '',
@@ -60,12 +57,21 @@ export const Configuracoes = () => {
         ambienteSefaz: 2,
         serieNfe: 1,
         numeroProximaNfe: 1,
-        // 🚀 NOVOS CAMPOS NFC-e
         serieNfce: 1,
         numeroProximaNfce: 1,
         cscIdToken: '',
         cscCodigo: '',
-        // =======================
+
+        // 🚀 NOVOS CAMPOS: FISCAL PREFEITURA (NFS-e)
+        inscricaoMunicipal: '',
+        codigoCnae: '',
+        codigoServicoLc116: '14.01',
+        aliquotaIss: '',
+        provedorPrefeitura: 'PADRAO_NACIONAL',
+        ambienteNfse: 2,
+        loginPrefeitura: '',
+        senhaPrefeitura: '',
+
         logoBase64: '',
         tamanhoImpressora: '80mm',
         mensagemRodape: '',
@@ -79,12 +85,10 @@ export const Configuracoes = () => {
         whatsappApiUrl: '',
         tipoCertificado: 'A1',
         senhaCertificado: '',
-        // 🚀 NOVOS CAMPOS E-MAIL (CONTADOR/CLIENTES)
         smtpHost: 'smtp.gmail.com',
         smtpPort: 587,
         emailRemetente: '',
         senhaEmailRemetente: '',
-        // 🚀 CHAVE DO IVA DUAL
         exibirIvaDual: false
     });
 
@@ -122,17 +126,25 @@ export const Configuracoes = () => {
                     ambienteSefaz: data.ambienteSefaz || 2,
                     serieNfe: data.serieNfe || 1,
                     numeroProximaNfe: data.numeroProximaNfe || 1,
-                    // 🚀 CARREGANDO OS DADOS DA NFC-e
                     serieNfce: data.serieNfce || 1,
                     numeroProximaNfce: data.numeroProximaNfce || 1,
                     cscIdToken: data.cscIdToken || '',
                     cscCodigo: data.cscCodigo || '',
-                    // ==============================
+
+                    // 🚀 CARREGANDO DADOS DA PREFEITURA
+                    inscricaoMunicipal: data.inscricaoMunicipal || '',
+                    codigoCnae: data.codigoCnae || '',
+                    codigoServicoLc116: data.codigoServicoLc116 || '14.01',
+                    aliquotaIss: data.aliquotaIss || '',
+                    provedorPrefeitura: data.provedorPrefeitura || 'PADRAO_NACIONAL',
+                    ambienteNfse: data.ambienteNfse || 2,
+                    loginPrefeitura: data.loginPrefeitura || '',
+                    senhaPrefeitura: data.senhaPrefeitura || '',
+
                     whatsappToken: data.whatsappToken || '',
                     whatsappApiUrl: data.whatsappApiUrl || '',
                     tamanhoImpressora: data.tamanhoImpressora || '80mm',
                     mensagemRodape: data.mensagemRodape || '',
-                    // 🚀 CARREGANDO DADOS E-MAIL SMTP E IVA
                     smtpHost: data.smtpHost || 'smtp.gmail.com',
                     smtpPort: data.smtpPort || 587,
                     emailRemetente: data.emailRemetente || '',
@@ -175,9 +187,6 @@ export const Configuracoes = () => {
         }
     };
 
-    // =========================================================================
-    // 🚀 BUSCA DE CNPJ (BRASIL API)
-    // =========================================================================
     const buscarCNPJ = async () => {
         const cnpjLimpo = config.cnpj.replace(/\D/g, '');
         if (cnpjLimpo.length !== 14) {
@@ -214,9 +223,6 @@ export const Configuracoes = () => {
         }
     };
 
-    // =========================================================================
-    // 🚀 NOVA BUSCA DE CEP (VIA CEP) PARA GARANTIR O LOGRADOURO E IBGE
-    // =========================================================================
     const buscarCEP = async () => {
         const cepLimpo = config.cep.replace(/\D/g, '');
         if (cepLimpo.length !== 8) {
@@ -248,9 +254,6 @@ export const Configuracoes = () => {
         }
     };
 
-    // =========================================================================
-    // 🚀 TESTAR CONEXÃO COM A SEFAZ
-    // =========================================================================
     const verificarConexaoSefaz = async () => {
         setTestandoSefaz(true);
         const loadId = toast.loading('Consultando servidores da SEFAZ...');
@@ -271,11 +274,7 @@ export const Configuracoes = () => {
         }
     };
 
-    // =========================================================================
-    // 🚀 TESTAR CONEXÃO SMTP DE E-MAIL
-    // =========================================================================
     const verificarConexaoEmail = async () => {
-        // Primeiro, salva as configurações atuais para o Java tentar testar
         await api.put('/api/configuracoes', config);
 
         setTestandoEmail(true);
@@ -297,35 +296,27 @@ export const Configuracoes = () => {
         const loadId = toast.loading('Salvando configurações...');
 
         try {
-            // 1. Salva os textos (JSON) usando o seu 'api' normal
             const res = await api.put('/api/configuracoes', config);
             const data = Array.isArray(res.data) ? res.data[0] : res.data;
             setConfig(prev => ({ ...prev, ...data }));
 
-            // 2. 🚀 ENVIA O ARQUIVO COM FETCH NATIVO (IMUNE AO AXIOS)
             if (arquivoCertificado) {
                 toast.loading('Enviando Certificado Digital...', { id: loadId });
 
                 const formData = new FormData();
                 formData.append('file', arquivoCertificado);
 
-                // Descobre a URL do seu servidor
                 const baseUrl = api.defaults.baseURL || 'http://localhost:8080';
 
-                // Caça o Token de Segurança de todas as formas possíveis
                 let token = localStorage.getItem('token');
                 if (!token && api.defaults.headers.common['Authorization']) {
                     token = api.defaults.headers.common['Authorization'];
                 }
                 const authHeader = token ? (token.startsWith('Bearer') ? token : `Bearer ${token}`) : '';
 
-                // 🚀 O DISPARO NATIVO (O Axios não consegue tocar nisso aqui)
                 const uploadRes = await fetch(`${baseUrl}/api/configuracoes/certificado`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': authHeader
-                        // NUNCA coloque 'Content-Type' aqui. O navegador criará a "fronteira" do arquivo.
-                    },
+                    headers: { 'Authorization': authHeader },
                     body: formData
                 });
 
@@ -335,23 +326,19 @@ export const Configuracoes = () => {
                     throw new Error(mensagemErroJava || 'Falha no upload');
                 }
 
-                setArquivoCertificado(null); // Limpa da tela após sucesso
+                setArquivoCertificado(null);
             }
 
-            toast.success('Configurações e Certificado salvos com sucesso!', { id: loadId });
+            toast.success('Configurações salvas com sucesso!', { id: loadId });
 
         } catch (error) {
             console.error("Erro detalhado:", error);
-            toast.error('Erro ao salvar certificado. Verifique o console.', { id: loadId });
+            toast.error('Erro ao salvar configurações. Verifique o console.', { id: loadId });
         } finally {
             setSalvando(false);
         }
     };
 
-
-    // =========================================================================
-    // 🚀 WHATSAPP E SISTEMA
-    // =========================================================================
     const solicitarQrCode = async (tentativa) => {
         const numTentativa = typeof tentativa === 'number' ? tentativa : 1;
         setGerandoQr(true);
@@ -439,7 +426,7 @@ export const Configuracoes = () => {
     };
 
     const fazerBackup = async () => {
-        const loadId = toast.loading('Gerando backup do banco de dados... Isto pode demorar alguns segundos.');
+        const loadId = toast.loading('Gerando backup do banco de dados...');
         try {
             const response = await api.get('/api/configuracoes/backup', { responseType: 'blob' });
 
@@ -511,7 +498,11 @@ export const Configuracoes = () => {
                 {/* MENU LATERAL */}
                 <div className="w-full lg:w-64 flex flex-col gap-2">
                     <button onClick={() => setAbaAtiva('EMPRESA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'EMPRESA' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Building2 size={20} /> Dados da Empresa</button>
-                    <button onClick={() => setAbaAtiva('FISCAL')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'FISCAL' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Receipt size={20} /> Fiscal / NF-e</button>
+                    <button onClick={() => setAbaAtiva('FISCAL')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'FISCAL' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Receipt size={20} /> Fiscal / NF-e (Peças)</button>
+
+                    {/* 🚀 NOVO BOTÃO DA PREFEITURA */}
+                    <button onClick={() => setAbaAtiva('PREFEITURA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'PREFEITURA' ? 'bg-orange-500 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Landmark size={20} /> Prefeitura (Serviços)</button>
+
                     <button onClick={() => setAbaAtiva('VENDEDORES')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'VENDEDORES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Users size={20} /> Vendedores</button>
                     <button onClick={() => setAbaAtiva('IMPRESSAO')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'IMPRESSAO' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Printer size={20} /> Impressão</button>
                     <button onClick={() => setAbaAtiva('REGRAS')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'REGRAS' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Sliders size={20} /> Regras</button>
@@ -556,7 +547,7 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            <h3 className="text-sm font-black text-slate-400 uppercase flex items-center gap-2 mt-8"><MapPin size={16}/> Localização Oficial (SEFAZ)</h3>
+                            <h3 className="text-sm font-black text-slate-400 uppercase flex items-center gap-2 mt-8"><MapPin size={16}/> Localização Oficial</h3>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
 
                                 <div>
@@ -574,7 +565,7 @@ export const Configuracoes = () => {
                                     <input type="text" name="logradouro" value={config.logradouro || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase">Nº</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase">Número</label>
                                     <input type="text" name="numero" value={config.numero || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500" />
                                 </div>
                                 <div className="md:col-span-2">
@@ -628,7 +619,6 @@ export const Configuracoes = () => {
                                     <Receipt className="text-blue-500" /> Parâmetros Fiscais (NF-e)
                                 </h2>
 
-                                {/* BOTÃO DE TESTAR CONEXÃO SEFAZ */}
                                 <button
                                     onClick={verificarConexaoSefaz}
                                     disabled={testandoSefaz}
@@ -649,7 +639,6 @@ export const Configuracoes = () => {
                                 </button>
                             </div>
 
-                            {/* 🚀 O TOGGLE / CHAVE DE VIRADA DO IVA DUAL */}
                             <div
                                 className={`mt-6 mb-8 p-6 rounded-2xl border-4 transition-all flex items-center justify-between group cursor-pointer ${config.exibirIvaDual ? 'bg-white border-green-500 shadow-lg shadow-green-500/20' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`}
                                 onClick={() => setConfig({...config, exibirIvaDual: !config.exibirIvaDual})}
@@ -723,7 +712,6 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            {/* CERTIFICADO DIGITAL */}
                             <div className="mt-8 p-6 bg-blue-50 border-2 border-blue-200 rounded-3xl shadow-inner">
                                 <h3 className="font-black text-blue-900 flex items-center gap-2 mb-4"><ShieldCheck className="text-blue-600" /> Certificado Digital (A1/A3)</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -759,6 +747,93 @@ export const Configuracoes = () => {
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 🚀 NOVA ABA: PREFEITURA (SERVIÇOS / MÃO DE OBRA) */}
+                    {abaAtiva === 'PREFEITURA' && (
+                        <div className="p-8 overflow-y-auto animate-fade-in custom-scrollbar">
+                            <div className="bg-orange-50 border border-orange-200 p-4 rounded-2xl mb-8 flex items-start gap-4">
+                                <Landmark size={32} className="text-orange-600 shrink-0"/>
+                                <div>
+                                    <h3 className="font-black text-orange-800">Prefeitura Municipal (Imposto Sobre Serviços - ISS)</h3>
+                                    <p className="text-sm font-medium text-orange-700 mt-1">
+                                        Configure as chaves e códigos da sua prefeitura para a emissão automática de <b className="font-black">NFS-e</b> referente à Mão de Obra das Ordens de Serviço.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                                <div>
+                                    <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-1 block">Inscrição Municipal (IM) *</label>
+                                    <input type="text" name="inscricaoMunicipal" value={config.inscricaoMunicipal || ''} onChange={handleChange} className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-mono text-slate-700 outline-none focus:border-orange-500" placeholder="Apenas números" />
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-1 flex items-center justify-between">
+                                        <span>Alíquota do ISS (%)</span>
+                                        <span className="text-slate-400 font-medium normal-case">Padrão da Oficina</span>
+                                    </label>
+                                    <div className="relative">
+                                        <input type="number" step="0.01" name="aliquotaIss" value={config.aliquotaIss || ''} onChange={handleChange} className="w-full p-3 pl-10 bg-white border-2 border-slate-200 rounded-xl font-black text-orange-600 outline-none focus:border-orange-500" placeholder="Ex: 5.0" />
+                                        <Percent size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400"/>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center justify-between">
+                                            CNAE Principal (Serviços)
+                                            <a href="https://concla.ibge.gov.br/busca-online-cnae.html" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline normal-case">Consultar IBGE</a>
+                                        </label>
+                                        <input type="text" name="codigoCnae" value={config.codigoCnae || ''} onChange={handleChange} className="w-full p-2 bg-white border-2 border-slate-200 rounded-lg font-mono text-sm outline-none focus:border-orange-500" placeholder="Ex: 4520-0/01" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center justify-between">
+                                            Código de Serviço (Lista LC 116)
+                                            <span className="text-slate-400 normal-case text-[9px]">Padrão: 14.01</span>
+                                        </label>
+                                        <input type="text" name="codigoServicoLc116" value={config.codigoServicoLc116 || ''} onChange={handleChange} className="w-full p-2 bg-white border-2 border-slate-200 rounded-lg font-mono text-sm outline-none focus:border-orange-500" placeholder="Ex: 14.01" />
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Provedor da Prefeitura</label>
+                                        <select name="provedorPrefeitura" value={config.provedorPrefeitura || 'PADRAO_NACIONAL'} onChange={handleChange} className="w-full p-2 bg-white border-2 border-slate-200 rounded-lg font-bold text-sm text-slate-700 outline-none focus:border-orange-500 cursor-pointer">
+                                            <option value="PADRAO_NACIONAL">Padrão Nacional (Sefin)</option>
+                                            <option value="GINFES">Ginfes</option>
+                                            <option value="BETHA">Betha Sistemas</option>
+                                            <option value="IPM">IPM</option>
+                                            <option value="WEBISS">WebISS</option>
+                                            <option value="OUTRO">Outro (Via Integração)</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-3">
+                                        <div className="col-span-2">
+                                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-1">
+                                                Acesso ao Portal da Prefeitura (Se Exigido pelo Provedor)
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <input type="text" name="loginPrefeitura" value={config.loginPrefeitura || ''} onChange={handleChange} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-orange-500" placeholder="Login/Usuário" />
+                                        </div>
+                                        <div>
+                                            <input type="password" name="senhaPrefeitura" value={config.senhaPrefeitura || ''} onChange={handleChange} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-orange-500" placeholder="Senha Web" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="md:col-span-2 border-t border-slate-100 pt-6 mt-2">
+                                    <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-1 block">Ambiente da Prefeitura (NFS-e)</label>
+                                    <select name="ambienteNfse" value={config.ambienteNfse || 2} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-bold focus:border-orange-500 outline-none text-sm cursor-pointer">
+                                        <option value={1}>1 - Produção (Emissão Oficial na Prefeitura)</option>
+                                        <option value={2}>2 - Homologação (Ambiente de Testes)</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -939,7 +1014,6 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            {/* NOVO BLOCO: CONFIGURAÇÃO DE E-MAIL INSERIDO AQUI */}
                             <div className="mt-8 p-6 bg-slate-50 border border-slate-200 rounded-3xl shadow-sm">
                                 <div className="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
                                     <div>
@@ -947,7 +1021,6 @@ export const Configuracoes = () => {
                                         <p className="text-sm text-slate-500 font-medium">Configure a conta que fará o envio dos XMLs para o contador e clientes.</p>
                                     </div>
 
-                                    {/* NOVO BOTÃO DE TESTAR CONEXÃO DE E-MAIL */}
                                     <button
                                         onClick={verificarConexaoEmail}
                                         disabled={testandoEmail}

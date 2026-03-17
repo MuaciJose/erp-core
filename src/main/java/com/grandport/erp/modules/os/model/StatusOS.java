@@ -7,5 +7,6 @@ public enum StatusOS {
     AGUARDANDO_PECA,
     FINALIZADA, // Carro pronto, cliente pode buscar
     FATURADA,   // Passou no caixa e virou dinheiro
-    CANCELADA
+    CANCELADA,
+    AGUARDANDO_PAGAMENTO
 }

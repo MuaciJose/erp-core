@@ -56,9 +56,22 @@ public class ConfiguracaoSistema {
     private String tipoCertificado = "A1";
     private String senhaCertificado = "";
 
+    // =======================================================
+    // 🚀 FISCAL PREFEITURA (NFS-e - SERVIÇOS / MÃO DE OBRA)
+    // =======================================================
+    private String inscricaoMunicipal = "";
+    private String codigoCnae = "";
+    private String codigoServicoLc116 = "14.01";
+    private String aliquotaIss = "";
+    private String provedorPrefeitura = "PADRAO_NACIONAL";
+    private Integer ambienteNfse = 2; // 1 = Produção, 2 = Homologação
+    private String loginPrefeitura = "";
+    private String senhaPrefeitura = "";
+
     // 🚀 REFORMA TRIBUTÁRIA / LEI DA TRANSPARÊNCIA
     @Column(name = "exibir_iva_dual", columnDefinition = "boolean default false")
     private Boolean exibirIvaDual = false;
+
 
     // ================= VISUAL =================
     private String logoUrl = "";

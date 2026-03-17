@@ -9,7 +9,7 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 
 export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
-    const [pedidos, setPedidos] = useState([]); // Agora guarda Vendas e OS juntas
+    const [pedidos, setPedidos] = useState([]); // Vendas e OS juntas
     const [busca, setBusca] = useState('');
     const [pedidoSelecionado, setPedidoSelecionado] = useState(null);
 
@@ -19,10 +19,8 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const buscaInputRef = useRef(null);
     const valorRecebidoRef = useRef(null);
 
-    // 🚀 ESTADO DO IVA DUAL PUXADO DAS CONFIGURAÇÕES DO SERVIDOR
     const [exibirIvaDual, setExibirIvaDual] = useState(false);
 
-    // ESTADOS DO PAGAMENTO MÚLTIPLO (SPLIT)
     const [metodoPagamento, setMetodoPagamento] = useState('DINHEIRO');
     const [valorRecebidoInput, setValorRecebidoInput] = useState('');
     const [numeroParcelas, setNumeroParcelas] = useState(1);
@@ -30,19 +28,15 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const [cpfAvulso, setCpfAvulso] = useState('');
     const [processandoPagamento, setProcessandoPagamento] = useState(false);
 
-    // ESTADOS GERAIS
     const [modalDevolucaoAberto, setModalDevolucaoAberto] = useState(false);
     const [pedidoPago, setPedidoPago] = useState(null);
     const [caixaStatus, setCaixaStatus] = useState(null);
     const [loadingCaixa, setLoadingCaixa] = useState(true);
     const [processandoNfce, setProcessandoNfce] = useState(false);
 
-    // O status de OS é FATURADA (Pronta para Pagar), e de Venda é AGUARDANDO_PAGAMENTO
-    const isPago = pedidoSelecionado?.status === 'CONCLUIDA' || pedidoSelecionado?.status === 'PAGA' || pedidoSelecionado?.status === 'FINALIZADA_PAGA';
+    // 🚀 O STATUS FINAL É FATURADA PARA A OS.
+    const isPago = pedidoSelecionado?.status === 'CONCLUIDA' || pedidoSelecionado?.status === 'PAGA' || pedidoSelecionado?.status === 'FATURADA';
 
-    // =======================================================================
-    // MÁSCARAS E CÁLCULOS FISCAIS (IVA)
-    // =======================================================================
     const formatarMoeda = (valor) => {
         if (valor === undefined || valor === null || isNaN(Number(valor))) return '0,00';
         return Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -65,9 +59,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const troco = Math.max(0, (totalJaPago + valorDigitadoAtual) - valorCobrado);
     const faltaPagarTotal = (totalJaPago + valorDigitadoAtual) < valorCobrado;
 
-    // =======================================================================
-    // 🚀 O NOVO MOTOR QUE JUNTA VENDAS E ORDEM DE SERVIÇO NA MESMA FILA
-    // =======================================================================
     const verificarCaixa = async () => {
         setLoadingCaixa(true);
         try {
@@ -92,7 +83,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
     const carregarPedidos = async (silencioso = false) => {
         try {
-            // Busca as duas filas ao mesmo tempo
             const [resVendas, resOs] = await Promise.all([
                 api.get('/api/vendas/fila-caixa').catch(() => ({ data: [] })),
                 api.get('/api/os').catch(() => ({ data: [] }))
@@ -100,7 +90,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
             let filaUnificada = [];
 
-            // 1. Processa Vendas Normais
             if (Array.isArray(resVendas.data)) {
                 const vendasFormatadas = resVendas.data.map(p => ({
                     ...p,
@@ -110,15 +99,14 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                 filaUnificada = [...filaUnificada, ...vendasFormatadas];
             }
 
-            // 2. Processa Ordens de Serviço (Filtra só as FATURADAS que ainda não foram pagas)
             if (Array.isArray(resOs.data)) {
-                const osFaturadas = resOs.data.filter(os => os.status === 'FATURADA');
+                // 🚀 AGORA FILTRA SÓ AS QUE ESTÃO AGUARDANDO PAGAMENTO
+                const osAguardando = resOs.data.filter(os => os.status === 'AGUARDANDO_PAGAMENTO');
 
-                const osFormatadas = osFaturadas.map(os => ({
+                const osFormatadas = osAguardando.map(os => ({
                     ...os,
-                    tipoFila: 'OS', // Marca (Sinalizador) para o Caixa saber que é OS
+                    tipoFila: 'OS',
                     horaEnvio: os.dataEntrada ? new Date(os.dataEntrada) : new Date(),
-                    // Unifica os itens (peças e serviços) para exibir na listagem do Caixa
                     itensUnificados: [
                         ...(os.itensPecas || []).map(p => ({
                             produto: { nome: p.produto?.nome || 'Peça (Sem Nome)' },
@@ -135,7 +123,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                 filaUnificada = [...filaUnificada, ...osFormatadas];
             }
 
-            // Ordena pela hora que chegou no caixa
             filaUnificada.sort((a, b) => a.horaEnvio - b.horaEnvio);
             setPedidos(filaUnificada);
 
@@ -162,9 +149,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         (p?.tipoFila === 'OS' && p?.veiculo?.placa?.toLowerCase().includes(busca.toLowerCase()))
     );
 
-    // =======================================================================
-    // AÇÕES DE PAGAMENTO E INTERFACE
-    // =======================================================================
     const abrirPagamentoDireto = (pedido) => {
         setPedidoSelecionado(pedido);
         setModoRecebimento(true);
@@ -299,14 +283,11 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         return <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${cor}`}><Clock size={10} className="inline mr-1 -mt-0.5"/> Há {diffMinutos} min</span>;
     };
 
-    // =======================================================================
-    // 🚀 LÓGICA DE PAGAMENTO FINAL (ROTEAMENTO INTELIGENTE)
-    // =======================================================================
     const adicionarPagamentoEVerificar = async () => {
         if (valorDigitadoAtual <= 0 && faltaPagarTotal) return toast.error("Digite um valor válido.");
 
         if (metodoPagamento === 'A_PRAZO' && !pedidoSelecionado.cliente) {
-            return toast.error("Venda Promissória (A Prazo) exige um cliente cadastrado no pedido!", { duration: 4000 });
+            return toast.error("Venda Promissória exige um cliente cadastrado no pedido!", { duration: 4000 });
         }
 
         let novosPagamentos = [...pagamentosAdicionados];
@@ -366,14 +347,11 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
             }));
 
             let response;
-            // 🚀 ROTEADOR DE PAGAMENTO
             if (pedidoSelecionado.tipoFila === 'OS') {
-                // Se for OS, manda pra rota de Pagar OS
+                // OS vai para a rota /pagar que mudará para FATURADA no BD
                 response = await api.post(`/api/os/${pedidoSelecionado.id}/pagar`, payload);
-                // Força o status simulado para a tela mostrar o Recibo
-                response.data = { ...response.data, status: 'FINALIZADA_PAGA', tipoFila: 'OS', itensUnificados: pedidoSelecionado.itensUnificados };
+                response.data = { ...response.data, status: 'FATURADA', tipoFila: 'OS', itensUnificados: pedidoSelecionado.itensUnificados };
             } else {
-                // Se for Venda Normal, manda pra rota de Vendas
                 response = await api.post(`/api/vendas/${pedidoSelecionado.id}/pagar`, payload);
                 response.data = { ...response.data, tipoFila: 'VENDA' };
             }
@@ -392,12 +370,9 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         }
     };
 
-    // =======================================================================
-    // DEVOLUÇÃO E CUPOM FISCAL
-    // =======================================================================
     const emitirCupomFiscal = async () => {
         if (pedidoSelecionado.tipoFila === 'OS') {
-            return toast.error("A emissão de NFC-e para OS (Serviços) deve ser feita pelo Gerenciador Fiscal ou Módulo de Serviços (NFS-e). O caixa emite apenas Recibo/NF-e de Peças.", { duration: 5000 });
+            return toast.error("A emissão de NFC-e para OS deve ser feita pelo Gerenciador Fiscal. O caixa emite NF-e de Vendas.", { duration: 5000 });
         }
 
         setProcessandoNfce(true);
@@ -425,7 +400,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         const idToast = toast.loading("Devolvendo/Revertendo...");
         try {
             if (pedidoSelecionado.tipoFila === 'OS') {
-                // Reverte a OS para Em Execução ou Aguardando Aprovação
                 await api.patch(`/api/os/${pedidoSelecionado.id}/status?status=EM_EXECUCAO`);
                 toast.success('OS devolvida para a produção (Em Execução)!', { id: idToast });
             } else {
@@ -533,7 +507,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                     <p className="text-slate-500 font-bold mt-1 flex items-center gap-1"><User size={16}/> {pedidoSelecionado.cliente?.nome || 'Consumidor Final'}</p>
                                 </div>
 
-                                {/* RESUMO FINANCEIRO HÍBRIDO */}
                                 <div className="text-right bg-white p-4 rounded-2xl shadow-sm border border-slate-200 min-w-[220px]">
                                     {exibirIvaDual ? (
                                         <div className="animate-fade-in flex flex-col items-end">
@@ -573,7 +546,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                             </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
-                                            {/* Usa a lista de itens normal (Vendas) ou a lista unificada (OS) */}
                                             {(pedidoSelecionado.itensUnificados || pedidoSelecionado.itens || []).map((item, idx) => (
                                                 <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                                     <td className={`p-3 font-bold ${item.produto?.nome?.includes('[SERVIÇO]') ? 'text-orange-600' : 'text-slate-700'}`}>
@@ -607,7 +579,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                                     <Printer size={24} /> IMPRIMIR RECIBO (F10)
                                                 </button>
 
-                                                {/* Somente Vendas Normais habilitam o botão de NFC-e */}
                                                 <button
                                                     onClick={emitirCupomFiscal}
                                                     disabled={processandoNfce || pedidoSelecionado.tipoFila === 'OS'}
@@ -622,8 +593,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                 </>
                             ) : (
                                 <div className="flex-1 flex flex-col bg-slate-50 animate-fade-in border-t border-slate-200">
-
-                                    {/* BOTÕES DE MÉTODOS DE PAGAMENTO */}
                                     <div className="p-4 bg-white border-b border-slate-200 grid grid-cols-5 gap-2">
                                         <button onClick={() => { setMetodoPagamento('DINHEIRO'); setNumeroParcelas(1); valorRecebidoRef.current?.focus(); }} className={`p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${metodoPagamento === 'DINHEIRO' ? 'border-green-500 bg-green-50 text-green-700 shadow-sm transform scale-[1.02]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
                                             <Banknote size={20} /><span className="font-black text-[10px]">DINHEIRO (D)</span>
@@ -644,7 +613,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
                                     <div className="flex-1 p-6 grid grid-cols-2 gap-6 overflow-y-auto">
                                         <div className="space-y-4">
-                                            {/* ENTRADA DE VALOR */}
                                             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                                                 <div className="flex justify-between items-end mb-2">
                                                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Valor do {metodoPagamento.replace('_', ' ')}</label>
@@ -662,7 +630,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                                 </div>
                                             </div>
 
-                                            {/* OPÇÕES DE PARCELAMENTO */}
                                             {(metodoPagamento === 'CARTAO_CREDITO' || metodoPagamento === 'A_PRAZO') && (
                                                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-orange-200 animate-fade-in">
                                                     <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest block mb-2">Dividir em quantas parcelas?</label>
@@ -687,7 +654,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                                 </div>
                                             )}
 
-                                            {/* CPF OPCIONAL */}
                                             {!pedidoSelecionado.cliente && (
                                                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">CPF na Nota (Opcional)</label>
@@ -702,7 +668,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                                 </div>
                                             )}
 
-                                            {/* LISTA DE PAGAMENTOS ADICIONADOS */}
                                             {pagamentosAdicionados.length > 0 && (
                                                 <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
                                                     <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Pagamentos Lançados</p>
@@ -721,7 +686,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                             )}
                                         </div>
 
-                                        {/* CAIXA DE TROCO E FINALIZAR */}
                                         <div className="flex flex-col justify-between">
                                             <div className={`p-6 rounded-3xl border-4 text-center transition-colors flex-1 flex flex-col justify-center ${faltaPagarTotal ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-500'}`}>
                                                 <p className={`text-sm font-black uppercase tracking-widest mb-1 ${faltaPagarTotal ? 'text-red-500' : 'text-emerald-600'}`}>
@@ -754,7 +718,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                 </div>
             </div>
 
-            {/* Modal de Devolução / Reversão */}
             {modalDevolucaoAberto && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] animate-fade-in">
                     <div className="bg-white p-8 rounded-3xl max-w-sm text-center border-4 border-red-500 shadow-2xl">
