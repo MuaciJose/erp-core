@@ -24,7 +24,8 @@ public class NfeSetupService {
 
         File arquivoCertificado = new File(caminhoCertificado);
         if (!arquivoCertificado.exists()) {
-            throw new Exception("Certificado Digital não encontrado para o CNPJ " + cnpjLimpo + " em: " + caminhoCertificado);
+            // 🚀 AQUI FOI ALTERADO: Mensagem limpa e segura, sem expor as pastas do servidor Linux
+            throw new Exception("Certificado Digital A1 não encontrado para o CNPJ " + cnpjLimpo + ". Acesse Configurações > Fiscal e faça o upload do arquivo .pfx");
         }
 
         // 3. Carrega o certificado usando a senha que está no banco de dados

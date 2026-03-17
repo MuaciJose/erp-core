@@ -9,26 +9,21 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 
 export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
-    // 🚀 NOVO: Controle de Abas
-    const [abaAtiva, setAbaAtiva] = useState('VENDAS'); // 'VENDAS' ou 'OS'
-
+    const [abaAtiva, setAbaAtiva] = useState('VENDAS');
     const [registros, setRegistros] = useState([]);
-    const [ordensServico, setOrdensServico] = useState([]); // 🚀 Lista de OS separada
+    const [ordensServico, setOrdensServico] = useState([]);
 
     const [loading, setLoading] = useState(true);
     const [busca, setBusca] = useState('');
     const [filtroStatus, setFiltroStatus] = useState('TODAS');
     const [processandoId, setProcessandoId] = useState(null);
 
-    // ESTADOS DE FILTRO DE DATA
     const [dataInicio, setDataInicio] = useState('');
     const [dataFim, setDataFim] = useState('');
 
-    // ESTADOS DE PAGINAÇÃO
     const [paginaAtual, setPaginaAtual] = useState(1);
     const itensPorPagina = 10;
 
-    // ESTADOS MODAL FECHAMENTO
     const [modalFechamentoAberto, setModalFechamentoAberto] = useState(false);
     const [fechamentoMes, setFechamentoMes] = useState(new Date().getMonth() + 1);
     const [fechamentoAno, setFechamentoAno] = useState(new Date().getFullYear());
@@ -36,25 +31,38 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
     const [enviandoLote, setEnviandoLote] = useState(false);
     const [fechamentoMensagem, setFechamentoMensagem] = useState('Olá Contador,\n\nSeguem em anexo os arquivos XML e PDFs referentes ao fechamento deste mês.\n\nQualquer dúvida, estamos à disposição.');
 
-    // ESTADOS PARA CANCELAMENTO DA NOTA
     const [modalCancelamentoAberto, setModalCancelamentoAberto] = useState(false);
     const [notaParaCancelar, setNotaParaCancelar] = useState(null);
     const [justificativaCancelamento, setJustificativaCancelamento] = useState('');
     const [cancelandoNfe, setCancelandoNfe] = useState(false);
 
     // =======================================================================
-    // EXTRATOR DE ERROS DO JAVA E UTILIDADES
+    // 🚀 EXTRATOR E TRADUTOR DE ERROS DO JAVA
     // =======================================================================
     const extrairErroBackend = (error, mensagemPadrao) => {
         if (error?.response?.status === 403) return "Acesso Negado: Rota bloqueada pelo servidor (Erro 403).";
         if (error?.response?.status === 401) return "Sessão expirada. Por favor, recarregue a página e faça login novamente.";
 
+        let msgBruta = error?.message || mensagemPadrao;
+
         if (error?.response?.data) {
-            if (typeof error.response.data === 'string') return error.response.data;
-            if (error.response.data.message) return error.response.data.message;
-            if (error.response.data.error) return error.response.data.error;
+            if (typeof error.response.data === 'string') msgBruta = error.response.data;
+            else if (error.response.data.message) msgBruta = error.response.data.message;
+            else if (error.response.data.error) msgBruta = error.response.data.error;
         }
-        return error?.message || mensagemPadrao;
+
+        // 🛡️ TRADUÇÕES AMIGÁVEIS PARA O USUÁRIO FINAL
+        if (msgBruta.includes("Certificado Digital não encontrado") || msgBruta.includes(".pfx")) {
+            return "⚠️ Certificado Digital Ausente! Vá em Configurações > Fiscal e faça o upload do seu arquivo A1 (.pfx) antes de emitir notas.";
+        }
+        if (msgBruta.includes("Senha") && msgBruta.includes("Certificado")) {
+            return "🔑 A senha do Certificado Digital está incorreta. Corrija na tela de Configurações Fiscais.";
+        }
+        if (msgBruta.includes("NCM")) {
+            return "📦 Falta o NCM em um dos produtos desta nota! Revise o cadastro das peças.";
+        }
+
+        return msgBruta.replace(/\/home\/[^\s]+/, '[SERVIDOR]');
     };
 
     const isCupomFiscal = (chaveAcesso) => {
@@ -78,9 +86,6 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
         return { expirado: false, mensagem: '' };
     };
 
-    // =======================================================================
-    // CARREGAMENTO DE DADOS UNIFICADO (VENDAS + NOTAS + OS)
-    // =======================================================================
     const carregarDadosFiscais = async () => {
         setLoading(true);
         try {
@@ -90,11 +95,9 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                 api.get('/api/os').catch(() => ({ data: [] }))
             ]);
 
-            // 1. Processar OS (Aba de OS)
             const osFaturadas = Array.isArray(resOs.data) ? resOs.data.filter(o => o.status === 'FATURADA') : [];
             setOrdensServico(osFaturadas.sort((a, b) => b.id - a.id));
 
-            // 2. Processar Vendas e Notas Avulsas (Aba Vendas)
             const unificados = [];
             const nfeIdsAdicionados = new Set();
 
@@ -154,9 +157,6 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
         setPaginaAtual(1);
     }, [busca, filtroStatus, dataInicio, dataFim, abaAtiva]);
 
-    // =========================================================================
-    // 🚀 LÓGICA FISCAL DE VENDAS E NOTAS (EXISTENTE)
-    // =========================================================================
     const abrirModalCancelamento = (registro) => {
         setNotaParaCancelar(registro);
         setJustificativaCancelamento('');
@@ -286,7 +286,7 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
     };
 
     // =========================================================================
-    // 🚀 LÓGICA FISCAL DE OS (NOVAS ROTAS)
+    // 🚀 LÓGICA FISCAL DE OS (AGORA COM O TRATAMENTO DE ERRO CORRETO)
     // =========================================================================
     const emitirNfePecas = async (osId) => {
         setProcessandoId(`pecas-${osId}`);
@@ -295,7 +295,8 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
             const res = await api.post(`/api/os/${osId}/fiscal/nfe-pecas`);
             toast.success(res.data.message || 'NF-e de Peças autorizada pela SEFAZ!', { id: toastId });
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Erro ao comunicar com a SEFAZ.', { id: toastId });
+            // 🚀 USANDO O TRADUTOR DE ERROS AQUI
+            toast.error(extrairErroBackend(error, 'Erro ao comunicar com a SEFAZ.'), { id: toastId, duration: 6000 });
         } finally {
             setProcessandoId(null);
         }
@@ -308,7 +309,8 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
             const res = await api.post(`/api/os/${osId}/fiscal/nfse-servicos`);
             toast.success(res.data.message || 'NFS-e autorizada pela Prefeitura!', { id: toastId });
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Erro ao comunicar com a Prefeitura.', { id: toastId });
+            // 🚀 USANDO O TRADUTOR DE ERROS AQUI
+            toast.error(extrairErroBackend(error, 'Erro ao comunicar com a Prefeitura.'), { id: toastId, duration: 6000 });
         } finally {
             setProcessandoId(null);
         }
@@ -335,7 +337,6 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
         return isCupomFiscal(chaveAcesso) ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-purple-100 text-purple-700 border-purple-200';
     };
 
-    // Filtros aplicados na Aba Ativa (Vendas ou OS)
     const registrosFiltrados = (abaAtiva === 'VENDAS' ? registros : ordensServico).filter(reg => {
         const clienteNome = reg.clienteNome || reg.cliente?.nome || '';
         const idLocal = reg.vendaId || reg.numeroNota || reg.id || '';
