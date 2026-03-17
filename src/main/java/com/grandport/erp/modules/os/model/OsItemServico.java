@@ -36,4 +36,9 @@ public class OsItemServico {
 
     @Column(precision = 10, scale = 2)
     private BigDecimal valorTotal = BigDecimal.ZERO;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal comissao = BigDecimal.ZERO;
+
+    private Boolean ativo = true;
 }
