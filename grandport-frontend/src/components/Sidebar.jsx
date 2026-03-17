@@ -49,8 +49,9 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             submenus: [
                 { titulo: 'Ponto de Venda (PDV)', acao: 'pdv' },
                 { titulo: 'Balcão / Central', acao: 'vendas' },
+                { titulo: 'Checklist de Entrada', acao: 'checklist' }, // 🚀 ADICIONADO AQUI
                 { titulo: 'Painel de OS (Kanban)', acao: 'os' },
-                { titulo: 'Consulta de OS (Lista)', acao: 'listagem-os' }, // 🚀 ADICIONADO AQUI
+                { titulo: 'Consulta de OS (Lista)', acao: 'listagem-os' },
                 { titulo: 'Fila do Caixa', acao: 'fila-caixa' },
                 { titulo: 'Controle de Caixa', acao: 'caixa' },
                 { titulo: 'Relatório de Comissões', acao: 'relatorio-comissoes' },
@@ -99,8 +100,8 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         { id: 'manual', titulo: 'Manual do Usuário', icone: <HelpCircle size={20} />, acao: 'manual' }
     ];
 
-    // 🚀 INCLUÍDO AQUI TAMBÉM
-    const rotasLivres = ['manual', 'listagem-os', 'os'];
+    // 🚀 INCLUÍDO AQUI TAMBÉM O CHECKLIST
+    const rotasLivres = ['manual'];
 
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {

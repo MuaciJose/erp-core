@@ -9,9 +9,12 @@ import com.grandport.erp.modules.veiculo.dto.TransferenciaForcadaDTO;
 import com.grandport.erp.modules.veiculo.model.Veiculo;
 import com.grandport.erp.modules.veiculo.repository.VeiculoRepository;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
-// 🚀 IMPORTAÇÕES DA OS
+
+// 🚀 IMPORTAÇÕES DA OS E CHECKLIST
 import com.grandport.erp.modules.os.repository.OrdemServicoRepository;
 import com.grandport.erp.modules.os.model.OrdemServico;
+import com.grandport.erp.modules.checklist.repository.ChecklistRepository;
+import com.grandport.erp.modules.checklist.model.ChecklistVeiculo;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -33,58 +37,100 @@ public class VeiculoService {
     @Autowired private AuditoriaService auditoriaService;
     @Autowired private PasswordEncoder passwordEncoder;
 
-    // 🚀 INJETANDO O REPOSITÓRIO DE OS
+    // 🚀 INJETANDO OS REPOSITÓRIOS DA OFICINA
     @Autowired private OrdemServicoRepository osRepository;
+    @Autowired private ChecklistRepository checklistRepository;
 
     public List<Veiculo> listarPorCliente(Long clienteId) {
         return repository.findByClienteId(clienteId);
     }
 
-    // 🚀 HISTÓRICO MISTO DO CARRO: VENDAS + OS
+    // 🚀 HISTÓRICO MISTO DO CARRO: VENDAS + OS + CHECKLISTS (REFATORADO COM BUILDER)
     public List<HistoricoVeiculoDTO> buscarHistorico(Long veiculoId) {
 
+        List<HistoricoVeiculoDTO> historico = new ArrayList<>();
+
+        // =========================================================
         // 1. Busca Vendas Diretas de balcão vinculadas ao carro
-        List<HistoricoVeiculoDTO> historico = vendaRepository.findByVeiculoIdOrderByDataHoraDesc(veiculoId).stream()
-                .map(venda -> new HistoricoVeiculoDTO(
-                        venda.getId(),
-                        venda.getDataHora(),
-                        venda.getKmVeiculo(),
-                        venda.getCliente() != null ? venda.getCliente().getNome() : "Consumidor Final",
-                        venda.getItens().stream()
-                                .map(item -> new HistoricoVeiculoDTO.ItemHistoricoDTO(item.getProduto().getNome(), item.getPrecoUnitario()))
-                                .collect(Collectors.toList())
-                ))
-                .collect(Collectors.toList());
+        // =========================================================
+        vendaRepository.findByVeiculoIdOrderByDataHoraDesc(veiculoId).forEach(venda -> {
+            historico.add(HistoricoVeiculoDTO.builder()
+                    .tipo("VENDA")
+                    .data(venda.getDataHora())
+                    .idReferencia(venda.getId())
+                    .dadosOs(HistoricoVeiculoDTO.DadosOsDTO.builder()
+                            .clienteComprador(venda.getCliente() != null ? venda.getCliente().getNome() : "Consumidor Final")
+                            .kmRegistrado(venda.getKmVeiculo())
+                            .itens(venda.getItens().stream()
+                                    .map(item -> HistoricoVeiculoDTO.ItemHistoricoDTO.builder()
+                                            .descricao("[BALCÃO] " + item.getProduto().getNome())
+                                            .valor(item.getPrecoUnitario())
+                                            .build())
+                                    .collect(Collectors.toList()))
+                            .build())
+                    .build());
+        });
 
+        // =========================================================
         // 2. Busca Ordens de Serviço vinculadas ao carro
+        // =========================================================
         List<OrdemServico> oss = osRepository.findByVeiculoId(veiculoId);
-
         for (OrdemServico os : oss) {
             List<HistoricoVeiculoDTO.ItemHistoricoDTO> itensMapeados = new ArrayList<>();
 
             // Mapeia Peças
-            os.getItensPecas().forEach(p ->
-                    itensMapeados.add(new HistoricoVeiculoDTO.ItemHistoricoDTO("[PEÇA] " + p.getProduto().getNome(), p.getPrecoUnitario()))
-            );
-            // Mapeia Mão de Obra
-            os.getItensServicos().forEach(s ->
-                    itensMapeados.add(new HistoricoVeiculoDTO.ItemHistoricoDTO("[SERVIÇO] " + s.getServico().getNome(), s.getPrecoUnitario()))
-            );
-
-            historico.add(new HistoricoVeiculoDTO(
-                    os.getId(),
-                    os.getDataEntrada(), // 🚀 Usando o campo exato da sua entidade
-                    os.getKmEntrada(),
-                    os.getCliente() != null ? os.getCliente().getNome() : "Sem Cliente",
-                    itensMapeados
+            os.getItensPecas().forEach(p -> itensMapeados.add(
+                    HistoricoVeiculoDTO.ItemHistoricoDTO.builder()
+                            .descricao("[PEÇA] " + p.getProduto().getNome())
+                            .valor(p.getPrecoUnitario())
+                            .build()
             ));
+
+            // Mapeia Mão de Obra
+            os.getItensServicos().forEach(s -> itensMapeados.add(
+                    HistoricoVeiculoDTO.ItemHistoricoDTO.builder()
+                            .descricao("[SERVIÇO] " + s.getServico().getNome())
+                            .valor(s.getPrecoUnitario())
+                            .build()
+            ));
+
+            historico.add(HistoricoVeiculoDTO.builder()
+                    .tipo("OS")
+                    .data(os.getDataEntrada())
+                    .idReferencia(os.getId())
+                    .dadosOs(HistoricoVeiculoDTO.DadosOsDTO.builder()
+                            .clienteComprador(os.getCliente() != null ? os.getCliente().getNome() : "Sem Cliente")
+                            .kmRegistrado(os.getKmEntrada())
+                            .itens(itensMapeados)
+                            .build())
+                    .build());
         }
 
-        // 3. Ordena cronologicamente
-        historico.sort((h1, h2) -> {
-            if (h1.getData() == null || h2.getData() == null) return 0;
-            return h2.getData().compareTo(h1.getData()); // 🚀 Trocado para getData()
-        });
+        // =========================================================
+        // 3. Busca Checklists de Vistoria vinculados ao carro
+        // =========================================================
+        List<ChecklistVeiculo> checklists = checklistRepository.findByVeiculoIdOrderByDataRegistroDesc(veiculoId);
+        for (ChecklistVeiculo chk : checklists) {
+            historico.add(HistoricoVeiculoDTO.builder()
+                    .tipo("CHECKLIST")
+                    .data(chk.getDataRegistro())
+                    .idReferencia(chk.getId())
+                    .dadosChecklist(HistoricoVeiculoDTO.DadosChecklistDTO.builder()
+                            .kmAtual(chk.getKmAtual())
+                            .nivelCombustivel(chk.getNivelCombustivel())
+                            .itensAvariados(chk.getItensAvariados())
+                            // Substitua "getObservacoesGerais" pelo nome exato do getter no seu model ChecklistVeiculo, se for diferente
+                            .observacoes(chk.getObservacoesGerais())
+                            .build())
+                    .build());
+        }
+
+        // =========================================================
+        // 4. Ordena tudo cronologicamente (do mais recente pro mais antigo)
+        // =========================================================
+        // Usando o Comparator moderno do Java que é mais limpo e seguro contra nulos
+        historico.sort(Comparator.comparing(HistoricoVeiculoDTO::getData,
+                Comparator.nullsLast(Comparator.naturalOrder())).reversed());
 
         return historico;
     }

@@ -40,7 +40,7 @@ public class OrdemServicoService {
         os.setCliente(dto.clienteId() != null ? parceiroRepository.findById(dto.clienteId()).orElse(null) : null);
         os.setVeiculo(dto.veiculoId() != null ? veiculoRepository.findById(dto.veiculoId()).orElse(null) : null);
         os.setKmEntrada(dto.kmEntrada());
-        os.setNivelCombustivel(dto.nivelCombustivel());
+
         os.setDefeitoRelatado(dto.defeitoRelatado());
         os.setDiagnosticoTecnico(dto.diagnosticoTecnico());
         os.setObservacoes(dto.observacoes());

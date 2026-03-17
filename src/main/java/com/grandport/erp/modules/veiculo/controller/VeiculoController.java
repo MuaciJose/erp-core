@@ -4,6 +4,8 @@ import com.grandport.erp.modules.veiculo.dto.HistoricoVeiculoDTO;
 import com.grandport.erp.modules.veiculo.dto.TransferenciaForcadaDTO;
 import com.grandport.erp.modules.veiculo.model.Veiculo;
 import com.grandport.erp.modules.veiculo.service.VeiculoService;
+import com.grandport.erp.modules.veiculo.repository.VeiculoRepository; // 🚀 IMPORTAÇÃO NECESSÁRIA
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +22,18 @@ public class VeiculoController {
 
     @Autowired
     private VeiculoService service;
+
+    @Autowired
+    private VeiculoRepository veiculoRepository; // 🚀 INJEÇÃO DO REPOSITÓRIO
+
+    // =========================================================
+    // 🚀 A ROTA QUE FALTAVA PARA O TABLET FUNCIONAR!
+    // =========================================================
+    @GetMapping
+    public ResponseEntity<List<Veiculo>> listarTodos() {
+        return ResponseEntity.ok(veiculoRepository.findAll());
+    }
+    // =========================================================
 
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<List<Veiculo>> listar(@PathVariable Long clienteId) {

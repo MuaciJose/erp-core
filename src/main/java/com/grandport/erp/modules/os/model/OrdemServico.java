@@ -29,20 +29,19 @@ public class OrdemServico {
 
     @ManyToOne
     @JoinColumn(name = "consultor_id")
-    private Usuario consultor; // Quem atendeu no balcão
+    private Usuario consultor;
 
     @Enumerated(EnumType.STRING)
     private StatusOS status = StatusOS.ORCAMENTO;
 
-    // --- CHECK-IN DO VEÍCULO ---
-    private Integer kmEntrada;
-    private String nivelCombustivel; // Ex: 1/4, Meio Tanque, Cheio
+    // --- DADOS DO VEÍCULO NA HORA DA MANUTENÇÃO ---
+    private Integer kmEntrada; // Mantido: Essencial para Garantia da Peça e Etiqueta de Óleo
 
     @Column(columnDefinition = "TEXT")
-    private String defeitoRelatado; // O que o cliente disse
+    private String defeitoRelatado; // Reclamação do Cliente
 
     @Column(columnDefinition = "TEXT")
-    private String diagnosticoTecnico; // O que o mecânico achou
+    private String diagnosticoTecnico; // Avaliação do Mecânico
 
     @Column(columnDefinition = "TEXT")
     private String observacoes;
@@ -64,7 +63,7 @@ public class OrdemServico {
     @Column(precision = 10, scale = 2)
     private BigDecimal valorTotal = BigDecimal.ZERO;
 
-    // --- ITENS (PEÇAS E MÃO DE OBRA) ---
+    // --- ITENS ---
     @OneToMany(mappedBy = "ordemServico", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OsItemPeca> itensPecas = new ArrayList<>();
 

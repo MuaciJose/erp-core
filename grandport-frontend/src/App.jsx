@@ -52,7 +52,10 @@ import { GeradorEtiquetas } from './modules/estoque/GeradorEtiquetas';
 
 // 🚀 MÓDULOS DE ORDEM DE SERVIÇO
 import { PainelOs } from './modules/os/PainelOs';
-import { ListagemOs } from './modules/os/ListagemOs'; // 🚀 ADICIONADO
+import { ListagemOs } from './modules/os/ListagemOs';
+
+// 🚀 MÓDULO CHECKLIST DE VEÍCULOS (NOVO)
+import { ChecklistTablet } from './modules/checklist/ChecklistTablet';
 
 // 🚀 MÓDULO SERVIÇOS / MÃO DE OBRA
 import { GestaoServicos } from './modules/servicos/GestaoServicos';
@@ -116,8 +119,8 @@ function App() {
         return <Login onLoginSuccess={handleLoginSucesso} />;
     }
 
-    // 🚀 Liberando as rotas extras para acesso temporário/testes
-    const permissoesExtra = ['revisoes', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual'];
+    // 🚀 Liberando as rotas extras (INCLUINDO O CHECKLIST) para acesso temporário/testes
+    const permissoesExtra = ['revisoes', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual', 'checklist'];
     const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva) || permissoesExtra.includes(paginaAtiva);
 
     return (
@@ -162,9 +165,10 @@ function App() {
                             {paginaAtiva === 'revisoes' && <PainelRevisoes />}
                             {paginaAtiva === 'etiquetas' && <GeradorEtiquetas />}
 
-                            {/* 🚀 TELAS DE OS */}
+                            {/* 🚀 TELAS DA OFICINA */}
+                            {paginaAtiva === 'checklist' && <ChecklistTablet setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'os' && <PainelOs />}
-                            {paginaAtiva === 'listagem-os' && <ListagemOs setPaginaAtiva={setPaginaAtiva} />} {/* 🚀 ADICIONADO */}
+                            {paginaAtiva === 'listagem-os' && <ListagemOs setPaginaAtiva={setPaginaAtiva} />}
 
                             {paginaAtiva === 'servicos' && <GestaoServicos />}
 

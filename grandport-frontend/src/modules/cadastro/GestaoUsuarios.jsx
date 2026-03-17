@@ -27,8 +27,9 @@ export const GestaoUsuarios = () => {
                 { acao: 'dash', nome: 'Dashboard Inicial (Gráficos)' },
                 { acao: 'pdv', nome: 'Ponto de Venda Rápido (PDV)' },
                 { acao: 'vendas', nome: 'Balcão de Peças / Central' },
+                { acao: 'checklist', nome: 'Checklist de Entrada (Tablet)' }, // 🚀 ADICIONADO AQUI
                 { acao: 'os', nome: 'Ordem de Serviço (OS)' },
-                { acao: 'listagem-os', nome: 'Consulta de OS (Histórico)' }, // 🚀 ADICIONADO AQUI
+                { acao: 'listagem-os', nome: 'Consulta de OS (Histórico)' },
                 { acao: 'orcamentos', nome: 'Orçamentos e Pedidos' },
                 { acao: 'fila-caixa', nome: 'Fila do Caixa (Receber Pagamentos)' },
                 { acao: 'caixa', nome: 'Controle de Caixa (Abrir/Fechar Turno)' },

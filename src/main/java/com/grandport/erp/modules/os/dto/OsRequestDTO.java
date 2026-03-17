@@ -7,7 +7,6 @@ public record OsRequestDTO(
         Long clienteId,
         Long veiculoId,
         Integer kmEntrada,
-        String nivelCombustivel,
         String defeitoRelatado,
         String diagnosticoTecnico,
         String observacoes,
