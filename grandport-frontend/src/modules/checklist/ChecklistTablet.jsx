@@ -7,6 +7,8 @@ import {
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import SignatureCanvas from 'react-signature-canvas'; // 🚀 A BIBLIOTECA DE ASSINATURA AQUI!
+import imageCompression from 'browser-image-compression';
+
 
 export const ChecklistTablet = ({ setPaginaAtiva }) => {
     const [loading, setLoading] = useState(false);
@@ -54,7 +56,7 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
         );
     };
 
-    const handleCaptureFoto = (e) => {
+    const handleCaptureFoto = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
@@ -68,8 +70,34 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
             return;
         }
 
-        const miniaturaUrl = URL.createObjectURL(file);
-        setFotosCapturadas(prev => [...prev, { file, miniaturaUrl }]);
+        const loadId = toast.loading("Processando imagem...");
+
+        try {
+            // 🧠 COMPRESSÃO INTELIGENTE
+            const tamanhoMB = file.size / 1024 / 1024;
+
+            const options = {
+                maxSizeMB: tamanhoMB > 3 ? 0.3 : 0.2, // adapta automaticamente
+                maxWidthOrHeight: 1280,
+                useWebWorker: true,
+                exifOrientation: true // 🚀 corrige rotação automaticamente
+            };
+
+            const compressedFile = await imageCompression(file, options);
+
+            const miniaturaUrl = URL.createObjectURL(compressedFile);
+
+            setFotosCapturadas(prev => [
+                ...prev,
+                { file: compressedFile, miniaturaUrl }
+            ]);
+
+            toast.dismiss(loadId);
+
+        } catch (error) {
+            console.error("Erro ao comprimir imagem:", error);
+            toast.error("Erro ao processar a imagem.", { id: loadId });
+        }
     };
 
     const removerFoto = (index) => {
@@ -89,7 +117,7 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
         if (!kmAtual) return toast.error("Informe a Quilometragem de entrada!");
         if (!nivelCombustivel) return toast.error("Informe o nível de combustível!");
 
-        // 🚀 TRAVA: Obriga o cliente a assinar no tablet!
+        // 🚀 TRAVA: assinatura obrigatória
         if (!sigCanvas.current || sigCanvas.current.isEmpty()) {
             return toast.error("A assinatura do cliente é obrigatória para validade jurídica!");
         }
@@ -98,7 +126,7 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
         const loadId = toast.loading("Salvando Vistoria...");
 
         try {
-            // 1. Salva os dados de texto
+            // 1. Dados principais
             const payload = {
                 veiculoId: veiculoSelecionado.id,
                 clienteId: veiculoSelecionado.cliente?.id || null,
@@ -109,9 +137,9 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
             };
 
             const response = await api.post('/api/checklists', payload);
-            const checklistCriado = response.data; // Pega o ID da vistoria gerada
+            const checklistCriado = response.data;
 
-            // 2. Transforma o rabisco da assinatura em um arquivo PNG real
+            // 2. Assinatura → PNG
             const assinaturaBase64 = sigCanvas.current.getCanvas().toDataURL('image/png');
             const resAssinatura = await fetch(assinaturaBase64);
             const blobAssinatura = await resAssinatura.blob();
@@ -119,32 +147,47 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
             const formDataAssinatura = new FormData();
             formDataAssinatura.append('assinatura', blobAssinatura, 'assinatura.png');
 
-            // 3. Envia a assinatura para o Java
-            await api.post(`/api/checklists/${checklistCriado.id}/assinatura`, formDataAssinatura, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            // 3. Upload assinatura
+            await api.post(
+                `/api/checklists/${checklistCriado.id}/assinatura`,
+                formDataAssinatura,
+                { headers: { 'Content-Type': 'multipart/form-data' } }
+            );
 
-            // 4. Faz o upload das fotos
+            // 4. Upload das fotos (🚀 AGORA EM PARALELO)
             if (fotosCapturadas.length > 0) {
                 toast.loading(`Enviando ${fotosCapturadas.length} fotos...`, { id: loadId });
 
-                for (const foto of fotosCapturadas) {
-                    const formData = new FormData();
-                    formData.append('foto', foto.file);
+                await Promise.all(
+                    fotosCapturadas.map(foto => {
+                        const formData = new FormData();
+                        formData.append('foto', foto.file);
 
-                    await api.post(`/api/checklists/${checklistCriado.id}/fotos`, formData, {
-                        headers: { 'Content-Type': 'multipart/form-data' }
-                    });
-                }
+                        return api.post(
+                            `/api/checklists/${checklistCriado.id}/fotos`,
+                            formData,
+                            { headers: { 'Content-Type': 'multipart/form-data' } }
+                        );
+                    })
+                );
             }
 
             toast.success("Vistoria oficializada com Sucesso!", { id: loadId });
+
             setTimeout(() => setPaginaAtiva('dash'), 1500);
+
         } catch (error) {
             console.error(error);
-            const erroDetalhado = error.response?.data?.message || error.response?.data || error.message;
+
+            const erroDetalhado =
+                error.response?.data?.message ||
+                error.response?.data ||
+                error.message;
+
             alert("ERRO DO SERVIDOR: " + JSON.stringify(erroDetalhado));
+
             toast.error("Erro ao salvar o checklist. Tente novamente.", { id: loadId });
+
         } finally {
             setLoading(false);
         }
