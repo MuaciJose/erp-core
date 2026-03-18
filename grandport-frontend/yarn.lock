@@ -1109,7 +1109,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/runtime@npm:^7.11.2":
+"@babel/runtime@npm:^7.11.2, @babel/runtime@npm:^7.17.9":
   version: 7.29.2
   resolution: "@babel/runtime@npm:7.29.2"
   checksum: 10c0/30b80a0140d16467792e1bbeb06f655b0dab70407da38dfac7fedae9c859f9ae9d846ef14ad77bd3814c064295fe9b1bc551f1541ea14646ae9f22b71a8bc17a
@@ -2056,6 +2056,13 @@ __metadata:
   version: 1.20.2
   resolution: "@types/resolve@npm:1.20.2"
   checksum: 10c0/c5b7e1770feb5ccfb6802f6ad82a7b0d50874c99331e0c9b259e415e55a38d7a86ad0901c57665d93f75938be2a6a0bc9aa06c9749192cadb2e4512800bbc6e6
+  languageName: node
+  linkType: hard
+
+"@types/signature_pad@npm:^2.3.0":
+  version: 2.3.6
+  resolution: "@types/signature_pad@npm:2.3.6"
+  checksum: 10c0/67bd91a078c90b51a7e0b4b75f306bf8e1ffccc7b20bd097902d4fb299953fc513981a1444c09d9a9a890fd04c624c3f6599b9d64f5cd39cc663cb3354f7e478
   languageName: node
   linkType: hard
 
@@ -3666,12 +3673,14 @@ __metadata:
     globals: "npm:^16.5.0"
     lucide-react: "npm:^0.575.0"
     postcss: "npm:^8.5.6"
+    prop-types: "npm:^15.8.1"
     react: "npm:^19.2.0"
     react-barcode: "npm:^1.6.1"
     react-dom: "npm:^19.2.0"
     react-hot-toast: "npm:^2.6.0"
     react-hotkeys-hook: "npm:^5.2.4"
     react-is: "npm:^19.2.4"
+    react-signature-canvas: "npm:^1.1.0-alpha.2"
     recharts: "npm:^3.7.0"
     tailwindcss: "npm:^3.0.0"
     vite: "npm:^7.3.1"
@@ -4944,7 +4953,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prop-types@npm:^15.6.2":
+"prop-types@npm:^15.6.2, prop-types@npm:^15.8.1":
   version: 15.8.1
   resolution: "prop-types@npm:15.8.1"
   dependencies:
@@ -5068,6 +5077,29 @@ __metadata:
   version: 0.18.0
   resolution: "react-refresh@npm:0.18.0"
   checksum: 10c0/34a262f7fd803433a534f50deb27a148112a81adcae440c7d1cbae7ef14d21ea8f2b3d783e858cb7698968183b77755a38b4d4b5b1d79b4f4689c2f6d358fff2
+  languageName: node
+  linkType: hard
+
+"react-signature-canvas@npm:^1.1.0-alpha.2":
+  version: 1.1.0-alpha.2
+  resolution: "react-signature-canvas@npm:1.1.0-alpha.2"
+  dependencies:
+    "@babel/runtime": "npm:^7.17.9"
+    "@types/signature_pad": "npm:^2.3.0"
+    signature_pad: "npm:^2.3.2"
+    trim-canvas: "npm:^0.1.0"
+  peerDependencies:
+    "@types/prop-types": ^15.7.3
+    "@types/react": 0.14 - 19
+    prop-types: ^15.5.8
+    react: 0.14 - 19
+    react-dom: 0.14 - 19
+  peerDependenciesMeta:
+    "@types/prop-types":
+      optional: true
+    "@types/react":
+      optional: true
+  checksum: 10c0/96c60771a42c3bbd5093271c7064ba86edbd606b804006e9486cb510f9c55fc1edcf56d90177adcb53fe0e72806a8a2359d5bb774b33070abfb4e2d9bc171f15
   languageName: node
   linkType: hard
 
@@ -5577,6 +5609,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"signature_pad@npm:^2.3.2":
+  version: 2.3.2
+  resolution: "signature_pad@npm:2.3.2"
+  checksum: 10c0/ab888873b294f76757a44f60614974cb9f3d34cdd51b464206ee59cb115b3f0219d8c04943a2d53ef8a49b5b1170502e930f2a8544b668e08f211eeb80112d6a
+  languageName: node
+  linkType: hard
+
 "smart-buffer@npm:^4.2.0":
   version: 4.2.0
   resolution: "smart-buffer@npm:4.2.0"
@@ -5918,6 +5957,13 @@ __metadata:
   dependencies:
     punycode: "npm:^2.1.0"
   checksum: 10c0/41525c2ccce86e3ef30af6fa5e1464e6d8bb4286a58ea8db09228f598889581ef62347153f6636cd41553dc41685bdfad0a9d032ef58df9fbb0792b3447d0f04
+  languageName: node
+  linkType: hard
+
+"trim-canvas@npm:^0.1.0":
+  version: 0.1.2
+  resolution: "trim-canvas@npm:0.1.2"
+  checksum: 10c0/dddc2ac30f22f1e8b7f390fe2c688fa843e97e5d99610f08931776ce7ebf795c369809bb4b1fee6ff234151d2de450b03b49f9c8043d4639fc94ab30e695978b
   languageName: node
   linkType: hard
 

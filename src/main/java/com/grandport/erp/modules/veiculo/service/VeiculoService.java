@@ -119,9 +119,10 @@ public class VeiculoService {
                             .kmAtual(chk.getKmAtual())
                             .nivelCombustivel(chk.getNivelCombustivel())
                             .itensAvariados(chk.getItensAvariados())
-                            // Substitua "getObservacoesGerais" pelo nome exato do getter no seu model ChecklistVeiculo, se for diferente
                             .observacoes(chk.getObservacoesGerais())
                             .fotos(chk.getFotos())
+                            // 🚀 AQUI ESTÁ A NOSSA LINHA para a assinatura!
+                            .urlAssinaturaCliente(chk.getUrlAssinaturaCliente())
                             .build())
                     .build());
         }

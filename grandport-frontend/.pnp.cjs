@@ -42,12 +42,14 @@ const RAW_RUNTIME_STATE =
           ["grandport-frontend", "workspace:."],\
           ["lucide-react", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:0.575.0"],\
           ["postcss", "npm:8.5.6"],\
+          ["prop-types", "npm:15.8.1"],\
           ["react", "npm:19.2.4"],\
           ["react-barcode", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:1.6.1"],\
           ["react-dom", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:19.2.4"],\
           ["react-hot-toast", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:2.6.0"],\
           ["react-hotkeys-hook", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:5.2.4"],\
           ["react-is", "npm:19.2.4"],\
+          ["react-signature-canvas", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:1.1.0-alpha.2"],\
           ["recharts", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:3.7.0"],\
           ["tailwindcss", "npm:3.4.19"],\
           ["vite", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:7.3.1"],\
@@ -3257,6 +3259,15 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["@types/signature_pad", [\
+      ["npm:2.3.6", {\
+        "packageLocation": "../../../.yarn/berry/cache/@types-signature_pad-npm-2.3.6-76161cb050-10c0.zip/node_modules/@types/signature_pad/",\
+        "packageDependencies": [\
+          ["@types/signature_pad", "npm:2.3.6"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["@types/trusted-types", [\
       ["npm:2.0.7", {\
         "packageLocation": "../../../.yarn/berry/cache/@types-trusted-types-npm-2.0.7-a07fc44f59-10c0.zip/node_modules/@types/trusted-types/",\
@@ -5124,12 +5135,14 @@ const RAW_RUNTIME_STATE =
           ["grandport-frontend", "workspace:."],\
           ["lucide-react", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:0.575.0"],\
           ["postcss", "npm:8.5.6"],\
+          ["prop-types", "npm:15.8.1"],\
           ["react", "npm:19.2.4"],\
           ["react-barcode", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:1.6.1"],\
           ["react-dom", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:19.2.4"],\
           ["react-hot-toast", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:2.6.0"],\
           ["react-hotkeys-hook", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:5.2.4"],\
           ["react-is", "npm:19.2.4"],\
+          ["react-signature-canvas", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:1.1.0-alpha.2"],\
           ["recharts", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:3.7.0"],\
           ["tailwindcss", "npm:3.4.19"],\
           ["vite", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:7.3.1"],\
@@ -6848,6 +6861,40 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["react-signature-canvas", [\
+      ["npm:1.1.0-alpha.2", {\
+        "packageLocation": "../../../.yarn/berry/cache/react-signature-canvas-npm-1.1.0-alpha.2-bbd2e36ffe-10c0.zip/node_modules/react-signature-canvas/",\
+        "packageDependencies": [\
+          ["react-signature-canvas", "npm:1.1.0-alpha.2"]\
+        ],\
+        "linkType": "SOFT"\
+      }],\
+      ["virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:1.1.0-alpha.2", {\
+        "packageLocation": "./.yarn/__virtual__/react-signature-canvas-virtual-498dfe19ff/4/.yarn/berry/cache/react-signature-canvas-npm-1.1.0-alpha.2-bbd2e36ffe-10c0.zip/node_modules/react-signature-canvas/",\
+        "packageDependencies": [\
+          ["@babel/runtime", "npm:7.29.2"],\
+          ["@types/prop-types", null],\
+          ["@types/react", "npm:19.2.14"],\
+          ["@types/react-dom", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:19.2.3"],\
+          ["@types/signature_pad", "npm:2.3.6"],\
+          ["prop-types", "npm:15.8.1"],\
+          ["react", "npm:19.2.4"],\
+          ["react-dom", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:19.2.4"],\
+          ["react-signature-canvas", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:1.1.0-alpha.2"],\
+          ["signature_pad", "npm:2.3.2"],\
+          ["trim-canvas", "npm:0.1.2"]\
+        ],\
+        "packagePeers": [\
+          "@types/prop-types",\
+          "@types/react-dom",\
+          "@types/react",\
+          "prop-types",\
+          "react-dom",\
+          "react"\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["read-cache", [\
       ["npm:1.0.0", {\
         "packageLocation": "../../../.yarn/berry/cache/read-cache-npm-1.0.0-00fa89ed05-10c0.zip/node_modules/read-cache/",\
@@ -7346,6 +7393,15 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["signature_pad", [\
+      ["npm:2.3.2", {\
+        "packageLocation": "../../../.yarn/berry/cache/signature_pad-npm-2.3.2-7d69e272f0-10c0.zip/node_modules/signature_pad/",\
+        "packageDependencies": [\
+          ["signature_pad", "npm:2.3.2"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["smart-buffer", [\
       ["npm:4.2.0", {\
         "packageLocation": "../../../.yarn/berry/cache/smart-buffer-npm-4.2.0-5ac3f668bb-10c0.zip/node_modules/smart-buffer/",\
@@ -7718,6 +7774,15 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["punycode", "npm:2.3.1"],\
           ["tr46", "npm:1.0.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["trim-canvas", [\
+      ["npm:0.1.2", {\
+        "packageLocation": "../../../.yarn/berry/cache/trim-canvas-npm-0.1.2-ddd6cb5761-10c0.zip/node_modules/trim-canvas/",\
+        "packageDependencies": [\
+          ["trim-canvas", "npm:0.1.2"]\
         ],\
         "linkType": "HARD"\
       }]\

@@ -73,4 +73,52 @@ public class ChecklistController {
     public ResponseEntity<ChecklistVeiculo> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(checklistService.buscarPorId(id));
     }
+
+    // =========================================================
+    // 🖋️ ROTA PARA RECEBER A ASSINATURA DIGITAL DO CLIENTE!
+    // =========================================================
+    @PostMapping("/{id}/assinatura")
+    public ResponseEntity<String> uploadAssinatura(@PathVariable Long id, @RequestParam("assinatura") MultipartFile assinatura) {
+        try {
+            // 1. Usa o SEU método que já está pronto para salvar imagens
+            String caminhoRelativo = fotoStorageService.salvarFoto(assinatura);
+
+            // 2. Busca o Checklist no banco de dados
+            ChecklistVeiculo checklist = checklistService.buscarPorId(id);
+
+            // 3. Monta a URL pública (igual fizemos com as fotos)
+            String urlAssinaturaCompleta = baseUrl + caminhoRelativo;
+
+            // 4. Salva o link da assinatura no campo específico que você já tinha criado!
+            checklist.setUrlAssinaturaCliente(urlAssinaturaCompleta);
+            checklistRepository.save(checklist);
+
+            return ResponseEntity.ok("Assinatura salva com sucesso!");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("Erro ao salvar assinatura: " + e.getMessage());
+        }
+    }
+
+    @Autowired
+    private com.grandport.erp.modules.checklist.service.LaudoVistoriaService laudoVistoriaService;
+
+    // =========================================================
+    // 🖨️ ROTA PARA BAIXAR O LAUDO DE VISTORIA EM PDF
+    // =========================================================
+    @GetMapping("/{id}/laudo")
+    public ResponseEntity<byte[]> imprimirLaudo(@PathVariable Long id) {
+        try {
+            byte[] relatorioPdf = laudoVistoriaService.gerarLaudoPdf(id);
+
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/pdf")
+                    .header("Content-Disposition", "inline; filename=laudo_vistoria_" + id + ".pdf")
+                    .body(relatorioPdf);
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 }

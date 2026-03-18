@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     Car, Camera, CheckCircle, AlertTriangle, FileText,
-    Droplet, Gauge, ChevronLeft, ChevronRight, Save, Search, X, ImagePlus
+    Droplet, Gauge, ChevronLeft, ChevronRight, Save, Search, X, ImagePlus, PenTool
 } from 'lucide-react';
 
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
+import SignatureCanvas from 'react-signature-canvas'; // 🚀 A BIBLIOTECA DE ASSINATURA AQUI!
 
 export const ChecklistTablet = ({ setPaginaAtiva }) => {
     const [loading, setLoading] = useState(false);
@@ -19,11 +20,14 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
     const [observacoes, setObservacoes] = useState('');
     const [termoBusca, setTermoBusca] = useState('');
 
-    // 🚀 ESTADO PARA AS FOTOS CAPTURADAS PELA CÂMERA
+    // Estado para as fotos capturadas
     const [fotosCapturadas, setFotosCapturadas] = useState([]);
     const fileInputRef = useRef(null);
 
-    // Dicionário Rápido para o Tablet (O cara não precisa digitar, só tocar)
+    // 🚀 REFERÊNCIA PARA CONTROLAR O QUADRO DE ASSINATURA
+    const sigCanvas = useRef(null);
+
+    // Dicionário Rápido para o Tablet
     const niveisCombustivel = ['Reserva', '1/4', 'Meio Tanque', '3/4', 'Cheio'];
     const tagsAvarias = [
         'Arranhão Para-choque Diant.', 'Arranhão Para-choque Tras.',
@@ -32,11 +36,10 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
         'Pintura Queimada', 'Retrovisor Danificado', 'Bancos Rasgados', 'Sem Estepe'
     ];
 
-    // Busca os veículos para selecionar na recepção
     useEffect(() => {
         const buscarVeiculos = async () => {
             try {
-                const res = await api.get('/api/veiculos'); // Ajuste a rota se necessário
+                const res = await api.get('/api/veiculos');
                 setVeiculos(res.data);
             } catch (error) {
                 toast.error("Erro ao buscar veículos cadastrados.");
@@ -51,12 +54,10 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
         );
     };
 
-    // 🚀 LÓGICA PARA CAPTURAR A FOTO DO TABLET
     const handleCaptureFoto = (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Limite de segurança: 4 fotos por vistoria
         if (fotosCapturadas.length >= 4) {
             toast.error("Limite de 4 evidências fotográficas atingido.");
             return;
@@ -67,7 +68,6 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
             return;
         }
 
-        // Cria a miniatura em tempo real para o usuário ver
         const miniaturaUrl = URL.createObjectURL(file);
         setFotosCapturadas(prev => [...prev, { file, miniaturaUrl }]);
     };
@@ -76,11 +76,23 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
         setFotosCapturadas(prev => prev.filter((_, i) => i !== index));
     };
 
-    // 🚀 SALVAR CHECKLIST + UPLOAD DAS FOTOS
+    // 🚀 FUNÇÃO PARA LIMPAR A ASSINATURA SE O CLIENTE ERRAR
+    const limparAssinatura = () => {
+        if (sigCanvas.current) {
+            sigCanvas.current.clear();
+        }
+    };
+
+    // 🚀 SALVAR CHECKLIST + UPLOAD DAS FOTOS E ASSINATURA
     const handleSalvarChecklist = async () => {
         if (!veiculoSelecionado) return toast.error("Selecione um veículo primeiro!");
         if (!kmAtual) return toast.error("Informe a Quilometragem de entrada!");
         if (!nivelCombustivel) return toast.error("Informe o nível de combustível!");
+
+        // 🚀 TRAVA: Obriga o cliente a assinar no tablet!
+        if (!sigCanvas.current || sigCanvas.current.isEmpty()) {
+            return toast.error("A assinatura do cliente é obrigatória para validade jurídica!");
+        }
 
         setLoading(true);
         const loadId = toast.loading("Salvando Vistoria...");
@@ -99,7 +111,20 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
             const response = await api.post('/api/checklists', payload);
             const checklistCriado = response.data; // Pega o ID da vistoria gerada
 
-            // 2. Faz o upload das fotos atreladas a esta vistoria
+            // 2. Transforma o rabisco da assinatura em um arquivo PNG real
+            const assinaturaBase64 = sigCanvas.current.getCanvas().toDataURL('image/png');
+            const resAssinatura = await fetch(assinaturaBase64);
+            const blobAssinatura = await resAssinatura.blob();
+
+            const formDataAssinatura = new FormData();
+            formDataAssinatura.append('assinatura', blobAssinatura, 'assinatura.png');
+
+            // 3. Envia a assinatura para o Java
+            await api.post(`/api/checklists/${checklistCriado.id}/assinatura`, formDataAssinatura, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            // 4. Faz o upload das fotos
             if (fotosCapturadas.length > 0) {
                 toast.loading(`Enviando ${fotosCapturadas.length} fotos...`, { id: loadId });
 
@@ -113,12 +138,10 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
                 }
             }
 
-            toast.success("Vistoria e Fotos salvas com Sucesso!", { id: loadId });
+            toast.success("Vistoria oficializada com Sucesso!", { id: loadId });
             setTimeout(() => setPaginaAtiva('dash'), 1500);
         } catch (error) {
             console.error(error);
-
-            // 👇 ISSO AQUI VAI GRITAR O ERRO EXATO NA TELA DO TABLET
             const erroDetalhado = error.response?.data?.message || error.response?.data || error.message;
             alert("ERRO DO SERVIDOR: " + JSON.stringify(erroDetalhado));
             toast.error("Erro ao salvar o checklist. Tente novamente.", { id: loadId });
@@ -166,8 +189,6 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
 
                 {/* COLUNA ESQUERDA: SELEÇÃO E DADOS VITAIS */}
                 <div className="lg:col-span-5 space-y-6">
-
-                    {/* BUSCA DE VEÍCULO (Estilo Touch) */}
                     {!veiculoSelecionado ? (
                         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
                             <h2 className="text-xl font-black text-slate-800 mb-4 flex items-center gap-2"><Car className="text-blue-500"/> Selecionar Veículo</h2>
@@ -212,11 +233,8 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
                         </div>
                     )}
 
-                    {/* HODÔMETRO (KM) E COMBUSTÍVEL */}
                     {veiculoSelecionado && (
                         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-8">
-
-                            {/* INPUT DE KM (Teclado Numérico Gigante) */}
                             <div>
                                 <h2 className="text-lg font-black text-slate-800 mb-3 flex items-center gap-2"><Gauge className="text-orange-500"/> Quilometragem de Entrada</h2>
                                 <div className="relative">
@@ -231,7 +249,6 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
                                 </div>
                             </div>
 
-                            {/* PAINEL DE COMBUSTÍVEL TOUCH */}
                             <div>
                                 <h2 className="text-lg font-black text-slate-800 mb-3 flex items-center gap-2"><Droplet className="text-blue-500"/> Nível de Combustível</h2>
                                 <div className="grid grid-cols-5 gap-2">
@@ -246,7 +263,6 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
                                             }`}
                                         >
                                             <div className="flex items-end gap-0.5 h-6">
-                                                {/* Barrinhas visuais do combustível */}
                                                 {[...Array(4)].map((_, i) => (
                                                     <div key={i} className={`w-1.5 md:w-2 rounded-t-sm ${i <= index - 1 || index === 4 ? 'bg-current' : 'bg-current opacity-20'} ${i === 0 ? 'h-3' : i === 1 ? 'h-4' : i === 2 ? 'h-5' : 'h-6'}`}></div>
                                                 ))}
@@ -256,16 +272,14 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
                                     ))}
                                 </div>
                             </div>
-
                         </div>
                     )}
                 </div>
 
-                {/* COLUNA DIREITA: AVARIAS E FOTOS */}
+                {/* COLUNA DIREITA: AVARIAS, FOTOS E ASSINATURA */}
                 <div className="lg:col-span-7 space-y-6">
                     {veiculoSelecionado && (
                         <>
-                            {/* CHIPS DE AVARIAS */}
                             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
                                 <div className="flex justify-between items-center mb-4">
                                     <h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-500"/> Mapeamento de Avarias</h2>
@@ -305,7 +319,6 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
                                 </div>
                             </div>
 
-                            {/* 🚀 MÓDULO DE CÂMERA INTEGRADO */}
                             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
                                 <div className="flex justify-between items-center mb-4">
                                     <h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><Camera className="text-blue-500"/> Evidências Fotográficas</h2>
@@ -313,7 +326,6 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
                                 </div>
                                 <p className="text-sm text-slate-500 font-bold mb-6">Tire fotos do painel (KM) ou dos danos apontados acima.</p>
 
-                                {/* Input invisível que aciona a câmera nativa do tablet */}
                                 <input
                                     type="file"
                                     accept="image/*"
@@ -348,7 +360,6 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
                                             </div>
                                         ))}
 
-                                        {/* Botão extra se tiver menos de 4 fotos */}
                                         {fotosCapturadas.length < 4 && (
                                             <div
                                                 onClick={() => fileInputRef.current.click()}
@@ -361,10 +372,42 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
                                     </div>
                                 )}
                             </div>
+
+                            {/* 🚀 MÓDULO DE ASSINATURA DIGITAL */}
+                            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                                        <PenTool className="text-blue-500"/> Assinatura do Cliente
+                                    </h2>
+                                    <button
+                                        onClick={limparAssinatura}
+                                        className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-full transition-colors"
+                                    >
+                                        Limpar / Refazer
+                                    </button>
+                                </div>
+                                <p className="text-sm text-slate-500 font-bold mb-4">
+                                    Declaro que acompanhei a vistoria e concordo com as avarias e o estado do veículo descritos acima.
+                                </p>
+
+                                <div className="border-2 border-dashed border-slate-300 rounded-2xl overflow-hidden bg-slate-50">
+                                    <SignatureCanvas
+                                        ref={sigCanvas}
+                                        penColor="black"
+                                        canvasProps={{
+                                            className: 'signature-canvas w-full h-40 cursor-crosshair'
+                                        }}
+                                    />
+                                </div>
+                                <div className="text-center mt-2 border-t border-slate-200 pt-2 w-3/4 mx-auto">
+                                    <p className="text-xs text-slate-400 font-black uppercase tracking-widest">
+                                        {veiculoSelecionado.cliente?.nome || 'Assinatura do Responsável'}
+                                    </p>
+                                </div>
+                            </div>
                         </>
                     )}
                 </div>
-
             </div>
         </div>
     );

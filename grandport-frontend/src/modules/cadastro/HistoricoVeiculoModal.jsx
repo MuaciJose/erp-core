@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
 import {
     Car, X, Calendar, PenTool, User, Gauge, CheckCircle,
-    ClipboardCheck, Droplet, AlertTriangle, FileText, Camera
-} from 'lucide-react';
-
+    ClipboardCheck, Droplet, AlertTriangle, FileText, Camera, Printer
+} from 'lucide-react'; // 🚀 IMPORTAMOS O ÍCONE DA IMPRESSORA AQUI!
+import toast from 'react-hot-toast';
 export const HistoricoVeiculoModal = ({ veiculo, onClose }) => {
     const [historico, setHistorico] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -26,6 +26,28 @@ export const HistoricoVeiculoModal = ({ veiculo, onClose }) => {
         if (veiculo) carregarHistorico();
     }, [veiculo]);
 
+    // 🚀 FUNÇÃO PARA ABRIR O PDF DO LAUDO (COM SEGURANÇA JWT)
+    const handleImprimirLaudo = async (idVistoria) => {
+        const toastId = toast.loading("Gerando Laudo Oficial...");
+        try {
+            // O Axios vai até o Java levando o Token e traz o PDF como um 'Blob' (Arquivo Bruto)
+            const response = await api.get(`/api/checklists/${idVistoria}/laudo`, {
+                responseType: 'blob'
+            });
+
+            // Transforma o arquivo bruto em um link temporário na memória do navegador
+            const file = new Blob([response.data], { type: 'application/pdf' });
+            const fileURL = URL.createObjectURL(file);
+
+            // Abre o PDF perfeitamente na nova aba
+            window.open(fileURL, '_blank');
+            toast.success("Laudo gerado com sucesso!", { id: toastId });
+
+        } catch (error) {
+            console.error("Erro ao gerar PDF:", error);
+            toast.error("Erro ao gerar o laudo. Verifique o servidor.", { id: toastId });
+        }
+    };
     return (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in">
@@ -75,10 +97,22 @@ export const HistoricoVeiculoModal = ({ veiculo, onClose }) => {
                                                     <ClipboardCheck size={12} /> Vistoria
                                                 </div>
 
-                                                <p className="text-sm font-black text-slate-800 flex items-center gap-2 mb-4">
-                                                    <Calendar size={16} className="text-orange-500"/>
-                                                    {new Date(evento.data).toLocaleDateString('pt-BR')} às {new Date(evento.data).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
-                                                </p>
+                                                {/* 🚀 CABEÇALHO DO CHECKLIST COM NÚMERO E BOTÃO PDF */}
+                                                <div className="flex justify-between items-start mb-4 mt-2">
+                                                    <p className="text-sm font-black text-slate-800 flex items-center gap-2">
+                                                        <Calendar size={16} className="text-orange-500"/>
+                                                        {new Date(evento.data).toLocaleDateString('pt-BR')} às {new Date(evento.data).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
+                                                        <span className="text-slate-400 font-medium ml-1 hidden md:inline">(Vistoria #{evento.idReferencia})</span>
+                                                    </p>
+
+                                                    <button
+                                                        onClick={() => handleImprimirLaudo(evento.idReferencia)}
+                                                        className="bg-orange-50 hover:bg-orange-500 text-orange-600 hover:text-white border border-orange-200 hover:border-orange-500 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm active:scale-95"
+                                                        title="Imprimir Laudo em PDF"
+                                                    >
+                                                        <Printer size={14} /> Laudo PDF
+                                                    </button>
+                                                </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-medium text-slate-700 bg-orange-50/50 p-4 rounded-xl">
                                                     <div className="flex items-center gap-2">
@@ -103,7 +137,7 @@ export const HistoricoVeiculoModal = ({ veiculo, onClose }) => {
                                                     )}
                                                 </div>
 
-                                                {/* SEÇÃO DE FOTOS (Só renderiza se houver fotos) */}
+                                                {/* SEÇÃO DE FOTOS */}
                                                 {evento.dadosChecklist.fotos && evento.dadosChecklist.fotos.length > 0 && (
                                                     <div className="mt-4 pt-4 border-t border-orange-200/50">
                                                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
@@ -120,6 +154,27 @@ export const HistoricoVeiculoModal = ({ veiculo, onClose }) => {
                                                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
                                                                 </div>
                                                             ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* SEÇÃO DE ASSINATURA */}
+                                                {evento.dadosChecklist.urlAssinaturaCliente && (
+                                                    <div className="mt-6 pt-4 border-t border-slate-200 flex flex-col items-center">
+                                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-2">
+                                                            <PenTool size={12}/> Assinatura do Cliente
+                                                        </p>
+                                                        <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-4 inline-block shadow-sm">
+                                                            <img
+                                                                src={evento.dadosChecklist.urlAssinaturaCliente}
+                                                                alt="Assinatura Digital"
+                                                                className="max-w-[200px] h-auto object-contain mix-blend-multiply"
+                                                            />
+                                                            <div className="border-t border-slate-300 mt-2 pt-2 text-center w-full">
+                                                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                                                    Termo Aceito
+                                                                </p>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 )}

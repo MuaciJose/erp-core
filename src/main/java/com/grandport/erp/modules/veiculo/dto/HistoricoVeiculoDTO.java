@@ -47,6 +47,7 @@ public class HistoricoVeiculoDTO {
         private String itensAvariados;
         private String observacoes;
         private List<String> fotos;
+        private String urlAssinaturaCliente;
     }
 
     @Data
