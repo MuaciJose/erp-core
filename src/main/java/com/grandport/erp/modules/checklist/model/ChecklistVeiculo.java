@@ -54,4 +54,6 @@ public class ChecklistVeiculo {
     // Assinatura do cliente (pode ser um link para a imagem da assinatura feita no tablet)
     @Column(columnDefinition = "TEXT")
     private String urlAssinaturaCliente;
+
+
 }

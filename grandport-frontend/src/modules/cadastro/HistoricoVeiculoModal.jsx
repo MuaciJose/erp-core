@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
 import {
     Car, X, Calendar, PenTool, User, Gauge, CheckCircle,
-    ClipboardCheck, Droplet, AlertTriangle, FileText
+    ClipboardCheck, Droplet, AlertTriangle, FileText, Camera
 } from 'lucide-react';
 
 export const HistoricoVeiculoModal = ({ veiculo, onClose }) => {
@@ -102,6 +102,28 @@ export const HistoricoVeiculoModal = ({ veiculo, onClose }) => {
                                                         </div>
                                                     )}
                                                 </div>
+
+                                                {/* SEÇÃO DE FOTOS (Só renderiza se houver fotos) */}
+                                                {evento.dadosChecklist.fotos && evento.dadosChecklist.fotos.length > 0 && (
+                                                    <div className="mt-4 pt-4 border-t border-orange-200/50">
+                                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
+                                                            <Camera size={12}/> Evidências Fotográficas
+                                                        </p>
+                                                        <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-2">
+                                                            {evento.dadosChecklist.fotos.map((fotoUrl, imgIndex) => (
+                                                                <div key={imgIndex} className="w-24 h-24 shrink-0 rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm hover:border-orange-400 transition-colors cursor-pointer relative group">
+                                                                    <img
+                                                                        src={fotoUrl}
+                                                                        alt={`Evidência ${imgIndex + 1}`}
+                                                                        className="w-full h-full object-cover"
+                                                                    />
+                                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                             </div>
                                         </>
                                     )}

@@ -12,12 +12,22 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // Caminho físico onde as fotos estão sendo salvas
+        // --- Mantendo sua lógica original ---
         Path uploadDir = Paths.get("uploads");
         String uploadPath = uploadDir.toFile().getAbsolutePath();
 
-        // Mapeia a URL /uploads/** para a pasta física
+        // Pega o caminho absoluto da pasta no seu servidor
+        String caminhoUploads = Paths.get("uploads").toAbsolutePath().toUri().toString();
+
+        // --- Atualização Segura ---
+        // Usamos o caminho absoluto extraído do seu 'uploadDir'
+        // O sufixo '/' no final é essencial para o Spring entender que é um diretório
+        String resourcePath = "file:" + uploadPath + "/";
+
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:/" + uploadPath + "/");
+                .addResourceLocations(resourcePath);
+
+        // Dica: Se você usa o Spring Security, lembre-se de liberar
+        // a rota "/uploads/**" no SecurityFilterChain para que as fotos apareçam!
     }
 }

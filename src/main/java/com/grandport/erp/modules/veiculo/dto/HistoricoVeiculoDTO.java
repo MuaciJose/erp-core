@@ -46,6 +46,7 @@ public class HistoricoVeiculoDTO {
         private String nivelCombustivel;
         private String itensAvariados;
         private String observacoes;
+        private List<String> fotos;
     }
 
     @Data

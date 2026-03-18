@@ -121,6 +121,7 @@ public class VeiculoService {
                             .itensAvariados(chk.getItensAvariados())
                             // Substitua "getObservacoesGerais" pelo nome exato do getter no seu model ChecklistVeiculo, se for diferente
                             .observacoes(chk.getObservacoesGerais())
+                            .fotos(chk.getFotos())
                             .build())
                     .build());
         }
