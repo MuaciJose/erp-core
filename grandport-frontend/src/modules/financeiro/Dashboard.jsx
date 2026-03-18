@@ -4,13 +4,16 @@ import {
     DollarSign, TrendingUp, PackageSearch, AlertTriangle,
     Calendar, ArrowRight, Activity, Layers,
     BarChart3, PieChart as PieIcon, Printer,
-    CalendarClock, CheckCircle // 🚀 Adicionados ícones para o CRM
+    CalendarClock, CheckCircle
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell
 } from 'recharts';
 import { PainelInteligencia } from './PainelInteligencia';
+
+// 🚀 IMPORTAÇÃO DO BANNER DO PWA
+import { InstallPWABanner } from '../../components/InstallPWABanner';
 
 export const Dashboard = ({ setPaginaAtiva }) => {
     const [resumo, setResumo] = useState(null);
@@ -206,7 +209,10 @@ export const Dashboard = ({ setPaginaAtiva }) => {
     return (
         <div className="p-8 max-w-7xl mx-auto animate-fade-in bg-gray-50/50 min-h-screen">
 
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
+            {/* 🚀 BANNER DO PWA AQUI NO TOPO */}
+            <InstallPWABanner />
+
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4 mt-2">
                 <div className="text-left">
                     <span className="text-blue-600 font-black text-xs uppercase tracking-[0.2em]">Painel de Controle</span>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight mt-1">Olá, {nomeUsuario}! 👋</h1>

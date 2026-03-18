@@ -1,10 +1,12 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8080'
+  // 🚀 A MÁGICA DO .ENV ENTRA AQUI!
+  // Agora o sistema lê o arquivo .env automaticamente.
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080'
 });
 
-// Interceptor para anexar o Token JWT em cada requisição
+// Interceptor para anexar o Token JWT em cada requisição (MANTIDO INTACTO - TÁ PERFEITO!)
 api.interceptors.request.use((config) => {
   // Sincronizado com a chave usada no Login.jsx e App.jsx
   const token = localStorage.getItem('grandport_token');

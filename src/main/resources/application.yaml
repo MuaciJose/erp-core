@@ -51,3 +51,13 @@ api:
   security:
     token:
       secret: ${JWT_SECRET:minha-chave-secreta-do-erp-123}
+
+
+# ==========================================
+# 🌐 CONFIGURAÇÕES GERAIS DO SISTEMA
+# ==========================================
+app:
+  api:
+    # No seu PC fica o IP da sua rede. No cliente, você vai trocar isso
+    # para https://api.site-do-cliente.com.br
+    base-url: "http://192.168.1.104:8080"

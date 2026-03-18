@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Car, Camera, CheckCircle, AlertTriangle, FileText,
-    Droplet, Gauge, ChevronLeft, ChevronRight, Save, Search, X
+    Droplet, Gauge, ChevronLeft, ChevronRight, Save, Search, X, ImagePlus
 } from 'lucide-react';
 
 import api from '../../api/axios';
@@ -18,6 +18,10 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
     const [avariadasSelecionadas, setAvariadasSelecionadas] = useState([]);
     const [observacoes, setObservacoes] = useState('');
     const [termoBusca, setTermoBusca] = useState('');
+
+    // 🚀 ESTADO PARA AS FOTOS CAPTURADAS PELA CÂMERA
+    const [fotosCapturadas, setFotosCapturadas] = useState([]);
+    const fileInputRef = useRef(null);
 
     // Dicionário Rápido para o Tablet (O cara não precisa digitar, só tocar)
     const niveisCombustivel = ['Reserva', '1/4', 'Meio Tanque', '3/4', 'Cheio'];
@@ -47,6 +51,32 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
         );
     };
 
+    // 🚀 LÓGICA PARA CAPTURAR A FOTO DO TABLET
+    const handleCaptureFoto = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Limite de segurança: 4 fotos por vistoria
+        if (fotosCapturadas.length >= 4) {
+            toast.error("Limite de 4 evidências fotográficas atingido.");
+            return;
+        }
+
+        if (!file.type.startsWith('image/')) {
+            toast.error("Por favor, selecione apenas imagens.");
+            return;
+        }
+
+        // Cria a miniatura em tempo real para o usuário ver
+        const miniaturaUrl = URL.createObjectURL(file);
+        setFotosCapturadas(prev => [...prev, { file, miniaturaUrl }]);
+    };
+
+    const removerFoto = (index) => {
+        setFotosCapturadas(prev => prev.filter((_, i) => i !== index));
+    };
+
+    // 🚀 SALVAR CHECKLIST + UPLOAD DAS FOTOS
     const handleSalvarChecklist = async () => {
         if (!veiculoSelecionado) return toast.error("Selecione um veículo primeiro!");
         if (!kmAtual) return toast.error("Informe a Quilometragem de entrada!");
@@ -56,23 +86,42 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
         const loadId = toast.loading("Salvando Vistoria...");
 
         try {
+            // 1. Salva os dados de texto
             const payload = {
                 veiculoId: veiculoSelecionado.id,
                 clienteId: veiculoSelecionado.cliente?.id || null,
                 kmAtual: parseInt(kmAtual),
                 nivelCombustivel: nivelCombustivel,
                 itensAvariados: avariadasSelecionadas.join(', '),
-                observacoesGerais: observacoes,
-                fotos: [] // Opcional para implementação futura de upload de câmera
+                observacoesGerais: observacoes
             };
 
-            await api.post('/api/checklists', payload);
-            toast.success("Checklist Salvo com Sucesso!", { id: loadId });
+            const response = await api.post('/api/checklists', payload);
+            const checklistCriado = response.data; // Pega o ID da vistoria gerada
 
-            // Volta para a tela principal ou lista de OS
+            // 2. Faz o upload das fotos atreladas a esta vistoria
+            if (fotosCapturadas.length > 0) {
+                toast.loading(`Enviando ${fotosCapturadas.length} fotos...`, { id: loadId });
+
+                for (const foto of fotosCapturadas) {
+                    const formData = new FormData();
+                    formData.append('foto', foto.file);
+
+                    await api.post(`/api/checklists/${checklistCriado.id}/fotos`, formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                }
+            }
+
+            toast.success("Vistoria e Fotos salvas com Sucesso!", { id: loadId });
             setTimeout(() => setPaginaAtiva('dash'), 1500);
         } catch (error) {
-            toast.error("Erro ao salvar o checklist.", { id: loadId });
+            console.error(error);
+
+            // 👇 ISSO AQUI VAI GRITAR O ERRO EXATO NA TELA DO TABLET
+            const erroDetalhado = error.response?.data?.message || error.response?.data || error.message;
+            alert("ERRO DO SERVIDOR: " + JSON.stringify(erroDetalhado));
+            toast.error("Erro ao salvar o checklist. Tente novamente.", { id: loadId });
         } finally {
             setLoading(false);
         }
@@ -256,17 +305,61 @@ export const ChecklistTablet = ({ setPaginaAtiva }) => {
                                 </div>
                             </div>
 
-                            {/* CÂMERA / FOTOS (Interface Preparada) */}
-                            <div className="bg-blue-50 p-6 rounded-3xl border-2 border-dashed border-blue-200 text-center">
-                                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-500">
-                                    <Camera size={40} />
+                            {/* 🚀 MÓDULO DE CÂMERA INTEGRADO */}
+                            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><Camera className="text-blue-500"/> Evidências Fotográficas</h2>
+                                    <span className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">{fotosCapturadas.length}/4 fotos</span>
                                 </div>
-                                <h3 className="font-black text-lg text-blue-900 mb-1">Evidências Fotográficas</h3>
-                                <p className="text-sm text-blue-700 font-medium mb-4">Tire fotos pelo tablet do painel ou dos arranhões.</p>
-                                <button className="bg-white border border-blue-300 text-blue-700 font-black px-6 py-3 rounded-2xl hover:bg-blue-100 transition-colors active:scale-95">
-                                    ABRIR CÂMERA DO TABLET
-                                </button>
-                                <p className="text-xs text-blue-400 font-bold mt-3 uppercase tracking-widest">(Integração Futura)</p>
+                                <p className="text-sm text-slate-500 font-bold mb-6">Tire fotos do painel (KM) ou dos danos apontados acima.</p>
+
+                                {/* Input invisível que aciona a câmera nativa do tablet */}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    ref={fileInputRef}
+                                    onChange={handleCaptureFoto}
+                                    className="hidden"
+                                />
+
+                                {fotosCapturadas.length === 0 ? (
+                                    <div
+                                        onClick={() => fileInputRef.current.click()}
+                                        className="bg-blue-50 p-10 rounded-3xl border-2 border-dashed border-blue-200 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                                    >
+                                        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-500">
+                                            <ImagePlus size={40} />
+                                        </div>
+                                        <h3 className="font-black text-lg text-blue-900 mb-1">Toque para abrir a Câmera</h3>
+                                        <p className="text-sm text-blue-700 font-medium mb-4">As fotos ficarão anexadas ao Prontuário do veículo.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        {fotosCapturadas.map((foto, index) => (
+                                            <div key={index} className="relative group rounded-2xl overflow-hidden aspect-square border-2 border-slate-200 shadow-sm">
+                                                <img src={foto.miniaturaUrl} alt={`Evidência ${index}`} className="w-full h-full object-cover" />
+                                                <button
+                                                    onClick={() => removerFoto(index)}
+                                                    className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-lg"
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                        ))}
+
+                                        {/* Botão extra se tiver menos de 4 fotos */}
+                                        {fotosCapturadas.length < 4 && (
+                                            <div
+                                                onClick={() => fileInputRef.current.click()}
+                                                className="rounded-2xl border-2 border-dashed border-slate-300 aspect-square flex flex-col items-center justify-center text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 cursor-pointer transition-colors"
+                                            >
+                                                <ImagePlus size={32} className="mb-2" />
+                                                <span className="text-xs font-black uppercase tracking-widest">Adicionar</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}

@@ -1,0 +1,69 @@
+O Truque Mágico: Liberar o seu IP no Tablet
+Nós vamos dizer ao Chrome do seu tablet para confiar cegamente no IP do seu computador. Pegue o seu tablet e faça o seguinte:
+
+Abra o Google Chrome no tablet.
+
+Na barra de endereços lá em cima, digite exatamente isso e dê Enter:
+chrome://flags
+
+Vai abrir uma tela cheia de configurações secretas. Na barra de pesquisa dessa tela, digite:
+unsafely-treat-insecure-origin-as-secure
+
+Vai aparecer uma opção com esse nome. Logo abaixo dela, tem uma caixa de texto. Digite o endereço exato do seu Vite:
+👉 http://192.168.1.104:4173
+
+Mude o botão do lado de Disabled para Enabled.
+
+Um botão azul grande escrito "Relaunch" (Reiniciar) vai aparecer na parte inferior da tela. Clique nele.
+
+
+🚀 GUIA DE IMPLANTAÇÃO: DO PC PARA O CLIENTE (PRODUÇÃO)
+Quando for colocar o sistema online no servidor do cliente, siga este passo a passo para conectar o Front-end e o Back-end corretamente:
+
+FASE 1: Preparando o Back-end (Java / Spring Boot)
+1. Ajustar o arquivo application.yml
+Vá no projeto Java em src/main/resources/application.yml e altere a URL base para o endereço real onde a API vai ficar hospedada.
+
+De (Local):
+
+YAML
+app:
+  api:
+    base-url: "http://192.168.1.104:8080"
+Para (Produção):
+
+YAML
+app:
+  api:
+    base-url: "https://api.oficinadocliente.com.br"
+2. Ajustar o Banco de Dados (Opcional, mas comum)
+No mesmo application.yml, lembre-se de mudar as credenciais do banco de dados (PostgreSQL) para as credenciais do servidor em nuvem do cliente:
+
+YAML
+  datasource:
+    url: jdbc:postgresql://ip-do-servidor-do-cliente:5432/nome_do_banco
+    username: usuario_producao
+    password: senha_segura_producao
+3. Gerar o pacote final do Java
+Após salvar, gere o arquivo .jar do projeto para enviar para o servidor rodando o comando do Maven (ex: mvn clean package).
+
+FASE 2: Preparando o Front-end (React / Vite)
+4. Atualizar o arquivo .env
+Vá na raiz do seu projeto Front-end, abra o arquivo .env e aponte para o novo endereço do Back-end.
+
+De (Local):
+
+Snippet de código
+VITE_API_URL=http://192.168.1.104:8080
+Para (Produção):
+
+Snippet de código
+VITE_API_URL=https://api.oficinadocliente.com.br
+5. Gerar o Build Final (O mais importante!)
+O Front-end precisa ser "empacotado" com esse novo endereço. No terminal do front-end, rode:
+
+Bash
+yarn build
+O Vite vai ler o seu .env e embutir o endereço oficial do cliente dentro do código otimizado. Ele vai gerar uma pasta chamada dist.
+
+Pronto! A partir daqui, é só pegar todo o conteúdo da pasta dist e colocar na hospedagem do cliente (seja HostGator, Vercel, AWS, ou um Apache/Nginx local).
