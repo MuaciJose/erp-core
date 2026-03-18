@@ -50,9 +50,15 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
     const isOrcamento = pedido.status === 'ORCAMENTO';
     const tituloCupom = isOrcamento ? `ORÇAMENTO` : `DOCUMENTO NÃO FISCAL`;
 
-    const valorSubtotal = Number(pedido.valorSubtotal || pedido.subtotal || pedido.total) || 0;
+    //const valorSubtotal = Number(pedido.valorSubtotal || pedido.subtotal || pedido.total) || 0;
     const valorDesconto = Number(pedido.desconto) || 0;
     const valorTotal = Number(pedido.valorTotal || pedido.total) || 0;
+
+    // 🚀 Se for OS, ele soma as peças e serviços. Se tudo falhar, ele faz a engenharia reversa (Total + Desconto = Subtotal)!
+    const valorSubtotal = Number(pedido.valorSubtotal || pedido.subtotal)
+        || (Number(pedido.totalPecas || 0) + Number(pedido.totalServicos || 0))
+        || (valorTotal + valorDesconto);
+
     const vendedorNome = pedido.vendedorNome || pedido.vendedor || 'Sistema';
 
     const veiculoNome = typeof pedido.veiculo === 'string' ? pedido.veiculo : (pedido.veiculoDescricao || pedido.veiculo?.modelo || 'Nenhum');
@@ -61,17 +67,36 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
     const kmAtual = veiculoObj.kmAtual || veiculoObj.quilometragem || '';
 
     // ============================================================================
-    // 🚀 LÓGICA DE DETECÇÃO DE PROMISSÓRIAS (A_PRAZO)
+    // 🚀 LÓGICA DE UNIFICAÇÃO DE ITENS (PEÇAS + SERVIÇOS DA OS OU VENDAS COMUNS)
     // ============================================================================
-    // Verifica se na lista de pagamentos tem algum "A_PRAZO"
+    let itensParaImprimir = [];
+    if (pedido.itensUnificados) {
+        itensParaImprimir = pedido.itensUnificados;
+    } else if (pedido.itensPecas || pedido.itensServicos) {
+        const pecas = (pedido.itensPecas || []).map(p => ({
+            produto: { nome: p.produto?.nome || 'Peça', sku: p.produto?.sku || '' },
+            quantidade: p.quantidade,
+            precoUnitario: p.precoUnitario
+        }));
+        const servicos = (pedido.itensServicos || []).map(s => ({
+            produto: { nome: `[SERVIÇO] ${s.servico?.nome || 'Mão de Obra'}`, sku: s.servico?.codigo || '' },
+            quantidade: s.quantidade,
+            precoUnitario: s.precoUnitario
+        }));
+        itensParaImprimir = [...pecas, ...servicos];
+    } else {
+        itensParaImprimir = pedido.itens || [];
+    }
+
+    // ============================================================================
+    // LÓGICA DE DETECÇÃO DE PROMISSÓRIAS (A_PRAZO)
+    // ============================================================================
     const pagamentosPrazo = (pedido.pagamentos || []).filter(p => p.metodo === 'A_PRAZO' || p.metodo === 'PROMISSORIA');
 
-    // Calcula o valor de cada parcela
     const gerarParcelasPromissoria = () => {
         if (pagamentosPrazo.length === 0) return [];
 
         let parcelas = [];
-        // 🚀 Pega o intervalo do cadastro do cliente (ou usa 30 se não tiver)
         const intervaloCliente = pedido.cliente?.intervaloDiasPagamento || 30;
 
         pagamentosPrazo.forEach(pag => {
@@ -80,8 +105,6 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
 
             for (let i = 1; i <= numParcelas; i++) {
                 let dataVencimento = new Date(pedido.dataHora || Date.now());
-
-                // 🚀 AQUI ESTÁ A MÁGICA: Multiplica o número da parcela pelo intervalo do cliente
                 dataVencimento.setDate(dataVencimento.getDate() + (intervaloCliente * i));
 
                 parcelas.push({
@@ -134,7 +157,7 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     </tr>
                     </thead>
                     <tbody className="align-top">
-                    {(pedido.itens || []).map((item, index) => {
+                    {itensParaImprimir.map((item, index) => {
                         const preco = Number(item.precoUnitario || item.preco) || 0;
                         const qtd = Number(item.quantidade || item.qtd) || 0;
                         return (
@@ -156,7 +179,6 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     {valorDesconto > 0 && <div className="w-full flex justify-between mb-1 text-gray-600"><span>Desconto:</span><span>- R$ {valorDesconto.toFixed(2)}</span></div>}
                     <div className="w-full flex justify-between font-black mt-2 pt-2 border-t border-black text-sm"><span>TOTAL:</span><span>R$ {valorTotal.toFixed(2)}</span></div>
 
-                    {/* Lista os métodos de pagamento reais se tiver */}
                     {!isOrcamento && pedido.pagamentos && pedido.pagamentos.length > 0 ? (
                         <div className="w-full mt-3 pt-2 border-t border-gray-300 border-dotted">
                             <p className="font-bold mb-1">Pagamentos:</p>
@@ -177,7 +199,6 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     <p className="mt-4 text-[9px] text-gray-400 font-sans">Gerado por Grandport ERP</p>
                 </div>
 
-                {/* 🚀 ANEXO DE PROMISSÓRIAS NA BOBINA */}
                 {possuiPromissoria && (
                     <div className="mt-8 break-before-page">
                         {parcelasPromissoria.map((parcela, idx) => (
@@ -267,20 +288,23 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     <thead>
                     <tr className="border-b-2 border-slate-800 text-slate-800">
                         <th className="py-1 px-1 text-[10px] font-black uppercase w-24">Cód/SKU</th>
-                        <th className="py-1 px-1 text-[10px] font-black uppercase">Descrição do Produto</th>
+                        <th className="py-1 px-1 text-[10px] font-black uppercase">Descrição do Produto/Serviço</th>
                         <th className="py-1 px-1 text-center text-[10px] font-black uppercase w-12">Qtd</th>
                         <th className="py-1 px-1 text-right text-[10px] font-black uppercase w-24">Vl. Unit</th>
                         <th className="py-1 px-1 text-right text-[10px] font-black uppercase w-28">Subtotal</th>
                     </tr>
                     </thead>
                     <tbody>
-                    {(pedido.itens || []).map((item, index) => {
+                    {itensParaImprimir.map((item, index) => {
                         const preco = Number(item.precoUnitario || item.preco) || 0;
                         const qtd = Number(item.quantidade || item.qtd) || 0;
+                        const nomeProduto = item.produto?.nome || item.nome;
+                        const isServico = nomeProduto && nomeProduto.includes('[SERVIÇO]');
+
                         return (
                             <tr key={index} className="border-b border-slate-200 text-[11px]">
                                 <td className="py-1 px-1 font-mono text-slate-600">{item.produto?.sku || item.codigo || 'S/N'}</td>
-                                <td className="py-1 px-1 font-bold text-slate-900">{item.produto?.nome || item.nome}</td>
+                                <td className={`py-1 px-1 font-bold ${isServico ? 'text-orange-600' : 'text-slate-900'}`}>{nomeProduto}</td>
                                 <td className="py-1 px-1 text-center font-bold">{qtd}</td>
                                 <td className="py-1 px-1 text-right text-slate-700">R$ {preco.toFixed(2)}</td>
                                 <td className="py-1 px-1 text-right font-black text-slate-900">R$ {(preco * qtd).toFixed(2)}</td>
@@ -322,7 +346,6 @@ export const CupomReciboModal = ({ pedido, onClose }) => {
                     <p>{isOrcamento ? 'Orçamento sujeito a alteração de valores.' : config.mensagemRodape}</p>
                 </div>
 
-                {/* 🚀 ANEXO DE PROMISSÓRIAS NA FOLHA A4 */}
                 {possuiPromissoria && (
                     <div className="mt-12 w-full print:break-before-page">
                         <h2 className="text-xl font-black text-center mb-8 uppercase text-slate-800">Títulos de Promissórias</h2>

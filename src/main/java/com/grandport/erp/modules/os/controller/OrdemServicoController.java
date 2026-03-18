@@ -57,10 +57,9 @@ public class OrdemServicoController {
 
     // Rota que o Operador de Caixa usa
     @PostMapping("/{id}/pagar")
-    public OrdemServico pagarOS(@PathVariable Long id, @RequestBody Object pagamentos) {
-        // 🚀 Agora sim! Chama o nosso motor blindado que baixa o estoque,
-        // checa quantidades e grava na Auditoria.
-        return osService.faturarOS(id);
+    public OrdemServico pagarOS(@PathVariable Long id, @RequestBody java.util.List<java.util.Map<String, Object>> pagamentosRequest) {
+        // 🚀 Passa os pagamentos para o motor para gravar o financeiro antes de faturar
+        return osService.faturarOSPagamento(id, pagamentosRequest);
     }
 
     // ==========================================

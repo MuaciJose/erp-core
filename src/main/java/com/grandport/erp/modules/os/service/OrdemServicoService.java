@@ -9,8 +9,11 @@ import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 import com.grandport.erp.modules.servicos.repository.ServicoRepository;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
 import com.grandport.erp.modules.veiculo.repository.VeiculoRepository;
-// 🚀 1. IMPORTAÇÃO DA AUDITORIA
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+// 🚀 AS DUAS IMPORTAÇÕES CERTAS AQUI EM CIMA:
+import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
+import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,18 +28,17 @@ public class OrdemServicoService {
     @Autowired private ProdutoRepository produtoRepository;
     @Autowired private ServicoRepository servicoRepository;
     @Autowired private UsuarioRepository usuarioRepository;
-
-    // 🚀 2. INJEÇÃO DO MOTOR DE AUDITORIA
     @Autowired private AuditoriaService auditoriaService;
+
+    // 🚀 O REPOSITÓRIO COM O NOME EXATO QUE VOCÊ CRIOU:
+    @Autowired private ConfiguracaoRepository configuracaoRepository;
 
     @Transactional
     public OrdemServico salvarRascunho(OsRequestDTO dto, Long osId) {
-        // Marca se é uma OS nova ou edição para o log de auditoria
         boolean isNovaOs = (osId == null);
 
         OrdemServico os = (osId != null) ? osRepository.findById(osId).orElse(new OrdemServico()) : new OrdemServico();
 
-        // 1. Preenche a Capa (Dados do Cliente e Carro)
         os.setCliente(dto.clienteId() != null ? parceiroRepository.findById(dto.clienteId()).orElse(null) : null);
         os.setVeiculo(dto.veiculoId() != null ? veiculoRepository.findById(dto.veiculoId()).orElse(null) : null);
         os.setKmEntrada(dto.kmEntrada());
@@ -46,14 +48,12 @@ public class OrdemServicoService {
         os.setObservacoes(dto.observacoes());
         os.setDesconto(dto.desconto() != null ? dto.desconto() : BigDecimal.ZERO);
 
-        // Limpa itens antigos se for uma edição
         os.getItensPecas().clear();
         os.getItensServicos().clear();
 
         BigDecimal somaPecas = BigDecimal.ZERO;
         BigDecimal somaServicos = BigDecimal.ZERO;
 
-        // 2. Processa as Peças
         if (dto.pecas() != null) {
             for (var p : dto.pecas()) {
                 OsItemPeca item = new OsItemPeca();
@@ -67,7 +67,6 @@ public class OrdemServicoService {
             }
         }
 
-        // 3. Processa a Mão de Obra e Vincula o Mecânico
         if (dto.servicos() != null) {
             for (var s : dto.servicos()) {
                 OsItemServico item = new OsItemServico();
@@ -82,14 +81,12 @@ public class OrdemServicoService {
             }
         }
 
-        // 4. Calcula os Totais da OS
         os.setTotalPecas(somaPecas);
         os.setTotalServicos(somaServicos);
         os.setValorTotal(somaPecas.add(somaServicos).subtract(os.getDesconto()));
 
         OrdemServico salva = osRepository.save(os);
 
-        // 🚀 3. AUDITORIA: Rastreamento de Criação/Edição da OS
         String acao = isNovaOs ? "CRIACAO_OS" : "EDICAO_OS";
         String verbo = isNovaOs ? "Criou" : "Editou e salvou";
         String clienteNome = salva.getCliente() != null ? salva.getCliente().getNome() : "Sem cliente";
@@ -108,27 +105,49 @@ public class OrdemServicoService {
             throw new RuntimeException("Esta OS já foi faturada e fechada!");
         }
 
-        // 1. Baixar o Estoque Fisicamente
+        // 1. LÊ A REGRA GLOBAL DA OFICINA
+        var config = configuracaoRepository.findById(1L).orElse(null);
+        boolean globalLiberado = config != null && Boolean.TRUE.equals(config.getPermitirEstoqueNegativoGlobal());
+
+        // 2. BAIXA O ESTOQUE FISICAMENTE
         for (OsItemPeca item : os.getItensPecas()) {
             Produto p = item.getProduto();
+
+            // LÊ A REGRA ESPECÍFICA DESTA PEÇA
+            boolean produtoLiberado = Boolean.TRUE.equals(p.getPermitirEstoqueNegativo());
+
+            // A REGRA DE OURO DA ARQUITETURA
             if (p.getQuantidadeEstoque() < item.getQuantidade()) {
-                throw new RuntimeException("Estoque insuficiente para a peça: " + p.getNome());
+                if (!globalLiberado && !produtoLiberado) {
+                    throw new RuntimeException("Estoque insuficiente para a peça: " + p.getNome());
+                }
             }
+
             p.setQuantidadeEstoque(p.getQuantidadeEstoque() - item.getQuantidade());
             produtoRepository.save(p);
 
-            // 🚀 4. AUDITORIA: Baixa de peças no estoque vinculadas a esta OS
             auditoriaService.registrar("ESTOQUE", "SAIDA_OS", "Baixa de " + item.getQuantidade() + "un de '" + p.getNome() + "' ref. OS #" + os.getId());
         }
 
-        // 2. Travar a OS como Faturada
+        // 4. TRAVA A OS COMO FATURADA
         os.setStatus(com.grandport.erp.modules.os.model.StatusOS.FATURADA);
 
         OrdemServico salva = osRepository.save(os);
 
-        // 🚀 5. AUDITORIA: Faturamento Final
         auditoriaService.registrar("ORDEM_SERVICO", "FATURAMENTO_OS", "Faturou e fechou a OS #" + salva.getId() + ". Peças baixadas do estoque e valor consolidado de R$ " + salva.getValorTotal());
 
         return salva;
+    }
+
+    @Transactional
+    public OrdemServico faturarOSPagamento(Long osId, java.util.List<java.util.Map<String, Object>> pagamentosRequest) {
+        OrdemServico os = osRepository.findById(osId)
+                .orElseThrow(() -> new RuntimeException("OS não encontrada"));
+
+        if (os.getStatus() == com.grandport.erp.modules.os.model.StatusOS.FATURADA) {
+            throw new RuntimeException("Esta OS já foi faturada e fechada!");
+        }
+
+        return this.faturarOS(osId);
     }
 }

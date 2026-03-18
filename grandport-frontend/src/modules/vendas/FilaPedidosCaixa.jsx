@@ -9,7 +9,7 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 
 export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
-    const [pedidos, setPedidos] = useState([]); // Vendas e OS juntas
+    const [pedidos, setPedidos] = useState([]);
     const [busca, setBusca] = useState('');
     const [pedidoSelecionado, setPedidoSelecionado] = useState(null);
 
@@ -34,14 +34,14 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const [loadingCaixa, setLoadingCaixa] = useState(true);
     const [processandoNfce, setProcessandoNfce] = useState(false);
 
-    // 🚀 O STATUS FINAL É FATURADA PARA A OS.
     const isPago = pedidoSelecionado?.status === 'CONCLUIDA' || pedidoSelecionado?.status === 'PAGA' || pedidoSelecionado?.status === 'FATURADA';
 
     const formatarMoeda = (valor) => {
-        if (valor === undefined || valor === null || isNaN(Number(valor))) return '0,00';
+        if (valor === undefined || valor === null || valor === '' || isNaN(Number(valor))) return '0,00';
         return Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
+    // 🚀 MÁSCARA MONETÁRIA (Da direita para a esquerda)
     const handleMudancaValorRecebido = (valorDigitado) => {
         const apenasDigitos = valorDigitado.replace(/\D/g, '');
         const valorRealFloat = Number(apenasDigitos) / 100;
@@ -100,13 +100,12 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
             }
 
             if (Array.isArray(resOs.data)) {
-                // 🚀 AGORA FILTRA SÓ AS QUE ESTÃO AGUARDANDO PAGAMENTO
                 const osAguardando = resOs.data.filter(os => os.status === 'AGUARDANDO_PAGAMENTO');
 
                 const osFormatadas = osAguardando.map(os => ({
                     ...os,
                     tipoFila: 'OS',
-                    horaEnvio: os.dataEntrada ? new Date(os.dataEntrada) : new Date(),
+                    horaEnvio: os.dataEnvioCaixa ? new Date(os.dataEnvioCaixa) : new Date(os.dataEntrada || Date.now()),
                     itensUnificados: [
                         ...(os.itensPecas || []).map(p => ({
                             produto: { nome: p.produto?.nome || 'Peça (Sem Nome)' },
@@ -274,15 +273,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     });
 
-    const getTempoEsperaBadge = (horaEnvio) => {
-        const diffMinutos = Math.floor((new Date() - horaEnvio) / 60000);
-        if (diffMinutos <= 0) return <span className="text-[10px] bg-green-100 text-green-700 font-black px-2 py-0.5 rounded uppercase">Agora mesmo</span>;
-        let cor = 'bg-slate-100 text-slate-600';
-        if (diffMinutos > 5 && diffMinutos <= 10) cor = 'bg-orange-100 text-orange-700';
-        if (diffMinutos > 10) cor = 'bg-red-100 text-red-700 animate-pulse';
-        return <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${cor}`}><Clock size={10} className="inline mr-1 -mt-0.5"/> Há {diffMinutos} min</span>;
-    };
-
     const adicionarPagamentoEVerificar = async () => {
         if (valorDigitadoAtual <= 0 && faltaPagarTotal) return toast.error("Digite um valor válido.");
 
@@ -316,6 +306,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         const somaAtualizada = novosPagamentos.reduce((acc, p) => acc + p.valor, 0);
 
         if (somaAtualizada >= valorCobrado) {
+            setValorRecebidoInput('');
             confirmarRecebimentoFinal(novosPagamentos);
         } else {
             const novoRestante = valorCobrado - somaAtualizada;
@@ -348,7 +339,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
             let response;
             if (pedidoSelecionado.tipoFila === 'OS') {
-                // OS vai para a rota /pagar que mudará para FATURADA no BD
                 response = await api.post(`/api/os/${pedidoSelecionado.id}/pagar`, payload);
                 response.data = { ...response.data, status: 'FATURADA', tipoFila: 'OS', itensUnificados: pedidoSelecionado.itensUnificados };
             } else {
@@ -480,7 +470,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                     {pedido.veiculo?.placa && <span className="ml-2 bg-slate-200 px-1.5 py-0.5 rounded font-mono text-[9px] uppercase">{pedido.veiculo.placa}</span>}
                                 </div>
                                 <div className="mt-2 flex justify-between items-center">
-                                    {getTempoEsperaBadge(pedido.horaEnvio)}
+                                    <RelogioEspera horaEnvio={pedido.horaEnvio} />
                                 </div>
                             </div>
                         ))}
@@ -620,12 +610,14 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                                 </div>
                                                 <div className="flex items-center gap-3 bg-slate-50 border-2 border-slate-200 p-2 rounded-xl focus-within:border-blue-50 transition-colors">
                                                     <span className="text-lg font-black text-slate-400 pl-2">R$</span>
+                                                    {/* 🚀 MÁSCARA APLICADA AQUI NA FILA DO CAIXA */}
                                                     <input
                                                         ref={valorRecebidoRef}
                                                         type="text"
-                                                        value={formatarMoeda(valorRecebidoInput)}
+                                                        value={valorRecebidoInput ? formatarMoeda(valorRecebidoInput) : ''}
                                                         onChange={(e) => handleMudancaValorRecebido(e.target.value)}
                                                         className="w-full bg-transparent outline-none text-3xl font-black text-slate-800"
+                                                        placeholder="0,00"
                                                     />
                                                 </div>
                                             </div>
@@ -742,5 +734,44 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                 <CupomReciboModal pedido={pedidoPago} onClose={() => setPedidoPago(null)} />
             )}
         </>
+    );
+};
+
+const RelogioEspera = ({ horaEnvio }) => {
+    const [tempo, setTempo] = useState('00:00');
+    const [minutosTotais, setMinutosTotais] = useState(0);
+
+    useEffect(() => {
+        const atualizarRelogio = () => {
+            const diffMs = new Date() - horaEnvio;
+            const diffSegundos = Math.max(0, Math.floor(diffMs / 1000));
+            const diffMin = Math.floor(diffSegundos / 60);
+
+            const horas = Math.floor(diffMin / 60);
+            const minutos = diffMin % 60;
+            const segundos = diffSegundos % 60;
+
+            const hh = String(horas).padStart(2, '0');
+            const mm = String(minutos).padStart(2, '0');
+            const ss = String(segundos).padStart(2, '0');
+
+            setTempo(horas > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`);
+            setMinutosTotais(diffMin);
+        };
+
+        atualizarRelogio();
+        const intervalo = setInterval(atualizarRelogio, 1000);
+
+        return () => clearInterval(intervalo);
+    }, [horaEnvio]);
+
+    let cor = 'bg-slate-100 text-slate-600';
+    if (minutosTotais >= 5 && minutosTotais < 10) cor = 'bg-orange-100 text-orange-700';
+    if (minutosTotais >= 10) cor = 'bg-red-100 text-red-700 shadow-sm border border-red-200';
+
+    return (
+        <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase flex items-center gap-1.5 transition-colors ${cor}`}>
+            <Clock size={12} className={minutosTotais >= 10 ? 'animate-pulse' : ''} /> {tempo}
+        </span>
     );
 };

@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
     Wrench, Car, User, Search, Plus, Trash2, CheckCircle, Save,
     Image as ImageIcon, Info, FileText, AlertTriangle, MessageCircle,
-    Printer, Gauge, Fuel, ChevronDown, Package, Calendar, DollarSign, Send
+    Printer, Gauge, Fuel, ChevronDown, Package, Calendar, DollarSign, Send, X
 } from 'lucide-react';
 
 export const OrdemServico = ({ osParaEditar, onVoltar }) => {
@@ -17,19 +17,21 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
     const [indexFocadoCliente, setIndexFocadoCliente] = useState(-1);
 
     const [veiculoSelecionado, setVeiculoSelecionado] = useState('');
+
+    // Controle de KM Inteligente
     const [kmVeiculo, setKmVeiculo] = useState('');
-    const [nivelCombustivel, setNivelCombustivel] = useState('MEIO_TANQUE');
+    const [kmVemDoChecklist, setKmVemDoChecklist] = useState(false);
 
     const [defeitoRelatado, setDefeitoRelatado] = useState('');
     const [diagnosticoTecnico, setDiagnosticoTecnico] = useState('');
     const [observacoes, setObservacoes] = useState('');
     const [imprimirLaudo, setImprimirLaudo] = useState(true);
 
+    const [descontoInput, setDescontoInput] = useState('');
+    const [tipoDesconto, setTipoDesconto] = useState('VALOR');
+
     const [dataProximaRevisao, setDataProximaRevisao] = useState('');
     const [obsProximaRevisao, setObsProximaRevisao] = useState('');
-
-    const [descontoInput, setDescontoInput] = useState('0');
-    const [tipoDesconto, setTipoDesconto] = useState('VALOR');
 
     const [itensPecas, setItensPecas] = useState([]);
     const [itensServicos, setItensServicos] = useState([]);
@@ -46,6 +48,8 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
     const [mecanicos, setMecanicos] = useState([]);
     const [empresaConfig, setEmpresaConfig] = useState({ nomeFantasia: 'OFICINA' });
 
+    const [permitirEstoqueNegativoGlobal, setPermitirEstoqueNegativoGlobal] = useState(false);
+
     const [modalAplicacao, setModalAplicacao] = useState({ aberto: false, texto: '', nome: '' });
     const [modalEnviarCaixaAberto, setModalEnviarCaixaAberto] = useState(false);
 
@@ -56,7 +60,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
     const listaPecasRef = useRef(null);
     const listaServicosRef = useRef(null);
 
-    // 🚀 MUDANÇA: A OS trava tanto se estiver aguardando o caixa, quanto se já estiver paga.
     const isBloqueada = status === 'FATURADA' || status === 'AGUARDANDO_PAGAMENTO';
 
     const notificar = (tipo, msg) => {
@@ -64,16 +67,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         else if(tipo === 'erro') toast.error(msg, { duration: 4000 });
         else toast(msg, { icon: '⚠️' });
     };
-
-    const Tooltip = ({ texto, alignRight = false }) => (
-        <div className="relative group cursor-pointer inline-block ml-2 align-middle">
-            <Info size={14} className="text-slate-400 hover:text-blue-500 transition-colors" />
-            <div className={`absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-slate-800 text-white text-[10px] uppercase font-bold tracking-widest rounded shadow-xl z-50 text-center ${alignRight ? 'right-0' : 'left-1/2 -translate-x-1/2'}`}>
-                {texto}
-                <div className={`absolute top-full border-4 border-transparent border-t-slate-800 ${alignRight ? 'right-1' : 'left-1/2 -translate-x-1/2'}`}></div>
-            </div>
-        </div>
-    );
 
     useEffect(() => {
         api.get('/api/usuarios').then(res => {
@@ -84,6 +77,8 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
             if (res.data) {
                 const data = Array.isArray(res.data) ? res.data[0] : res.data;
                 setEmpresaConfig({ nomeFantasia: data?.nomeFantasia || 'OFICINA' });
+
+                setPermitirEstoqueNegativoGlobal(data?.permitirEstoqueNegativoGlobal === true);
             }
         }).catch(() => {});
 
@@ -101,7 +96,7 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
             }
 
             setKmVeiculo(osParaEditar.kmEntrada || '');
-            setNivelCombustivel(osParaEditar.nivelCombustivel || 'MEIO_TANQUE');
+            setKmVemDoChecklist(false);
             setDefeitoRelatado(osParaEditar.defeitoRelatado || '');
             setDiagnosticoTecnico(osParaEditar.diagnosticoTecnico || '');
             setObservacoes(osParaEditar.observacoes || '');
@@ -112,7 +107,7 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
             if (osParaEditar.itensPecas) {
                 setItensPecas(osParaEditar.itensPecas.map(p => ({
                     produtoId: p.produto.id, codigo: p.produto.sku, nome: p.produto.nome,
-                    qtd: p.quantidade, preco: p.precoUnitario, fotoUrl: p.produto.fotoUrl
+                    qtd: p.quantidade, preco: p.precoUnitario, fotoUrl: p.produto.fotoUrl, aplicacao: p.produto.aplicacao
                 })));
             }
             if (osParaEditar.itensServicos) {
@@ -123,6 +118,34 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
             }
         }
     }, [osParaEditar]);
+
+    useEffect(() => {
+        if (!osId && veiculoSelecionado && !isBloqueada) {
+            const buscarUltimoChecklist = async () => {
+                try {
+                    const res = await api.get(`/api/veiculos/${veiculoSelecionado}/historico`);
+                    const checklists = res.data.filter(e => e.tipo === 'CHECKLIST');
+
+                    if (checklists.length > 0) {
+                        const ultimo = checklists[0];
+                        if (ultimo.dadosChecklist && ultimo.dadosChecklist.kmAtual) {
+                            setKmVeiculo(ultimo.dadosChecklist.kmAtual.toString());
+                            setKmVemDoChecklist(true);
+                            toast.success("KM importado da Vistoria com sucesso!");
+                        } else {
+                            setKmVemDoChecklist(false);
+                        }
+                    } else {
+                        setKmVemDoChecklist(false);
+                    }
+                } catch (error) {
+                    console.error("Erro ao buscar vistoria", error);
+                    setKmVemDoChecklist(false);
+                }
+            };
+            buscarUltimoChecklist();
+        }
+    }, [veiculoSelecionado, osId, isBloqueada]);
 
     useEffect(() => {
         const timer = setTimeout(async () => {
@@ -177,22 +200,45 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
             setItensPecas([...itensPecas, {
                 produtoId: peca.id, codigo: peca.sku, nome: peca.nome,
                 qtd: 1, preco: peca.precoVenda, estoque: peca.quantidadeEstoque,
-                fotoUrl: peca.fotoUrl || peca.fotoLocalPath
+                fotoUrl: peca.fotoUrl || peca.fotoLocalPath, aplicacao: peca.aplicacao
             }]);
         }
         notificar('sucesso', 'Peça adicionada!');
         setBuscaPeca(''); setResultadosPecas([]); inputPecaRef.current?.focus();
+        setPreviewImagem(null);
     };
 
     const adicionarServico = (serv) => {
         if (isBloqueada) return;
         const existe = itensServicos.find(i => i.servicoId === serv.id);
+
+        let idLogado = localStorage.getItem('usuarioId') || localStorage.getItem('userId') || '';
+        if (!idLogado) {
+            try {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    idLogado = payload.id || payload.userId || '';
+                }
+            } catch(e) {}
+        }
+
+        let mecanicoAuto = '';
+        if (idLogado) {
+            const m = mecanicos.find(m => m.id.toString() === idLogado.toString());
+            if (m) mecanicoAuto = m.id.toString();
+        }
+        if (!mecanicoAuto && mecanicos.length > 0) {
+            mecanicoAuto = mecanicos[0].id.toString();
+        }
+
         if (existe) {
             setItensServicos(itensServicos.map(i => i.servicoId === serv.id ? { ...i, qtd: i.qtd + 1 } : i));
         } else {
             setItensServicos([...itensServicos, {
                 servicoId: serv.id, codigo: serv.codigo, nome: serv.nome,
-                qtd: 1, preco: serv.preco, mecanicoId: ''
+                qtd: 1, preco: serv.preco,
+                mecanicoId: mecanicoAuto
             }]);
         }
         notificar('sucesso', 'Serviço adicionado!');
@@ -213,6 +259,8 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         setClienteSelecionado(null);
         setBuscaCliente('');
         setVeiculoSelecionado('');
+        setKmVeiculo('');
+        setKmVemDoChecklist(false);
         setTimeout(() => inputClienteRef.current?.focus(), 100);
     };
 
@@ -245,6 +293,7 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
             if(e.key === 'Escape') {
                 setModalAplicacao({aberto:false, texto:'', nome:''});
                 setModalEnviarCaixaAberto(false);
+                setPreviewImagem(null);
                 setResultadosPecas([]); setResultadosServicos([]); setResultadosClientes([]);
             }
             if((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
@@ -260,9 +309,19 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     }, [clienteSelecionado, itensPecas, itensServicos, defeitoRelatado, isBloqueada]);
 
-    // ==========================================
-    // 🚀 CÁLCULOS E SALVAMENTO
-    // ==========================================
+    const formatarMoeda = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+    // 🚀 MÁSCARA MONETÁRIA DO DESCONTO NA OS
+    const handleMudancaDesconto = (valorDigitado) => {
+        if (tipoDesconto === 'PERCENTUAL') {
+            setDescontoInput(valorDigitado.replace(/[^0-9.]/g, ''));
+        } else {
+            const apenasDigitos = valorDigitado.replace(/\D/g, '');
+            const valorRealFloat = Number(apenasDigitos) / 100;
+            setDescontoInput(valorRealFloat > 0 ? valorRealFloat.toString() : '');
+        }
+    };
+
     const totalPecas = itensPecas.reduce((acc, i) => acc + (i.preco * i.qtd), 0);
     const totalServicos = itensServicos.reduce((acc, i) => acc + (i.preco * i.qtd), 0);
     const subtotalOS = totalPecas + totalServicos;
@@ -273,7 +332,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         : valorDescontoDigitado;
 
     const totalGeral = Math.max(0, subtotalOS - valorDescontoCalculado);
-    const formatarMoeda = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
     const salvarOrdemServico = async () => {
         if(isBloqueada) return false;
@@ -285,7 +343,7 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
             clienteId: clienteSelecionado.id,
             veiculoId: veiculoSelecionado || null,
             kmEntrada: kmVeiculo ? parseInt(kmVeiculo) : null,
-            nivelCombustivel: nivelCombustivel,
+            nivelCombustivel: 'NAO_INFORMADO',
             defeitoRelatado,
             diagnosticoTecnico,
             observacoes,
@@ -306,9 +364,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         }
     };
 
-    // ==========================================
-    // 🚀 ENVIAR PARA O CAIXA (O NOVO "FATURAR" DO GERENTE)
-    // ==========================================
     const abrirModalEnviarCaixa = () => {
         if (isBloqueada) return notificar('aviso', 'Esta OS já foi fechada/enviada!');
         if (!osId) return notificar('erro', 'Salve a OS primeiro antes de enviar ao caixa.');
@@ -316,16 +371,24 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
     };
 
     const confirmarEnvioCaixa = async () => {
+        // 🚀 3. O NOVO RADAR: Só bloqueia se a regra global for FALSA.
+        if (!permitirEstoqueNegativoGlobal) {
+            const pecasSemEstoque = itensPecas.filter(p => p.qtd > (p.estoque || 0));
+            if (pecasSemEstoque.length > 0) {
+                setModalEnviarCaixaAberto(false);
+                const nomes = pecasSemEstoque.map(p => p.nome).join(', ');
+                return toast.error(`ESTOQUE INSUFICIENTE!\nVocê não tem saldo para: ${nomes}. (O estoque negativo está bloqueado nas configurações do sistema)`, { duration: 6000 });
+            }
+        }
+
         setModalEnviarCaixaAberto(false);
         const salvou = await salvarOrdemServico();
         if(!salvou) return;
 
         const loadId = toast.loading("Enviando para a fila do caixa e baixando estoque...");
         try {
-            // Nova rota que apenas prepara para pagamento
             await api.post(`/api/os/${osId}/enviar-caixa`);
 
-            // Agenda no CRM
             if (dataProximaRevisao) {
                 try {
                     await api.post('/api/revisoes', {
@@ -348,9 +411,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         }
     };
 
-    // ==========================================
-    // 🚀 IMPRESSÃO SILENCIOSA VIA IFRAME
-    // ==========================================
     const imprimirOrdemServicoSilenciosa = () => {
         if(!clienteSelecionado) return notificar('erro', 'Salve a OS com um cliente antes de imprimir.');
         const toastId = toast.loading('Gerando documento para impressão...');
@@ -393,7 +453,7 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                 <div class="section-title">Dados do Cliente e Veículo</div>
                 <table>
                     <tr><td width="50%"><b>Cliente:</b> ${clienteSelecionado?.nome || 'Não informado'}</td><td width="50%"><b>Veículo:</b> ${nomeVeiculo}</td></tr>
-                    <tr><td><b>KM Atual:</b> ${kmVeiculo || 'N/A'}</td><td><b>Combustível:</b> ${nivelCombustivel}</td></tr>
+                    <tr><td><b>KM Atual:</b> ${kmVeiculo || 'N/A'}</td><td></td></tr>
                 </table>
                 ${(observacoes && imprimirLaudo) ? `<div class="section-title">Parecer Técnico / O Que Foi Feito</div><div class="laudo-box">${observacoes.replace(/\n/g, '<br/>')}</div>` : ''}
                 ${itensServicos.length > 0 ? `<div class="section-title">Mão de Obra (Serviços Executados)</div><table><tr><th>Descrição</th><th class="text-right">Qtd</th><th class="text-right">Valor Un.</th><th class="text-right">Subtotal</th></tr>${itensServicos.map(s => `<tr><td>${s.nome}</td><td class="text-right">${s.qtd}</td><td class="text-right">R$ ${formatarMoeda(s.preco)}</td><td class="text-right">R$ ${formatarMoeda(s.preco * s.qtd)}</td></tr>`).join('')}</table>` : ''}
@@ -414,473 +474,515 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 10000);
     };
 
-    const renderCombustivelVisual = () => {
-        const niveis = [
-            { id: 'RESERVA', cor: 'bg-red-500', titulo: 'Reserva' },
-            { id: 'UM_QUARTO', cor: 'bg-orange-500', titulo: '1/4' },
-            { id: 'MEIO_TANQUE', cor: 'bg-yellow-400', titulo: '1/2' },
-            { id: 'TRES_QUARTOS', cor: 'bg-lime-400', titulo: '3/4' },
-            { id: 'CHEIO', cor: 'bg-green-500', titulo: 'Cheio' },
-        ];
-        const indiceSelecionado = niveis.findIndex(n => n.id === nivelCombustivel);
-
-        return (
-            <div className={`flex items-center gap-1 w-full h-12 bg-slate-100 p-1.5 rounded-xl border-2 border-slate-200 ${isBloqueada ? 'opacity-60 pointer-events-none' : ''}`}>
-                {niveis.map((nivel, index) => {
-                    const ativo = index <= indiceSelecionado;
-                    return (
-                        <div
-                            key={nivel.id}
-                            onClick={() => !isBloqueada && setNivelCombustivel(nivel.id)}
-                            title={nivel.titulo}
-                            className={`flex-1 h-full rounded cursor-pointer transition-all duration-300 ${ativo ? nivel.cor + ' shadow-inner' : 'bg-slate-200 hover:bg-slate-300'}`}
-                        >
-                            {index === indiceSelecionado && <span className="flex items-center justify-center h-full text-[10px] font-black text-white/90 drop-shadow-md">{nivel.titulo}</span>}
-                        </div>
-                    )
-                })}
-            </div>
-        );
-    };
-
     return (
-        <div className="flex flex-col h-full bg-slate-50 relative z-10 animate-fade-in custom-scrollbar overflow-y-auto p-4 md:p-8">
+        <div className="flex flex-col h-full max-h-full bg-slate-50 relative z-10 animate-fade-in overflow-hidden">
 
-            {/* CABEÇALHO */}
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="bg-indigo-600 p-4 rounded-2xl text-white shadow-lg shadow-indigo-600/30">
-                        <Wrench size={28} />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                            ORDEM DE SERVIÇO {osId ? `#${osId}` : '- NOVA'}
-                        </h1>
-                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border mt-1 inline-block ${isBloqueada ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
-                            STATUS: {status.replace(/_/g, ' ')}
-                        </span>
-                        {!isBloqueada && (
-                            <div className="hidden md:inline-flex items-center gap-2 ml-4">
-                                <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-1 rounded uppercase border border-slate-200">F2: Cliente</span>
-                                <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-1 rounded uppercase border border-slate-200">F3: Peça</span>
-                                <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-1 rounded uppercase border border-slate-200">F4: Serviço</span>
+            {/* MODAL FLUTUANTE DA IMAGEM DA PEÇA */}
+            {previewImagem && (
+                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[99999] pointer-events-none animate-fade-in shadow-2xl border-4 border-white rounded-2xl overflow-hidden bg-white">
+                    <img src={previewImagem} alt="Preview" className="max-w-[400px] max-h-[400px] object-contain" />
+                    <div className="bg-slate-900 text-white text-center text-[10px] font-black tracking-widest py-2 uppercase">Pré-visualização da Peça</div>
+                </div>
+            )}
+
+            {/* ÁREA ROLÁVEL PRINCIPAL */}
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 md:p-6 pb-24">
+
+                {/* CABEÇALHO */}
+                <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-200 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-indigo-600 p-3 rounded-xl text-white shadow-md">
+                            <Wrench size={24} />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                                ORDEM DE SERVIÇO {osId ? `#${osId}` : '- NOVA'}
+                            </h1>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${isBloqueada ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                                    STATUS: {status.replace(/_/g, ' ')}
+                                </span>
+                                {!isBloqueada && (
+                                    <>
+                                        <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">F2: Cliente</span>
+                                        <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">F3: Peça</span>
+                                        <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">F4: Serviço</span>
+                                    </>
+                                )}
                             </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                        {onVoltar && (
+                            <button onClick={onVoltar} className="p-2.5 bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors shadow-sm text-xs font-bold uppercase">
+                                Voltar
+                            </button>
+                        )}
+                        <button
+                            onClick={salvarOrdemServico}
+                            disabled={isBloqueada}
+                            className={`px-4 py-2.5 font-black rounded-lg shadow-md flex items-center gap-2 uppercase text-xs transition-transform ${isBloqueada ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white hover:scale-105'}`}
+                        >
+                            <Save size={16}/> Salvar OS
+                        </button>
+                        <button onClick={imprimirOrdemServicoSilenciosa} className="p-2.5 bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors shadow-sm">
+                            <Printer size={18}/>
+                        </button>
+                        {osId && (
+                            <button
+                                onClick={abrirModalEnviarCaixa}
+                                disabled={isBloqueada}
+                                className={`px-4 py-2.5 font-black rounded-lg shadow-md flex items-center gap-2 uppercase text-xs transition-all ${isBloqueada ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600 text-white hover:scale-105'}`}
+                            >
+                                <Send size={16}/> {isBloqueada ? 'NO CAIXA' : 'Enviar Caixa'}
+                            </button>
                         )}
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                    {onVoltar && (
-                        <button onClick={onVoltar} className="p-3 bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shadow-sm text-xs font-bold uppercase tracking-widest">
-                            Voltar
-                        </button>
-                    )}
-                    <button
-                        onClick={salvarOrdemServico}
-                        disabled={isBloqueada}
-                        title="Ctrl+S"
-                        className={`flex-1 md:flex-none px-4 py-3 font-black rounded-xl shadow-lg flex items-center justify-center gap-2 uppercase text-xs tracking-widest transition-transform ${isBloqueada ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white hover:scale-105'}`}
-                    >
-                        <Save size={16}/> Salvar OS
-                    </button>
-                    <button onClick={imprimirOrdemServicoSilenciosa} title="Ctrl+P" className="p-3 bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shadow-sm">
-                        <Printer size={18}/>
-                    </button>
-                    {osId && (
-                        <>
-                            <button
-                                onClick={abrirModalEnviarCaixa}
-                                disabled={isBloqueada}
-                                className={`px-4 py-3 font-black rounded-xl shadow-lg flex items-center justify-center gap-2 uppercase text-xs tracking-widest transition-all ${isBloqueada ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600 text-white hover:scale-105'}`}
-                            >
-                                <Send size={16}/> {isBloqueada ? 'NO CAIXA / PAGA' : 'Enviar p/ Caixa'}
-                            </button>
-                        </>
-                    )}
-                </div>
-            </div>
-
-            {isBloqueada && (
-                <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 mb-6 rounded-r-2xl shadow-sm flex items-center gap-3">
-                    <CheckCircle className="text-emerald-500" size={24} />
-                    <div>
-                        <h4 className="font-black text-emerald-800 uppercase tracking-widest text-sm">
-                            {status === 'FATURADA' ? 'Ordem de Serviço Fechada e Paga' : 'OS Aguardando no Caixa'}
-                        </h4>
-                        <p className="text-xs font-medium text-emerald-700">
-                            {status === 'FATURADA' ? 'O recebimento já foi concluído pelo financeiro.' : 'Esta OS foi enviada ao caixa e as peças foram baixadas do estoque.'}
-                            {' '}Os dados estão bloqueados para edição.
-                        </p>
+                {/* AVISO DE BLOQUEIO */}
+                {isBloqueada && (
+                    <div className="bg-emerald-50 border-l-4 border-emerald-500 p-3 mb-4 rounded-r-xl shadow-sm flex items-center gap-3">
+                        <CheckCircle className="text-emerald-500" size={20} />
+                        <div>
+                            <h4 className="font-black text-emerald-800 uppercase text-xs">
+                                {status === 'FATURADA' ? 'OS Paga e Fechada' : 'OS no Caixa (Estoque Baixado)'}
+                            </h4>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
-                {/* DADOS DO VEÍCULO E CLIENTE */}
-                <div className="xl:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4">
-                    <h3 className="font-black text-sm text-slate-400 uppercase tracking-widest border-b pb-2 mb-4 flex items-center gap-2">
-                        <User size={16}/> 1. Identificação
-                    </h3>
+                {/* BLOCO SUPERIOR COMPACTADO (LADO A LADO) */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="relative">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Cliente *</label>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    ref={inputClienteRef}
-                                    type="text"
-                                    value={buscaCliente}
-                                    onChange={(e) => setBuscaCliente(e.target.value)}
-                                    onKeyDown={(e) => onKeyDownBuscaGenerica(e, indexFocadoCliente, setIndexFocadoCliente, resultadosClientes, selecionarCliente, listaClientesRef)}
-                                    disabled={!!clienteSelecionado || isBloqueada}
-                                    placeholder="Buscar Cliente (F2)..."
-                                    className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-500 disabled:opacity-60 disabled:bg-slate-100"
-                                />
-                                {(clienteSelecionado && !isBloqueada) && (
-                                    <button onClick={removerCliente} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-100" title="Trocar Cliente"><Trash2 size={18}/></button>
+                    {/* 1. IDENTIFICAÇÃO */}
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col">
+                        <h3 className="font-black text-sm text-slate-700 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
+                            <User size={16} className="text-blue-500"/> 1. Identificação
+                        </h3>
+                        <div className="flex-1 space-y-3">
+                            <div className="relative">
+                                <label className="text-[10px] font-black text-slate-500 uppercase mb-1 block">Cliente *</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        ref={inputClienteRef}
+                                        type="text"
+                                        value={buscaCliente}
+                                        onChange={(e) => setBuscaCliente(e.target.value)}
+                                        onKeyDown={(e) => onKeyDownBuscaGenerica(e, indexFocadoCliente, setIndexFocadoCliente, resultadosClientes, selecionarCliente, listaClientesRef)}
+                                        disabled={!!clienteSelecionado || isBloqueada}
+                                        placeholder="Buscar Cliente (F2)..."
+                                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-indigo-500 disabled:opacity-60"
+                                    />
+                                    {(clienteSelecionado && !isBloqueada) && (
+                                        <button onClick={removerCliente} className="p-2.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100"><Trash2 size={16}/></button>
+                                    )}
+                                </div>
+                                {resultadosClientes.length > 0 && !clienteSelecionado && !isBloqueada && (
+                                    <div ref={listaClientesRef} className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-40 overflow-y-auto">
+                                        {resultadosClientes.map((c, idx) => (
+                                            <div key={c.id} onClick={() => selecionarCliente(c)} onMouseEnter={() => setIndexFocadoCliente(idx)} className={`p-3 cursor-pointer border-b text-xs font-bold ${idx === indexFocadoCliente ? 'bg-indigo-600 text-white' : 'hover:bg-indigo-50'}`}>
+                                                {c.nome} {c.documento && <span className="ml-2 opacity-70">({c.documento})</span>}
+                                            </div>
+                                        ))}
+                                    </div>
                                 )}
                             </div>
-                            {resultadosClientes.length > 0 && !clienteSelecionado && !isBloqueada && (
-                                <div ref={listaClientesRef} className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto custom-scrollbar">
-                                    {resultadosClientes.map((c, idx) => (
-                                        <div key={c.id} onClick={() => selecionarCliente(c)} onMouseEnter={() => setIndexFocadoCliente(idx)} className={`p-3 cursor-pointer border-b font-bold text-sm ${idx === indexFocadoCliente ? 'bg-indigo-600 text-white' : 'hover:bg-indigo-50 text-slate-800'}`}>
-                                            {c.nome} {c.documento && <span className={`text-xs ml-2 ${idx === indexFocadoCliente ? 'text-indigo-200' : 'text-slate-400'}`}>({c.documento})</span>}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
 
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Veículo *</label>
-                            <select
-                                value={veiculoSelecionado}
-                                onChange={(e) => setVeiculoSelecionado(e.target.value)}
-                                disabled={!clienteSelecionado || isBloqueada}
-                                className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-500 disabled:opacity-60"
-                            >
-                                <option value="">Selecione o Veículo...</option>
-                                {clienteSelecionado?.veiculos?.map(v => <option key={v.id} value={v.id}>{v.marca} {v.modelo} - {v.placa}</option>)}
-                            </select>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="col-span-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase mb-1 block">Veículo *</label>
+                                    <select
+                                        value={veiculoSelecionado}
+                                        onChange={(e) => setVeiculoSelecionado(e.target.value)}
+                                        disabled={!clienteSelecionado || isBloqueada}
+                                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-indigo-500 disabled:opacity-60"
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {clienteSelecionado?.veiculos?.map(v => <option key={v.id} value={v.id}>{v.marca} {v.modelo} - {v.placa}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase mb-1 flex items-center justify-between">
+                                        KM Atual
+                                        {kmVemDoChecklist && <CheckCircle size={10} className="text-emerald-500" title="Veio da Vistoria"/>}
+                                    </label>
+                                    <input
+                                        type="number"
+                                        disabled={isBloqueada || kmVemDoChecklist}
+                                        value={kmVeiculo}
+                                        onChange={e => setKmVeiculo(e.target.value)}
+                                        className={`w-full p-2.5 border rounded-lg text-sm font-bold outline-none ${kmVemDoChecklist ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'} disabled:opacity-70`}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Gauge size={12}/> KM Atual</label>
-                            <input type="number" disabled={isBloqueada} value={kmVeiculo} onChange={e => setKmVeiculo(e.target.value)} className="w-full h-12 p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-500 disabled:opacity-60" placeholder="Ex: 54000" />
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Fuel size={12}/> Nível de Combustível</label>
-                            {renderCombustivelVisual()}
+                    {/* 2. RELATOS E PARECER */}
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col">
+                        <h3 className="font-black text-sm text-slate-700 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
+                            <AlertTriangle size={16} className="text-orange-500"/> 2. Relatos e Parecer
+                        </h3>
+
+                        <div className="flex-1 flex flex-col gap-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase mb-1 flex items-center gap-1"><MessageCircle size={12} className="text-red-400"/> Reclamação</label>
+                                    <textarea disabled={isBloqueada} value={defeitoRelatado} onChange={e => setDefeitoRelatado(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500 min-h-[40px] resize-none" />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase mb-1 flex items-center gap-1"><Wrench size={12} className="text-emerald-500"/> Diagnóstico</label>
+                                    <textarea disabled={isBloqueada} value={diagnosticoTecnico} onChange={e => setDiagnosticoTecnico(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500 min-h-[40px] resize-none" />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-2">
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-1"><FileText size={12} className="text-blue-500"/> Laudo Final</label>
+                                        <label className="text-[8px] font-bold text-slate-500 flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={imprimirLaudo} onChange={e => setImprimirLaudo(e.target.checked)}/> Imprimir</label>
+                                    </div>
+                                    <textarea disabled={isBloqueada} value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="O que foi feito..." className="w-full p-2 bg-blue-50/30 border border-blue-100 rounded-lg text-xs font-bold text-blue-900 outline-none focus:border-blue-400 min-h-[50px] resize-none" />
+                                </div>
+                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                    <label className="text-[9px] font-black text-slate-500 uppercase mb-1 flex items-center gap-1"><Calendar size={12} className="text-purple-500"/> Agendar Revisão</label>
+                                    <input type="date" disabled={isBloqueada} value={dataProximaRevisao} onChange={e => setDataProximaRevisao(e.target.value)} className="w-full p-1.5 mb-1 bg-white border border-slate-200 rounded text-xs outline-none focus:border-purple-500" />
+                                    <input type="text" disabled={isBloqueada || !dataProximaRevisao} value={obsProximaRevisao} onChange={e => setObsProximaRevisao(e.target.value)} placeholder="Obs. Revisão..." className="w-full p-1.5 bg-white border border-slate-200 rounded text-xs outline-none focus:border-purple-500" />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* CHECK-IN / DIAGNÓSTICO / PARECER */}
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4 flex flex-col">
-                    <h3 className="font-black text-sm text-slate-400 uppercase tracking-widest border-b pb-2 mb-2 flex items-center gap-2">
-                        <AlertTriangle size={16}/> 2. Relatos e Parecer Técnico
-                    </h3>
+                {/* PEÇAS E SERVIÇOS */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
-                    <div className="flex-1 space-y-3 flex flex-col overflow-y-auto overflow-x-hidden custom-scrollbar">
-                        <div className="flex flex-col">
-                            <label className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1">Reclamação do Cliente</label>
-                            <textarea disabled={isBloqueada} value={defeitoRelatado} onChange={e => setDefeitoRelatado(e.target.value)} placeholder="Ex: Barulho ao frear..." className="w-full p-2 bg-red-50/50 border-2 border-red-100 rounded-xl text-sm font-medium outline-none focus:border-red-300 resize-none min-h-[50px] disabled:opacity-60" />
-                        </div>
-                        <div className="flex flex-col">
-                            <label className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Diagnóstico (Mecânico)</label>
-                            <textarea disabled={isBloqueada} value={diagnosticoTecnico} onChange={e => setDiagnosticoTecnico(e.target.value)} placeholder="Ex: Pastilhas gastas..." className="w-full p-2 bg-emerald-50/50 border-2 border-emerald-100 rounded-xl text-sm font-medium outline-none focus:border-emerald-300 resize-none min-h-[50px] disabled:opacity-60" />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-100 pt-3 mt-1">
-                            <div className="flex flex-col">
-                                <div className="flex items-center justify-between mb-1">
-                                    <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center">
-                                        Laudo / O que foi Feito?
-                                    </label>
-                                    <label className="flex items-center gap-1 cursor-pointer group bg-indigo-50 px-1.5 py-0.5 rounded hover:bg-indigo-100 transition-colors">
-                                        <span className="text-[9px] font-bold text-indigo-700 uppercase">Imprimir?</span>
-                                        <input type="checkbox" checked={imprimirLaudo} onChange={e => setImprimirLaudo(e.target.checked)} className="accent-indigo-600" />
-                                    </label>
-                                </div>
-                                <textarea disabled={isBloqueada} value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Ex: Troca de pastilhas..." className="w-full p-2 bg-indigo-50/50 border-2 border-indigo-200 rounded-xl text-sm font-bold text-indigo-900 outline-none focus:border-indigo-400 resize-none min-h-[60px] placeholder:text-indigo-300 shadow-inner disabled:opacity-60" />
-                            </div>
-
-                            <div className="flex flex-col bg-purple-50 p-2 rounded-xl border-2 border-purple-200 shadow-inner">
-                                <label className="text-[10px] font-black text-purple-700 uppercase tracking-widest mb-1 flex items-center gap-1">
-                                    <Calendar size={12}/> Próxima Revisão (CRM)
-                                </label>
+                    {/* SERVIÇOS (Altura Max Fixa) */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-[350px] xl:h-[400px]">
+                        <div className="bg-orange-50 border-b border-orange-100 p-3 shrink-0">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400" size={16} />
                                 <input
-                                    type="date"
-                                    disabled={isBloqueada}
-                                    value={dataProximaRevisao}
-                                    onChange={e => setDataProximaRevisao(e.target.value)}
-                                    className="w-full mb-2 p-1.5 bg-white border border-purple-200 rounded text-xs font-bold text-purple-900 outline-none focus:border-purple-500 disabled:opacity-60"
-                                />
-                                <input
+                                    ref={inputServicoRef}
                                     type="text"
-                                    disabled={isBloqueada || !dataProximaRevisao}
-                                    value={obsProximaRevisao}
-                                    onChange={e => setObsProximaRevisao(e.target.value)}
-                                    placeholder={dataProximaRevisao ? "Ex: Trocar correia dentada" : "Selecione a data primeiro..."}
-                                    className="w-full p-1.5 bg-white border border-purple-200 rounded text-xs outline-none focus:border-purple-500 disabled:opacity-60 disabled:bg-purple-50"
+                                    value={buscaServico}
+                                    onChange={e => setBuscaServico(e.target.value)}
+                                    onKeyDown={(e) => onKeyDownBuscaGenerica(e, indexFocadoServico, setIndexFocadoServico, resultadosServicos, adicionarServico, listaServicosRef)}
+                                    disabled={isBloqueada}
+                                    placeholder="Buscar Serviço (F4)..."
+                                    className="w-full pl-9 pr-3 py-2.5 bg-white border border-orange-200 rounded-lg text-sm font-bold outline-none focus:border-orange-500 disabled:opacity-60"
                                 />
+                                {resultadosServicos.length > 0 && !isBloqueada && (
+                                    <div ref={listaServicosRef} className="absolute top-full left-0 w-full mt-1 bg-white border border-orange-200 rounded-lg shadow-xl z-50 max-h-40 overflow-y-auto">
+                                        {resultadosServicos.map((serv, idx) => (
+                                            <div key={serv.id} onClick={() => adicionarServico(serv)} onMouseEnter={() => setIndexFocadoServico(idx)} className={`p-3 cursor-pointer border-b flex justify-between items-center text-sm ${idx === indexFocadoServico ? 'bg-orange-500 text-white' : 'hover:bg-orange-50 text-slate-800'}`}>
+                                                <span className="font-bold">{serv.nome}</span>
+                                                <span className="font-black">R$ {formatarMoeda(serv.preco)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
 
-            {/* ÁREA MISTA: MÃO DE OBRA E PEÇAS */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                {/* BLOCO MÃO DE OBRA */}
-                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-                    <div className="bg-orange-50 border-b border-orange-100 p-4 relative">
-                        <h3 className="font-black text-orange-800 uppercase tracking-widest text-sm flex items-center gap-2 mb-3">
-                            <Wrench size={18}/> Mão de Obra (Serviços)
-                        </h3>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400" size={18} />
-                            <input
-                                ref={inputServicoRef}
-                                type="text"
-                                value={buscaServico}
-                                onChange={e => setBuscaServico(e.target.value)}
-                                onKeyDown={(e) => onKeyDownBuscaGenerica(e, indexFocadoServico, setIndexFocadoServico, resultadosServicos, adicionarServico, listaServicosRef)}
-                                disabled={isBloqueada}
-                                placeholder="Buscar Serviço (F4)..."
-                                className="w-full pl-10 pr-4 py-3 bg-white border-2 border-orange-200 rounded-xl text-sm font-bold shadow-sm focus:border-orange-500 outline-none disabled:opacity-60 disabled:bg-slate-100"
-                            />
-                            {resultadosServicos.length > 0 && !isBloqueada && (
-                                <div ref={listaServicosRef} className="absolute top-full left-0 w-full mt-1 bg-white border border-orange-200 rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto custom-scrollbar">
-                                    {resultadosServicos.map((serv, idx) => (
-                                        <div key={serv.id} onClick={() => adicionarServico(serv)} onMouseEnter={() => setIndexFocadoServico(idx)} className={`p-3 cursor-pointer border-b flex justify-between items-center ${idx === indexFocadoServico ? 'bg-orange-500 text-white' : 'hover:bg-orange-50 text-slate-800'}`}>
-                                            <span className="font-bold text-sm">{serv.nome}</span>
-                                            <span className="font-black">R$ {formatarMoeda(serv.preco)}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                        {/* Tabela rolável */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 sticky top-0 border-b border-slate-100">
+                                <tr>
+                                    <th className="p-2.5">Serviço</th>
+                                    <th className="p-2.5">Executante</th>
+                                    <th className="p-2.5 text-right">Valor</th>
+                                    <th className="p-2.5 w-8"></th>
+                                </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                {itensServicos.length === 0 && <tr><td colSpan="4" className="p-6 text-center text-slate-400 text-xs font-bold">Nenhum serviço adicionado.</td></tr>}
+                                {itensServicos.map((item) => (
+                                    <tr key={item.servicoId} className="hover:bg-slate-50">
+                                        <td className="p-2.5 font-bold text-slate-700 text-sm">{item.nome}</td>
+                                        <td className="p-2.5">
+                                            <select
+                                                disabled={isBloqueada}
+                                                value={item.mecanicoId}
+                                                onChange={(e) => setItensServicos(itensServicos.map(i => i.servicoId === item.servicoId ? { ...i, mecanicoId: e.target.value } : i))}
+                                                className={`w-full p-1.5 rounded font-bold text-xs outline-none border ${!item.mecanicoId ? 'bg-red-50 border-red-300 text-red-700' : 'bg-white border-slate-200'}`}
+                                            >
+                                                <option value="">-- SELECIONE --</option>
+                                                {mecanicos.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                                            </select>
+                                        </td>
+                                        <td className="p-2.5 text-right font-black text-orange-600 text-base">R$ {formatarMoeda(item.preco)}</td>
+                                        <td className="p-2.5 text-center">
+                                            <button disabled={isBloqueada} onClick={() => setItensServicos(itensServicos.filter(i => i.servicoId !== item.servicoId))} className="text-slate-300 hover:text-red-500 disabled:opacity-30"><Trash2 size={16}/></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto min-h-[250px]">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 sticky top-0 border-b border-slate-100">
-                            <tr>
-                                <th className="p-3">Serviço</th>
-                                <th className="p-3">Mecânico Executante</th>
-                                <th className="p-3 text-right">Valor</th>
-                                <th className="p-3 w-10"></th>
-                            </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                            {itensServicos.length === 0 && <tr><td colSpan="4" className="p-6 text-center text-slate-400 font-bold">Nenhum serviço adicionado.</td></tr>}
-                            {itensServicos.map((item) => (
-                                <tr key={item.servicoId} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-3 font-bold text-slate-700 text-sm">{item.nome}</td>
-                                    <td className="p-3">
-                                        <select
-                                            disabled={isBloqueada}
-                                            value={item.mecanicoId}
-                                            onChange={(e) => setItensServicos(itensServicos.map(i => i.servicoId === item.servicoId ? { ...i, mecanicoId: e.target.value } : i))}
-                                            className={`w-full p-2 rounded-lg font-bold text-xs outline-none border-2 transition-colors disabled:opacity-70 ${!item.mecanicoId ? 'bg-red-50 border-red-300 text-red-700 focus:border-red-500' : 'bg-white border-slate-200 focus:border-indigo-500'}`}
-                                        >
-                                            <option value="">-- QUEM VAI FAZER? --</option>
-                                            {mecanicos.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                                        </select>
-                                    </td>
-                                    <td className="p-3 text-right font-black text-orange-600">R$ {formatarMoeda(item.preco)}</td>
-                                    <td className="p-3 text-center">
-                                        <button disabled={isBloqueada} onClick={() => setItensServicos(itensServicos.filter(i => i.servicoId !== item.servicoId))} className="text-slate-300 hover:text-red-500 disabled:opacity-30 disabled:hover:text-slate-300"><Trash2 size={16}/></button>
-                                    </td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* BLOCO DE PEÇAS */}
-                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-                    <div className="bg-blue-50 border-b border-blue-100 p-4 relative">
-                        <h3 className="font-black text-blue-800 uppercase tracking-widest text-sm flex items-center gap-2 mb-3">
-                            <Package size={18}/> Peças / Produtos
-                        </h3>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" size={18} />
-                            <input
-                                ref={inputPecaRef}
-                                type="text"
-                                value={buscaPeca}
-                                onChange={e => setBuscaPeca(e.target.value)}
-                                disabled={isBloqueada}
-                                onKeyDown={(e) => {
-                                    if(e.altKey && e.key === 'a' && indexFocadoPeca >= 0) {
-                                        e.preventDefault();
-                                        setModalAplicacao({ aberto: true, texto: resultadosPecas[indexFocadoPeca].aplicacao, nome: resultadosPecas[indexFocadoPeca].nome });
-                                    } else {
-                                        onKeyDownBuscaGenerica(e, indexFocadoPeca, setIndexFocadoPeca, resultadosPecas, adicionarPeca, listaPecasRef);
-                                    }
-                                }}
-                                placeholder="Buscar Peça (F3)..."
-                                className="w-full pl-10 pr-4 py-3 bg-white border-2 border-blue-200 rounded-xl text-sm font-bold shadow-sm focus:border-blue-500 outline-none disabled:opacity-60 disabled:bg-slate-100"
-                            />
-                            {resultadosPecas.length > 0 && !isBloqueada && (
-                                <div ref={listaPecasRef} className="absolute top-full left-0 w-full mt-1 bg-white border border-blue-200 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto custom-scrollbar">
-                                    {resultadosPecas.map((peca, idx) => (
-                                        <div key={peca.id} className={`p-3 border-b flex justify-between items-center cursor-pointer ${idx === indexFocadoPeca ? 'bg-blue-600 text-white' : 'hover:bg-blue-50 text-slate-800'}`} onMouseEnter={() => setIndexFocadoPeca(idx)}>
-                                            <div className="flex items-center gap-3 flex-1" onClick={() => adicionarPeca(peca)}>
-                                                <div className={`w-10 h-10 rounded bg-white flex items-center justify-center overflow-hidden shrink-0 ${peca.fotoUrl ? '' : 'border border-slate-200'}`} onMouseEnter={() => peca.fotoUrl && setPreviewImagem(peca.fotoUrl)} onMouseLeave={() => setPreviewImagem(null)}>
-                                                    {peca.fotoUrl ? <img src={peca.fotoUrl} alt="Peca" className="w-full h-full object-cover" /> : <ImageIcon size={16} className={idx === indexFocadoPeca ? "text-blue-300" : "text-slate-300"}/>}
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-sm leading-tight">{peca.nome}</p>
-                                                    <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className={`text-[10px] font-mono ${idx === indexFocadoPeca ? 'text-blue-200' : 'text-slate-500'}`}>{peca.sku}</span>
-                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${idx === indexFocadoPeca ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'}`}>Estoque: {peca.quantidadeEstoque}</span>
+                    {/* PEÇAS (Altura Max Fixa) */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-[350px] xl:h-[400px]">
+                        <div className="bg-blue-50 border-b border-blue-100 p-3 shrink-0">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" size={16} />
+                                <input
+                                    ref={inputPecaRef}
+                                    type="text"
+                                    value={buscaPeca}
+                                    onChange={e => setBuscaPeca(e.target.value)}
+                                    disabled={isBloqueada}
+                                    onKeyDown={(e) => {
+                                        if(e.altKey && e.key === 'a' && indexFocadoPeca >= 0) {
+                                            e.preventDefault();
+                                            setModalAplicacao({ aberto: true, texto: resultadosPecas[indexFocadoPeca].aplicacao, nome: resultadosPecas[indexFocadoPeca].nome });
+                                        } else {
+                                            onKeyDownBuscaGenerica(e, indexFocadoPeca, setIndexFocadoPeca, resultadosPecas, adicionarPeca, listaPecasRef);
+                                        }
+                                    }}
+                                    placeholder="Buscar Peça (F3)... (Alt+A p/ Aplicação)"
+                                    className="w-full pl-9 pr-3 py-2.5 bg-white border border-blue-200 rounded-lg text-sm font-bold outline-none focus:border-blue-500 disabled:opacity-60"
+                                />
+                                {resultadosPecas.length > 0 && !isBloqueada && (
+                                    <div ref={listaPecasRef} className="absolute top-full left-0 w-full mt-1 bg-white border border-blue-200 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto custom-scrollbar">
+                                        {resultadosPecas.map((peca, idx) => (
+                                            <div key={peca.id} className={`p-3 border-b flex justify-between items-center cursor-pointer ${idx === indexFocadoPeca ? 'bg-blue-600 text-white' : 'hover:bg-blue-50 text-slate-800'}`} onMouseEnter={() => setIndexFocadoPeca(idx)}>
+                                                <div className="flex items-center gap-3 flex-1" onClick={() => adicionarPeca(peca)}>
+                                                    <div className={`w-8 h-8 rounded bg-white flex items-center justify-center overflow-hidden shrink-0 ${peca.fotoUrl ? '' : 'border border-slate-200'}`} onMouseEnter={() => peca.fotoUrl && setPreviewImagem(peca.fotoUrl)} onMouseLeave={() => setPreviewImagem(null)}>
+                                                        {peca.fotoUrl ? <img src={peca.fotoUrl} alt="Peca" className="w-full h-full object-cover" /> : <ImageIcon size={14} className={idx === indexFocadoPeca ? "text-blue-300" : "text-slate-300"}/>}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-sm leading-tight">{peca.nome}</p>
+                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                            <span className={`text-[10px] font-mono ${idx === indexFocadoPeca ? 'text-blue-200' : 'text-slate-500'}`}>{peca.sku}</span>
+                                                            <span className={`text-[9px] px-1 rounded font-black uppercase ${idx === indexFocadoPeca ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'}`}>Estoque: {peca.quantidadeEstoque}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
+                                                <div className="flex items-center gap-3">
+                                                    <button onClick={(e) => { e.stopPropagation(); setModalAplicacao({ aberto: true, texto: peca.aplicacao, nome: peca.nome }); }} className={`p-1.5 rounded transition-colors ${idx === indexFocadoPeca ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'}`} title="Alt+A"><Info size={14}/></button>
+                                                    <p className="font-black text-sm" onClick={() => adicionarPeca(peca)}>R$ {formatarMoeda(peca.precoVenda)}</p>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <button onClick={(e) => { e.stopPropagation(); setModalAplicacao({ aberto: true, texto: peca.aplicacao, nome: peca.nome }); }} className={`p-1.5 rounded transition-colors ${idx === indexFocadoPeca ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-blue-100 hover:bg-blue-200 text-blue-700'}`} title="Ver Aplicação (Alt+A)"><Info size={16}/></button>
-                                                <p className="font-black" onClick={() => adicionarPeca(peca)}>R$ {formatarMoeda(peca.precoVenda)}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto min-h-[250px] custom-scrollbar">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 sticky top-0 border-b border-slate-100">
-                            <tr>
-                                <th className="p-3 w-12 text-center">Img</th>
-                                <th className="p-3">Peça</th>
-                                <th className="p-3 text-center w-16">Qtd</th>
-                                <th className="p-3 text-right">Subtotal</th>
-                                <th className="p-3 w-10"></th>
-                            </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                            {itensPecas.length === 0 && <tr><td colSpan="5" className="p-6 text-center text-slate-400 font-bold">Nenhuma peça adicionada.</td></tr>}
-                            {itensPecas.map((item) => (
-                                <tr key={item.produtoId} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-3 text-center">
-                                        <div className="w-8 h-8 rounded bg-slate-100 mx-auto flex items-center justify-center overflow-hidden border border-slate-200" onMouseEnter={() => item.fotoUrl && setPreviewImagem(item.fotoUrl)} onMouseLeave={() => setPreviewImagem(null)}>
-                                            {item.fotoUrl ? <img src={item.fotoUrl} alt="Peca" className="w-full h-full object-cover" /> : <ImageIcon size={14} className="text-slate-300"/>}
-                                        </div>
-                                    </td>
-                                    <td className="p-3 font-bold text-slate-700 text-sm">
-                                        <p className="truncate max-w-[150px]" title={item.nome}>{item.nome}</p>
-                                        <p className="text-[9px] text-slate-400 font-mono">{item.codigo}</p>
-                                    </td>
-                                    <td className="p-3 text-center">
-                                        <input disabled={isBloqueada} type="number" value={item.qtd} onChange={(e) => setItensPecas(itensPecas.map(i => i.produtoId === item.produtoId ? { ...i, qtd: Math.max(1, parseInt(e.target.value) || 1) } : i))} className="w-12 p-1.5 text-center font-black bg-white border-2 border-slate-200 rounded outline-none focus:border-blue-500 text-xs disabled:opacity-70 disabled:bg-slate-100" />
-                                    </td>
-                                    <td className="p-3 text-right font-black text-blue-600">R$ {formatarMoeda(item.preco * item.qtd)}</td>
-                                    <td className="p-3 text-center">
-                                        <button disabled={isBloqueada} onClick={() => setItensPecas(itensPecas.filter(i => i.produtoId !== item.produtoId))} className="text-slate-300 hover:text-red-500 disabled:opacity-30 disabled:hover:text-slate-300"><Trash2 size={16}/></button>
-                                    </td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            {/* RODAPÉ DE TOTAIS */}
-            <div className="bg-slate-900 rounded-3xl border-t-4 border-indigo-500 p-6 flex flex-col lg:flex-row justify-between items-center shadow-2xl sticky bottom-4 z-40">
-                <div className="flex items-center gap-6 mb-4 lg:mb-0">
-                    <div className="text-slate-400">
-                        <p className="text-[10px] font-black uppercase tracking-widest mb-1">Total Mão de Obra</p>
-                        <p className="text-xl font-black text-orange-400">R$ {formatarMoeda(totalServicos)}</p>
-                    </div>
-                    <div className="w-px h-10 bg-slate-700"></div>
-                    <div className="text-slate-400">
-                        <p className="text-[10px] font-black uppercase tracking-widest mb-1">Total Peças</p>
-                        <p className="text-xl font-black text-blue-400">R$ {formatarMoeda(totalPecas)}</p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-6">
-                    <div className="text-right">
-                        <div className="flex items-center justify-end gap-2 mb-1">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Desconto</p>
-                            <div className="flex bg-slate-800 rounded p-0.5 border border-slate-700">
-                                <button
-                                    onClick={() => setTipoDesconto('VALOR')}
-                                    disabled={isBloqueada}
-                                    className={`px-2 py-0.5 text-[9px] font-black rounded transition-colors ${tipoDesconto === 'VALOR' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                                >
-                                    R$
-                                </button>
-                                <button
-                                    onClick={() => setTipoDesconto('PERCENTUAL')}
-                                    disabled={isBloqueada}
-                                    className={`px-2 py-0.5 text-[9px] font-black rounded transition-colors ${tipoDesconto === 'PERCENTUAL' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                                >
-                                    %
-                                </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-slate-500">
-                                {tipoDesconto === 'VALOR' ? 'R$' : '%'}
-                            </span>
-                            <input
-                                disabled={isBloqueada}
-                                type="number"
-                                value={descontoInput}
-                                onChange={e => setDescontoInput(e.target.value)}
-                                className="w-32 py-2 pr-3 pl-8 bg-slate-800 border border-slate-700 text-red-400 font-black rounded-lg text-right outline-none focus:border-red-500 transition-colors disabled:opacity-50"
-                                placeholder="0.00"
-                            />
+
+                        {/* Tabela rolável */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 sticky top-0 border-b border-slate-100">
+                                <tr>
+                                    <th className="p-2.5 w-10 text-center">Img</th>
+                                    <th className="p-2.5">Peça</th>
+                                    <th className="p-2.5 text-center w-14">Qtd</th>
+                                    <th className="p-2.5 text-right">Subtotal</th>
+                                    <th className="p-2.5 w-8"></th>
+                                </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                {itensPecas.length === 0 && <tr><td colSpan="5" className="p-6 text-center text-slate-400 text-xs font-bold">Nenhuma peça adicionada.</td></tr>}
+                                {itensPecas.map((item) => (
+                                    <tr key={item.produtoId} className="hover:bg-slate-50">
+                                        <td className="p-2.5 text-center">
+                                            <div className="w-8 h-8 rounded bg-slate-100 mx-auto flex items-center justify-center overflow-hidden border border-slate-200 cursor-pointer" onMouseEnter={() => item.fotoUrl && setPreviewImagem(item.fotoUrl)} onMouseLeave={() => setPreviewImagem(null)}>
+                                                {item.fotoUrl ? <img src={item.fotoUrl} alt="Peca" className="w-full h-full object-cover" /> : <ImageIcon size={14} className="text-slate-300"/>}
+                                            </div>
+                                        </td>
+                                        <td className="p-2.5 font-bold text-slate-700 text-sm">
+                                            <p className="truncate max-w-[150px]" title={item.nome}>{item.nome}</p>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[9px] text-slate-400 font-mono">{item.codigo}</span>
+                                                {item.aplicacao && (
+                                                    <button onClick={() => setModalAplicacao({ aberto: true, texto: item.aplicacao, nome: item.nome })} className="text-[9px] text-blue-500 hover:text-blue-700 font-black uppercase tracking-widest flex items-center gap-1">
+                                                        <Info size={10}/> Aplicação
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="p-2.5 text-center">
+                                            <input disabled={isBloqueada} type="number" value={item.qtd} onChange={(e) => setItensPecas(itensPecas.map(i => i.produtoId === item.produtoId ? { ...i, qtd: Math.max(1, parseInt(e.target.value) || 1) } : i))} className="w-10 p-1 text-center font-black bg-white border border-slate-200 rounded outline-none focus:border-blue-500 text-sm disabled:opacity-70" />
+                                        </td>
+                                        <td className="p-2.5 text-right font-black text-blue-600 text-base">R$ {formatarMoeda(item.preco * item.qtd)}</td>
+                                        <td className="p-2.5 text-center">
+                                            <button disabled={isBloqueada} onClick={() => setItensPecas(itensPecas.filter(i => i.produtoId !== item.produtoId))} className="text-slate-300 hover:text-red-500 disabled:opacity-30"><Trash2 size={16}/></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div> {/* <-- FIM DA ÁREA ROLÁVEL --> */}
+
+            {/* 🚀 RODAPÉ FIXO (TOTALMENTE TRAVADO E FLUTUANTE) */}
+            <div className="shrink-0 bg-slate-50 p-4 md:px-6 md:pb-6 pt-4 border-t border-slate-200 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] z-40 relative">
+                <div className="bg-slate-900 rounded-2xl border-t-4 border-indigo-500 p-5 flex flex-col lg:flex-row justify-between items-center shadow-xl">
+                    <div className="flex items-center gap-6 mb-4 lg:mb-0">
+                        <div>
+                            <p className="text-[10px] font-black uppercase text-slate-400 mb-0.5">Total Mão de Obra</p>
+                            <p className="text-lg font-black text-orange-400">R$ {formatarMoeda(totalServicos)}</p>
+                        </div>
+                        <div className="w-px h-8 bg-slate-700"></div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase text-slate-400 mb-0.5">Total Peças</p>
+                            <p className="text-lg font-black text-blue-400">R$ {formatarMoeda(totalPecas)}</p>
                         </div>
                     </div>
 
-                    <div className="bg-slate-800 px-6 py-3 rounded-2xl shadow-inner border border-slate-700 text-right">
-                        <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest block mb-1">Total Final da OS</span>
-                        <h2 className="text-4xl font-black text-emerald-400 tracking-tighter leading-none">R$ {formatarMoeda(totalGeral)}</h2>
+                    <div className="flex items-center gap-6">
+                        <div className="text-right">
+                            <div className="flex items-center justify-end gap-2 mb-1">
+                                <p className="text-[10px] font-black uppercase text-slate-400">Desconto</p>
+                                <div className="flex bg-slate-800 rounded p-0.5 border border-slate-700">
+                                    <button onClick={() => { setTipoDesconto('VALOR'); setDescontoInput(''); }} disabled={isBloqueada} className={`px-2 py-0.5 text-[9px] font-black rounded ${tipoDesconto === 'VALOR' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>R$</button>
+                                    <button onClick={() => { setTipoDesconto('PERCENTUAL'); setDescontoInput(''); }} disabled={isBloqueada} className={`px-2 py-0.5 text-[9px] font-black rounded ${tipoDesconto === 'PERCENTUAL' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>%</button>
+                                </div>
+                            </div>
+                            <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 font-black text-slate-500 text-sm">{tipoDesconto === 'VALOR' ? 'R$' : '%'}</span>
+                                {/* 🚀 MÁSCARA APLICADA AQUI NO DESCONTO DA OS */}
+                                <input
+                                    disabled={isBloqueada}
+                                    type="text"
+                                    value={tipoDesconto === 'VALOR' ? (descontoInput ? formatarMoeda(descontoInput) : '') : descontoInput}
+                                    onChange={e => handleMudancaDesconto(e.target.value)}
+                                    className="w-28 py-1.5 pr-2 pl-7 bg-slate-800 border border-slate-700 text-red-400 font-black rounded text-right outline-none focus:border-red-500 disabled:opacity-50"
+                                    placeholder="0,00"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-800 px-5 py-2 rounded-xl shadow-inner border border-slate-700 text-right">
+                            <span className="text-[10px] text-slate-400 font-black uppercase block mb-0.5">Total da OS</span>
+                            <h2 className="text-3xl font-black text-emerald-400 leading-none">R$ {formatarMoeda(totalGeral)}</h2>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* 🚀 NOVO MODAL PROFISSIONAL DE CONFIRMAÇÃO DE ENVIO AO CAIXA */}
+            {/* A NOVA MODAL DE APLICAÇÃO FICA AQUI */}
+            {modalAplicacao.aberto && (
+                <ModalAplicacaoPeca
+                    modalAplicacao={modalAplicacao}
+                    setModalAplicacao={setModalAplicacao}
+                />
+            )}
+
+            {/* MODAL DE CONFIRMAÇÃO DE ENVIO AO CAIXA */}
             {modalEnviarCaixaAberto && (
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm animate-fade-in p-4">
                     <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden text-center border-t-4 border-emerald-500">
                         <div className="p-8">
-                            <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <Send size={36} className="text-emerald-500 ml-1" />
+                            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Send size={28} className="text-emerald-500 ml-1" />
                             </div>
-                            <h2 className="text-2xl font-black text-slate-800 mb-2">Enviar ao Caixa?</h2>
-                            <p className="text-slate-500 font-medium mb-6">
-                                Esta OS irá para a <b className="text-blue-600">Fila do Caixa</b> para recebimento e <b className="text-red-500">baixará as peças do estoque</b> agora. A OS ficará bloqueada.
+                            <h2 className="text-xl font-black text-slate-800 mb-2">Enviar ao Caixa?</h2>
+                            <p className="text-slate-500 text-sm font-medium mb-6">
+                                A OS irá para a <b className="text-blue-600">Fila do Caixa</b> e <b className="text-red-500">baixará as peças do estoque</b>.
                             </p>
-
-                            {dataProximaRevisao && (
-                                <div className="bg-purple-50 text-purple-700 p-3 rounded-xl text-xs font-bold mb-6 flex items-center justify-center gap-2 border border-purple-200">
-                                    <Calendar size={14}/> Uma revisão será agendada no CRM para {new Date(dataProximaRevisao).toLocaleDateString('pt-BR')}.
-                                </div>
-                            )}
-
-                            <div className="flex gap-4">
-                                <button onClick={() => setModalEnviarCaixaAberto(false)} className="flex-1 p-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors uppercase tracking-widest text-xs">
-                                    Cancelar
-                                </button>
-                                <button onClick={confirmarEnvioCaixa} className="flex-1 bg-emerald-500 text-white p-3 rounded-xl font-black hover:bg-emerald-600 transition-transform hover:scale-105 uppercase tracking-widest text-xs shadow-lg shadow-emerald-500/30">
-                                    Confirmar
-                                </button>
+                            <div className="flex gap-3">
+                                <button onClick={() => setModalEnviarCaixaAberto(false)} className="flex-1 p-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-100 text-xs uppercase">Cancelar</button>
+                                <button onClick={confirmarEnvioCaixa} className="flex-1 bg-emerald-500 text-white p-2.5 rounded-xl font-black hover:bg-emerald-600 text-xs uppercase shadow-md">Confirmar</button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+// =========================================================================
+// 🚀 COMPONENTE DA MODAL DE APLICAÇÃO
+// =========================================================================
+const ModalAplicacaoPeca = ({ modalAplicacao, setModalAplicacao }) => {
+    const [filtro, setFiltro] = useState('');
+
+    const formatarTexto = (texto) => {
+        if (!texto) return [];
+        let linhas = texto.split('\n');
+
+        if (linhas.length === 1) {
+            linhas = texto.replace(/(\S)\s+([A-Z]{4,}\s)/g, '$1\n$2').split('\n');
+        }
+        return linhas;
+    };
+
+    const linhas = formatarTexto(modalAplicacao.texto);
+
+    const linhasFiltradas = linhas.filter(linha => {
+        if (!filtro) return true;
+        try {
+            const regex = new RegExp(filtro, 'i');
+            return regex.test(linha);
+        } catch (e) {
+            return linha.toLowerCase().includes(filtro.toLowerCase());
+        }
+    });
+
+    return (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 md:p-8 animate-fade-in">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full flex flex-col border-t-4 border-blue-500 overflow-hidden max-h-[90vh] md:max-h-[85vh]">
+
+                {/* CABEÇALHO FIXO */}
+                <div className="p-5 md:p-6 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                            <Info className="text-blue-500"/> Aplicação da Peça
+                        </h2>
+                        <p className="text-blue-700 font-bold mt-1 text-sm">{modalAplicacao.nome}</p>
+                    </div>
+                    <button
+                        onClick={() => setModalAplicacao({aberto: false, texto: '', nome: ''})}
+                        className="p-2 bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 rounded-xl transition-colors"
+                    >
+                        <X size={24}/>
+                    </button>
+                </div>
+
+                {/* BARRA DE PESQUISA (REGEX) FIXA */}
+                <div className="p-4 bg-slate-50 border-b border-slate-200 shrink-0">
+                    <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={18} />
+                        <input
+                            type="text"
+                            value={filtro}
+                            onChange={e => setFiltro(e.target.value)}
+                            placeholder="Filtrar aplicação (Suporta Regex. Ex: HONDA|FIAT ou 1\.6 16V)"
+                            className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm transition-all"
+                        />
+                    </div>
+                </div>
+
+                {/* CONTEÚDO ROLÁVEL */}
+                <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50">
+                    {linhasFiltradas.length > 0 ? (
+                        <ul className="space-y-2">
+                            {linhasFiltradas.map((linha, idx) => (
+                                <li key={idx} className="p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 shadow-sm flex items-start gap-3 hover:border-blue-300 transition-colors">
+                                    <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 shrink-0"></div>
+                                    <span className="leading-relaxed">{linha.trim()}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                            <AlertTriangle size={48} className="mb-3 opacity-30"/>
+                            <p className="font-bold">Nenhuma aplicação encontrada para o filtro.</p>
+                        </div>
+                    )}
+                </div>
+
+            </div>
         </div>
     );
 };

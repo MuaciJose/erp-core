@@ -5,6 +5,8 @@ import {
     Search, LayoutList, Printer, Eye, Clock, User, Car, DollarSign,
     CheckCircle, AlertTriangle, FileText, ChevronRight
 } from 'lucide-react';
+// 🚀 IMPORTANTE: Importando a tela de OS que criamos para abrir como "Visualização"
+import { OrdemServico } from './OrdemServico'; // Ajuste o caminho se estiver em outra pasta
 
 export const ListagemOs = ({ setPaginaAtiva }) => {
     const [ordens, setOrdens] = useState([]);
@@ -12,6 +14,9 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
     const [busca, setBusca] = useState('');
     const [filtroStatus, setFiltroStatus] = useState('TODOS');
     const [empresaConfig, setEmpresaConfig] = useState({ nomeFantasia: 'OFICINA' });
+
+    // 🚀 NOVO ESTADO: Controla qual OS estamos visualizando agora
+    const [osEmVisualizacao, setOsEmVisualizacao] = useState(null);
 
     useEffect(() => {
         const carregarDados = async () => {
@@ -34,10 +39,12 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
                 setLoading(false);
             }
         };
-        carregarDados();
-    }, []);
+        // Só recarrega a lista se não estivermos com uma OS aberta
+        if (!osEmVisualizacao) {
+            carregarDados();
+        }
+    }, [osEmVisualizacao]);
 
-    // 🚀 FILTRO INTELIGENTE (Busca por Nome, Placa, ID ou Status)
     const ordensFiltradas = ordens.filter(os => {
         const termo = busca.toLowerCase();
         const matchBusca =
@@ -65,7 +72,6 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
         return badges[status] || badges['ORCAMENTO'];
     };
 
-    // 🚀 IMPRESSÃO RÁPIDA DIRETO DA LISTAGEM
     const imprimirOs = (os) => {
         const toastId = toast.loading(`Gerando impressão da OS #${os.id}...`);
         const iframe = document.createElement('iframe');
@@ -136,6 +142,16 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
         setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 10000);
     };
 
+    // 🚀 INTERCEPTA A TELA SE O USUÁRIO CLICOU EM "VER DETALHES"
+    if (osEmVisualizacao) {
+        return (
+            <OrdemServico
+                osParaEditar={osEmVisualizacao}
+                onVoltar={() => setOsEmVisualizacao(null)}
+            />
+        );
+    }
+
     return (
         <div className="p-8 max-w-[1600px] mx-auto h-full flex flex-col animate-fade-in">
 
@@ -149,7 +165,7 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
                     <p className="text-slate-500 mt-1 font-medium">Busque, visualize e reimprima qualquer Ordem de Serviço</p>
                 </div>
                 <button
-                    onClick={() => setPaginaAtiva('os')} // Redireciona para o Kanban/Nova OS
+                    onClick={() => setPaginaAtiva('os')}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black shadow-lg flex items-center gap-2 uppercase tracking-widest text-sm transition-transform hover:scale-105"
                 >
                     Ir para o Kanban de Produção <ChevronRight size={18} />
@@ -237,7 +253,8 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
                                             <button onClick={() => imprimirOs(os)} className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 rounded-lg transition-colors" title="Reimprimir OS">
                                                 <Printer size={18}/>
                                             </button>
-                                            <button onClick={() => toast("Para visualizar detalhes, acesse o Kanban e clique no Card da OS.", {icon: 'ℹ️'})} className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors" title="Ver Detalhes">
+                                            {/* 🚀 AQUI: O BOTÃO DE DETALHES AGORA CHAMA A OS CERTA */}
+                                            <button onClick={() => setOsEmVisualizacao(os)} className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors" title="Ver Detalhes da OS">
                                                 <Eye size={18}/>
                                             </button>
                                         </div>

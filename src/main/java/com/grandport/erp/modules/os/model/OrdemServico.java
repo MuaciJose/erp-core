@@ -69,4 +69,7 @@ public class OrdemServico {
 
     @OneToMany(mappedBy = "ordemServico", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OsItemServico> itensServicos = new ArrayList<>();
+
+    @Column(name = "data_envio_caixa")
+    private java.time.LocalDateTime dataEnvioCaixa;
 }
