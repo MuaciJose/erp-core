@@ -19,6 +19,9 @@ public class ConfiguracaoController {
     @Autowired
     private ConfiguracaoService service;
 
+    @Autowired
+    private com.grandport.erp.modules.configuracoes.service.ManutencaoService manutencaoService;
+
     @GetMapping
     public ResponseEntity<ConfiguracaoSistema> obterConfig() {
         return ResponseEntity.ok(service.obterConfiguracao());
@@ -85,5 +88,18 @@ public class ConfiguracaoController {
     public ResponseEntity<Void> resetarBancoDeDados() {
         service.resetarBancoDeDados();
         return ResponseEntity.ok().build();
+    }
+
+
+
+    // =========================================================
+    // 🧹 ROTA DO ROBÔ: LIMPEZA DE FOTOS ANTIGAS
+    // =========================================================
+    @PostMapping("/manutencao/limpar-fotos-vistorias")
+    public ResponseEntity<Map<String, Object>> limparFotosAntigas(
+            @RequestParam(defaultValue = "24") int meses) { // Por padrão, apaga fotos com mais de 2 anos (24 meses)
+
+        Map<String, Object> resultado = manutencaoService.limparFotosVistoriasAntigas(meses);
+        return ResponseEntity.ok(resultado);
     }
 }

@@ -39,6 +39,10 @@ export const Configuracoes = () => {
     const [statusEmail, setStatusEmail] = useState('DESCONHECIDO');
     const [testandoEmail, setTestandoEmail] = useState(false);
 
+    // 🚀 ESTADOS DO ROBÔ DE LIMPEZA (NOVO)
+    const [mesesLimpeza, setMesesLimpeza] = useState(24);
+    const [limpandoFotos, setLimpandoFotos] = useState(false);
+
     const [config, setConfig] = useState({
         nomeFantasia: '',
         razaoSocial: '',
@@ -394,7 +398,8 @@ export const Configuracoes = () => {
         }
     };
 
-    const restaurarBanco = async (event) => {
+    // 🚀 RESTAURAR BANCO (AGORA COM CONFIRMAÇÃO MODERNA VIA TOAST)
+    const restaurarBanco = (event) => {
         const arquivo = event.target.files[0];
         if (!arquivo) return;
 
@@ -402,27 +407,41 @@ export const Configuracoes = () => {
             return toast.error("Por favor, selecione um arquivo .sql válido.");
         }
 
-        const confirmacao = window.confirm(
-            "🚨 ATENÇÃO CRÍTICA 🚨\n\nEsta ação apagará todos os dados atuais e substituirá pelos do arquivo.\n\nTem certeza absoluta?"
-        );
+        toast((t) => (
+            <div className="flex flex-col gap-3 max-w-sm">
+                <div className="flex items-center gap-2 text-red-600 font-black text-lg">
+                    <Bomb size={24} /> ALERTA CRÍTICO
+                </div>
+                <p className="text-sm text-slate-600 font-medium">
+                    Esta ação apagará todos os dados atuais e substituirá pelos do arquivo. Tem certeza absoluta?
+                </p>
+                <div className="flex justify-end gap-2 mt-2">
+                    <button onClick={() => toast.dismiss(t.id)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs transition-colors">CANCELAR</button>
+                    <button onClick={() => {
+                        toast.dismiss(t.id);
+                        executarRestauracaoBanco(arquivo);
+                    }} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs transition-colors shadow-md">RESTAURAR BANCO</button>
+                </div>
+            </div>
+        ), { duration: Infinity, position: 'top-center' });
 
-        if (confirmacao) {
-            const formData = new FormData();
-            formData.append('file', arquivo);
+        event.target.value = null; // Limpa o input para poder selecionar o mesmo arquivo se cancelar
+    };
 
-            const loadId = toast.loading('Restaurando banco de dados... Não feche o navegador.');
-            try {
-                await api.post('/api/configuracoes/restaurar-banco', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
-                toast.success('Banco de dados restaurado com sucesso!', { id: loadId });
-                setTimeout(() => window.location.reload(), 3000);
-            } catch (error) {
-                console.error(error);
-                toast.error('Falha na restauração. Verifique o console do servidor.', { id: loadId });
-            }
+    const executarRestauracaoBanco = async (arquivo) => {
+        const formData = new FormData();
+        formData.append('file', arquivo);
+        const loadId = toast.loading('Restaurando banco de dados... Não feche o navegador.');
+        try {
+            await api.post('/api/configuracoes/restaurar-banco', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            toast.success('Banco de dados restaurado com sucesso!', { id: loadId });
+            setTimeout(() => window.location.reload(), 3000);
+        } catch (error) {
+            console.error(error);
+            toast.error('Falha na restauração. Verifique o console do servidor.', { id: loadId });
         }
-        event.target.value = null;
     };
 
     const fazerBackup = async () => {
@@ -457,20 +476,72 @@ export const Configuracoes = () => {
         }
     };
 
-    const limparBancoDeDados = async () => {
-        const confirmacao = window.confirm(
-            "⚠️ ATENÇÃO EXTREMA ⚠️\n\nIsso irá APAGAR TODOS os Produtos, Clientes, Vendas e Orçamentos do banco de dados.\nEssa ação é irreversível.\n\nTem certeza absoluta que deseja resetar o sistema?"
-        );
+    // 🚀 LIMPAR BANCO (AGORA COM CONFIRMAÇÃO MODERNA VIA TOAST)
+    const limparBancoDeDados = () => {
+        toast((t) => (
+            <div className="flex flex-col gap-3 max-w-sm">
+                <div className="flex items-center gap-2 text-red-600 font-black text-lg">
+                    <AlertTriangle size={24} /> ATENÇÃO EXTREMA
+                </div>
+                <p className="text-sm text-slate-600 font-medium">
+                    Isso irá APAGAR TODOS os Produtos, Clientes, Vendas e Orçamentos do banco de dados de forma irreversível!
+                </p>
+                <div className="flex justify-end gap-2 mt-2">
+                    <button onClick={() => toast.dismiss(t.id)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs transition-colors">CANCELAR</button>
+                    <button onClick={() => {
+                        toast.dismiss(t.id);
+                        executarLimpezaBanco();
+                    }} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black text-xs transition-colors shadow-md">RESETAR TUDO</button>
+                </div>
+            </div>
+        ), { duration: Infinity, position: 'top-center' });
+    };
 
-        if (confirmacao) {
-            const loadId = toast.loading('Resetando banco de dados. Por favor, aguarde...');
-            try {
-                await api.delete('/api/configuracoes/resetar-banco');
-                toast.success('O banco de dados foi limpo com sucesso!', { id: loadId });
-                setTimeout(() => window.location.reload(), 2000);
-            } catch (error) {
-                toast.error('Erro ao limpar o banco de dados. Verifique a conexão com o servidor.', { id: loadId });
-            }
+    const executarLimpezaBanco = async () => {
+        const loadId = toast.loading('Resetando banco de dados. Por favor, aguarde...');
+        try {
+            await api.delete('/api/configuracoes/resetar-banco');
+            toast.success('O banco de dados foi limpo com sucesso!', { id: loadId });
+            setTimeout(() => window.location.reload(), 2000);
+        } catch (error) {
+            toast.error('Erro ao limpar o banco de dados. Verifique a conexão com o servidor.', { id: loadId });
+        }
+    };
+
+    // 🚀 FUNÇÃO DO ROBÔ DE LIMPEZA DE FOTOS (NOVO)
+    // 🚀 FUNÇÃO DO ROBÔ (AGORA COM CONFIRMAÇÃO MODERNA VIA TOAST)
+    const limparFotosAntigas = () => {
+        toast((t) => (
+            <div className="flex flex-col gap-3 max-w-sm">
+                <div className="flex items-center gap-2 text-orange-600 font-black text-lg">
+                    <AlertTriangle size={24} /> Confirmação de Faxina
+                </div>
+                <p className="text-sm text-slate-600 font-medium">
+                    Apagar permanentemente as fotos com mais de <b>{mesesLimpeza} meses</b>? O laudo em texto será mantido intacto.
+                </p>
+                <div className="flex justify-end gap-2 mt-2">
+                    <button onClick={() => toast.dismiss(t.id)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs transition-colors">CANCELAR</button>
+                    <button onClick={() => {
+                        toast.dismiss(t.id);
+                        executarLimpezaFotos();
+                    }} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs transition-colors shadow-md">SIM, APAGAR</button>
+                </div>
+            </div>
+        ), { duration: Infinity, position: 'top-center' });
+    };
+
+    const executarLimpezaFotos = async () => {
+        setLimpandoFotos(true);
+        const loadId = toast.loading('O robô da faxina está trabalhando no servidor...');
+        try {
+            const response = await api.post(`/api/configuracoes/manutencao/limpar-fotos-vistorias?meses=${mesesLimpeza}`);
+            const { fotosApagadas, espacoLiberadoMb, checklistsAfetados } = response.data;
+            toast.success(`Faxina concluída! ${espacoLiberadoMb} MB liberados. (${fotosApagadas} fotos apagadas).`, { id: loadId, duration: 8000 });
+        } catch (error) {
+            console.error(error);
+            toast.error('Erro ao executar a limpeza. Verifique se a rota no Back-end está correta.', { id: loadId });
+        } finally {
+            setLimpandoFotos(false);
         }
     };
 
@@ -500,7 +571,6 @@ export const Configuracoes = () => {
                     <button onClick={() => setAbaAtiva('EMPRESA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'EMPRESA' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Building2 size={20} /> Dados da Empresa</button>
                     <button onClick={() => setAbaAtiva('FISCAL')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'FISCAL' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Receipt size={20} /> Fiscal / NF-e (Peças)</button>
 
-                    {/* 🚀 NOVO BOTÃO DA PREFEITURA */}
                     <button onClick={() => setAbaAtiva('PREFEITURA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'PREFEITURA' ? 'bg-orange-500 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Landmark size={20} /> Prefeitura (Serviços)</button>
 
                     <button onClick={() => setAbaAtiva('VENDEDORES')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'VENDEDORES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Users size={20} /> Vendedores</button>
@@ -1099,6 +1169,40 @@ export const Configuracoes = () => {
                                     <p className="text-[10px] text-slate-400 mt-3 font-medium text-center">Recomendamos fazer o download do backup 1x por semana.</p>
                                 </div>
                             </div>
+
+                            {/* 🚀 NOVA SESSÃO: ROBÔ DE LIMPEZA (FAXINA NO DISCO) */}
+                            <div className="mt-8 p-6 bg-slate-50 border border-slate-200 rounded-3xl">
+                                <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-4">
+                                    <div>
+                                        <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-1">
+                                            <Wrench size={18} className="text-orange-500"/> Robô de Faxina (Armazenamento)
+                                        </h3>
+                                        <p className="text-xs text-slate-500 font-medium">Libere espaço no HD apagando fotos de vistorias antigas. Os textos e assinaturas dos laudos serão mantidos.</p>
+                                    </div>
+                                    <div className="flex items-center gap-3 w-full md:w-auto">
+                                        <select
+                                            value={mesesLimpeza}
+                                            onChange={(e) => setMesesLimpeza(e.target.value)}
+                                            className="p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-orange-500"
+                                        >
+                                            <option value={6}>Vistorias com +6 meses</option>
+                                            <option value={12}>Vistorias com +1 ano</option>
+                                            <option value={24}>Vistorias com +2 anos</option>
+                                            <option value={36}>Vistorias com +3 anos</option>
+                                        </select>
+                                        <button
+                                            onClick={limparFotosAntigas}
+                                            disabled={limpandoFotos}
+                                            title="Acionar robô para excluir arquivos físicos do servidor"
+                                            className="bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 font-bold px-6 py-3 rounded-xl flex items-center gap-2 transition-colors whitespace-nowrap disabled:opacity-50 shadow-sm active:scale-95"
+                                        >
+                                            {limpandoFotos ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                                            {limpandoFotos ? 'LIMPANDO...' : 'EXECUTAR FAXINA'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {/* ========================================================= */}
 
                             <div className="mt-8 p-6 border-2 border-red-500 bg-red-50 rounded-3xl relative overflow-hidden">
                                 <div className="absolute -right-4 -top-4 opacity-10">
