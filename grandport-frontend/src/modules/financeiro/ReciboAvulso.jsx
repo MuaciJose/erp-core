@@ -68,29 +68,17 @@ export const ReciboAvulso = ({ setPaginaAtiva }) => {
     };
 
     const processarRecibo = async () => {
-        if (!dados.pagador.trim()) {
-            return toast.error("O campo 'Recebemos de' é obrigatório!");
-        }
-        if (!dados.valor) {
-            return toast.error("O campo 'A quantia de (R$)' é obrigatório!");
-        }
-        if (!dados.valorExtenso.trim()) {
-            return toast.error("O campo 'Valor por Extenso' é obrigatório!");
-        }
-        if (!dados.referente.trim()) {
-            return toast.error("O campo 'Referente a' é obrigatório!");
-        }
-        if (!dados.cidade.trim()) {
-            return toast.error("O campo 'Cidade' é obrigatório!");
-        }
-        if (!dados.data) {
-            return toast.error("O campo 'Data' é obrigatório!");
-        }
+        if (!dados.pagador.trim()) return toast.error("O campo 'Recebemos de' é obrigatório!");
+        if (!dados.valor) return toast.error("O campo 'A quantia de (R$)' é obrigatório!");
+        if (!dados.valorExtenso.trim()) return toast.error("O campo 'Valor por Extenso' é obrigatório!");
+        if (!dados.referente.trim()) return toast.error("O campo 'Referente a' é obrigatório!");
+        if (!dados.cidade.trim()) return toast.error("O campo 'Cidade' é obrigatório!");
+        if (!dados.data) return toast.error("O campo 'Data' é obrigatório!");
 
         setProcessando(true);
 
+        // 1. Salva no banco (se estiver marcado)
         if (salvarNoBanco) {
-            const loadId = toast.loading("Registrando recibo no financeiro...");
             try {
                 await api.post('/api/financeiro/recibos', {
                     ...dados,
@@ -98,21 +86,39 @@ export const ReciboAvulso = ({ setPaginaAtiva }) => {
                     tipo: 'EMITIDO',
                     dataRegistro: new Date().toISOString()
                 });
-                toast.success("Recibo salvo com sucesso!", { id: loadId });
+                toast.success("Recibo registrado no financeiro!");
             } catch (error) {
                 console.error(error);
-                toast.error("Erro ao salvar no banco, tente novamente.", { id: loadId });
+                toast.error("Erro ao salvar no banco, tente novamente.");
                 setProcessando(false);
                 return;
             }
         }
 
-        setTimeout(() => {
-            window.print();
-            setTimeout(() => {
-                limparCampos();
-            }, 1000);
-        }, 500);
+        // 2. 🚀 GERA O PDF DIRETO DO JAVA
+        const loadPdf = toast.loading("Gerando PDF Oficial...");
+        try {
+            const payloadPdf = {
+                ...dados,
+                valor: parseFloat(dados.valor),
+                textoFinal: textoFinal,
+                dadosCompletos: dadosCompletos
+            };
+
+            const response = await api.post('/api/financeiro/recibos/gerar-pdf', payloadPdf, { responseType: 'blob' });
+            const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            window.open(fileURL, '_blank');
+
+            toast.success("Recibo gerado com sucesso!", { id: loadPdf });
+
+            // Limpa a tela após 1 segundo
+            setTimeout(() => limparCampos(), 1000);
+        } catch (error) {
+            console.error(error);
+            toast.error("Falha ao gerar o PDF no servidor.", { id: loadPdf });
+        } finally {
+            setProcessando(false);
+        }
     };
 
     return (
@@ -310,44 +316,7 @@ export const ReciboAvulso = ({ setPaginaAtiva }) => {
                 </div>
             </div>
 
-            <style>{`
-                @media print {
-                    @page { margin: 0; size: landscape; }
-                    body * { visibility: hidden !important; }
-                    
-                    html, body, #root, main, div[class*="overflow-y-auto"] { 
-                        height: auto !important; 
-                        min-height: 0 !important;
-                        overflow: visible !important; 
-                        position: static !important;
-                        background: white !important;
-                    }
 
-                    #print-area-wrapper, #print-area-wrapper * { 
-                        visibility: visible !important; 
-                    }
-
-                    #print-area-wrapper {
-                        display: block !important;
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
-                        width: 100% !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
-                        border: none !important;
-                        box-shadow: none !important;
-                    }
-
-                    #recibo-final {
-                        border: 3px double #000 !important;
-                        padding: 40px !important;
-                        margin: 1cm !important;
-                    }
-
-                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                }
-            `}</style>
         </div>
     );
 };

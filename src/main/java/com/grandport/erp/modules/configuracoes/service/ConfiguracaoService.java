@@ -109,14 +109,15 @@ public class ConfiguracaoService {
         if (dadosAtualizados.getCscCodigo() != null) configBanco.setCscCodigo(dadosAtualizados.getCscCodigo());
 
 
+        // 🚀 AQUI NÓS SALVAMOS TODOS OS LAYOUTS DE IMPRESSÃO (AGORA BLINDADOS!)
+        if (dadosAtualizados.getLayoutHtmlOs() != null) configBanco.setLayoutHtmlOs(dadosAtualizados.getLayoutHtmlOs());
+        if (dadosAtualizados.getLayoutHtmlVenda() != null) configBanco.setLayoutHtmlVenda(dadosAtualizados.getLayoutHtmlVenda());
+        if (dadosAtualizados.getLayoutHtmlRelatorioComissao() != null) configBanco.setLayoutHtmlRelatorioComissao(dadosAtualizados.getLayoutHtmlRelatorioComissao());
+        if (dadosAtualizados.getLayoutHtmlFechamentoCaixa() != null) configBanco.setLayoutHtmlFechamentoCaixa(dadosAtualizados.getLayoutHtmlFechamentoCaixa());
+        if (dadosAtualizados.getLayoutHtmlEspelhoNota() != null) configBanco.setLayoutHtmlEspelhoNota(dadosAtualizados.getLayoutHtmlEspelhoNota());
+        if (dadosAtualizados.getLayoutHtmlDre() != null) configBanco.setLayoutHtmlDre(dadosAtualizados.getLayoutHtmlDre());
+        if (dadosAtualizados.getLayoutHtmlRecibo() != null) configBanco.setLayoutHtmlRecibo(dadosAtualizados.getLayoutHtmlRecibo());
 
-        // 🚀 AQUI NÓS SALVAMOS TODOS OS LAYOUTS DE IMPRESSÃO!
-        configBanco.setLayoutHtmlOs(dadosAtualizados.getLayoutHtmlOs());
-        configBanco.setLayoutHtmlVenda(dadosAtualizados.getLayoutHtmlVenda());
-        configBanco.setLayoutHtmlRelatorioComissao(dadosAtualizados.getLayoutHtmlRelatorioComissao());
-        configBanco.setLayoutHtmlFechamentoCaixa(dadosAtualizados.getLayoutHtmlFechamentoCaixa());
-        configBanco.setLayoutHtmlEspelhoNota(dadosAtualizados.getLayoutHtmlEspelhoNota());
-        configBanco.setLayoutHtmlDre(dadosAtualizados.getLayoutHtmlDre());
 
         ConfiguracaoSistema salva = repository.save(configBanco);
         reagendarBackup();

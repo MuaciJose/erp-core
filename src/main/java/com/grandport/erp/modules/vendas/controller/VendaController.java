@@ -26,16 +26,22 @@ import java.util.Optional;
 @RequestMapping("/api/vendas")
 public class VendaController {
 
-    @Autowired private VendaService service;
-    @Autowired private VendaRepository repository;
-    @Autowired private WhatsAppService whatsAppService;
+    @Autowired
+    private VendaService service;
+    @Autowired
+    private VendaRepository repository;
+    @Autowired
+    private WhatsAppService whatsAppService;
 
     // 🚀 INJEÇÃO DO SERVIÇO DE NOTA FISCAL
-    @Autowired private NfeService nfeService;
+    @Autowired
+    private NfeService nfeService;
 
 
-    @Autowired private com.grandport.erp.modules.pdf.service.PdfService pdfService;
-    @Autowired private com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository configuracaoRepository;
+    @Autowired
+    private com.grandport.erp.modules.pdf.service.PdfService pdfService;
+    @Autowired
+    private com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository configuracaoRepository;
 
     // =========================================================================
     // 🚀 ENDPOINT DO WHATSAPP
@@ -154,18 +160,36 @@ public class VendaController {
     }
 
     // =========================================================
-    // 🚀 ROTA DE IMPRESSÃO PROFISSIONAL (VENDAS E ORÇAMENTOS)
-    // =========================================================
+// 🚀 ROTA DE IMPRESSÃO PROFISSIONAL (VENDAS E ORÇAMENTOS)
+// =========================================================
     @GetMapping("/{id}/imprimir-pdf")
     public org.springframework.http.ResponseEntity<byte[]> imprimirVendaPdf(@PathVariable Long id) {
         // 1. Puxa a Venda e a Configuração
         Venda venda = repository.findById(id).orElseThrow(() -> new RuntimeException("Venda não encontrada"));
         var empresa = configuracaoRepository.findById(1L).orElse(new com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema());
 
+        // 🚀 A MÁGICA: Pré-processamos tudo no Java!
+        boolean isOrcamento = venda.getStatus() != null && venda.getStatus().name().equals("ORCAMENTO");
+
+        // 🚀 CLIENTE
+        String nomeCliente = (venda.getCliente() != null && venda.getCliente().getNome() != null)
+                ? venda.getCliente().getNome()
+                : "CONSUMIDOR FINAL";
+
+        // 🚀 VENDEDOR: O mistério resolvido! Usando getVendedorNome() direto da String.
+        String nomeVendedor = (venda.getVendedorNome() != null && !venda.getVendedorNome().isEmpty())
+                ? venda.getVendedorNome()
+                : "Padrão";
+
         // 2. Prepara a maleta de variáveis
         java.util.Map<String, Object> variaveis = new java.util.HashMap<>();
         variaveis.put("venda", venda);
         variaveis.put("empresa", empresa);
+
+        // Injetamos as variáveis mastigadas e prontas
+        variaveis.put("isOrcamento", isOrcamento);
+        variaveis.put("nomeCliente", nomeCliente);
+        variaveis.put("nomeVendedor", nomeVendedor);
 
         // 3. Pega o layout específico de VENDAS salvo no banco
         String htmlDoBanco = empresa.getLayoutHtmlVenda();
@@ -183,4 +207,5 @@ public class VendaController {
                 .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
                 .body(arquivoPdf);
     }
+
 }

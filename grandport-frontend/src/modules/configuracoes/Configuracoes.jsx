@@ -89,6 +89,7 @@ export const Configuracoes = () => {
         layoutHtmlFechamentoCaixa: '',
         layoutHtmlEspelhoNota: '',
         layoutHtmlDre: '',
+        layoutHtmlRecibo: '',
 
         descontoMaximoPermitido: 10.00,
         permitirEstoqueNegativoGlobal: false,
@@ -165,6 +166,7 @@ export const Configuracoes = () => {
                     layoutHtmlFechamentoCaixa: data.layoutHtmlFechamentoCaixa || '',
                     layoutHtmlEspelhoNota: data.layoutHtmlEspelhoNota || '',
                     layoutHtmlDre: data.layoutHtmlDre || '',
+                    layoutHtmlRecibo: data.layoutHtmlRecibo || '',
 
                     smtpHost: data.smtpHost || 'smtp.gmail.com',
                     smtpPort: data.smtpPort || 587,
@@ -1031,6 +1033,14 @@ export const Configuracoes = () => {
                                             DRE Oficial (A4)
                                         </button>
 
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditorLayoutAtivo('RECIBO')}
+                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'RECIBO' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Recibo Avulso (A4)
+                                        </button>
+
                                     </div>
 
                                     {/* A CAIXA PRETA MÁGICA QUE MUDA DE CONTEÚDO */}
@@ -1038,28 +1048,31 @@ export const Configuracoes = () => {
                                         <div className="absolute left-0 top-0 bottom-0 w-10 bg-slate-900 border-r border-slate-700 flex flex-col items-center py-4 text-slate-600 text-[10px] font-mono pointer-events-none select-none">
                                             {Array.from({length: 20}).map((_, i) => <div key={i} className="mb-1">{i+1}</div>)}
                                         </div>
+
                                         <textarea
                                             className="w-full h-[600px] bg-slate-900 text-green-400 p-6 font-mono text-sm outline-none resize-none leading-relaxed"
                                             spellCheck="false"
 
-                                            // 🚀 O NAME (Só mudamos a lógica para não quebrar)
+                                            // 🚀 ATUALIZE O NAME:
                                             name={
                                                 editorLayoutAtivo === 'OS' ? 'layoutHtmlOs' :
                                                     editorLayoutAtivo === 'VENDA' ? 'layoutHtmlVenda' :
                                                         editorLayoutAtivo === 'COMISSAO' ? 'layoutHtmlRelatorioComissao' :
                                                             editorLayoutAtivo === 'CAIXA' ? 'layoutHtmlFechamentoCaixa' :
                                                                 editorLayoutAtivo === 'ESPELHO' ? 'layoutHtmlEspelhoNota' :
-                                                                    'layoutHtmlDre'
+                                                                    editorLayoutAtivo === 'DRE' ? 'layoutHtmlDre' :
+                                                                        'layoutHtmlRecibo' // 🚀 NOVO VALOR AQUI
                                             }
 
-                                            // 🚀 O VALUE BLINDADO COM config?. (Se for undefined, ele devolve string vazia e não quebra a tela)
+                                            // 🚀 ATUALIZE O VALUE:
                                             value={
                                                 editorLayoutAtivo === 'OS' ? (config?.layoutHtmlOs || '') :
                                                     editorLayoutAtivo === 'VENDA' ? (config?.layoutHtmlVenda || '') :
                                                         editorLayoutAtivo === 'COMISSAO' ? (config?.layoutHtmlRelatorioComissao || '') :
                                                             editorLayoutAtivo === 'CAIXA' ? (config?.layoutHtmlFechamentoCaixa || '') :
                                                                 editorLayoutAtivo === 'ESPELHO' ? (config?.layoutHtmlEspelhoNota || '') :
-                                                                    (config?.layoutHtmlDre || '')
+                                                                    editorLayoutAtivo === 'DRE' ? (config?.layoutHtmlDre || '') :
+                                                                        (config?.layoutHtmlRecibo || '') // 🚀 NOVO VALOR AQUI
                                             }
                                             onChange={handleChange}
                                             placeholder="<!DOCTYPE html>..."

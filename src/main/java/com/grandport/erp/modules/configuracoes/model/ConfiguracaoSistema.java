@@ -141,6 +141,10 @@ public class ConfiguracaoSistema {
     @Column(columnDefinition = "TEXT")
     private String layoutHtmlDre;
 
+    // 🚀 NOVO: LAYOUT DO RECIBO AVULSO (A4 Paisagem)
+    @Column(columnDefinition = "TEXT")
+    private String layoutHtmlRecibo;
+
 
 
 
