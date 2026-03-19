@@ -17,6 +17,9 @@ public class OrdemServicoController {
     @Autowired private OrdemServicoService osService;
     @Autowired private OsFiscalService osFiscalService;
 
+    @Autowired private com.grandport.erp.modules.pdf.service.PdfService pdfService;
+    @Autowired private com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository configuracaoRepository;
+
     @GetMapping
     public List<OrdemServico> listarTodas() {
         return osRepository.findAll();
@@ -85,5 +88,43 @@ public class OrdemServicoController {
         } catch (Exception e) {
             return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage()));
         }
+    }
+
+    // =========================================================
+    // 🚀 ROTA DE IMPRESSÃO PROFISSIONAL (HTML PARA PDF)
+    // =========================================================
+    @GetMapping("/{id}/imprimir-pdf")
+    public org.springframework.http.ResponseEntity<byte[]> imprimirOsPdf(@PathVariable Long id) {
+        // 1. Puxa a OS e a Empresa do Banco
+        OrdemServico os = osRepository.findById(id).orElseThrow(() -> new RuntimeException("OS não encontrada"));
+        var empresa = configuracaoRepository.findById(1L).orElse(new com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema());
+
+        // 2. Monta o nome do carro bonitinho
+        String veiculoNome = "Não informado";
+        if (os.getVeiculo() != null) {
+            veiculoNome = os.getVeiculo().getMarca() + " " + os.getVeiculo().getModelo() + " - Placa: " + os.getVeiculo().getPlaca();
+        }
+
+        // 3. Prepara a maleta de variáveis para entregar pro HTML
+        java.util.Map<String, Object> variaveis = new java.util.HashMap<>();
+        variaveis.put("os", os);
+        variaveis.put("empresa", empresa);
+        variaveis.put("veiculoNome", veiculoNome);
+
+        // 4. Manda o serviço gerar o PDF (COM PLANO B CASO O BANCO ESTEJA VAZIO) 🚀
+        String htmlDoBanco = empresa.getLayoutHtmlOs();
+
+        // 🚀 O PLANO DE CONTINGÊNCIA AQUI:
+        if (htmlDoBanco == null || htmlDoBanco.trim().isEmpty()) {
+            htmlDoBanco = "<!DOCTYPE html><html xmlns:th=\"http://www.thymeleaf.org\"><head><meta charset=\"UTF-8\"/></head><body><h1>Ordem de Serviço #<span th:text=\"${os.id}\"></span></h1><p>Vá em configurações para definir seu layout!</p></body></html>";
+        }
+
+        byte[] arquivoPdf = pdfService.gerarPdfDeStringHtml(htmlDoBanco, variaveis);
+
+        // 5. Devolve o arquivo blindado
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=OS-" + id + ".pdf")
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .body(arquivoPdf);
     }
 }

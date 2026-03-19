@@ -86,6 +86,9 @@ public class ConfiguracaoSistema {
     private String mensagemRodape = "Obrigado pela preferência! Volte sempre.";
     private Boolean exibirVendedorCupom = true;
 
+    @Column(columnDefinition = "TEXT")
+    private String layoutHtmlOs = "<!DOCTYPE html><html xmlns:th=\"http://www.thymeleaf.org\"><head><meta charset=\"UTF-8\"/><style>body { font-family: Arial, sans-serif; }</style></head><body><h1>Ordem de Serviço #<span th:text=\"${os.id}\"></span></h1><p>Cliente: <span th:text=\"${os.cliente != null ? os.cliente.nome : 'Consumidor Final'}\"></span></p><p>Total: R$ <span th:text=\"${#numbers.formatDecimal(os.valorTotal, 1, 'POINT', 2, 'COMMA')}\"></span></p></body></html>";
+
     // ================= REGRAS DE NEGÓCIO =================
     @Column(precision = 5, scale = 2)
     private BigDecimal descontoMaximoPermitido = new BigDecimal("10.00");
@@ -115,4 +118,10 @@ public class ConfiguracaoSistema {
     private Integer smtpPort; // Ex: 587
     private String emailRemetente;
     private String senhaEmailRemetente; // Deve ser a "Senha de Aplicativo"
+
+
+
+
+
+
 }

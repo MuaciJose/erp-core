@@ -39,7 +39,7 @@ export const Configuracoes = () => {
     const [statusEmail, setStatusEmail] = useState('DESCONHECIDO');
     const [testandoEmail, setTestandoEmail] = useState(false);
 
-    // 🚀 ESTADOS DO ROBÔ DE LIMPEZA (NOVO)
+    // ESTADOS DO ROBÔ DE LIMPEZA
     const [mesesLimpeza, setMesesLimpeza] = useState(24);
     const [limpandoFotos, setLimpandoFotos] = useState(false);
 
@@ -66,7 +66,6 @@ export const Configuracoes = () => {
         cscIdToken: '',
         cscCodigo: '',
 
-        // 🚀 NOVOS CAMPOS: FISCAL PREFEITURA (NFS-e)
         inscricaoMunicipal: '',
         codigoCnae: '',
         codigoServicoLc116: '14.01',
@@ -80,6 +79,10 @@ export const Configuracoes = () => {
         tamanhoImpressora: '80mm',
         mensagemRodape: '',
         exibirVendedorCupom: true,
+
+        // 🚀 AQUI: O NOVO CAMPO NO ESTADO INICIAL
+        layoutHtmlOs: '',
+
         descontoMaximoPermitido: 10.00,
         permitirEstoqueNegativoGlobal: false,
         diasValidadeOrcamento: 5,
@@ -135,7 +138,6 @@ export const Configuracoes = () => {
                     cscIdToken: data.cscIdToken || '',
                     cscCodigo: data.cscCodigo || '',
 
-                    // 🚀 CARREGANDO DADOS DA PREFEITURA
                     inscricaoMunicipal: data.inscricaoMunicipal || '',
                     codigoCnae: data.codigoCnae || '',
                     codigoServicoLc116: data.codigoServicoLc116 || '14.01',
@@ -149,6 +151,10 @@ export const Configuracoes = () => {
                     whatsappApiUrl: data.whatsappApiUrl || '',
                     tamanhoImpressora: data.tamanhoImpressora || '80mm',
                     mensagemRodape: data.mensagemRodape || '',
+
+                    // 🚀 AQUI: PUXANDO O HTML DO BANCO DE DADOS
+                    layoutHtmlOs: data.layoutHtmlOs || '',
+
                     smtpHost: data.smtpHost || 'smtp.gmail.com',
                     smtpPort: data.smtpPort || 587,
                     emailRemetente: data.emailRemetente || '',
@@ -398,7 +404,6 @@ export const Configuracoes = () => {
         }
     };
 
-    // 🚀 RESTAURAR BANCO (AGORA COM CONFIRMAÇÃO MODERNA VIA TOAST)
     const restaurarBanco = (event) => {
         const arquivo = event.target.files[0];
         if (!arquivo) return;
@@ -425,7 +430,7 @@ export const Configuracoes = () => {
             </div>
         ), { duration: Infinity, position: 'top-center' });
 
-        event.target.value = null; // Limpa o input para poder selecionar o mesmo arquivo se cancelar
+        event.target.value = null;
     };
 
     const executarRestauracaoBanco = async (arquivo) => {
@@ -476,7 +481,6 @@ export const Configuracoes = () => {
         }
     };
 
-    // 🚀 LIMPAR BANCO (AGORA COM CONFIRMAÇÃO MODERNA VIA TOAST)
     const limparBancoDeDados = () => {
         toast((t) => (
             <div className="flex flex-col gap-3 max-w-sm">
@@ -508,8 +512,6 @@ export const Configuracoes = () => {
         }
     };
 
-    // 🚀 FUNÇÃO DO ROBÔ DE LIMPEZA DE FOTOS (NOVO)
-    // 🚀 FUNÇÃO DO ROBÔ (AGORA COM CONFIRMAÇÃO MODERNA VIA TOAST)
     const limparFotosAntigas = () => {
         toast((t) => (
             <div className="flex flex-col gap-3 max-w-sm">
@@ -582,7 +584,6 @@ export const Configuracoes = () => {
 
                 <div className="flex-1 bg-white p-8 rounded-3xl shadow-sm border border-slate-200 min-h-[500px] overflow-y-auto">
 
-                    {/* ABA: DADOS DA EMPRESA */}
                     {abaAtiva === 'EMPRESA' && (
                         <div className="space-y-6 animate-fade-in">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><Store className="text-blue-500" /> Identidade e Endereço</h2>
@@ -681,7 +682,6 @@ export const Configuracoes = () => {
                         </div>
                     )}
 
-                    {/* ABA: FISCAL / NF-e e NFC-e */}
                     {abaAtiva === 'FISCAL' && (
                         <div className="space-y-6 animate-fade-in">
                             <div className="flex justify-between items-center mb-6 border-b pb-4">
@@ -822,7 +822,6 @@ export const Configuracoes = () => {
                         </div>
                     )}
 
-                    {/* 🚀 NOVA ABA: PREFEITURA (SERVIÇOS / MÃO DE OBRA) */}
                     {abaAtiva === 'PREFEITURA' && (
                         <div className="p-8 overflow-y-auto animate-fade-in custom-scrollbar">
                             <div className="bg-orange-50 border border-orange-200 p-4 rounded-2xl mb-8 flex items-start gap-4">
@@ -909,7 +908,6 @@ export const Configuracoes = () => {
                         </div>
                     )}
 
-                    {/* ABA: VENDEDORES */}
                     {abaAtiva === 'VENDEDORES' && (
                         <div className="space-y-6 animate-fade-in">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-4 border-b pb-4"><Users className="text-blue-500" /> Parametrização de Equipe</h2>
@@ -940,7 +938,6 @@ export const Configuracoes = () => {
                         </div>
                     )}
 
-                    {/* ABA: IMPRESSÃO */}
                     {abaAtiva === 'IMPRESSAO' && (
                         <div className="space-y-6 animate-fade-in">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><Printer className="text-blue-500" /> Configurações de Impressão</h2>
@@ -962,11 +959,37 @@ export const Configuracoes = () => {
                                     <label className="text-xs font-bold text-slate-500 uppercase">Mensagem Padrão no Rodapé (Garantia/Agradecimento)</label>
                                     <textarea name="mensagemRodape" value={config.mensagemRodape || ''} onChange={handleChange} rows="3" className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="Ex: Orçamento sujeito a alteração de preços após validade."></textarea>
                                 </div>
+
+                                {/* 🚀 AQUI ESTÁ O NOVO PAINEL DE HTML "HACKER" */}
+                                <div className="md:col-span-2 mt-8">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-xs font-black text-slate-500 uppercase flex items-center gap-2">
+                                            <Printer size={16} className="text-blue-500"/> Layout Dinâmico da OS (HTML)
+                                        </label>
+                                        <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">Avançado</span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mb-3">Cole aqui o código HTML customizado para a impressão da Ordem de Serviço em PDF. Deixe em branco para usar o padrão.</p>
+
+                                    <div className="relative group">
+                                        <div className="absolute left-0 top-0 bottom-0 w-10 bg-slate-800 rounded-l-xl border-r border-slate-700 flex flex-col items-center py-4 text-slate-500 text-[10px] font-mono pointer-events-none select-none opacity-50">
+                                            {/* Gerando uns números de linha só pra dar um ar de editor profissional */}
+                                            {Array.from({length: 15}).map((_, i) => <div key={i} className="mb-2">{i+1}</div>)}
+                                        </div>
+                                        <textarea
+                                            name="layoutHtmlOs"
+                                            value={config.layoutHtmlOs || ''}
+                                            onChange={handleChange}
+                                            rows="15"
+                                            className="w-full p-4 pl-14 bg-slate-900 text-emerald-400 font-mono text-xs border-2 border-slate-800 rounded-xl focus:border-blue-500 outline-none custom-scrollbar"
+                                            placeholder="<!DOCTYPE html><html>...</html>"
+                                            spellCheck="false"
+                                        ></textarea>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {/* ABA: REGRAS */}
                     {abaAtiva === 'REGRAS' && (
                         <div className="space-y-6 animate-fade-in">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><Sliders className="text-blue-500" /> Regras de Negócio</h2>
@@ -992,7 +1015,6 @@ export const Configuracoes = () => {
                         </div>
                     )}
 
-                    {/* ABA INTEGRAÇÕES */}
                     {abaAtiva === 'INTEGRACOES' && (
                         <div className="space-y-6 animate-fade-in">
                             <div className="flex justify-between items-center mb-6 border-b pb-4">
@@ -1140,7 +1162,6 @@ export const Configuracoes = () => {
                         </div>
                     )}
 
-                    {/* ABA: SISTEMA */}
                     {abaAtiva === 'SISTEMA' && (
                         <div className="space-y-6 animate-fade-in">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4">
@@ -1170,7 +1191,6 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            {/* 🚀 NOVA SESSÃO: ROBÔ DE LIMPEZA (FAXINA NO DISCO) */}
                             <div className="mt-8 p-6 bg-slate-50 border border-slate-200 rounded-3xl">
                                 <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-4">
                                     <div>
@@ -1202,7 +1222,6 @@ export const Configuracoes = () => {
                                     </div>
                                 </div>
                             </div>
-                            {/* ========================================================= */}
 
                             <div className="mt-8 p-6 border-2 border-red-500 bg-red-50 rounded-3xl relative overflow-hidden">
                                 <div className="absolute -right-4 -top-4 opacity-10">

@@ -27,7 +27,7 @@ public class PdfController {
         dados.put("valorTotal", "R$ 5.430,00");
 
         // Chama o motor passando o nome do HTML (sem o .html no final) e os dados
-        byte[] arquivoPdf = pdfService.gerarPdfDeHtml("recibo-teste", dados);
+        byte[] arquivoPdf = pdfService.gerarPdfDeStringHtml("recibo-teste", dados);
 
         // Devolve o PDF para o navegador exibir
         return ResponseEntity.ok()

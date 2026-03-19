@@ -5,8 +5,7 @@ import {
     Search, LayoutList, Printer, Eye, Clock, User, Car, DollarSign,
     CheckCircle, AlertTriangle, FileText, ChevronRight
 } from 'lucide-react';
-// 🚀 IMPORTANTE: Importando a tela de OS que criamos para abrir como "Visualização"
-import { OrdemServico } from './OrdemServico'; // Ajuste o caminho se estiver em outra pasta
+import { OrdemServico } from './OrdemServico';
 
 export const ListagemOs = ({ setPaginaAtiva }) => {
     const [ordens, setOrdens] = useState([]);
@@ -15,7 +14,6 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
     const [filtroStatus, setFiltroStatus] = useState('TODOS');
     const [empresaConfig, setEmpresaConfig] = useState({ nomeFantasia: 'OFICINA' });
 
-    // 🚀 NOVO ESTADO: Controla qual OS estamos visualizando agora
     const [osEmVisualizacao, setOsEmVisualizacao] = useState(null);
 
     useEffect(() => {
@@ -27,7 +25,6 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
                     api.get('/api/configuracoes').catch(() => ({ data: { nomeFantasia: 'OFICINA' } }))
                 ]);
 
-                // Ordena da mais nova para a mais antiga (ID decrescente)
                 const osOrdenadas = resOs.data.sort((a, b) => b.id - a.id);
                 setOrdens(osOrdenadas);
 
@@ -39,7 +36,6 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
                 setLoading(false);
             }
         };
-        // Só recarrega a lista se não estivermos com uma OS aberta
         if (!osEmVisualizacao) {
             carregarDados();
         }
@@ -72,77 +68,19 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
         return badges[status] || badges['ORCAMENTO'];
     };
 
-    const imprimirOs = (os) => {
-        const toastId = toast.loading(`Gerando impressão da OS #${os.id}...`);
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute'; iframe.style.width = '0px'; iframe.style.height = '0px'; iframe.style.border = 'none';
-        document.body.appendChild(iframe);
-        const doc = iframe.contentWindow.document;
-
-        const nomeVeiculo = os.veiculo ? `${os.veiculo.marca} ${os.veiculo.modelo} - Placa: ${os.veiculo.placa}` : 'Não informado';
-
-        const htmlContent = `
-            <!DOCTYPE html>
-            <html lang="pt-BR">
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: 'Arial', sans-serif; padding: 20px; color: #000; font-size: 12px; }
-                    .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-                    .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; }
-                    .header p { margin: 5px 0 0 0; font-size: 14px; }
-                    .section-title { background: #eee; padding: 5px; font-weight: bold; text-transform: uppercase; border: 1px solid #ccc; margin-top: 15px; }
-                    table { border-collapse: collapse; margin-top: 10px; width: 100%; }
-                    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-                    th { background: #f9f9f9; }
-                    .text-right { text-align: right; }
-                    .laudo-box { border: 1px solid #000; padding: 15px; margin-top: 5px; background: #fafafa; font-size: 13px; line-height: 1.5; min-height: 50px; }
-                    .totals { width: 300px; float: right; margin-top: 20px; border: 1px solid #000; padding: 10px; }
-                    .totals p { margin: 5px 0; display: flex; justify-content: space-between; font-weight: bold; }
-                    .totals .final { font-size: 16px; border-top: 1px solid #000; padding-top: 5px; }
-                    .clear { clear: both; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>${empresaConfig.nomeFantasia}</h1>
-                    <p>ORDEM DE SERVIÇO Nº ${os.id} - STATUS: ${os.status}</p>
-                </div>
-                <div class="section-title">Dados do Cliente e Veículo</div>
-                <table>
-                    <tr><td width="50%"><b>Cliente:</b> ${os.cliente?.nome || 'Não informado'}</td><td width="50%"><b>Veículo:</b> ${nomeVeiculo}</td></tr>
-                    <tr><td><b>KM Atual:</b> ${os.kmEntrada || 'N/A'}</td><td><b>Combustível:</b> ${os.nivelCombustivel || 'N/A'}</td></tr>
-                </table>
-                ${(os.observacoes) ? `<div class="section-title">Parecer Técnico / O Que Foi Feito</div><div class="laudo-box">${os.observacoes.replace(/\n/g, '<br/>')}</div>` : ''}
-                ${(os.itensServicos && os.itensServicos.length > 0) ? `
-                <div class="section-title">Mão de Obra (Serviços)</div>
-                <table>
-                    <tr><th>Descrição</th><th class="text-right">Qtd</th><th class="text-right">Valor Un.</th><th class="text-right">Subtotal</th></tr>
-                    ${os.itensServicos.map(s => `<tr><td>${s.servico?.nome || 'Serviço'}</td><td class="text-right">${s.quantidade}</td><td class="text-right">R$ ${formatarMoeda(s.precoUnitario)}</td><td class="text-right">R$ ${formatarMoeda(s.precoUnitario * s.quantidade)}</td></tr>`).join('')}
-                </table>` : ''}
-                ${(os.itensPecas && os.itensPecas.length > 0) ? `
-                <div class="section-title">Peças e Produtos Aplicados</div>
-                <table>
-                    <tr><th>Código</th><th>Descrição</th><th class="text-right">Qtd</th><th class="text-right">Valor Un.</th><th class="text-right">Subtotal</th></tr>
-                    ${os.itensPecas.map(p => `<tr><td>${p.produto?.sku || ''}</td><td>${p.produto?.nome || 'Peça'}</td><td class="text-right">${p.quantidade}</td><td class="text-right">R$ ${formatarMoeda(p.precoUnitario)}</td><td class="text-right">R$ ${formatarMoeda(p.precoUnitario * p.quantidade)}</td></tr>`).join('')}
-                </table>` : ''}
-                <div class="totals">
-                    <p><span>Subtotal:</span> <span>R$ ${formatarMoeda(os.valorTotal + (os.desconto || 0))}</span></p>
-                    ${os.desconto > 0 ? `<p><span>Desconto:</span> <span>- R$ ${formatarMoeda(os.desconto)}</span></p>` : ''}
-                    <p class="final"><span>TOTAL A PAGAR:</span> <span>R$ ${formatarMoeda(os.valorTotal)}</span></p>
-                </div>
-                <div class="clear"></div>
-                <div style="margin-top: 50px; text-align: center;"><p>____________________________________________________</p><p>Assinatura do Cliente / De Acordo</p></div>
-                <script> window.onload = function() { setTimeout(function() { window.print(); }, 400); } </script>
-            </body>
-            </html>
-        `;
-        doc.open(); doc.write(htmlContent); doc.close();
-        toast.success("Enviado para a impressora!", { id: toastId });
-        setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 10000);
+    // 🚀 IMPRESSÃO PROFISSIONAL COM PDF GERADO NO BACK-END (HTML ARRANCADO)
+    const imprimirOs = async (os) => {
+        const toastId = toast.loading(`Gerando PDF da OS #${os.id}...`);
+        try {
+            const response = await api.get(`/api/os/${os.id}/imprimir-pdf`, { responseType: 'blob' });
+            const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            window.open(fileURL, '_blank');
+            toast.success("Documento gerado com sucesso!", { id: toastId });
+        } catch (error) {
+            toast.error("Erro ao gerar o PDF da OS. Verifique se o Back-end está respondendo.", { id: toastId });
+        }
     };
 
-    // 🚀 INTERCEPTA A TELA SE O USUÁRIO CLICOU EM "VER DETALHES"
     if (osEmVisualizacao) {
         return (
             <OrdemServico
@@ -154,8 +92,6 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
 
     return (
         <div className="p-8 max-w-[1600px] mx-auto h-full flex flex-col animate-fade-in">
-
-            {/* CABEÇALHO */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 shrink-0">
                 <div>
                     <h1 className="text-3xl font-black text-slate-800 flex items-center gap-3">
@@ -172,7 +108,6 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
                 </button>
             </div>
 
-            {/* FILTROS */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row gap-4 shrink-0">
                 <div className="flex-1 relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
@@ -202,7 +137,6 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
                 </div>
             </div>
 
-            {/* TABELA DE RESULTADOS */}
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
                 {loading ? (
                     <div className="flex-1 flex items-center justify-center font-black text-slate-400 animate-pulse text-lg">
@@ -253,7 +187,6 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
                                             <button onClick={() => imprimirOs(os)} className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 rounded-lg transition-colors" title="Reimprimir OS">
                                                 <Printer size={18}/>
                                             </button>
-                                            {/* 🚀 AQUI: O BOTÃO DE DETALHES AGORA CHAMA A OS CERTA */}
                                             <button onClick={() => setOsEmVisualizacao(os)} className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors" title="Ver Detalhes da OS">
                                                 <Eye size={18}/>
                                             </button>

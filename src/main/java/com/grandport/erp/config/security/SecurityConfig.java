@@ -39,6 +39,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         // 🚀  ESTA LINHA AQUI PARA LIBERAR O TESTE PDF:
                         .requestMatchers("/api/teste-pdf").permitAll()
+                        // 🚀 A NOVA CHAVE MESTRA PARA A IMPRESSÃO DA OS:
+                        .requestMatchers("/api/os/*/imprimir-pdf").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
 

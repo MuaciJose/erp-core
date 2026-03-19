@@ -18,7 +18,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
 
     const [veiculoSelecionado, setVeiculoSelecionado] = useState('');
 
-    // Controle de KM Inteligente
     const [kmVeiculo, setKmVeiculo] = useState('');
     const [kmVemDoChecklist, setKmVemDoChecklist] = useState(false);
 
@@ -77,7 +76,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
             if (res.data) {
                 const data = Array.isArray(res.data) ? res.data[0] : res.data;
                 setEmpresaConfig({ nomeFantasia: data?.nomeFantasia || 'OFICINA' });
-
                 setPermitirEstoqueNegativoGlobal(data?.permitirEstoqueNegativoGlobal === true);
             }
         }).catch(() => {});
@@ -139,7 +137,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                         setKmVemDoChecklist(false);
                     }
                 } catch (error) {
-                    console.error("Erro ao buscar vistoria", error);
                     setKmVemDoChecklist(false);
                 }
             };
@@ -311,7 +308,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
 
     const formatarMoeda = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
-    // 🚀 MÁSCARA MONETÁRIA DO DESCONTO NA OS
     const handleMudancaDesconto = (valorDigitado) => {
         if (tipoDesconto === 'PERCENTUAL') {
             setDescontoInput(valorDigitado.replace(/[^0-9.]/g, ''));
@@ -371,7 +367,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
     };
 
     const confirmarEnvioCaixa = async () => {
-        // 🚀 3. O NOVO RADAR: Só bloqueia se a regra global for FALSA.
         if (!permitirEstoqueNegativoGlobal) {
             const pecasSemEstoque = itensPecas.filter(p => p.qtd > (p.estoque || 0));
             if (pecasSemEstoque.length > 0) {
@@ -411,73 +406,23 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         }
     };
 
-    const imprimirOrdemServicoSilenciosa = () => {
-        if(!clienteSelecionado) return notificar('erro', 'Salve a OS com um cliente antes de imprimir.');
-        const toastId = toast.loading('Gerando documento para impressão...');
-
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute'; iframe.style.width = '0px'; iframe.style.height = '0px'; iframe.style.border = 'none';
-        document.body.appendChild(iframe);
-        const doc = iframe.contentWindow.document;
-
-        const veiculoObj = clienteSelecionado?.veiculos?.find(v => v.id === parseInt(veiculoSelecionado));
-        const nomeVeiculo = veiculoObj ? `${veiculoObj.marca} ${veiculoObj.modelo} - Placa: ${veiculoObj.placa}` : 'Não informado';
-
-        const htmlContent = `
-            <!DOCTYPE html>
-            <html lang="pt-BR">
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: 'Arial', sans-serif; padding: 20px; color: #000; font-size: 12px; }
-                    .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-                    .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; }
-                    .header p { margin: 5px 0 0 0; font-size: 14px; }
-                    .section-title { background: #eee; padding: 5px; font-weight: bold; text-transform: uppercase; border: 1px solid #ccc; margin-top: 15px; }
-                    table { border-collapse: collapse; margin-top: 10px; width: 100%; }
-                    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-                    th { background: #f9f9f9; }
-                    .text-right { text-align: right; }
-                    .laudo-box { border: 1px solid #000; padding: 15px; margin-top: 5px; background: #fafafa; font-size: 13px; line-height: 1.5; min-height: 50px; }
-                    .totals { width: 300px; float: right; margin-top: 20px; border: 1px solid #000; padding: 10px; }
-                    .totals p { margin: 5px 0; display: flex; justify-content: space-between; font-weight: bold; }
-                    .totals .final { font-size: 16px; border-top: 1px solid #000; padding-top: 5px; }
-                    .clear { clear: both; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>${empresaConfig.nomeFantasia}</h1>
-                    <p>ORDEM DE SERVIÇO Nº ${osId || 'RASCUNHO'} - STATUS: ${status}</p>
-                </div>
-                <div class="section-title">Dados do Cliente e Veículo</div>
-                <table>
-                    <tr><td width="50%"><b>Cliente:</b> ${clienteSelecionado?.nome || 'Não informado'}</td><td width="50%"><b>Veículo:</b> ${nomeVeiculo}</td></tr>
-                    <tr><td><b>KM Atual:</b> ${kmVeiculo || 'N/A'}</td><td></td></tr>
-                </table>
-                ${(observacoes && imprimirLaudo) ? `<div class="section-title">Parecer Técnico / O Que Foi Feito</div><div class="laudo-box">${observacoes.replace(/\n/g, '<br/>')}</div>` : ''}
-                ${itensServicos.length > 0 ? `<div class="section-title">Mão de Obra (Serviços Executados)</div><table><tr><th>Descrição</th><th class="text-right">Qtd</th><th class="text-right">Valor Un.</th><th class="text-right">Subtotal</th></tr>${itensServicos.map(s => `<tr><td>${s.nome}</td><td class="text-right">${s.qtd}</td><td class="text-right">R$ ${formatarMoeda(s.preco)}</td><td class="text-right">R$ ${formatarMoeda(s.preco * s.qtd)}</td></tr>`).join('')}</table>` : ''}
-                ${itensPecas.length > 0 ? `<div class="section-title">Peças e Produtos Aplicados</div><table><tr><th>Código</th><th>Descrição</th><th class="text-right">Qtd</th><th class="text-right">Valor Un.</th><th class="text-right">Subtotal</th></tr>${itensPecas.map(p => `<tr><td>${p.codigo}</td><td>${p.nome}</td><td class="text-right">${p.qtd}</td><td class="text-right">R$ ${formatarMoeda(p.preco)}</td><td class="text-right">R$ ${formatarMoeda(p.preco * p.qtd)}</td></tr>`).join('')}</table>` : ''}
-                <div class="totals">
-                    <p><span>Subtotal:</span> <span>R$ ${formatarMoeda(subtotalOS)}</span></p>
-                    ${valorDescontoCalculado > 0 ? `<p><span>Desconto:</span> <span>- R$ ${formatarMoeda(valorDescontoCalculado)}</span></p>` : ''}
-                    <p class="final"><span>TOTAL A PAGAR:</span> <span>R$ ${formatarMoeda(totalGeral)}</span></p>
-                </div>
-                <div class="clear"></div>
-                <div style="margin-top: 50px; text-align: center;"><p>____________________________________________________</p><p>Assinatura do Cliente / De Acordo</p></div>
-                <script> window.onload = function() { setTimeout(function() { window.print(); }, 400); } </script>
-            </body>
-            </html>
-        `;
-        doc.open(); doc.write(htmlContent); doc.close();
-        toast.success("Documento enviado para a impressora!", { id: toastId });
-        setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 10000);
+    // 🚀 IMPRESSÃO PROFISSIONAL COM PDF GERADO NO BACK-END (HTML ARRANCADO)
+    const imprimirOrdemServicoSilenciosa = async () => {
+        if(!osId) return notificar('erro', 'Salve a OS antes de imprimir.');
+        const toastId = toast.loading('Buscando PDF no servidor...');
+        try {
+            const response = await api.get(`/api/os/${osId}/imprimir-pdf`, { responseType: 'blob' });
+            const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            window.open(fileURL, '_blank');
+            toast.success("Documento gerado com sucesso!", { id: toastId });
+        } catch (error) {
+            toast.error("Erro ao gerar o PDF da OS.", { id: toastId });
+        }
     };
 
     return (
         <div className="flex flex-col h-full max-h-full bg-slate-50 relative z-10 animate-fade-in overflow-hidden">
 
-            {/* MODAL FLUTUANTE DA IMAGEM DA PEÇA */}
             {previewImagem && (
                 <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[99999] pointer-events-none animate-fade-in shadow-2xl border-4 border-white rounded-2xl overflow-hidden bg-white">
                     <img src={previewImagem} alt="Preview" className="max-w-[400px] max-h-[400px] object-contain" />
@@ -485,10 +430,8 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                 </div>
             )}
 
-            {/* ÁREA ROLÁVEL PRINCIPAL */}
             <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 md:p-6 pb-24">
 
-                {/* CABEÇALHO */}
                 <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-200 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div className="flex items-center gap-3">
                         <div className="bg-indigo-600 p-3 rounded-xl text-white shadow-md">
@@ -541,7 +484,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                     </div>
                 </div>
 
-                {/* AVISO DE BLOQUEIO */}
                 {isBloqueada && (
                     <div className="bg-emerald-50 border-l-4 border-emerald-500 p-3 mb-4 rounded-r-xl shadow-sm flex items-center gap-3">
                         <CheckCircle className="text-emerald-500" size={20} />
@@ -553,10 +495,7 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                     </div>
                 )}
 
-                {/* BLOCO SUPERIOR COMPACTADO (LADO A LADO) */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-
-                    {/* 1. IDENTIFICAÇÃO */}
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col">
                         <h3 className="font-black text-sm text-slate-700 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
                             <User size={16} className="text-blue-500"/> 1. Identificação
@@ -620,7 +559,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                         </div>
                     </div>
 
-                    {/* 2. RELATOS E PARECER */}
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col">
                         <h3 className="font-black text-sm text-slate-700 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
                             <AlertTriangle size={16} className="text-orange-500"/> 2. Relatos e Parecer
@@ -656,10 +594,7 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                     </div>
                 </div>
 
-                {/* PEÇAS E SERVIÇOS */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-
-                    {/* SERVIÇOS (Altura Max Fixa) */}
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-[350px] xl:h-[400px]">
                         <div className="bg-orange-50 border-b border-orange-100 p-3 shrink-0">
                             <div className="relative">
@@ -687,7 +622,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                             </div>
                         </div>
 
-                        {/* Tabela rolável */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 sticky top-0 border-b border-slate-100">
@@ -725,7 +659,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                         </div>
                     </div>
 
-                    {/* PEÇAS (Altura Max Fixa) */}
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-[350px] xl:h-[400px]">
                         <div className="bg-blue-50 border-b border-blue-100 p-3 shrink-0">
                             <div className="relative">
@@ -774,7 +707,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                             </div>
                         </div>
 
-                        {/* Tabela rolável */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 sticky top-0 border-b border-slate-100">
@@ -823,7 +755,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
 
             </div> {/* <-- FIM DA ÁREA ROLÁVEL --> */}
 
-            {/* 🚀 RODAPÉ FIXO (TOTALMENTE TRAVADO E FLUTUANTE) */}
             <div className="shrink-0 bg-slate-50 p-4 md:px-6 md:pb-6 pt-4 border-t border-slate-200 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] z-40 relative">
                 <div className="bg-slate-900 rounded-2xl border-t-4 border-indigo-500 p-5 flex flex-col lg:flex-row justify-between items-center shadow-xl">
                     <div className="flex items-center gap-6 mb-4 lg:mb-0">
@@ -849,7 +780,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                             </div>
                             <div className="relative">
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 font-black text-slate-500 text-sm">{tipoDesconto === 'VALOR' ? 'R$' : '%'}</span>
-                                {/* 🚀 MÁSCARA APLICADA AQUI NO DESCONTO DA OS */}
                                 <input
                                     disabled={isBloqueada}
                                     type="text"
@@ -869,7 +799,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                 </div>
             </div>
 
-            {/* A NOVA MODAL DE APLICAÇÃO FICA AQUI */}
             {modalAplicacao.aberto && (
                 <ModalAplicacaoPeca
                     modalAplicacao={modalAplicacao}
@@ -877,7 +806,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                 />
             )}
 
-            {/* MODAL DE CONFIRMAÇÃO DE ENVIO AO CAIXA */}
             {modalEnviarCaixaAberto && (
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm animate-fade-in p-4">
                     <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden text-center border-t-4 border-emerald-500">
@@ -901,9 +829,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
     );
 };
 
-// =========================================================================
-// 🚀 COMPONENTE DA MODAL DE APLICAÇÃO
-// =========================================================================
 const ModalAplicacaoPeca = ({ modalAplicacao, setModalAplicacao }) => {
     const [filtro, setFiltro] = useState('');
 
@@ -933,7 +858,6 @@ const ModalAplicacaoPeca = ({ modalAplicacao, setModalAplicacao }) => {
         <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 md:p-8 animate-fade-in">
             <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full flex flex-col border-t-4 border-blue-500 overflow-hidden max-h-[90vh] md:max-h-[85vh]">
 
-                {/* CABEÇALHO FIXO */}
                 <div className="p-5 md:p-6 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
                     <div>
                         <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
@@ -949,7 +873,6 @@ const ModalAplicacaoPeca = ({ modalAplicacao, setModalAplicacao }) => {
                     </button>
                 </div>
 
-                {/* BARRA DE PESQUISA (REGEX) FIXA */}
                 <div className="p-4 bg-slate-50 border-b border-slate-200 shrink-0">
                     <div className="relative">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={18} />
@@ -963,7 +886,6 @@ const ModalAplicacaoPeca = ({ modalAplicacao, setModalAplicacao }) => {
                     </div>
                 </div>
 
-                {/* CONTEÚDO ROLÁVEL */}
                 <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50">
                     {linhasFiltradas.length > 0 ? (
                         <ul className="space-y-2">
@@ -986,3 +908,4 @@ const ModalAplicacaoPeca = ({ modalAplicacao, setModalAplicacao }) => {
         </div>
     );
 };
+
