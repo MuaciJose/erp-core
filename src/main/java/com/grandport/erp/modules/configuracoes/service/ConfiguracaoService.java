@@ -84,12 +84,42 @@ public class ConfiguracaoService {
     }
 
     public ConfiguracaoSistema atualizarConfiguracao(ConfiguracaoSistema dadosAtualizados) {
-        dadosAtualizados.setId(1L);
-        ConfiguracaoSistema salva = repository.save(dadosAtualizados);
+
+        ConfiguracaoSistema configBanco = repository.findById(1L).orElseGet(ConfiguracaoSistema::new);
+        configBanco.setId(1L); // Garante que o ID é sempre 1
+
+        // Copiamos os dados básicos (só se não vierem nulos)
+        if (dadosAtualizados.getNomeFantasia() != null) configBanco.setNomeFantasia(dadosAtualizados.getNomeFantasia());
+        if (dadosAtualizados.getRazaoSocial() != null) configBanco.setRazaoSocial(dadosAtualizados.getRazaoSocial());
+        if (dadosAtualizados.getCnpj() != null) configBanco.setCnpj(dadosAtualizados.getCnpj());
+        if (dadosAtualizados.getTelefone() != null) configBanco.setTelefone(dadosAtualizados.getTelefone());
+        if (dadosAtualizados.getEndereco() != null) configBanco.setEndereco(dadosAtualizados.getEndereco());
+        if (dadosAtualizados.getMensagemRodape() != null) configBanco.setMensagemRodape(dadosAtualizados.getMensagemRodape());
+
+        // Copiamos a Logo
+        if (dadosAtualizados.getLogoBase64() != null) configBanco.setLogoBase64(dadosAtualizados.getLogoBase64());
+
+        // Copiamos as configurações fiscais/sistema
+        if (dadosAtualizados.getHorarioBackupAuto() != null) configBanco.setHorarioBackupAuto(dadosAtualizados.getHorarioBackupAuto());
+        if (dadosAtualizados.getSerieNfe() != null) configBanco.setSerieNfe(dadosAtualizados.getSerieNfe());
+        if (dadosAtualizados.getNumeroProximaNfe() != null) configBanco.setNumeroProximaNfe(dadosAtualizados.getNumeroProximaNfe());
+        if (dadosAtualizados.getSerieNfce() != null) configBanco.setSerieNfce(dadosAtualizados.getSerieNfce());
+        if (dadosAtualizados.getNumeroProximaNfce() != null) configBanco.setNumeroProximaNfce(dadosAtualizados.getNumeroProximaNfce());
+        if (dadosAtualizados.getCscIdToken() != null) configBanco.setCscIdToken(dadosAtualizados.getCscIdToken());
+        if (dadosAtualizados.getCscCodigo() != null) configBanco.setCscCodigo(dadosAtualizados.getCscCodigo());
+
+
+
+        // 🚀 AQUI NÓS SALVAMOS TODOS OS LAYOUTS DE IMPRESSÃO!
+        configBanco.setLayoutHtmlOs(dadosAtualizados.getLayoutHtmlOs());
+        configBanco.setLayoutHtmlVenda(dadosAtualizados.getLayoutHtmlVenda());
+        configBanco.setLayoutHtmlRelatorioComissao(dadosAtualizados.getLayoutHtmlRelatorioComissao());
+
+        ConfiguracaoSistema salva = repository.save(configBanco);
         reagendarBackup();
 
-        // 🚀 3. AUDITORIA: Alteração de Configurações Globais
-        auditoriaService.registrar("SISTEMA", "ALTERACAO_CONFIGURACAO", "As configurações globais do sistema e parâmetros fiscais foram atualizados.");
+        // 🚀 AUDITORIA: Alteração de Configurações Globais
+        auditoriaService.registrar("SISTEMA", "ALTERACAO_CONFIGURACAO", "As configurações globais do sistema e layouts de impressão foram atualizados.");
 
         return salva;
     }

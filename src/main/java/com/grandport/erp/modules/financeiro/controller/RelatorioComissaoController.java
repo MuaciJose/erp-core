@@ -30,7 +30,6 @@ public class RelatorioComissaoController {
     @Autowired
     private ConfiguracaoRepository configuracaoRepository;
 
-    // 1. Rota antiga que devolve os dados pro React desenhar na tela
     @GetMapping("/comissoes")
     public ResponseEntity<?> gerarRelatorioComissao(
             @RequestParam String inicio,
@@ -39,36 +38,34 @@ public class RelatorioComissaoController {
 
         LocalDateTime dataIni = LocalDate.parse(inicio).atStartOfDay();
         LocalDateTime dataFim = LocalDate.parse(fim).atTime(23, 59, 59);
-        return ResponseEntity.ok(relatorioService.calcularComissoes(dataIni, dataFim, vendedorId));
+        ConfiguracaoSistema empresa = configuracaoRepository.findById(1L).orElse(new ConfiguracaoSistema());
+
+        // 🚀 Passa as configurações pro Service calcular tudo direitinho
+        return ResponseEntity.ok(relatorioService.calcularComissoes(dataIni, dataFim, vendedorId, empresa));
     }
 
-    // 2. 🚀 NOVA ROTA DO MOTOR V8 (THYMELEAF + PDF)
     @GetMapping("/comissoes/pdf")
     public ResponseEntity<byte[]> imprimirRelatorioPdf(
             @RequestParam String inicio,
             @RequestParam String fim,
             @RequestParam(required = false) Long vendedorId) {
 
-        // Calcula os dados no servidor
         LocalDateTime dataIni = LocalDate.parse(inicio).atStartOfDay();
         LocalDateTime dataFim = LocalDate.parse(fim).atTime(23, 59, 59);
-        List<RelatorioComissaoService.ComissaoMembroDTO> dados = relatorioService.calcularComissoes(dataIni, dataFim, vendedorId);
-
-        // Puxa a empresa
         ConfiguracaoSistema empresa = configuracaoRepository.findById(1L).orElse(new ConfiguracaoSistema());
 
-        // Monta a maleta do Thymeleaf
+        // 🚀 Passa as configurações pro Service
+        List<RelatorioComissaoService.ComissaoMembroDTO> dados = relatorioService.calcularComissoes(dataIni, dataFim, vendedorId, empresa);
+
         Map<String, Object> variaveis = new HashMap<>();
         variaveis.put("empresa", empresa);
         variaveis.put("dados", dados);
 
-        // Formata as datas pra ficar bonito no PDF (Ex: 01/03/2026)
         DateTimeFormatter brFormat = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         variaveis.put("dataInicio", dataIni.format(brFormat));
         variaveis.put("dataFim", dataFim.format(brFormat));
         variaveis.put("dataEmissao", LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
 
-        // Pega o Layout do Banco ou usa o Padrão de Luxo
         String htmlDoBanco = empresa.getLayoutHtmlRelatorioComissao();
 
         if (htmlDoBanco == null || htmlDoBanco.trim().isEmpty()) {
@@ -85,7 +82,6 @@ public class RelatorioComissaoController {
                     "</body></html>";
         }
 
-        // Gera e devolve o PDF!
         byte[] arquivoPdf = pdfService.gerarPdfDeStringHtml(htmlDoBanco, variaveis);
 
         return ResponseEntity.ok()
@@ -93,6 +89,4 @@ public class RelatorioComissaoController {
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(arquivoPdf);
     }
-
-
 }

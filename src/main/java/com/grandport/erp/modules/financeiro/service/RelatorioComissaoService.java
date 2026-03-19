@@ -1,5 +1,7 @@
 package com.grandport.erp.modules.financeiro.service;
 
+import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
+import com.grandport.erp.modules.configuracoes.model.VendedorComissao;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.os.repository.OrdemServicoRepository;
@@ -20,7 +22,19 @@ public class RelatorioComissaoService {
     @Autowired
     private OrdemServicoRepository osRepository;
 
-    public List<ComissaoMembroDTO> calcularComissoes(LocalDateTime inicio, LocalDateTime fim, Long vendedorFiltroId) {
+    // 🚀 BLINDAGEM MÁXIMA: Usando texto para o Java nunca errar o ID e não zerar a comissão
+    private double getComissaoPadrao(ConfiguracaoSistema empresa, Long usuarioId) {
+        if (empresa == null || empresa.getVendedores() == null || usuarioId == null) return 0.0;
+
+        for (VendedorComissao v : empresa.getVendedores()) {
+            if (v.getUsuarioId() != null && String.valueOf(v.getUsuarioId()).equals(String.valueOf(usuarioId))) {
+                return v.getComissao() != null ? v.getComissao().doubleValue() : 0.0;
+            }
+        }
+        return 0.0; // Se o mecânico não estiver na aba Vendedores, ganha 0%
+    }
+
+    public List<ComissaoMembroDTO> calcularComissoes(LocalDateTime inicio, LocalDateTime fim, Long vendedorFiltroId, ConfiguracaoSistema empresa) {
         Map<Long, ComissaoMembroDTO> mapaComissoes = new HashMap<>();
 
         // =======================================================
@@ -29,21 +43,17 @@ public class RelatorioComissaoService {
         List<Venda> vendas = vendaRepository.findAll();
 
         for (Venda venda : vendas) {
-            // Ignora se estiver fora da data
             if (venda.getDataHora() == null || venda.getDataHora().isBefore(inicio) || venda.getDataHora().isAfter(fim)) continue;
 
-            // Verifica o Status
             if ("CONCLUIDA".equals(venda.getStatus().name()) || "PAGA".equals(venda.getStatus().name()) || "FATURADA".equals(venda.getStatus().name())) {
 
-                // 🚀 PUXANDO OS CAMPOS EXATOS DA SUA CLASSE VENDA
                 Long vendedorId = venda.getVendedorId();
                 String vendedorNome = (venda.getVendedorNome() != null) ? venda.getVendedorNome() : "Desconhecido";
 
-                // Se não filtramos por vendedor, ou se o vendedor for o selecionado
                 if (vendedorId != null && (vendedorFiltroId == null || vendedorFiltroId.equals(vendedorId))) {
+                    double percPadrao = getComissaoPadrao(empresa, vendedorId);
 
                     for (var item : venda.getItens()) {
-                        // 🚀 BIGDECIMAL PARA DOUBLE (Consertando o erro do '*')
                         double preco = item.getPrecoUnitario() != null ? item.getPrecoUnitario().doubleValue() : 0.0;
                         double qtd = item.getQuantidade() != null ? item.getQuantidade().doubleValue() : 1.0;
                         double valorBase = preco * qtd;
@@ -53,7 +63,10 @@ public class RelatorioComissaoService {
                             percAplicado = item.getProduto().getComissao().doubleValue();
                         }
 
-                        String tipoRegra = percAplicado > 0 ? "ESPECÍFICA (PEÇA)" : "PADRÃO (VENDEDOR)";
+                        // Se não tem na peça, usa a do vendedor
+                        if (percAplicado <= 0.0) percAplicado = percPadrao;
+
+                        String tipoRegra = (item.getProduto() != null && item.getProduto().getComissao() != null && item.getProduto().getComissao().doubleValue() > 0) ? "ESPECÍFICA (PEÇA)" : "PADRÃO (VENDEDOR)";
                         String descricao = item.getProduto() != null ? item.getProduto().getNome() : "Item de Venda";
 
                         registrarComissao(mapaComissoes, vendedorId, vendedorNome, "Venda #" + venda.getId(), "PEÇA", descricao, valorBase, percAplicado, tipoRegra);
@@ -72,12 +85,12 @@ public class RelatorioComissaoService {
 
             if ("FATURADA".equals(os.getStatus().name())) {
 
-                // A) PEÇAS DA OS (Vai para o Consultor)
-                // 🚀 PUXANDO O CAMPO "CONSULTOR" DA SUA CLASSE OS
+                // A) PEÇAS DA OS (Vai para o Consultor/Gerente)
                 Long consultorId = (os.getConsultor() != null) ? os.getConsultor().getId() : null;
                 String consultorNome = (os.getConsultor() != null) ? os.getConsultor().getUsername() : "Consultor";
 
                 if (consultorId != null && (vendedorFiltroId == null || vendedorFiltroId.equals(consultorId))) {
+                    double percPadrao = getComissaoPadrao(empresa, consultorId);
 
                     for (var peca : os.getItensPecas()) {
                         double preco = peca.getPrecoUnitario() != null ? peca.getPrecoUnitario().doubleValue() : 0.0;
@@ -89,8 +102,10 @@ public class RelatorioComissaoService {
                             percAplicado = peca.getProduto().getComissao().doubleValue();
                         }
 
-                        String tipoRegra = percAplicado > 0 ? "ESPECÍFICA (PEÇA)" : "PADRÃO (CONSULTOR)";
-                        String nomeProd = peca.getProduto() != null ? peca.getProduto().getNome() : "Peça";
+                        if (percAplicado <= 0.0) percAplicado = percPadrao;
+
+                        String tipoRegra = (peca.getProduto() != null && peca.getProduto().getComissao() != null && peca.getProduto().getComissao().doubleValue() > 0) ? "ESPECÍFICA (PEÇA)" : "PADRÃO (CONSULTOR)";
+                        String nomeProd = peca.getProduto() != null ? peca.getProduto().getNome() : "Peça da OS";
 
                         registrarComissao(mapaComissoes, consultorId, consultorNome, "OS #" + os.getId(), "PEÇA", nomeProd, valorBase, percAplicado, tipoRegra);
                     }
@@ -102,13 +117,16 @@ public class RelatorioComissaoService {
                     String mecanicoNome = (servico.getMecanico() != null) ? servico.getMecanico().getUsername() : "Mecânico";
 
                     if (mecanicoId != null && (vendedorFiltroId == null || vendedorFiltroId.equals(mecanicoId))) {
+
+                        // 🚀 AQUI ESTÁ A MÁGICA: Pega DIRETO a comissão do Mecânico nas Configurações!
+                        double percAplicado = getComissaoPadrao(empresa, mecanicoId);
+
                         double preco = servico.getPrecoUnitario() != null ? servico.getPrecoUnitario().doubleValue() : 0.0;
                         double qtd = servico.getQuantidade() != null ? servico.getQuantidade().doubleValue() : 1.0;
                         double valorBase = preco * qtd;
 
-                        double percAplicado = 0.0;
                         String tipoRegra = "PADRÃO (MECÂNICO)";
-                        String nomeServico = servico.getServico() != null ? servico.getServico().getNome() : "Serviço";
+                        String nomeServico = servico.getServico() != null ? servico.getServico().getNome() : "Mão de Obra";
 
                         registrarComissao(mapaComissoes, mecanicoId, mecanicoNome, "OS #" + os.getId(), "MÃO DE OBRA", nomeServico, valorBase, percAplicado, tipoRegra);
                     }
@@ -116,7 +134,6 @@ public class RelatorioComissaoService {
             }
         }
 
-        // Converte o Mapa em Lista e ordena
         List<ComissaoMembroDTO> resultado = new ArrayList<>(mapaComissoes.values());
         resultado.sort((a, b) -> Double.compare(b.getTotalComissao(), a.getTotalComissao()));
 

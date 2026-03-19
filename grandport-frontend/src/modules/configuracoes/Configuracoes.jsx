@@ -83,10 +83,9 @@ export const Configuracoes = () => {
         mensagemRodape: '',
         exibirVendedorCupom: true,
 
-        // 🚀 AQUI: O NOVO CAMPO NO ESTADO INICIAL
         layoutHtmlOs: '',
         layoutHtmlVenda: '',
-        layoutHtmlRelatorioComissao: '',
+        layoutHtmlRelatorioComissao: '', // 🚀 CAMPO GARANTIDO AQUI
 
         descontoMaximoPermitido: 10.00,
         permitirEstoqueNegativoGlobal: false,
@@ -157,7 +156,6 @@ export const Configuracoes = () => {
                     tamanhoImpressora: data.tamanhoImpressora || '80mm',
                     mensagemRodape: data.mensagemRodape || '',
 
-                    // 🚀 AQUI: PUXANDO O HTML DO BANCO DE DADOS
                     layoutHtmlOs: data.layoutHtmlOs || '',
                     layoutHtmlVenda: data.layoutHtmlVenda || '',
                     layoutHtmlRelatorioComissao: data.layoutHtmlRelatorioComissao || '',
@@ -313,6 +311,8 @@ export const Configuracoes = () => {
         const loadId = toast.loading('Salvando configurações...');
 
         try {
+            // Como config já contém layoutHtmlRelatorioComissao atualizado no onChange,
+            // mandar o config inteiro é suficiente!
             const res = await api.put('/api/configuracoes', config);
             const data = Array.isArray(res.data) ? res.data[0] : res.data;
             setConfig(prev => ({ ...prev, ...data }));
@@ -967,7 +967,6 @@ export const Configuracoes = () => {
                                     <textarea name="mensagemRodape" value={config.mensagemRodape || ''} onChange={handleChange} rows="3" className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="Ex: Orçamento sujeito a alteração de preços após validade."></textarea>
                                 </div>
 
-                                {/* 🚀 AQUI ESTÁ O NOVO PAINEL DE HTML "HACKER" */}
                                 {/* ======================================================= */}
                                 {/* 🚀 CENTRAL DE LAYOUTS DINÂMICOS (PAINEL INTELIGENTE) */}
                                 {/* ======================================================= */}
@@ -996,15 +995,13 @@ export const Configuracoes = () => {
                                         >
                                             Pedidos e Vendas (A4)
                                         </button>
-                                        {/* 🚀 3. O TERCEIRO BOTÃO NOVO AQUI: */}
+                                        {/* 🚀 BOTÃO DE COMISSÃO AQUI */}
                                         <button
                                             onClick={() => setEditorLayoutAtivo('COMISSAO')}
                                             className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'COMISSAO' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             Relatório de Comissões (RH)
                                         </button>
-
-                                        {/* No futuro, é só adicionar os botões de RECIBO, GARANTIA, etc aqui! */}
                                     </div>
 
                                     {/* A CAIXA PRETA MÁGICA QUE MUDA DE CONTEÚDO */}
@@ -1013,9 +1010,18 @@ export const Configuracoes = () => {
                                             {Array.from({length: 20}).map((_, i) => <div key={i} className="mb-1">{i+1}</div>)}
                                         </div>
                                         <textarea
-                                            // A mágica acontece nessas 2 linhas abaixo: O React decide qual campo do config ele vai atualizar/mostrar
-                                            name={editorLayoutAtivo === 'OS' ? 'layoutHtmlOs' : 'layoutHtmlVenda'}
-                                            value={editorLayoutAtivo === 'OS' ? (config.layoutHtmlOs || '') : (config.layoutHtmlVenda || '')}
+                                            // 🚀 A CORREÇÃO DE OURO ESTÁ NESTAS DUAS LINHAS:
+                                            // O text area agora entende a 3ª opção ('COMISSAO') para Name e Value
+                                            name={
+                                                editorLayoutAtivo === 'OS' ? 'layoutHtmlOs' :
+                                                    editorLayoutAtivo === 'VENDA' ? 'layoutHtmlVenda' :
+                                                        'layoutHtmlRelatorioComissao'
+                                            }
+                                            value={
+                                                editorLayoutAtivo === 'OS' ? (config.layoutHtmlOs || '') :
+                                                    editorLayoutAtivo === 'VENDA' ? (config.layoutHtmlVenda || '') :
+                                                        (config.layoutHtmlRelatorioComissao || '')
+                                            }
                                             onChange={handleChange}
                                             rows="20"
                                             className="w-full p-4 pl-14 bg-[#0d1117] text-emerald-400 font-mono text-xs outline-none custom-scrollbar leading-relaxed"

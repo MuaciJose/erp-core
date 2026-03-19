@@ -47,39 +47,11 @@ export const RelatorioComissoes = () => {
             }
 
             const res = await api.get(url);
-            let dadosProcessados = res.data;
 
-            // Se a comissão específica veio zerada do Java, aplicamos a regra padrão global configurada
-            dadosProcessados = dadosProcessados.map(membro => {
-                const configVendedor = configuracaoGlobal?.vendedores?.find(v => v.usuarioId === membro.id);
-                const percPadrao = configVendedor ? configVendedor.comissao : 0;
+            // 🚀 O JAVA AGORA ENTREGA TUDO 100% MASTIGADO E CALCULADO!
+            setDadosCalculados(res.data);
 
-                let novoTotalComissao = 0;
-
-                const detalhesAjustados = membro.detalhes.map(detalhe => {
-                    let percFinal = detalhe.percAplicado;
-                    let regraFinal = detalhe.tipoRegra;
-
-                    if (percFinal === 0 && percPadrao > 0) {
-                        percFinal = percPadrao;
-                        regraFinal = "PADRÃO (VENDEDOR/MECÂNICO)";
-                    }
-
-                    const comissaoFinal = detalhe.valorBase * (percFinal / 100);
-                    novoTotalComissao += comissaoFinal;
-
-                    return { ...detalhe, percAplicado: percFinal, valorComissao: comissaoFinal, tipoRegra: regraFinal };
-                });
-
-                return { ...membro, detalhes: detalhesAjustados, totalComissao: novoTotalComissao };
-            });
-
-            // Reordena do maior para o menor salário
-            dadosProcessados.sort((a, b) => b.totalComissao - a.totalComissao);
-
-            setDadosCalculados(dadosProcessados);
-
-            if (dadosProcessados.length === 0) {
+            if (res.data.length === 0) {
                 toast.error("Nenhuma comissão gerada para os filtros informados.", { id: idToast });
             } else {
                 toast.success("Cálculo processado com sucesso!", { id: idToast });
@@ -91,6 +63,7 @@ export const RelatorioComissoes = () => {
             setLoading(false);
         }
     };
+
 
     // =========================================================================
     // 🚀 O NOVO MOTOR QUE CHAMA O THYMELEAF NO JAVA (PDF BLINDADO)
