@@ -33,6 +33,10 @@ public class VendaController {
     // 🚀 INJEÇÃO DO SERVIÇO DE NOTA FISCAL
     @Autowired private NfeService nfeService;
 
+
+    @Autowired private com.grandport.erp.modules.pdf.service.PdfService pdfService;
+    @Autowired private com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository configuracaoRepository;
+
     // =========================================================================
     // 🚀 ENDPOINT DO WHATSAPP
     // =========================================================================
@@ -147,5 +151,36 @@ public class VendaController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "Rejeição SEFAZ: " + e.getMessage()));
         }
+    }
+
+    // =========================================================
+    // 🚀 ROTA DE IMPRESSÃO PROFISSIONAL (VENDAS E ORÇAMENTOS)
+    // =========================================================
+    @GetMapping("/{id}/imprimir-pdf")
+    public org.springframework.http.ResponseEntity<byte[]> imprimirVendaPdf(@PathVariable Long id) {
+        // 1. Puxa a Venda e a Configuração
+        Venda venda = repository.findById(id).orElseThrow(() -> new RuntimeException("Venda não encontrada"));
+        var empresa = configuracaoRepository.findById(1L).orElse(new com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema());
+
+        // 2. Prepara a maleta de variáveis
+        java.util.Map<String, Object> variaveis = new java.util.HashMap<>();
+        variaveis.put("venda", venda);
+        variaveis.put("empresa", empresa);
+
+        // 3. Pega o layout específico de VENDAS salvo no banco
+        String htmlDoBanco = empresa.getLayoutHtmlVenda();
+
+        // Plano B caso o banco esteja vazio
+        if (htmlDoBanco == null || htmlDoBanco.trim().isEmpty()) {
+            htmlDoBanco = "<!DOCTYPE html><html xmlns:th=\"http://www.thymeleaf.org\"><body><h1>Pedido de Venda #<span th:text=\"${venda.id}\"></span></h1><p>Vá em configurações para definir seu layout!</p></body></html>";
+        }
+
+        // 4. Manda gerar o PDF
+        byte[] arquivoPdf = pdfService.gerarPdfDeStringHtml(htmlDoBanco, variaveis);
+
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=Documento-" + id + ".pdf")
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .body(arquivoPdf);
     }
 }

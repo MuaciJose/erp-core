@@ -171,7 +171,7 @@ export const Pdv = ({ setPaginaAtiva }) => {
     }, [carrinho, indexFocado, modoAtual, vendaFinalizada]);
 
     // =======================================================================
-    // 🚀 FINALIZAÇÃO E IMPRESSÃO DE FERRO
+    // 🚀 FINALIZAÇÃO DE VENDA
     // =======================================================================
     const processarVenda = async () => {
         if (faltaPagar > 0) return toast.error("A venda ainda não foi totalmente paga!");
@@ -210,8 +210,26 @@ export const Pdv = ({ setPaginaAtiva }) => {
         }
     };
 
-    // 🚀 IMPRESSÃO GERENCIAL INJETADA NO HTML (INFALÍVEL)
-    const imprimirGerencial = (tipo) => {
+    // =======================================================================
+    // 🚀 O NOVO MOTOR V8: IMPRESSÃO A4 (VIA JAVA / BANCO DE DADOS)
+    // =======================================================================
+    const imprimirDocumentoBackend = async () => {
+        if (!vendaFinalizada) return;
+        const toastId = toast.loading('Buscando PDF no servidor (Layout do Banco)...');
+        try {
+            const response = await api.get(`/api/vendas/${vendaFinalizada.id}/imprimir-pdf`, { responseType: 'blob' });
+            const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            window.open(fileURL, '_blank');
+            toast.success("Documento gerado com sucesso!", { id: toastId });
+        } catch (error) {
+            toast.error("Erro ao gerar o PDF. Verifique a conexão com o servidor.", { id: toastId });
+        }
+    };
+
+    // =======================================================================
+    // 🖨️ IMPRESSÃO GERENCIAL ANTIGA: MANTIDA APENAS PARA BOBINA TÉRMICA
+    // =======================================================================
+    const imprimirBobinaLocal = () => {
         if (!vendaFinalizada) return;
         const printWindow = window.open('', '_blank');
         const nome = configLoja?.nomeFantasia || 'GRANDPORT AUTOPEÇAS';
@@ -221,47 +239,27 @@ export const Pdv = ({ setPaginaAtiva }) => {
         carrinho.forEach((item, i) => {
             const prc = Number(item.precoVenda || item.preco);
             const tot = prc * item.qtd;
-            if (tipo === 'A4') {
-                linhasProd += `<tr style="border-bottom: 1px solid #ccc;"><td style="padding: 8px;">${item.sku||'-'}</td><td style="padding: 8px; font-weight: bold;">${item.nome}</td><td style="padding: 8px; text-align: center;">${item.qtd}</td><td style="padding: 8px; text-align: right;">${formatCurrency(prc)}</td><td style="padding: 8px; text-align: right; font-weight: bold;">${formatCurrency(tot)}</td></tr>`;
-            } else {
-                linhasProd += `<div style="margin-bottom: 8px; font-size: 11px;"><div style="font-weight: bold;">${String(i+1).padStart(2,'0')} ${item.nome}</div><div style="display: flex; justify-content: space-between; margin-top: 2px;"><span style="width: 40%; font-size: 9px;">${item.sku||''}</span><span style="width: 30%; text-align: center;">${item.qtd} x ${prc.toFixed(2)}</span><span style="width: 30%; text-align: right; font-weight: bold;">${tot.toFixed(2)}</span></div></div>`;
-            }
+            linhasProd += `<div style="margin-bottom: 8px; font-size: 11px;"><div style="font-weight: bold;">${String(i+1).padStart(2,'0')} ${item.nome}</div><div style="display: flex; justify-content: space-between; margin-top: 2px;"><span style="width: 40%; font-size: 9px;">${item.sku||''}</span><span style="width: 30%; text-align: center;">${item.qtd} x ${prc.toFixed(2)}</span><span style="width: 30%; text-align: right; font-weight: bold;">${tot.toFixed(2)}</span></div></div>`;
         });
 
         let linhasPag = '';
         vendaFinalizada.pagamentosInfo.forEach(p => {
-            linhasPag += `<div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px; font-size: ${tipo==='A4'?'14px':'11px'};"><span>${p.metodo.replace('_',' ')}</span><span>${formatCurrency(p.valor)}</span></div>`;
+            linhasPag += `<div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px; font-size: 11px;"><span>${p.metodo.replace('_',' ')}</span><span>${formatCurrency(p.valor)}</span></div>`;
         });
 
-        let html = '';
-        if (tipo === 'A4') {
-            html = `<!DOCTYPE html><html><head><title>Pedido #${vendaFinalizada.id}</title><style>body{font-family: Arial; padding: 40px;} table{width: 100%; border-collapse: collapse; margin: 20px 0;} th{border-bottom: 2px solid #000; text-align: left; padding: 8px;}</style></head><body>
-                <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 20px;">
-                    <div><h1 style="margin:0;">${nome}</h1><p style="margin:5px 0 0 0; color:#555;">PEDIDO #${vendaFinalizada.id}</p><p style="margin:5px 0 0 0;">${data}</p></div>
-                    <div style="text-align: right;"><h2 style="margin:0;">RECIBO / PEDIDO</h2><p style="color:red; font-weight:bold;">NÃO É DOCUMENTO FISCAL</p></div>
-                </div>
-                ${vendaFinalizada.cliente ? `<div style="border: 1px solid #ccc; padding: 15px; margin-bottom: 20px;"><strong>CLIENTE:</strong> ${vendaFinalizada.cliente.nome} ${vendaFinalizada.cliente.cpfCnpj ? `| CPF/CNPJ: ${vendaFinalizada.cliente.cpfCnpj}` : ''}</div>` : ''}
-                <table><thead><tr><th>SKU</th><th>DESCRIÇÃO</th><th style="text-align:center;">QTD</th><th style="text-align:right;">V. UNIT</th><th style="text-align:right;">TOTAL</th></tr></thead><tbody>${linhasProd}</tbody></table>
-                <div style="display: flex; justify-content: space-between; margin-top: 30px;">
-                    <div style="width: 45%; border: 1px solid #ccc; padding: 15px;"><strong>PAGAMENTOS</strong><br><br>${linhasPag} ${vendaFinalizada.troco > 0 ? `<hr><div style="display: flex; justify-content: space-between; color: red;"><span>TROCO</span><span>${formatCurrency(vendaFinalizada.troco)}</span></div>` : ''}</div>
-                    <div style="width: 45%; text-align: right; font-size: 24px; font-weight: bold; border-top: 2px solid #000; padding-top: 10px;">TOTAL: ${formatCurrency(vendaFinalizada.total)}</div>
-                </div>
-            </body></html>`;
-        } else {
-            html = `<!DOCTYPE html><html><head><title>Cupom #${vendaFinalizada.id}</title><style>body{font-family: monospace; width: 80mm; margin:0; padding:4mm;} .divider{border-bottom: 1px dashed #000; margin: 8px 0;}</style></head><body>
-                <div style="text-align:center; font-weight:bold; font-size:14px;">${nome}</div>
-                <div style="text-align:center; font-weight:bold; font-size:12px;">RECIBO DE VENDA</div>
-                <div style="text-align:center; font-size:10px;">*** NAO E DOCUMENTO FISCAL ***</div>
-                <div style="text-align:center; font-size:11px; margin-top:5px;">Pedido: #${String(vendaFinalizada.id).padStart(6,'0')}</div>
-                <div style="text-align:center; font-size:11px;">${data}</div><div class="divider"></div>
-                ${vendaFinalizada.cliente ? `<div style="font-size:11px;">CLI: ${vendaFinalizada.cliente.nome}</div><div class="divider"></div>` : ''}
-                <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:bold;"><span>Item</span><span style="text-align:center;">QtdxVl</span><span style="text-align:right;">Total</span></div><div class="divider"></div>
-                ${linhasProd}<div class="divider"></div>
-                <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold;"><span>TOTAL</span><span>${formatCurrency(vendaFinalizada.total)}</span></div><div class="divider"></div>
-                <div style="font-size:11px;"><strong>PAGAMENTOS:</strong><br>${linhasPag} ${vendaFinalizada.troco > 0 ? `<div style="display:flex; justify-content:space-between; margin-top:4px; border-top:1px solid #000;"><span>TROCO</span><span>${formatCurrency(vendaFinalizada.troco)}</span></div>` : ''}</div>
-                <div class="divider"></div><div style="text-align:center; font-size:10px;">OBRIGADO PELA PREFERENCIA</div>
-            </body></html>`;
-        }
+        const html = `<!DOCTYPE html><html><head><title>Cupom #${vendaFinalizada.id}</title><style>body{font-family: monospace; width: 80mm; margin:0; padding:4mm;} .divider{border-bottom: 1px dashed #000; margin: 8px 0;}</style></head><body>
+            <div style="text-align:center; font-weight:bold; font-size:14px;">${nome}</div>
+            <div style="text-align:center; font-weight:bold; font-size:12px;">RECIBO DE VENDA</div>
+            <div style="text-align:center; font-size:10px;">*** NAO E DOCUMENTO FISCAL ***</div>
+            <div style="text-align:center; font-size:11px; margin-top:5px;">Pedido: #${String(vendaFinalizada.id).padStart(6,'0')}</div>
+            <div style="text-align:center; font-size:11px;">${data}</div><div class="divider"></div>
+            ${vendaFinalizada.cliente ? `<div style="font-size:11px;">CLI: ${vendaFinalizada.cliente.nome}</div><div class="divider"></div>` : ''}
+            <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:bold;"><span>Item</span><span style="text-align:center;">QtdxVl</span><span style="text-align:right;">Total</span></div><div class="divider"></div>
+            ${linhasProd}<div class="divider"></div>
+            <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold;"><span>TOTAL</span><span>${formatCurrency(vendaFinalizada.total)}</span></div><div class="divider"></div>
+            <div style="font-size:11px;"><strong>PAGAMENTOS:</strong><br>${linhasPag} ${vendaFinalizada.troco > 0 ? `<div style="display:flex; justify-content:space-between; margin-top:4px; border-top:1px solid #000;"><span>TROCO</span><span>${formatCurrency(vendaFinalizada.troco)}</span></div>` : ''}</div>
+            <div class="divider"></div><div style="text-align:center; font-size:10px;">OBRIGADO PELA PREFERENCIA</div>
+        </body></html>`;
 
         printWindow.document.write(html);
         printWindow.document.close();
@@ -280,10 +278,8 @@ export const Pdv = ({ setPaginaAtiva }) => {
                 window.open(res.data.urlPdf, '_blank');
             }
         } catch (err) {
-            // 🚀 CORREÇÃO: Pegando a chave "mensagem" que o seu Java envia!
             const msgRealDoJava = err.response?.data?.mensagem || err.response?.data?.message || err.message;
             toast.error("Erro na SEFAZ: " + msgRealDoJava, { id: toastId, duration: 8000 });
-            console.error("DETALHE DO ERRO:", err.response?.data);
         }
     };
 
@@ -320,14 +316,16 @@ export const Pdv = ({ setPaginaAtiva }) => {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 max-w-4xl w-full">
-                    <button onClick={() => imprimirGerencial('TERMICA')} className="bg-slate-800 border border-slate-700 text-white px-6 py-6 rounded-2xl font-black hover:bg-slate-700 shadow-lg flex flex-col items-center gap-3 transition-transform hover:-translate-y-1">
+                    {/* 🚀 BOTÃO DA BOBINA (MANTÉM O SISTEMA LOCAL) */}
+                    <button onClick={imprimirBobinaLocal} className="bg-slate-800 border border-slate-700 text-white px-6 py-6 rounded-2xl font-black hover:bg-slate-700 shadow-lg flex flex-col items-center gap-3 transition-transform hover:-translate-y-1">
                         <Receipt size={32} className="text-slate-400" />
                         <span className="text-center">RECIBO GERENCIAL<br/><span className="text-xs text-slate-400 font-normal">Bobina Térmica 80mm</span></span>
                     </button>
 
-                    <button onClick={() => imprimirGerencial('A4')} className="bg-slate-800 border border-slate-700 text-white px-6 py-6 rounded-2xl font-black hover:bg-slate-700 shadow-lg flex flex-col items-center gap-3 transition-transform hover:-translate-y-1">
-                        <FileText size={32} className="text-slate-400" />
-                        <span className="text-center">PEDIDO DE VENDA<br/><span className="text-xs text-slate-400 font-normal">Folha A4 Normal</span></span>
+                    {/* 🚀 BOTÃO DO A4 (CHAMA O MOTOR V8 DO JAVA/BANCO DE DADOS) */}
+                    <button onClick={imprimirDocumentoBackend} className="bg-slate-800 border border-slate-700 text-white px-6 py-6 rounded-2xl font-black hover:bg-blue-600 shadow-lg flex flex-col items-center gap-3 transition-transform hover:-translate-y-1 border-b-4 border-b-blue-500">
+                        <FileText size={32} className="text-blue-400" />
+                        <span className="text-center">PEDIDO DE VENDA<br/><span className="text-xs text-blue-200 font-normal">Folha A4 (Layout DB)</span></span>
                     </button>
 
                     <button onClick={emitirFiscal} className="bg-green-600 border-2 border-green-400 text-white px-6 py-6 rounded-2xl font-black hover:bg-green-500 shadow-[0_0_20px_rgba(34,197,94,0.3)] flex flex-col items-center gap-3 transition-transform hover:-translate-y-1 relative overflow-hidden group">
@@ -449,7 +447,6 @@ export const Pdv = ({ setPaginaAtiva }) => {
                     </>
                 )}
 
-                {/* TELA DE PAGAMENTO E VENDA PERDIDA MANTIDAS IGUAL AO CÓDIGO ANTERIOR... */}
                 {modoAtual === 'PAGAMENTO' && (
                     <div className="flex-1 bg-slate-50 flex flex-col animate-fade-in relative">
                         <div className="p-6 bg-white border-b border-slate-200 flex justify-between items-center shadow-sm">

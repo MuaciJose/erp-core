@@ -32,123 +32,87 @@ export const RelatorioComissoes = () => {
     }, []);
 
     // =========================================================================
-    // 🚀 O MOTOR MATEMÁTICO DE CASCATA (FRONT-END)
+    // 🚀 BATE NA ROTA DO JAVA PARA PEGAR OS DADOS MASTIGADOS
     // =========================================================================
     const gerarRelatorio = async () => {
         if (!datas.inicio || !datas.fim) return toast.error("Selecione o período inicial e final.");
 
-        const dataIni = new Date(datas.inicio + 'T00:00:00');
-        const dataFimDate = new Date(datas.fim + 'T23:59:59');
-
-        const idToast = toast.loading("Analisando itens, serviços e calculando cascata de comissões...");
+        const idToast = toast.loading("Calculando cascata de comissões no servidor (V8)...");
         setLoading(true);
 
         try {
-            // 1. Busca os dados brutos
-            const [resVendas, resOs] = await Promise.all([
-                api.get('/api/vendas').catch(() => ({ data: [] })),
-                api.get('/api/os').catch(() => ({ data: [] }))
-            ]);
+            let url = `/api/relatorios/comissoes?inicio=${datas.inicio}&fim=${datas.fim}`;
+            if (vendedorSelecionado) {
+                url += `&vendedorId=${vendedorSelecionado}`;
+            }
 
-            const comissoesMap = {}; // Estrutura: { usuarioId: { nome, totalBase, totalComissao, detalhes: [] } }
+            const res = await api.get(url);
+            let dadosProcessados = res.data;
 
-            // Função auxiliar para mapear equipe
-            const getNomeMembro = (id) => equipe.find(e => e.id === id)?.nome || 'Usuário Desconhecido';
+            // Se a comissão específica veio zerada do Java, aplicamos a regra padrão global configurada
+            dadosProcessados = dadosProcessados.map(membro => {
+                const configVendedor = configuracaoGlobal?.vendedores?.find(v => v.usuarioId === membro.id);
+                const percPadrao = configVendedor ? configVendedor.comissao : 0;
 
-            // Função auxiliar para pegar a comissão padrão
-            const getComissaoPadrao = (userId) => {
-                if (!configuracaoGlobal || !configuracaoGlobal.vendedores) return 0;
-                const configVendedor = configuracaoGlobal.vendedores.find(v => v.usuarioId === userId);
-                return configVendedor ? configVendedor.comissao : 0;
-            };
+                let novoTotalComissao = 0;
 
-            // Função auxiliar para injetar dados no mapa
-            const registrarComissao = (userId, origem, tipoItem, descricao, valorBase, percAplicado, tipoRegra) => {
-                if (vendedorSelecionado && vendedorSelecionado !== userId.toString()) return; // Filtro de usuário
+                const detalhesAjustados = membro.detalhes.map(detalhe => {
+                    let percFinal = detalhe.percAplicado;
+                    let regraFinal = detalhe.tipoRegra;
 
-                if (!comissoesMap[userId]) {
-                    comissoesMap[userId] = { id: userId, nome: getNomeMembro(userId), totalBase: 0, totalComissao: 0, detalhes: [] };
-                }
+                    if (percFinal === 0 && percPadrao > 0) {
+                        percFinal = percPadrao;
+                        regraFinal = "PADRÃO (VENDEDOR/MECÂNICO)";
+                    }
 
-                const valorComissao = valorBase * (percAplicado / 100);
+                    const comissaoFinal = detalhe.valorBase * (percFinal / 100);
+                    novoTotalComissao += comissaoFinal;
 
-                comissoesMap[userId].totalBase += valorBase;
-                comissoesMap[userId].totalComissao += valorComissao;
-                comissoesMap[userId].detalhes.push({
-                    origem, tipoItem, descricao, valorBase, percAplicado, valorComissao, tipoRegra
+                    return { ...detalhe, percAplicado: percFinal, valorComissao: comissaoFinal, tipoRegra: regraFinal };
                 });
-            };
 
-            // 2. PROCESSAR VENDAS (Balcão)
-            const vendasPagas = resVendas.data.filter(v => v.status === 'CONCLUIDA' || v.status === 'PAGA' || v.status === 'FATURADA');
-            vendasPagas.forEach(venda => {
-                const dataVenda = new Date(venda.dataHora || venda.dataCriacao);
-                if (dataVenda >= dataIni && dataVenda <= dataFimDate) {
-                    const vendedorId = venda.vendedor?.id || venda.usuario?.id;
-                    if (vendedorId) {
-                        (venda.itens || []).forEach(item => {
-                            const valorBase = item.precoUnitario * item.quantidade;
-                            const percEspecifco = item.produto?.comissao || 0;
-
-                            // 🚀 REGRA DE CASCATA APLICADA
-                            const percAplicado = percEspecifco > 0 ? percEspecifco : getComissaoPadrao(vendedorId);
-                            const tipoRegra = percEspecifco > 0 ? 'ESPECÍFICA (PRODUTO)' : 'PADRÃO (VENDEDOR)';
-
-                            registrarComissao(vendedorId, `Venda #${venda.id}`, 'PEÇA', item.produto?.nome, valorBase, percAplicado, tipoRegra);
-                        });
-                    }
-                }
+                return { ...membro, detalhes: detalhesAjustados, totalComissao: novoTotalComissao };
             });
 
-            // 3. PROCESSAR ORDENS DE SERVIÇO (OS)
-            const osFaturadas = resOs.data.filter(o => o.status === 'FATURADA');
-            osFaturadas.forEach(os => {
-                const dataOs = new Date(os.dataEntrada); // Ou dataSaida se preferir faturado
-                if (dataOs >= dataIni && dataOs <= dataFimDate) {
+            // Reordena do maior para o menor salário
+            dadosProcessados.sort((a, b) => b.totalComissao - a.totalComissao);
 
-                    // A) Peças da OS (Geralmente quem ganha é o Consultor/Gerente que abriu a OS)
-                    const consultorId = os.consultor?.id || os.vendedor?.id;
-                    if (consultorId) {
-                        (os.itensPecas || []).forEach(peca => {
-                            const valorBase = peca.precoUnitario * peca.quantidade;
-                            const percEspecifco = peca.produto?.comissao || 0;
-                            const percAplicado = percEspecifco > 0 ? percEspecifco : getComissaoPadrao(consultorId);
-                            const tipoRegra = percEspecifco > 0 ? 'ESPECÍFICA (PEÇA)' : 'PADRÃO (CONSULTOR)';
+            setDadosCalculados(dadosProcessados);
 
-                            registrarComissao(consultorId, `OS #${os.id}`, 'PEÇA', peca.produto?.nome, valorBase, percAplicado, tipoRegra);
-                        });
-                    }
-
-                    // B) Mão de Obra da OS (Quem ganha é o Mecânico que executou a linha)
-                    (os.itensServicos || []).forEach(servico => {
-                        const mecanicoId = servico.mecanico?.id;
-                        if (mecanicoId) {
-                            const valorBase = servico.precoUnitario * servico.quantidade;
-                            const percEspecifco = servico.servico?.comissao || 0;
-                            const percAplicado = percEspecifco > 0 ? percEspecifco : getComissaoPadrao(mecanicoId);
-                            const tipoRegra = percEspecifco > 0 ? 'ESPECÍFICA (SERVIÇO)' : 'PADRÃO (MECÂNICO)';
-
-                            registrarComissao(mecanicoId, `OS #${os.id}`, 'MÃO DE OBRA', servico.servico?.nome || servico.nome, valorBase, percAplicado, tipoRegra);
-                        }
-                    });
-                }
-            });
-
-            // 4. Converter Mapa para Array e Ordenar
-            const resultadoFinal = Object.values(comissoesMap).sort((a, b) => b.totalComissao - a.totalComissao);
-
-            setDadosCalculados(resultadoFinal);
-
-            if (resultadoFinal.length === 0) {
+            if (dadosProcessados.length === 0) {
                 toast.error("Nenhuma comissão gerada para os filtros informados.", { id: idToast });
             } else {
-                toast.success("Cálculo de cascata concluído!", { id: idToast });
+                toast.success("Cálculo processado com sucesso!", { id: idToast });
             }
         } catch (error) {
             console.error(error);
-            toast.error("Falha ao analisar os dados.", { id: idToast });
+            toast.error("Falha de comunicação com o servidor.", { id: idToast });
         } finally {
             setLoading(false);
+        }
+    };
+
+    // =========================================================================
+    // 🚀 O NOVO MOTOR QUE CHAMA O THYMELEAF NO JAVA (PDF BLINDADO)
+    // =========================================================================
+    const imprimirRelatorioOficial = async () => {
+        if (!datas.inicio || !datas.fim) return toast.error("Selecione o período inicial e final.");
+
+        const idToast = toast.loading("Gerando PDF blindado no servidor...");
+        try {
+            let url = `/api/relatorios/comissoes/pdf?inicio=${datas.inicio}&fim=${datas.fim}`;
+            if (vendedorSelecionado) {
+                url += `&vendedorId=${vendedorSelecionado}`;
+            }
+
+            const response = await api.get(url, { responseType: 'blob' });
+            const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+
+            window.open(fileURL, '_blank');
+            toast.success("Documento gerado com sucesso!", { id: idToast });
+        } catch (error) {
+            console.error(error);
+            toast.error("Erro ao gerar o PDF no servidor.", { id: idToast });
         }
     };
 
@@ -193,14 +157,16 @@ export const RelatorioComissoes = () => {
                         <button onClick={gerarRelatorio} disabled={loading} className="flex-1 md:flex-none bg-slate-900 text-white px-8 py-3 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-slate-800 transition-all disabled:opacity-50 tracking-widest text-xs uppercase">
                             {loading ? 'CALCULANDO...' : 'GERAR'}
                         </button>
-                        <button onClick={() => window.print()} disabled={dadosCalculados.length === 0} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 disabled:opacity-50 transition-all">
-                            <Printer size={18}/>
+
+                        {/* 🚀 BOTÃO VERDE AGORA CHAMA O JAVA (PDF) */}
+                        <button onClick={imprimirRelatorioOficial} disabled={dadosCalculados.length === 0} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 disabled:opacity-50 transition-all">
+                            <Printer size={18}/> IMPRIMIR
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* ÁREA DO DOCUMENTO DE IMPRESSÃO */}
+            {/* ÁREA DO DOCUMENTO VIRTUAL NA TELA */}
             <div className="bg-white p-12 print:p-0 rounded-3xl shadow-sm border border-slate-200 print:shadow-none print:border-none min-h-[500px]">
 
                 <div className="flex justify-between items-start border-b-4 border-slate-900 pb-6 mb-8">
@@ -217,7 +183,7 @@ export const RelatorioComissoes = () => {
                     <div className="text-right text-xs font-bold text-slate-400 bg-slate-50 p-3 rounded-xl border border-slate-100">
                         <p className="uppercase tracking-widest mb-1">Período de Apuração</p>
                         <p className="text-sm font-black text-slate-700">{formatarData(datas.inicio)} a {formatarData(datas.fim)}</p>
-                        <p className="mt-2 text-[9px]">Impresso em: {new Date().toLocaleString('pt-BR')}</p>
+                        <p className="mt-2 text-[9px]">Calculado em: {new Date().toLocaleString('pt-BR')}</p>
                     </div>
                 </div>
 
@@ -231,7 +197,6 @@ export const RelatorioComissoes = () => {
                     dadosCalculados.map((membro) => (
                         <div key={membro.id} className="mb-16 break-inside-avoid">
 
-                            {/* CARTÃO RESUMO DO COLABORADOR */}
                             <div className="bg-slate-900 text-white p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center mb-6 shadow-lg print:bg-slate-100 print:text-slate-900 print:shadow-none print:border-2 print:border-slate-900">
                                 <div>
                                     <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 print:text-slate-500">Colaborador</p>
@@ -249,7 +214,6 @@ export const RelatorioComissoes = () => {
                                 </div>
                             </div>
 
-                            {/* TABELA DETALHADA - A MÁGICA DA TRANSPARÊNCIA */}
                             <table className="w-full text-left border-collapse text-sm">
                                 <thead>
                                 <tr className="border-b-2 border-slate-200">
@@ -286,24 +250,7 @@ export const RelatorioComissoes = () => {
                         </div>
                     ))
                 )}
-
-                <div className="mt-20 pt-8 flex justify-between items-end break-inside-avoid print:block hidden">
-                    <div className="w-72 border-t-2 border-slate-900 text-center pt-2">
-                        <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Assinatura da Diretoria / RH</p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-xs font-black text-slate-400">Página gerada via ERP Grandport</p>
-                    </div>
-                </div>
             </div>
-
-            <style dangerouslySetInnerHTML={{ __html: `
-                @media print {
-                    body { background: white !important; }
-                    .print\\:hidden { display: none !important; }
-                    @page { margin: 1.5cm; }
-                }
-            `}} />
         </div>
     );
 };

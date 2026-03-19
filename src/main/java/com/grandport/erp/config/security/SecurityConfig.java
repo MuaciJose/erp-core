@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/teste-pdf").permitAll()
                         // 🚀 A NOVA CHAVE MESTRA PARA A IMPRESSÃO DA OS:
                         .requestMatchers("/api/os/*/imprimir-pdf").permitAll()
+                        .requestMatchers("/api/vendas/*/imprimir-pdf").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
 

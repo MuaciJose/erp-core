@@ -89,6 +89,14 @@ public class ConfiguracaoSistema {
     @Column(columnDefinition = "TEXT")
     private String layoutHtmlOs = "<!DOCTYPE html><html xmlns:th=\"http://www.thymeleaf.org\"><head><meta charset=\"UTF-8\"/><style>body { font-family: Arial, sans-serif; }</style></head><body><h1>Ordem de Serviço #<span th:text=\"${os.id}\"></span></h1><p>Cliente: <span th:text=\"${os.cliente != null ? os.cliente.nome : 'Consumidor Final'}\"></span></p><p>Total: R$ <span th:text=\"${#numbers.formatDecimal(os.valorTotal, 1, 'POINT', 2, 'COMMA')}\"></span></p></body></html>";
 
+    // 🚀 NOVO: LAYOUT DOS PEDIDOS E VENDAS DO CAIXA
+    @Column(columnDefinition = "TEXT")
+    private String layoutHtmlVenda = "<!DOCTYPE html><html xmlns:th=\"http://www.thymeleaf.org\"><head><meta charset=\"UTF-8\"/></head><body><h1>Pedido de Venda #<span th:text=\"${venda.id}\"></span></h1><p>Vá em configurações para personalizar o layout da Venda!</p></body></html>";
+
+    // 🚀 NOVO: LAYOUT DO RELATÓRIO DE COMISSÕES (RH)
+    @Column(columnDefinition = "TEXT")
+    private String layoutHtmlRelatorioComissao;
+
     // ================= REGRAS DE NEGÓCIO =================
     @Column(precision = 5, scale = 2)
     private BigDecimal descontoMaximoPermitido = new BigDecimal("10.00");

@@ -2,9 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Search, Clock, User, FileText, CheckCircle, DollarSign,
     Package, AlertCircle, Lock, Undo, X, Receipt, Loader2,
-    CreditCard, Banknote, QrCode, Trash2, FileSignature, Printer, Wrench
+    CreditCard, Banknote, QrCode, Trash2, FileSignature, Printer, Wrench, ShieldCheck
 } from 'lucide-react';
-import { CupomReciboModal } from './CupomReciboModal';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 
@@ -20,6 +19,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const valorRecebidoRef = useRef(null);
 
     const [exibirIvaDual, setExibirIvaDual] = useState(false);
+    const [configLoja, setConfigLoja] = useState({ nomeFantasia: 'OFICINA', mensagemRodape: 'Obrigado pela preferência!' });
 
     const [metodoPagamento, setMetodoPagamento] = useState('DINHEIRO');
     const [valorRecebidoInput, setValorRecebidoInput] = useState('');
@@ -29,7 +29,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
     const [processandoPagamento, setProcessandoPagamento] = useState(false);
 
     const [modalDevolucaoAberto, setModalDevolucaoAberto] = useState(false);
-    const [pedidoPago, setPedidoPago] = useState(null);
     const [caixaStatus, setCaixaStatus] = useState(null);
     const [loadingCaixa, setLoadingCaixa] = useState(true);
     const [processandoNfce, setProcessandoNfce] = useState(false);
@@ -73,12 +72,13 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
     const carregarConfiguracoes = async () => {
         try {
-            const res = await api.get('/api/configuracoes/empresa');
+            const res = await api.get('/api/configuracoes');
             const data = Array.isArray(res.data) ? res.data[0] : res.data;
-            if (data && data.exibirIvaDual !== undefined) {
+            if (data) {
                 setExibirIvaDual(data.exibirIvaDual);
+                setConfigLoja(data);
             }
-        } catch (e) { console.log("Não foi possível carregar config do IVA."); }
+        } catch (e) { console.log("Não foi possível carregar configurações."); }
     };
 
     const carregarPedidos = async (silencioso = false) => {
@@ -108,12 +108,12 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                     horaEnvio: os.dataEnvioCaixa ? new Date(os.dataEnvioCaixa) : new Date(os.dataEntrada || Date.now()),
                     itensUnificados: [
                         ...(os.itensPecas || []).map(p => ({
-                            produto: { nome: p.produto?.nome || 'Peça (Sem Nome)' },
+                            produto: { nome: p.produto?.nome || 'Peça (Sem Nome)', sku: p.produto?.sku || '' },
                             quantidade: p.quantidade,
                             precoUnitario: p.precoUnitario
                         })),
                         ...(os.itensServicos || []).map(s => ({
-                            produto: { nome: `[SERVIÇO] ${s.servico?.nome || 'Mão de Obra'}` },
+                            produto: { nome: `[SERVIÇO] ${s.servico?.nome || 'Mão de Obra'}`, sku: s.servico?.codigo || '' },
                             quantidade: s.quantidade,
                             precoUnitario: s.precoUnitario
                         }))
@@ -135,12 +135,12 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         carregarConfiguracoes();
         carregarPedidos();
         const intervalId = setInterval(() => {
-            if(caixaStatus !== 'FECHADO' && !modoRecebimento && !modalDevolucaoAberto && !pedidoPago) {
+            if(caixaStatus !== 'FECHADO' && !modoRecebimento && !modalDevolucaoAberto && !isPago) {
                 carregarPedidos(true);
             }
         }, 10000);
         return () => clearInterval(intervalId);
-    }, [caixaStatus, modoRecebimento, modalDevolucaoAberto, pedidoPago]);
+    }, [caixaStatus, modoRecebimento, modalDevolucaoAberto, isPago]);
 
     const pedidosFiltrados = pedidos.filter(p =>
         p?.id?.toString().includes(busca) ||
@@ -174,8 +174,8 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
 
     useEffect(() => {
         const handleKeyDown = (e) => {
-            if (pedidoPago || modalDevolucaoAberto) {
-                if (e.key === 'Escape' && modalDevolucaoAberto) setModalDevolucaoAberto(false);
+            if (modalDevolucaoAberto) {
+                if (e.key === 'Escape') setModalDevolucaoAberto(false);
                 return;
             }
 
@@ -202,7 +202,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
             if (isPago) {
                 if (e.key === 'F10') {
                     e.preventDefault();
-                    setPedidoPago(pedidoSelecionado);
+                    imprimirDocumentoA4();
                 } else if (e.key === 'F12') {
                     e.preventDefault();
                     if(!processandoNfce) emitirCupomFiscal();
@@ -360,6 +360,80 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
         }
     };
 
+    // =======================================================================
+    // 🚀 O NOVO MOTOR V8: IMPRESSÃO A4 (VIA JAVA / BANCO DE DADOS)
+    // =======================================================================
+    const imprimirDocumentoA4 = async () => {
+        if (!pedidoSelecionado) return;
+        const toastId = toast.loading('Buscando PDF no servidor...');
+        try {
+            const endpoint = pedidoSelecionado.tipoFila === 'OS'
+                ? `/api/os/${pedidoSelecionado.id}/imprimir-pdf`
+                : `/api/vendas/${pedidoSelecionado.id}/imprimir-pdf`;
+
+            const response = await api.get(endpoint, { responseType: 'blob' });
+            const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            window.open(fileURL, '_blank');
+            toast.success("Documento gerado com sucesso!", { id: toastId });
+        } catch (error) {
+            toast.error("Erro ao gerar o PDF. Verifique a conexão com o servidor.", { id: toastId });
+        }
+    };
+
+    // =======================================================================
+    // 🖨️ IMPRESSÃO GERENCIAL: BOBINA TÉRMICA LOCAL (Navegador)
+    // =======================================================================
+    const imprimirBobinaLocal = () => {
+        if (!pedidoSelecionado) return;
+        const printWindow = window.open('', '_blank');
+        const nomeEmpresa = configLoja?.nomeFantasia || 'EMPRESA';
+        const isOs = pedidoSelecionado.tipoFila === 'OS';
+        const titulo = isOs ? 'ORDEM DE SERVICO' : 'RECIBO DE VENDA';
+        const dataDoc = new Date(pedidoSelecionado.dataHora || pedidoSelecionado.dataEntrada || Date.now()).toLocaleString('pt-BR');
+
+        const itensParaImprimir = pedidoSelecionado.itensUnificados || pedidoSelecionado.itens || [];
+
+        let linhasProd = '';
+        itensParaImprimir.forEach((item, i) => {
+            const prc = Number(item.precoUnitario || item.preco) || 0;
+            const qtd = Number(item.quantidade || item.qtd) || 0;
+            const tot = prc * qtd;
+            const nomeProd = item.produto?.nome || item.nome || 'Item';
+            const sku = item.produto?.sku || item.codigo || '';
+
+            linhasProd += `<div style="margin-bottom: 8px; font-size: 11px;"><div style="font-weight: bold;">${String(i+1).padStart(2,'0')} ${nomeProd}</div><div style="display: flex; justify-content: space-between; margin-top: 2px;"><span style="width: 40%; font-size: 9px;">${sku}</span><span style="width: 30%; text-align: center;">${qtd} x ${prc.toFixed(2)}</span><span style="width: 30%; text-align: right; font-weight: bold;">${tot.toFixed(2)}</span></div></div>`;
+        });
+
+        const pagamentos = pedidoSelecionado.pagamentos || pedidoSelecionado.pagamentosInfo || [];
+        let linhasPag = '';
+        pagamentos.forEach(p => {
+            const metodoStr = (p.metodo || p.formaPagamento || 'DINHEIRO').replace('_', ' ');
+            linhasPag += `<div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px; font-size: 11px;"><span>${metodoStr}</span><span>${formatarMoeda(p.valor)}</span></div>`;
+        });
+
+        const desconto = Number(pedidoSelecionado.desconto) || 0;
+
+        const html = `<!DOCTYPE html><html><head><title>Cupom #${pedidoSelecionado.id}</title><style>body{font-family: monospace; width: 80mm; margin:0; padding:4mm;} .divider{border-bottom: 1px dashed #000; margin: 8px 0;}</style></head><body>
+            <div style="text-align:center; font-weight:bold; font-size:14px;">COMPROVANTE</div>
+            <div style="text-align:center; font-weight:bold; font-size:12px;">${titulo}</div>
+            <div style="text-align:center; font-size:10px;">*** NAO E DOCUMENTO FISCAL ***</div>
+            <div style="text-align:center; font-size:11px; margin-top:5px;">Nº: #${String(pedidoSelecionado.id).padStart(6,'0')}</div>
+            <div style="text-align:center; font-size:11px;">${dataDoc}</div><div class="divider"></div>
+            ${pedidoSelecionado.cliente ? `<div style="font-size:11px;">CLI: ${pedidoSelecionado.cliente.nome}</div><div class="divider"></div>` : ''}
+            <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:bold;"><span>Item</span><span style="text-align:center;">QtdxVl</span><span style="text-align:right;">Total</span></div><div class="divider"></div>
+            ${linhasProd}<div class="divider"></div>
+            ${desconto > 0 ? `<div style="display:flex; justify-content:space-between; font-size:11px; color:red;"><span>DESCONTO</span><span>- R$ ${formatarMoeda(desconto)}</span></div>` : ''}
+            <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold; margin-top:5px;"><span>TOTAL</span><span>R$ ${formatarMoeda(pedidoSelecionado.valorTotal)}</span></div><div class="divider"></div>
+            <div style="font-size:11px;"><strong>PAGAMENTOS:</strong><br>${linhasPag}</div>
+            <div class="divider"></div><div style="text-align:center; font-size:10px;">OBRIGADO PELA PREFERENCIA</div>
+        </body></html>`;
+
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+    };
+
     const emitirCupomFiscal = async () => {
         if (pedidoSelecionado.tipoFila === 'OS') {
             return toast.error("A emissão de NFC-e para OS deve ser feita pelo Gerenciador Fiscal. O caixa emite NF-e de Vendas.", { duration: 5000 });
@@ -488,7 +562,7 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                         <>
                             {/* CABEÇALHO DO PEDIDO / OS */}
                             <div className={`p-8 border-b border-slate-100 flex justify-between items-center relative z-10 ${pedidoSelecionado.tipoFila === 'OS' ? 'bg-purple-50/50' : 'bg-slate-50'}`}>
-                                <button onClick={() => selecionarPedido(null)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition-colors" title="Fechar (Esc)"><X size={24}/></button>
+                                <button onClick={() => { setPedidoSelecionado(null); setBusca(''); }} className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition-colors" title="Fechar (Esc)"><X size={24}/></button>
                                 <div>
                                     <p className={`text-xs font-black uppercase tracking-widest mb-1 flex items-center gap-1 ${pedidoSelecionado.tipoFila === 'OS' ? 'text-purple-500' : 'text-blue-500'}`}>
                                         {pedidoSelecionado.tipoFila === 'OS' ? <><Wrench size={14}/> Ordem de Serviço</> : <><Package size={14}/> Venda Balcão</>}
@@ -561,21 +635,30 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                                                 </button>
                                             </>
                                         ) : (
-                                            <div className="flex w-full gap-4 animate-fade-in">
+                                            // 🚀 AQUI É ONDE A MÁGICA ACONTECE (PAINEL 3 BOTÕES)
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full animate-fade-in">
                                                 <button
-                                                    onClick={() => setPedidoPago(pedidoSelecionado)}
-                                                    className="flex-1 py-5 bg-slate-800 hover:bg-slate-700 text-white font-black text-lg rounded-xl flex items-center justify-center gap-3 transition-transform transform hover:-translate-y-1 shadow-lg"
+                                                    onClick={imprimirBobinaLocal}
+                                                    className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-white font-black text-sm rounded-xl flex flex-col items-center justify-center gap-2 transition-transform transform hover:-translate-y-1 shadow-lg"
                                                 >
-                                                    <Printer size={24} /> IMPRIMIR RECIBO (F10)
+                                                    <Receipt size={24} className="text-slate-400" /> RECIBO BOBINA
+                                                </button>
+
+                                                <button
+                                                    onClick={imprimirDocumentoA4}
+                                                    className="flex-1 py-4 bg-slate-800 hover:bg-blue-600 text-white font-black text-sm rounded-xl flex flex-col items-center justify-center gap-2 transition-transform transform hover:-translate-y-1 shadow-lg border-b-4 border-b-blue-500"
+                                                >
+                                                    <FileText size={24} className="text-blue-400" /> IMPRIMIR A4 (PDF) (F10)
                                                 </button>
 
                                                 <button
                                                     onClick={emitirCupomFiscal}
                                                     disabled={processandoNfce || pedidoSelecionado.tipoFila === 'OS'}
-                                                    className="flex-1 py-5 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-black text-lg rounded-xl flex items-center justify-center gap-3 transition-transform transform hover:-translate-y-1 shadow-lg shadow-emerald-500/30 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    className="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white font-black text-sm rounded-xl flex flex-col items-center justify-center gap-2 transition-transform transform hover:-translate-y-1 shadow-[0_0_15px_rgba(34,197,94,0.2)] disabled:opacity-30 disabled:cursor-not-allowed"
                                                     title={pedidoSelecionado.tipoFila === 'OS' ? "Emissão Fiscal de OS deve ser feita pelo Gerenciador Fiscal" : "Emitir Nota"}
                                                 >
-                                                    {processandoNfce ? <Loader2 size={24} className="animate-spin" /> : <Receipt size={24} />} EMITIR NFC-e (F12)
+                                                    {processandoNfce ? <Loader2 size={24} className="animate-spin" /> : <ShieldCheck size={24} className="text-green-200" />}
+                                                    NFC-e (FISCAL) (F12)
                                                 </button>
                                             </div>
                                         )}
@@ -728,10 +811,6 @@ export const FilaPedidosCaixa = ({ setPaginaAtiva }) => {
                         </div>
                     </div>
                 </div>
-            )}
-
-            {pedidoPago && (
-                <CupomReciboModal pedido={pedidoPago} onClose={() => setPedidoPago(null)} />
             )}
         </>
     );

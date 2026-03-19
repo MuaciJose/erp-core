@@ -43,6 +43,9 @@ export const Configuracoes = () => {
     const [mesesLimpeza, setMesesLimpeza] = useState(24);
     const [limpandoFotos, setLimpandoFotos] = useState(false);
 
+    // Controle de qual layout o usuário está editando no momento
+    const [editorLayoutAtivo, setEditorLayoutAtivo] = useState('OS');
+
     const [config, setConfig] = useState({
         nomeFantasia: '',
         razaoSocial: '',
@@ -82,6 +85,8 @@ export const Configuracoes = () => {
 
         // 🚀 AQUI: O NOVO CAMPO NO ESTADO INICIAL
         layoutHtmlOs: '',
+        layoutHtmlVenda: '',
+        layoutHtmlRelatorioComissao: '',
 
         descontoMaximoPermitido: 10.00,
         permitirEstoqueNegativoGlobal: false,
@@ -154,6 +159,8 @@ export const Configuracoes = () => {
 
                     // 🚀 AQUI: PUXANDO O HTML DO BANCO DE DADOS
                     layoutHtmlOs: data.layoutHtmlOs || '',
+                    layoutHtmlVenda: data.layoutHtmlVenda || '',
+                    layoutHtmlRelatorioComissao: data.layoutHtmlRelatorioComissao || '',
 
                     smtpHost: data.smtpHost || 'smtp.gmail.com',
                     smtpPort: data.smtpPort || 587,
@@ -961,26 +968,57 @@ export const Configuracoes = () => {
                                 </div>
 
                                 {/* 🚀 AQUI ESTÁ O NOVO PAINEL DE HTML "HACKER" */}
-                                <div className="md:col-span-2 mt-8">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className="text-xs font-black text-slate-500 uppercase flex items-center gap-2">
-                                            <Printer size={16} className="text-blue-500"/> Layout Dinâmico da OS (HTML)
-                                        </label>
-                                        <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">Avançado</span>
+                                {/* ======================================================= */}
+                                {/* 🚀 CENTRAL DE LAYOUTS DINÂMICOS (PAINEL INTELIGENTE) */}
+                                {/* ======================================================= */}
+                                <div className="md:col-span-2 mt-8 border-t border-slate-200 pt-8">
+                                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-4">
+                                        <div>
+                                            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                                                <Printer size={20} className="text-blue-500"/> Central de Layouts (PDFs)
+                                            </h3>
+                                            <p className="text-xs text-slate-500 mt-1">Selecione o documento abaixo para personalizar o código HTML.</p>
+                                        </div>
+                                        <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg uppercase tracking-widest">Avançado</span>
                                     </div>
-                                    <p className="text-xs text-slate-500 mb-3">Cole aqui o código HTML customizado para a impressão da Ordem de Serviço em PDF. Deixe em branco para usar o padrão.</p>
 
-                                    <div className="relative group">
-                                        <div className="absolute left-0 top-0 bottom-0 w-10 bg-slate-800 rounded-l-xl border-r border-slate-700 flex flex-col items-center py-4 text-slate-500 text-[10px] font-mono pointer-events-none select-none opacity-50">
-                                            {/* Gerando uns números de linha só pra dar um ar de editor profissional */}
-                                            {Array.from({length: 15}).map((_, i) => <div key={i} className="mb-2">{i+1}</div>)}
+                                    {/* BOTÕES SELETORES DE LAYOUT */}
+                                    <div className="flex flex-wrap gap-2 mb-4 bg-slate-100 p-1.5 rounded-xl inline-flex">
+                                        <button
+                                            onClick={() => setEditorLayoutAtivo('OS')}
+                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'OS' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Ordem de Serviço (A4)
+                                        </button>
+                                        <button
+                                            onClick={() => setEditorLayoutAtivo('VENDA')}
+                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'VENDA' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Pedidos e Vendas (A4)
+                                        </button>
+                                        {/* 🚀 3. O TERCEIRO BOTÃO NOVO AQUI: */}
+                                        <button
+                                            onClick={() => setEditorLayoutAtivo('COMISSAO')}
+                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'COMISSAO' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Relatório de Comissões (RH)
+                                        </button>
+
+                                        {/* No futuro, é só adicionar os botões de RECIBO, GARANTIA, etc aqui! */}
+                                    </div>
+
+                                    {/* A CAIXA PRETA MÁGICA QUE MUDA DE CONTEÚDO */}
+                                    <div className="relative group shadow-lg rounded-xl overflow-hidden border-2 border-slate-800">
+                                        <div className="absolute left-0 top-0 bottom-0 w-10 bg-slate-900 border-r border-slate-700 flex flex-col items-center py-4 text-slate-600 text-[10px] font-mono pointer-events-none select-none">
+                                            {Array.from({length: 20}).map((_, i) => <div key={i} className="mb-1">{i+1}</div>)}
                                         </div>
                                         <textarea
-                                            name="layoutHtmlOs"
-                                            value={config.layoutHtmlOs || ''}
+                                            // A mágica acontece nessas 2 linhas abaixo: O React decide qual campo do config ele vai atualizar/mostrar
+                                            name={editorLayoutAtivo === 'OS' ? 'layoutHtmlOs' : 'layoutHtmlVenda'}
+                                            value={editorLayoutAtivo === 'OS' ? (config.layoutHtmlOs || '') : (config.layoutHtmlVenda || '')}
                                             onChange={handleChange}
-                                            rows="15"
-                                            className="w-full p-4 pl-14 bg-slate-900 text-emerald-400 font-mono text-xs border-2 border-slate-800 rounded-xl focus:border-blue-500 outline-none custom-scrollbar"
+                                            rows="20"
+                                            className="w-full p-4 pl-14 bg-[#0d1117] text-emerald-400 font-mono text-xs outline-none custom-scrollbar leading-relaxed"
                                             placeholder="<!DOCTYPE html><html>...</html>"
                                             spellCheck="false"
                                         ></textarea>

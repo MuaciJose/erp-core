@@ -5,12 +5,11 @@ import {
     Trash2, ArrowRight, Save, FolderOpen, Car, X, RefreshCw,
     AlertTriangle, MessageCircle, XCircle, Smartphone, Loader2, ArrowLeft, Receipt, FileDown,
     Image as ImageIcon, Ban, Info, Calendar, Plus,
-    Gauge // 🚀 Ícone de quilometragem mantido
+    Gauge
 } from 'lucide-react';
 
 import toast from 'react-hot-toast';
 
-// 🚀 IMPORTAÇÃO DO NOVO MODAL DO CRM
 import { ModalAgendarRevisao } from '../cadastro/ModalAgendarRevisao';
 import { ModalCadastroVeiculoRapido } from '../cadastro/ModalCadastroVeiculoRapido';
 
@@ -270,7 +269,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                     const res = await api.get(`/api/produtos?busca=${termoPrincipal}`);
 
                     const resultadosInteligentes = res.data.filter(peca => {
-                        // 🚀 CORREÇÃO: Agora o filtro local do React também lê as Referências Cruzadas e Código de Barras!
                         const textoDaPeca = `${peca.nome || ''} ${peca.sku || ''} ${peca.codigoBarras || ''} ${peca.referenciaOriginal || ''} ${peca.aplicacao || ''}`.toLowerCase();
                         return termosBusca.every(termo => textoDaPeca.includes(termo));
                     });
@@ -288,6 +286,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         }, 300);
         return () => clearTimeout(timer);
     }, [buscaPeca]);
+
     const selecionarCliente = (cliente) => {
         setClienteSelecionado(cliente);
         setBuscaCliente(cliente.nome);
@@ -295,7 +294,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         setIndexFocadoCliente(-1);
         api.get(`/api/veiculos/cliente/${cliente.id}`).then(res => {
             setClienteSelecionado(prev => ({ ...prev, veiculos: res.data || [] }));
-            // 🚀 MÁGICA 1: Se o cliente tem apenas 1 veículo, já seleciona ele e puxa o KM
             if(res.data?.length === 1) {
                 setVeiculoSelecionado(res.data[0].id.toString());
                 if (res.data[0].km) {
@@ -567,138 +565,23 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         sincronizarEstoqueSilencioso(itensFormatados).catch(console.error);
     };
 
-    const imprimirViaIframe = () => {
-        if (itens.length === 0) return toast.error("Adicione itens para imprimir.");
+    // 🚀 AQUI É O NOVO MOTOR DE IMPRESSÃO VIA JAVA!
+    const imprimirDocumento = async () => {
+        if (!orcamentoId) return toast.error("Salve o documento (F8) antes de imprimir!");
 
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0px';
-        iframe.style.height = '0px';
-        iframe.style.border = 'none';
-        iframe.style.opacity = '0';
-        document.body.appendChild(iframe);
-
-        const doc = iframe.contentWindow.document;
-
-        const linhasItens = itens.map(item => `
-            <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 6px; font-family: monospace; font-size: 10px; color: #475569;">${item.codigo}</td>
-                <td style="padding: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase;">${item.nome}</td>
-                <td style="padding: 6px; text-align: center; font-size: 12px; font-weight: bold;">${item.qtd}</td>
-                <td style="padding: 6px; text-align: right; font-size: 12px;">R$ ${formatarMoeda(item.preco)}</td>
-                <td style="padding: 6px; text-align: right; font-size: 12px; font-weight: bold;">R$ ${formatarMoeda(item.preco * item.qtd)}</td>
-            </tr>
-        `).join('');
-
-        const htmlContent = `
-            <!DOCTYPE html>
-            <html lang="pt-BR">
-            <head>
-                <meta charset="UTF-8">
-                <title>Impressao Documento</title>
-                <style>
-                    body { font-family: 'Segoe UI', Arial, sans-serif; color: #000; margin: 0; padding: 20px; font-size: 12px; }
-                    .header { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; }
-                    .empresa-info h1 { margin: 0; font-size: 20px; text-transform: uppercase; font-weight: 900; }
-                    .empresa-info p { margin: 2px 0; font-size: 11px; font-weight: bold; color: #475569; text-transform: uppercase; }
-                    .doc-info { text-align: right; }
-                    .doc-info .badge { background: #000; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 16px; font-weight: 900; text-transform: uppercase; display: inline-block; margin-bottom: 4px; }
-                    .cliente-veiculo { display: flex; border: 1px solid #000; border-radius: 6px; margin-bottom: 20px; }
-                    .box { padding: 10px; flex: 1; }
-                    .box:first-child { border-right: 1px solid #000; flex: 1.5; }
-                    .box-title { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 900; margin: 0 0 2px 0; }
-                    .box-value { font-size: 13px; font-weight: 900; text-transform: uppercase; margin: 0 0 2px 0; }
-                    .box-sub { font-size: 11px; font-weight: bold; margin: 0; }
-                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-                    th { border-bottom: 2px solid #000; border-top: 2px solid #000; padding: 8px 6px; text-align: left; font-size: 10px; text-transform: uppercase; background: #f8fafc; color: #000;}
-                    .totais-container { display: flex; justify-content: space-between; margin-top: 10px; }
-                    .rodape-msg { font-size: 11px; color: #475569; width: 60%; border-left: 2px solid #cbd5e1; padding-left: 10px; font-weight: 500; }
-                    .valores { width: 35%; border: 1px solid #cbd5e1; padding: 10px; border-radius: 6px; background: #f8fafc; }
-                    .linha-valor { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; margin-bottom: 4px; }
-                    .linha-total { display: flex; justify-content: space-between; font-size: 16px; font-weight: 900; border-top: 1px solid #94a3b8; padding-top: 8px; margin-top: 6px; text-transform: uppercase; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <div class="empresa-info">
-                        <h1>${empresaConfig.nomeFantasia}</h1>
-                        <p>${empresaConfig.razaoSocial}</p>
-                        ${empresaConfig.enderecoString ? `<p>${empresaConfig.enderecoString}</p>` : ''}
-                        <p>CNPJ: ${empresaConfig.cnpj || '---'} | TEL: ${empresaConfig.telefone || '---'}</p>
-                    </div>
-                    <div class="doc-info">
-                        <div class="badge">${modo}</div>
-                        <p style="font-size: 12px; font-weight: 900; color: #000; margin-top: 5px;">Nº DOC: ${orcamentoId || 'PROVISÓRIO'}</p>
-                        <p style="font-size: 11px;">${new Date().toLocaleString('pt-BR')}</p>
-                    </div>
-                </div>
-
-                <div class="cliente-veiculo">
-                    <div class="box">
-                        <p class="box-title">Identificação do Cliente</p>
-                        <p class="box-value">${clienteSelecionado?.nome || 'CLIENTE NÃO IDENTIFICADO / AVULSO'}</p>
-                        <p class="box-sub">DOC: ${clienteSelecionado?.documento || '---'} | TEL: ${clienteSelecionado?.telefone || '---'}</p>
-                    </div>
-                    <div class="box" style="background: #f8fafc;">
-                        <p class="box-title">Veículo em Atendimento</p>
-                        ${veiculoDetalhado ? `
-                            <p class="box-value">${veiculoDetalhado.marca} ${veiculoDetalhado.modelo}</p>
-                            <p class="box-sub">PLACA: ${veiculoDetalhado.placa} | KM: ${kmVeiculo || '---'}</p>
-                        ` : `<p class="box-value" style="color: #64748b; font-style: italic; margin-top: 5px;">VENDA BALCÃO</p>`}
-                    </div>
-                </div>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 15%;">Cód.</th>
-                            <th style="width: 45%;">Descrição</th>
-                            <th style="width: 10%; text-align: center;">Qtd</th>
-                            <th style="width: 15%; text-align: right;">Unitário</th>
-                            <th style="width: 15%; text-align: right;">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${linhasItens}
-                    </tbody>
-                </table>
-
-                <div class="totais-container">
-                    <div class="rodape-msg">
-                        ${empresaConfig.mensagemRodape}
-                    </div>
-                    <div class="valores">
-                        <div class="linha-valor"><span>SUBTOTAL:</span><span>R$ ${formatarMoeda(subtotal)}</span></div>
-                        ${valorDescontoReal > 0 ? `<div class="linha-valor" style="color: #dc2626;"><span>DESCONTO:</span><span>- R$ ${formatarMoeda(valorDescontoReal)}</span></div>` : ''}
-                        <div class="linha-total"><span>TOTAL:</span><span>R$ ${formatarMoeda(totalFinal)}</span></div>
-                    </div>
-                </div>
-
-                <script>
-                    window.onload = function() {
-                        setTimeout(function() {
-                            window.print();
-                        }, 200);
-                    }
-                </script>
-            </body>
-            </html>
-        `;
-
-        doc.open();
-        doc.write(htmlContent);
-        doc.close();
-
-        setTimeout(() => {
-            if (document.body.contains(iframe)) {
-                document.body.removeChild(iframe);
-            }
-        }, 10000);
+        const toastId = toast.loading('Buscando PDF no servidor...');
+        try {
+            const response = await api.get(`/api/vendas/${orcamentoId}/imprimir-pdf`, { responseType: 'blob' });
+            const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            window.open(fileURL, '_blank');
+            toast.success("Documento gerado com sucesso!", { id: toastId });
+        } catch (error) {
+            toast.error("Erro ao gerar o PDF. Verifique a conexão com o servidor.", { id: toastId });
+        }
     };
 
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
-            // 🚀 SE O MODAL DO CRM ESTIVER ABERTO, ELE MANDA NO ESCAPE
             if (modalCrmAberto) {
                 if (e.key === 'Escape') setModalCrmAberto(false);
                 return;
@@ -750,10 +633,10 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                     break;
                 case 'F10': e.preventDefault(); if (orcamentoId && !notaFiscalInfo) emitirNFe(); break;
                 case 'F11': e.preventDefault(); acionarWhatsApp(); break;
-                case 'F12': e.preventDefault(); setModalCrmAberto(true); break; // 🚀 ATALHO PARA O CRM
+                case 'F12': e.preventDefault(); setModalCrmAberto(true); break;
                 case 'p':
                 case 'P':
-                    if (e.ctrlKey || e.metaKey) { e.preventDefault(); imprimirViaIframe(); }
+                    if (e.ctrlKey || e.metaKey) { e.preventDefault(); imprimirDocumento(); } // 🚀 ATALHO ATUALIZADO
                     break;
                 case 'Escape':
                     if (resultadosClientes.length > 0) { setResultadosClientes([]); setIndexFocadoCliente(-1); }
@@ -775,7 +658,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         <div className="flex flex-col h-full bg-white relative z-[15]">
             <div className="p-8 max-w-7xl mx-auto flex flex-col h-full animate-fade-in relative">
 
-                {/* 🚀 MODAL DO CRM (AGORA MANDA OS IDs PARA VINCULAR NO BANCO) */}
                 <ModalAgendarRevisao
                     isOpen={modalCrmAberto}
                     onClose={() => setModalCrmAberto(false)}
@@ -789,7 +671,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                     } : null}
                 />
 
-                {/* MODAL CENTRAL DE CONSULTA DE APLICAÇÃO */}
                 {modalAplicacao.aberto && (
                     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-fade-in p-4 text-left">
                         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 flex flex-col max-h-[85vh]">
@@ -915,7 +796,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
                             <button onClick={() => processarVendaAPI(modo)} title="Salvar progresso atual (F8)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Save size={14}/> SALVAR (F8)</button>
 
-                            <button onClick={imprimirViaIframe} title="Gerar impressão A4 do documento atual (Ctrl+P)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Printer size={14}/> IMPRIMIR (Ctrl+P)</button>
+                            {/* 🚀 NOVO BOTÃO DE IMPRESSÃO QUE CHAMA O BACKEND */}
+                            <button onClick={imprimirDocumento} title="Gerar impressão PDF do documento atual (Ctrl+P)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Printer size={14}/> IMPRIMIR (Ctrl+P)</button>
 
                             <div className="flex items-center rounded-lg border border-green-200 bg-green-50 overflow-hidden ml-1">
                                 <button type="button" onClick={verificarConexaoZap} disabled={checandoZap} className="p-2 border-r border-green-200 text-green-600 hover:bg-green-100 transition-colors" title="Verificar se o motor do WhatsApp está conectado">
@@ -966,7 +848,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         setVeiculoSelecionado(val);
-                                        // 🚀 MÁGICA 2: Quando escolhe na lista, preenche o KM automático
                                         if (val && clienteSelecionado?.veiculos) {
                                             const veic = clienteSelecionado.veiculos.find(v => String(v.id) === String(val));
                                             if (veic && veic.km) {
@@ -1237,7 +1118,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 </div>
             </div>
 
-            {/* MODAL DE CANCELAMENTO DE NF-E */}
             {modalCancelamentoAberto && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 text-left">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in border-4 border-red-600">
@@ -1276,7 +1156,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 </div>
             )}
 
-            {/* MODAL DE VENDA PERDIDA */}
             {modalVendaPerdidaAberto && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 text-left">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
@@ -1304,7 +1183,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 </div>
             )}
 
-            {/* MODAL LISTA DE ORÇAMENTOS */}
             {modalListaAberto && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in text-left">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[80vh]">
@@ -1327,8 +1205,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 </div>
             )}
 
-
-            {/* 🚀 MODAL DE CADASTRO DE VEÍCULO RÁPIDO */}
             <ModalCadastroVeiculoRapido
                 isOpen={modalVeiculoAberto}
                 onClose={() => setModalVeiculoAberto(false)}
@@ -1339,12 +1215,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                         veiculos: [...(prev.veiculos || []), veiculoNovo]
                     }));
                     setVeiculoSelecionado(veiculoNovo.id.toString());
-
-                    // 🚀 MÁGICA 3: Se o carro novo recém-criado já tiver KM preenchido, carrega ele aqui
                     if (veiculoNovo.km) {
                         setKmVeiculo(veiculoNovo.km.toString());
                     }
-
                     setModalVeiculoAberto(false);
 
                     setTimeout(() => {
@@ -1354,7 +1227,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 }}
             />
 
-            {/* OVERLAY DE ZOOM DA IMAGEM DA PEÇA */}
             {previewImagemPeca && (
                 <div className="fixed inset-0 pointer-events-none z-[99999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white p-2 rounded-3xl shadow-2xl">
