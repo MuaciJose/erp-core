@@ -85,7 +85,8 @@ export const Configuracoes = () => {
 
         layoutHtmlOs: '',
         layoutHtmlVenda: '',
-        layoutHtmlRelatorioComissao: '', // 🚀 CAMPO GARANTIDO AQUI
+        layoutHtmlRelatorioComissao: '',
+        layoutHtmlFechamentoCaixa: '',
 
         descontoMaximoPermitido: 10.00,
         permitirEstoqueNegativoGlobal: false,
@@ -159,6 +160,7 @@ export const Configuracoes = () => {
                     layoutHtmlOs: data.layoutHtmlOs || '',
                     layoutHtmlVenda: data.layoutHtmlVenda || '',
                     layoutHtmlRelatorioComissao: data.layoutHtmlRelatorioComissao || '',
+                    layoutHtmlFechamentoCaixa: data.layoutHtmlFechamentoCaixa || '', // 🚀 Adicione aqui
 
                     smtpHost: data.smtpHost || 'smtp.gmail.com',
                     smtpPort: data.smtpPort || 587,
@@ -1002,6 +1004,14 @@ export const Configuracoes = () => {
                                         >
                                             Relatório de Comissões (RH)
                                         </button>
+
+                                        <button
+                                            onClick={() => setEditorLayoutAtivo('CAIXA')}
+                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'CAIXA' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Fechamento de Caixa (80mm)
+                                        </button>
+
                                     </div>
 
                                     {/* A CAIXA PRETA MÁGICA QUE MUDA DE CONTEÚDO */}
@@ -1015,12 +1025,14 @@ export const Configuracoes = () => {
                                             name={
                                                 editorLayoutAtivo === 'OS' ? 'layoutHtmlOs' :
                                                     editorLayoutAtivo === 'VENDA' ? 'layoutHtmlVenda' :
-                                                        'layoutHtmlRelatorioComissao'
+                                                        editorLayoutAtivo === 'COMISSAO' ? 'layoutHtmlRelatorioComissao' :
+                                                            'layoutHtmlFechamentoCaixa' // 🚀 O NOVO AQUI
                                             }
                                             value={
                                                 editorLayoutAtivo === 'OS' ? (config.layoutHtmlOs || '') :
                                                     editorLayoutAtivo === 'VENDA' ? (config.layoutHtmlVenda || '') :
-                                                        (config.layoutHtmlRelatorioComissao || '')
+                                                        editorLayoutAtivo === 'COMISSAO' ? (config.layoutHtmlRelatorioComissao || '') :
+                                                            (config.layoutHtmlFechamentoCaixa || '') // 🚀 O NOVO AQUI
                                             }
                                             onChange={handleChange}
                                             rows="20"

@@ -12,6 +12,7 @@ public class CaixaDiarioDTO {
     private BigDecimal cartao;
     private BigDecimal pix;
     private BigDecimal sangrias;
+    private BigDecimal valorInformadoFechamento;
 
     public CaixaDiarioDTO(CaixaDiario caixa) {
         this.status = caixa.getStatus().toString();
@@ -20,6 +21,7 @@ public class CaixaDiarioDTO {
         this.cartao = caixa.getTotalCartao();
         this.pix = caixa.getTotalPix();
         this.sangrias = caixa.getTotalSangrias();
+        this.valorInformadoFechamento = caixa.getValorInformadoFechamento();
     }
     
     // Construtor para quando o caixa está fechado
@@ -30,5 +32,6 @@ public class CaixaDiarioDTO {
         this.cartao = BigDecimal.ZERO;
         this.pix = BigDecimal.ZERO;
         this.sangrias = BigDecimal.ZERO;
+        this.valorInformadoFechamento = BigDecimal.ZERO;
     }
 }

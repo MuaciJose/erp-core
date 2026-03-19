@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/os/*/imprimir-pdf").permitAll()
                         .requestMatchers("/api/vendas/*/imprimir-pdf").permitAll()
                         .requestMatchers("/api/relatorios/comissoes/pdf").permitAll()
+                        .requestMatchers("/api/caixa/pdf").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
 

@@ -128,6 +128,11 @@ public class ConfiguracaoSistema {
     private String senhaEmailRemetente; // Deve ser a "Senha de Aplicativo"
 
 
+    // 🚀 NOVO: LAYOUT DO FECHAMENTO DE CAIXA (CUPOM 80mm)
+    @Column(columnDefinition = "TEXT")
+    private String layoutHtmlFechamentoCaixa;
+
+
 
 
 
