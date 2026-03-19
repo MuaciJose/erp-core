@@ -48,179 +48,19 @@ export const FluxoCaixaDre = () => {
         carregarConfiguracoes();
     }, [mesAno]);
 
-    // =======================================================================
-    // 🚀 IMPRESSÃO DO RELATÓRIO OFICIAL (TURBINADO!)
-    // =======================================================================
-    const imprimirRelatorio = () => {
-        const printWindow = window.open('', '_blank');
 
-        const [ano, mes] = mesAno.split('-');
-        const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-        const mesExtenso = `${meses[parseInt(mes) - 1]} de ${ano}`;
+    const imprimirRelatorio = async () => {
+        const idToast = toast.loading("Gerando PDF Oficial do DRE...");
+        try {
+            const response = await api.get(`/api/financeiro/dre/pdf?mesAno=${mesAno}`, { responseType: 'blob' });
+            const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
 
-        const receitaLiquida = dados.receitaBruta - dados.devolucoesDescontos;
-        const lucroBruto = receitaLiquida - dados.cmv;
-        const totalDespesas = Object.values(dados.despesasOperacionais || {}).reduce((a, b) => a + b, 0);
-        const lucroLiquido = lucroBruto - totalDespesas;
-        const margemLiquida = dados.receitaBruta > 0 ? ((lucroLiquido / dados.receitaBruta) * 100).toFixed(1) : 0;
-
-        const format = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-        // Monta as linhas da tabela de despesas
-        let despesasHtml = '';
-        Object.entries(dados.despesasOperacionais || {}).forEach(([nome, valor]) => {
-            despesasHtml += `
-                <tr class="row-item">
-                    <td>${nome.toUpperCase()}</td>
-                    <td class="text-right">${format(valor)}</td>
-                </tr>
-            `;
-        });
-
-        if (Object.keys(dados.despesasOperacionais || {}).length === 0) {
-            despesasHtml = `<tr class="row-item"><td style="font-style: italic;">Nenhuma despesa no período</td><td class="text-right">R$ 0,00</td></tr>`;
+            window.open(fileURL, '_blank');
+            toast.success("Documento gerado com sucesso!", { id: idToast });
+        } catch (error) {
+            console.error(error);
+            toast.error("Erro ao gerar o PDF no servidor.", { id: idToast });
         }
-
-        const html = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>DRE Oficial - ${mesExtenso}</title>
-                <style>
-                    @page { margin: 1.5cm; size: A4 portrait; }
-                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #334155; margin: 0; padding: 0; }
-                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
-
-                    /* Header Profissional */
-                    .header { border-bottom: 3px solid #0f172a; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
-                    .title-area h1 { margin: 0; font-size: 20px; font-weight: 900; color: #0f172a; text-transform: uppercase; letter-spacing: -0.5px; }
-                    .title-area p { margin: 4px 0 0; font-size: 10px; color: #10b981; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
-                    .company-name { font-size: 14px; font-weight: 900; color: #3b82f6; text-transform: uppercase; text-align: right; }
-
-                    /* Cards de Resumo */
-                    .summary-container { display: flex; gap: 15px; margin-bottom: 30px; }
-                    .summary-box { flex: 1; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; }
-                    .summary-label { font-size: 9px; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
-                    .summary-value { font-size: 18px; font-weight: 900; color: #0f172a; }
-                    .val-green { color: #10b981; }
-                    .val-red { color: #ef4444; }
-
-                    /* Tabela Cascata */
-                    .dre-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-                    .dre-table th { background: #0f172a; color: white; text-align: left; padding: 10px 15px; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
-                    .dre-table td { padding: 8px 15px; border-bottom: 1px solid #e2e8f0; }
-                    .text-right { text-align: right; }
-
-                    /* Estilos das Linhas */
-                    .row-group { background: #f1f5f9; font-weight: bold; color: #334155; }
-                    .row-subtotal { background: #e2e8f0; font-weight: 900; color: #0f172a; font-size: 12px; }
-                    .row-item td:first-child { padding-left: 30px; color: #64748b; }
-                    
-                    /* Resultado Final */
-                    .row-total-final { background: ${lucroLiquido >= 0 ? '#dcfce7' : '#fee2e2'}; font-weight: 900; font-size: 15px; color: ${lucroLiquido >= 0 ? '#166534' : '#991b1b'}; }
-                    .row-total-final td { border-bottom: none; border-top: 2px solid ${lucroLiquido >= 0 ? '#22c55e' : '#ef4444'}; padding: 15px; }
-
-                    /* Assinaturas */
-                    .footer-signatures { margin-top: 60px; display: flex; justify-content: space-around; text-align: center; page-break-inside: avoid; }
-                    .signature-line { width: 220px; border-top: 1px solid #0f172a; padding-top: 8px; font-size: 10px; font-weight: bold; color: #0f172a; text-transform: uppercase; }
-                    .timestamp { text-align: center; margin-top: 30px; font-size: 9px; color: #94a3b8; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <div class="title-area">
-                        <h1>Demonstração do Resultado (DRE)</h1>
-                        <p>Período de Apuração Oficial: ${mesExtenso}</p>
-                    </div>
-                    <div class="company-name">
-                        ${nomeEmpresa}
-                    </div>
-                </div>
-
-                <div class="summary-container">
-                    <div class="summary-box">
-                        <div class="summary-label">Receita Bruta</div>
-                        <div class="summary-value">${format(dados.receitaBruta)}</div>
-                    </div>
-                    <div class="summary-box">
-                        <div class="summary-label">Custos e Despesas</div>
-                        <div class="summary-value val-red">${format(dados.cmv + totalDespesas)}</div>
-                    </div>
-                    <div class="summary-box" style="background: ${lucroLiquido >= 0 ? '#ecfdf5' : '#fef2f2'}; border-color: ${lucroLiquido >= 0 ? '#10b981' : '#ef4444'};">
-                        <div class="summary-label" style="color: ${lucroLiquido >= 0 ? '#059669' : '#b91c1c'};">Lucro Líquido Real</div>
-                        <div class="summary-value ${lucroLiquido >= 0 ? 'val-green' : 'val-red'}">${format(lucroLiquido)}</div>
-                    </div>
-                </div>
-
-                <table class="dre-table">
-                    <thead>
-                        <tr>
-                            <th>Descrição da Conta Contábil / Gerencial</th>
-                            <th class="text-right" width="25%">Valor (R$)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr class="row-group">
-                            <td>(+) RECEITA BRUTA DE VENDAS</td>
-                            <td class="text-right">${format(dados.receitaBruta)}</td>
-                        </tr>
-                        <tr class="row-item">
-                            <td>(-) Devoluções e Descontos Concedidos</td>
-                            <td class="text-right val-red">${format(dados.devolucoesDescontos)}</td>
-                        </tr>
-                        <tr class="row-subtotal">
-                            <td>(=) RECEITA LÍQUIDA</td>
-                            <td class="text-right">${format(receitaLiquida)}</td>
-                        </tr>
-
-                        <tr><td colspan="2" style="padding: 4px; border:none;"></td></tr>
-
-                        <tr class="row-group">
-                            <td>(-) CMV (Custo da Mercadoria Vendida)</td>
-                            <td class="text-right val-red">${format(dados.cmv)}</td>
-                        </tr>
-                        <tr class="row-subtotal">
-                            <td>(=) LUCRO BRUTO SOBRE VENDAS</td>
-                            <td class="text-right">${format(lucroBruto)}</td>
-                        </tr>
-
-                        <tr><td colspan="2" style="padding: 4px; border:none;"></td></tr>
-
-                        <tr class="row-group">
-                            <td>(-) DESPESAS OPERACIONAIS</td>
-                            <td class="text-right val-red">${format(totalDespesas)}</td>
-                        </tr>
-                        ${despesasHtml}
-
-                        <tr><td colspan="2" style="padding: 8px; border:none;"></td></tr>
-
-                        <tr class="row-total-final">
-                            <td>(=) RESULTADO LÍQUIDO DO EXERCÍCIO (Margem: ${margemLiquida}%)</td>
-                            <td class="text-right">${format(lucroLiquido)}</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <div class="footer-signatures">
-                    <div class="signature-line">Assinatura da Diretoria / Sócios</div>
-                    <div class="signature-line">Visto do Departamento Financeiro</div>
-                </div>
-
-                <div class="timestamp">
-                    Documento gerado pelo sistema ERP em ${new Date().toLocaleString('pt-BR')}
-                </div>
-            </body>
-            </html>
-        `;
-
-        printWindow.document.write(html);
-        printWindow.document.close();
-        printWindow.focus();
-
-        setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
-        }, 500);
     };
 
     // =======================================================================

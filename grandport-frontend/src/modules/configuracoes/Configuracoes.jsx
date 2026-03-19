@@ -88,6 +88,7 @@ export const Configuracoes = () => {
         layoutHtmlRelatorioComissao: '',
         layoutHtmlFechamentoCaixa: '',
         layoutHtmlEspelhoNota: '',
+        layoutHtmlDre: '',
 
         descontoMaximoPermitido: 10.00,
         permitirEstoqueNegativoGlobal: false,
@@ -163,6 +164,7 @@ export const Configuracoes = () => {
                     layoutHtmlRelatorioComissao: data.layoutHtmlRelatorioComissao || '',
                     layoutHtmlFechamentoCaixa: data.layoutHtmlFechamentoCaixa || '',
                     layoutHtmlEspelhoNota: data.layoutHtmlEspelhoNota || '',
+                    layoutHtmlDre: data.layoutHtmlDre || '',
 
                     smtpHost: data.smtpHost || 'smtp.gmail.com',
                     smtpPort: data.smtpPort || 587,
@@ -1021,6 +1023,14 @@ export const Configuracoes = () => {
                                             Espelho de Nota (A4)
                                         </button>
 
+                                        <button
+                                            type="button" // Previne o form de dar submit acidental
+                                            onClick={() => setEditorLayoutAtivo('DRE')}
+                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'DRE' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            DRE Oficial (A4)
+                                        </button>
+
                                     </div>
 
                                     {/* A CAIXA PRETA MÁGICA QUE MUDA DE CONTEÚDO */}
@@ -1029,28 +1039,33 @@ export const Configuracoes = () => {
                                             {Array.from({length: 20}).map((_, i) => <div key={i} className="mb-1">{i+1}</div>)}
                                         </div>
                                         <textarea
+                                            className="w-full h-[600px] bg-slate-900 text-green-400 p-6 font-mono text-sm outline-none resize-none leading-relaxed"
+                                            spellCheck="false"
 
+                                            // 🚀 O NAME (Só mudamos a lógica para não quebrar)
                                             name={
                                                 editorLayoutAtivo === 'OS' ? 'layoutHtmlOs' :
                                                     editorLayoutAtivo === 'VENDA' ? 'layoutHtmlVenda' :
                                                         editorLayoutAtivo === 'COMISSAO' ? 'layoutHtmlRelatorioComissao' :
                                                             editorLayoutAtivo === 'CAIXA' ? 'layoutHtmlFechamentoCaixa' :
-                                                                'layoutHtmlEspelhoNota' // 🚀 O NOVO AQUI
-                                            }
-                                            value={
-                                                editorLayoutAtivo === 'OS' ? (config.layoutHtmlOs || '') :
-                                                    editorLayoutAtivo === 'VENDA' ? (config.layoutHtmlVenda || '') :
-                                                        editorLayoutAtivo === 'COMISSAO' ? (config.layoutHtmlRelatorioComissao || '') :
-                                                            editorLayoutAtivo === 'CAIXA' ? (config.layoutHtmlFechamentoCaixa || '') :
-                                                                (config.layoutHtmlEspelhoNota || '') // 🚀 O NOVO AQUI
+                                                                editorLayoutAtivo === 'ESPELHO' ? 'layoutHtmlEspelhoNota' :
+                                                                    'layoutHtmlDre'
                                             }
 
+                                            // 🚀 O VALUE BLINDADO COM config?. (Se for undefined, ele devolve string vazia e não quebra a tela)
+                                            value={
+                                                editorLayoutAtivo === 'OS' ? (config?.layoutHtmlOs || '') :
+                                                    editorLayoutAtivo === 'VENDA' ? (config?.layoutHtmlVenda || '') :
+                                                        editorLayoutAtivo === 'COMISSAO' ? (config?.layoutHtmlRelatorioComissao || '') :
+                                                            editorLayoutAtivo === 'CAIXA' ? (config?.layoutHtmlFechamentoCaixa || '') :
+                                                                editorLayoutAtivo === 'ESPELHO' ? (config?.layoutHtmlEspelhoNota || '') :
+                                                                    (config?.layoutHtmlDre || '')
+                                            }
                                             onChange={handleChange}
-                                            rows="20"
-                                            className="w-full p-4 pl-14 bg-[#0d1117] text-emerald-400 font-mono text-xs outline-none custom-scrollbar leading-relaxed"
-                                            placeholder="<!DOCTYPE html><html>...</html>"
-                                            spellCheck="false"
-                                        ></textarea>
+                                            placeholder="<!DOCTYPE html>..."
+                                        />
+
+
                                     </div>
                                 </div>
                             </div>

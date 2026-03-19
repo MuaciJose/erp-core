@@ -137,6 +137,11 @@ public class ConfiguracaoSistema {
     @Column(columnDefinition = "TEXT")
     private String layoutHtmlEspelhoNota;
 
+    // 🚀 NOVO: LAYOUT DO DRE (A4)
+    @Column(columnDefinition = "TEXT")
+    private String layoutHtmlDre;
+
+
 
 
 
