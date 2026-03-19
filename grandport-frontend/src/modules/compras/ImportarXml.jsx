@@ -107,6 +107,23 @@ export const ImportarXml = () => {
         setModoAtual('LISTA');
     };
 
+    // 🚀 NOVA FUNÇÃO DE IMPRESSÃO DO ESPELHO
+    const imprimirEspelhoNota = async () => {
+        if (!notaSelecionada) return;
+        const idToast = toast.loading("Gerando PDF do espelho da nota...");
+        try {
+            // Bate na rota do Java pedindo o PDF desta nota específica
+            const response = await api.get(`/api/compras/${notaSelecionada.id}/pdf`, { responseType: 'blob' });
+            const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+
+            window.open(fileURL, '_blank');
+            toast.success("Documento gerado com sucesso!", { id: idToast });
+        } catch (error) {
+            console.error(error);
+            toast.error("Erro ao gerar o PDF no servidor.", { id: idToast });
+        }
+    };
+
     const confirmarConferencia = async () => {
         if (notaSelecionada.status === 'Finalizado' || notaSelecionada.status === 'Conferido') {
             return toast.success("Esta nota já foi conferida!");
@@ -238,7 +255,6 @@ export const ImportarXml = () => {
         }
     };
 
-    // 🚀 ATUALIZADO: Salva o estoque atual junto no vínculo manual
     const selecionarVinculo = (produto) => {
         setVinculos(prev => ({
             ...prev,
@@ -380,6 +396,7 @@ export const ImportarXml = () => {
     return (
         <div className="flex-1 bg-slate-50 flex flex-col animate-fade-in min-h-screen">
 
+            {/* MODAL CONVERSÃO */}
             {modalConversao.aberto && (
                 <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
@@ -442,6 +459,7 @@ export const ImportarXml = () => {
                 </div>
             )}
 
+            {/* MODAL VÍNCULO */}
             {modalVinculo.aberto && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[200] animate-fade-in p-4">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
@@ -469,9 +487,18 @@ export const ImportarXml = () => {
                 </div>
             )}
 
+            {/* 🚀 CABEÇALHO DO ESPELHO (ONDE O BOTÃO DE IMPRIMIR ENTROU) */}
             <div className="p-6 bg-white border-b flex justify-between items-center shadow-sm sticky top-0 z-20">
                 <button onClick={voltarParaLista} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-black transition-colors"><ArrowLeft size={20} /> VOLTAR</button>
                 <div className="flex gap-4">
+                    {/* 🚀 NOVO BOTÃO DE IMPRESSÃO AQUI */}
+                    <button
+                        onClick={imprimirEspelhoNota}
+                        className="flex items-center gap-2 px-6 py-2 rounded-xl font-black text-slate-600 bg-white border-2 border-slate-200 hover:text-blue-600 hover:border-blue-300 transition-all shadow-sm"
+                    >
+                        <Printer size={20} /> IMPRIMIR ESPELHO
+                    </button>
+
                     <button onClick={confirmarConferencia} disabled={notaSelecionada.status === 'Finalizado'} className={`flex items-center gap-2 px-6 py-2 rounded-xl font-black shadow-lg transition-all ${notaSelecionada.status === 'Finalizado' ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600 shadow-green-500/30 hover:-translate-y-1'}`}>
                         <CheckCircle size={20} /> {notaSelecionada.status === 'Finalizado' ? 'NOTA FINALIZADA' : 'SALVAR PREÇOS E VÍNCULOS (F10)'}
                     </button>
@@ -532,7 +559,6 @@ export const ImportarXml = () => {
                                 return (
                                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
 
-                                        {/* 🚀 ATUALIZADO: Mostra o Nome do Banco e o Estoque Atual! */}
                                         <td className="p-4">
                                             <p className="font-black text-slate-700 uppercase text-sm leading-tight mb-2">
                                                 {vinculos[idx] ? vinculos[idx].nome : item.nome}

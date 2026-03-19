@@ -115,6 +115,7 @@ public class ConfiguracaoService {
         configBanco.setLayoutHtmlVenda(dadosAtualizados.getLayoutHtmlVenda());
         configBanco.setLayoutHtmlRelatorioComissao(dadosAtualizados.getLayoutHtmlRelatorioComissao());
         configBanco.setLayoutHtmlFechamentoCaixa(dadosAtualizados.getLayoutHtmlFechamentoCaixa());
+        configBanco.setLayoutHtmlEspelhoNota(dadosAtualizados.getLayoutHtmlEspelhoNota());
 
         ConfiguracaoSistema salva = repository.save(configBanco);
         reagendarBackup();

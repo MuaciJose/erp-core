@@ -87,6 +87,7 @@ export const Configuracoes = () => {
         layoutHtmlVenda: '',
         layoutHtmlRelatorioComissao: '',
         layoutHtmlFechamentoCaixa: '',
+        layoutHtmlEspelhoNota: '',
 
         descontoMaximoPermitido: 10.00,
         permitirEstoqueNegativoGlobal: false,
@@ -160,7 +161,8 @@ export const Configuracoes = () => {
                     layoutHtmlOs: data.layoutHtmlOs || '',
                     layoutHtmlVenda: data.layoutHtmlVenda || '',
                     layoutHtmlRelatorioComissao: data.layoutHtmlRelatorioComissao || '',
-                    layoutHtmlFechamentoCaixa: data.layoutHtmlFechamentoCaixa || '', // 🚀 Adicione aqui
+                    layoutHtmlFechamentoCaixa: data.layoutHtmlFechamentoCaixa || '',
+                    layoutHtmlEspelhoNota: data.layoutHtmlEspelhoNota || '',
 
                     smtpHost: data.smtpHost || 'smtp.gmail.com',
                     smtpPort: data.smtpPort || 587,
@@ -1012,6 +1014,13 @@ export const Configuracoes = () => {
                                             Fechamento de Caixa (80mm)
                                         </button>
 
+                                        <button
+                                            onClick={() => setEditorLayoutAtivo('ESPELHO')}
+                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'ESPELHO' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Espelho de Nota (A4)
+                                        </button>
+
                                     </div>
 
                                     {/* A CAIXA PRETA MÁGICA QUE MUDA DE CONTEÚDO */}
@@ -1020,20 +1029,22 @@ export const Configuracoes = () => {
                                             {Array.from({length: 20}).map((_, i) => <div key={i} className="mb-1">{i+1}</div>)}
                                         </div>
                                         <textarea
-                                            // 🚀 A CORREÇÃO DE OURO ESTÁ NESTAS DUAS LINHAS:
-                                            // O text area agora entende a 3ª opção ('COMISSAO') para Name e Value
+
                                             name={
                                                 editorLayoutAtivo === 'OS' ? 'layoutHtmlOs' :
                                                     editorLayoutAtivo === 'VENDA' ? 'layoutHtmlVenda' :
                                                         editorLayoutAtivo === 'COMISSAO' ? 'layoutHtmlRelatorioComissao' :
-                                                            'layoutHtmlFechamentoCaixa' // 🚀 O NOVO AQUI
+                                                            editorLayoutAtivo === 'CAIXA' ? 'layoutHtmlFechamentoCaixa' :
+                                                                'layoutHtmlEspelhoNota' // 🚀 O NOVO AQUI
                                             }
                                             value={
                                                 editorLayoutAtivo === 'OS' ? (config.layoutHtmlOs || '') :
                                                     editorLayoutAtivo === 'VENDA' ? (config.layoutHtmlVenda || '') :
                                                         editorLayoutAtivo === 'COMISSAO' ? (config.layoutHtmlRelatorioComissao || '') :
-                                                            (config.layoutHtmlFechamentoCaixa || '') // 🚀 O NOVO AQUI
+                                                            editorLayoutAtivo === 'CAIXA' ? (config.layoutHtmlFechamentoCaixa || '') :
+                                                                (config.layoutHtmlEspelhoNota || '') // 🚀 O NOVO AQUI
                                             }
+
                                             onChange={handleChange}
                                             rows="20"
                                             className="w-full p-4 pl-14 bg-[#0d1117] text-emerald-400 font-mono text-xs outline-none custom-scrollbar leading-relaxed"

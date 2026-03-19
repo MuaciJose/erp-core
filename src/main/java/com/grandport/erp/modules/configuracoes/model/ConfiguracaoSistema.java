@@ -133,6 +133,11 @@ public class ConfiguracaoSistema {
     private String layoutHtmlFechamentoCaixa;
 
 
+    // 🚀 NOVO: LAYOUT DO ESPELHO DA NOTA (A4)
+    @Column(columnDefinition = "TEXT")
+    private String layoutHtmlEspelhoNota;
+
+
 
 
 

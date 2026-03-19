@@ -9,7 +9,6 @@ import java.util.Optional;
 @Repository
 public interface CompraXMLRepository extends JpaRepository<CompraXML, Long> {
 
-    // 🚀  Busca se já existe uma nota com esse Número e CNPJ
+    //Verifica se a nota já existe para evitar duplicidade!
     Optional<CompraXML> findByNumeroAndCnpjFornecedor(String numero, String cnpjFornecedor);
-
 }
