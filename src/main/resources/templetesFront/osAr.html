@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Ordem de Serviço</title>
+    <style>
+        @page { margin: 1cm; size: A4 portrait; }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; color: #1e293b; margin: 0; }
+        .header { width: 100%; border-bottom: 3px solid #1e293b; padding-bottom: 10px; margin-bottom: 20px; }
+        .logo { max-height: 70px; max-width: 180px; }
+        .info-empresa h2 { margin: 0; font-size: 20px; font-weight: 900; text-transform: uppercase; }
+        .info-empresa p { margin: 2px 0; font-size: 10px; font-weight: bold; color: #64748b; }
+        .box-os { border: 2px solid #1e293b; background: #f8fafc; padding: 10px; text-align: center; border-radius: 8px; }
+        .box-os h1 { margin: 0; font-size: 24px; font-weight: 900; color: #dc2626; }
+        .box-os span { font-size: 10px; font-weight: bold; text-transform: uppercase; }
+
+        .secao-titulo { background: #1e293b; color: #fff; padding: 6px 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-top: 15px; margin-bottom: 5px; }
+        .dados-grid { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        .dados-grid td { padding: 5px; border: 1px solid #cbd5e1; font-size: 10px; }
+        .label { font-size: 8px; color: #64748b; text-transform: uppercase; font-weight: bold; display: block; }
+        .valor { font-weight: 900; font-size: 11px; text-transform: uppercase; }
+
+        .tabela-itens { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        .tabela-itens th { background: #e2e8f0; color: #1e293b; font-size: 9px; text-transform: uppercase; padding: 6px; text-align: left; border: 1px solid #cbd5e1; }
+        .tabela-itens td { padding: 6px; border: 1px solid #cbd5e1; font-size: 10px; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+
+        .totais-box { float: right; width: 300px; border: 2px solid #1e293b; margin-top: 15px; border-radius: 4px; overflow: hidden; }
+        .totais-box table { width: 100%; border-collapse: collapse; }
+        .totais-box td { padding: 6px 10px; border-bottom: 1px solid #cbd5e1; font-size: 11px; font-weight: bold; }
+        .totais-box .total-final { background: #1e293b; color: #fff; font-size: 16px; font-weight: 900; }
+
+        .termo-garantia { margin-top: 150px; font-size: 9px; color: #64748b; text-align: justify; border-top: 1px dashed #cbd5e1; padding-top: 10px; }
+        .assinaturas { width: 100%; margin-top: 60px; text-align: center; }
+        .assinaturas td { width: 50%; padding: 0 20px; }
+        .linha-ass { border-top: 1px solid #1e293b; padding-top: 5px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+<table class="header">
+    <tr>
+        <td width="60%" class="info-empresa">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <img th:if="${empresa.logoBase64 != null}" th:src="${empresa.logoBase64}" class="logo" />
+                <div>
+                    <h2 th:text="${empresa.nomeFantasia != null ? empresa.nomeFantasia : 'NOME DA EMPRESA'}">NOME DA EMPRESA</h2>
+                    <p th:text="'CNPJ: ' + ${empresa.cnpj != null ? empresa.cnpj : '00.000.000'} + ' | TEL: ' + ${empresa.telefone != null ? empresa.telefone : ''}"></p>
+                    <p th:text="${empresa.logradouro != null ? empresa.logradouro : ''}"></p>
+                </div>
+            </div>
+        </td>
+        <td width="40%">
+            <div class="box-os">
+                <span>Ordem de Serviço</span>
+                <h1 th:text="'Nº ' + os.id">00000</h1>
+                <span th:text="${os.status != null ? os.status.name() : 'STATUS'}">STATUS</span>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div class="secao-titulo">Dados do Cliente &amp; Veículo</div>
+<table class="dados-grid">
+    <tr>
+        <td width="50%"><span class="label">Cliente</span><span class="valor" th:text="${nomeCliente}"></span></td>
+        <td width="25%"><span class="label">Telefone / WhatsApp</span><span class="valor" th:text="${telefoneCliente}"></span></td>
+        <td width="25%"><span class="label">Data de Entrada</span><span class="valor" th:text="${os.dataEntrada != null ? #temporals.format(os.dataEntrada, 'dd/MM/yyyy HH:mm') : '--/--/----'}"></span></td>
+    </tr>
+    <tr>
+        <td><span class="label">Veículo</span><span class="valor" th:text="${veiculoNome}"></span></td>
+        <td><span class="label">Placa</span><span class="valor" th:text="${placaVeiculo}"></span></td>
+        <td><span class="label">Odômetro (KM)</span><span class="valor" th:text="${os.kmEntrada != null ? os.kmEntrada : '--'}"></span></td>
+    </tr>
+    <tr>
+        <td colspan="3"><span class="label">Consultor Técnico</span><span class="valor" th:text="${nomeConsultor}"></span></td>
+    </tr>
+</table>
+
+<div th:if="${os.defeitoRelatado != null and !os.defeitoRelatado.isEmpty()}" style="margin-bottom: 15px;">
+    <span class="label" style="display:inline;">Defeito Relatado:</span> <span style="font-size: 10px;" th:text="${os.defeitoRelatado}"></span>
+</div>
+
+<div th:if="${os.itensServicos != null and !os.itensServicos.isEmpty()}">
+    <div class="secao-titulo">Mão de Obra / Serviços Executados</div>
+    <table class="tabela-itens">
+        <thead>
+        <tr>
+            <th width="10%" class="text-center">QTD</th>
+            <th width="50%">Descrição do Serviço</th>
+            <th width="20%" class="text-right">V. Unitário (R$)</th>
+            <th width="20%" class="text-right">Total (R$)</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="itemServico : ${os.itensServicos}">
+            <td class="text-center bold" th:text="${itemServico.quantidade != null ? itemServico.quantidade : '1'}">1</td>
+            <td class="valor" th:text="${itemServico.servico != null ? itemServico.servico.nome : 'Serviço Diverso'}">Descrição</td>
+            <td class="text-right">R$ <span th:text="${itemServico.precoUnitario != null ? #numbers.formatDecimal(itemServico.precoUnitario, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+            <td class="text-right bold">R$ <span th:text="${itemServico.valorTotal != null ? #numbers.formatDecimal(itemServico.valorTotal, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<div th:if="${os.itensPecas != null and !os.itensPecas.isEmpty()}">
+    <div class="secao-titulo">Peças e Produtos Aplicados</div>
+    <table class="tabela-itens">
+        <thead>
+        <tr>
+            <th width="10%" class="text-center">QTD</th>
+            <th width="50%">Descrição da Peça</th>
+            <th width="20%" class="text-right">V. Unitário (R$)</th>
+            <th width="20%" class="text-right">Total (R$)</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="peca : ${os.itensPecas}">
+            <td class="text-center bold" th:text="${peca.quantidade != null ? peca.quantidade : '1'}">1</td>
+            <td class="valor" th:text="${peca.produto != null ? peca.produto.nome : 'Peça Diversa'}">Descrição</td>
+            <td class="text-right">R$ <span th:text="${peca.precoUnitario != null ? #numbers.formatDecimal(peca.precoUnitario, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+            <td class="text-right bold">R$ <span th:text="${peca.valorTotal != null ? #numbers.formatDecimal(peca.valorTotal, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="totais-box">
+    <table>
+        <tr>
+            <td>Total Serviços</td>
+            <td class="text-right">R$ <span th:text="${os.totalServicos != null ? #numbers.formatDecimal(os.totalServicos, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+        </tr>
+        <tr>
+            <td>Total Peças</td>
+            <td class="text-right">R$ <span th:text="${os.totalPecas != null ? #numbers.formatDecimal(os.totalPecas, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+        </tr>
+        <tr>
+            <td style="color: #dc2626;">Descontos (-)</td>
+            <td class="text-right" style="color: #dc2626;">R$ <span th:text="${os.desconto != null ? #numbers.formatDecimal(os.desconto, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+        </tr>
+        <tr class="total-final">
+            <td>TOTAL DA OS</td>
+            <td class="text-right">R$ <span th:text="${os.valorTotal != null ? #numbers.formatDecimal(os.valorTotal, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+        </tr>
+    </table>
+</div>
+
+<div style="clear: both;"></div>
+
+<div class="termo-garantia">
+    <strong style="color:#1e293b;">TERMO DE GARANTIA E CONDIÇÕES:</strong> <span th:text="${empresa.mensagemRodape != null and !empresa.mensagemRodape.isEmpty() ? empresa.mensagemRodape : 'Garantia de 90 dias para serviços prestados, conforme artigo 26 do CDC. As peças substituídas possuem garantia dos respectivos fabricantes.'}"></span>
+</div>
+
+<table class="assinaturas">
+    <tr>
+        <td><div class="linha-ass">Assinatura da Oficina</div></td>
+        <td><div class="linha-ass">Assinatura do Cliente</div></td>
+    </tr>
+</table>
+</body>
+</html>

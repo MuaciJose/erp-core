@@ -91,25 +91,47 @@ public class OrdemServicoController {
     }
 
     // =========================================================
-    // 🚀 ROTA DE IMPRESSÃO PROFISSIONAL (HTML PARA PDF)
-    // =========================================================
+// 🚀 ROTA DE IMPRESSÃO PROFISSIONAL (ORDEM DE SERVIÇO)
+// =========================================================
     @GetMapping("/{id}/imprimir-pdf")
     public org.springframework.http.ResponseEntity<byte[]> imprimirOsPdf(@PathVariable Long id) {
         // 1. Puxa a OS e a Empresa do Banco
         OrdemServico os = osRepository.findById(id).orElseThrow(() -> new RuntimeException("OS não encontrada"));
         var empresa = configuracaoRepository.findById(1L).orElse(new com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema());
 
+        // 🚀 A MÁGICA: Pré-processamos os dados críticos no Java!
+        String nomeCliente = (os.getCliente() != null && os.getCliente().getNome() != null)
+                ? os.getCliente().getNome()
+                : "CONSUMIDOR FINAL";
+
+        String telefoneCliente = (os.getCliente() != null && os.getCliente().getTelefone() != null)
+                ? os.getCliente().getTelefone()
+                : "--";
+
+        String nomeConsultor = (os.getConsultor() != null && os.getConsultor().getNomeCompleto() != null)
+                ? os.getConsultor().getNomeCompleto()
+                : "Padrão";
+
         // 2. Monta o nome do carro bonitinho
         String veiculoNome = "Não informado";
+        String placaVeiculo = "--";
         if (os.getVeiculo() != null) {
-            veiculoNome = os.getVeiculo().getMarca() + " " + os.getVeiculo().getModelo() + " - Placa: " + os.getVeiculo().getPlaca();
+            veiculoNome = (os.getVeiculo().getMarca() != null ? os.getVeiculo().getMarca() : "") + " " +
+                    (os.getVeiculo().getModelo() != null ? os.getVeiculo().getModelo() : "");
+            placaVeiculo = os.getVeiculo().getPlaca() != null ? os.getVeiculo().getPlaca() : "--";
         }
 
         // 3. Prepara a maleta de variáveis para entregar pro HTML
         java.util.Map<String, Object> variaveis = new java.util.HashMap<>();
         variaveis.put("os", os);
         variaveis.put("empresa", empresa);
-        variaveis.put("veiculoNome", veiculoNome);
+
+        // Injetamos as variáveis mastigadas
+        variaveis.put("nomeCliente", nomeCliente);
+        variaveis.put("telefoneCliente", telefoneCliente);
+        variaveis.put("nomeConsultor", nomeConsultor);
+        variaveis.put("veiculoNome", veiculoNome.trim());
+        variaveis.put("placaVeiculo", placaVeiculo);
 
         // 4. Manda o serviço gerar o PDF (COM PLANO B CASO O BANCO ESTEJA VAZIO) 🚀
         String htmlDoBanco = empresa.getLayoutHtmlOs();
@@ -126,5 +148,6 @@ public class OrdemServicoController {
                 .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=OS-" + id + ".pdf")
                 .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
                 .body(arquivoPdf);
+        }
+
     }
-}

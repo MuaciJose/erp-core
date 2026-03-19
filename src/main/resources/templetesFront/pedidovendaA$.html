@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Pedido de Venda / Orçamento</title>
+    <style>
+        @page { margin: 1cm; size: A4 portrait; }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; color: #1e293b; margin: 0; }
+        .header { width: 100%; border-bottom: 2px solid #cbd5e1; padding-bottom: 15px; margin-bottom: 20px; }
+        .logo { max-height: 60px; max-width: 150px; }
+        .info-empresa { text-align: right; }
+        .info-empresa h2 { margin: 0; font-size: 18px; font-weight: 900; text-transform: uppercase; color: #2563eb; }
+        .info-empresa p { margin: 2px 0; font-size: 10px; font-weight: bold; color: #64748b; text-transform: uppercase; }
+
+        .titulo-doc { font-size: 22px; font-weight: 900; text-transform: uppercase; margin-bottom: 15px; display: inline-block; padding-bottom: 5px; border-bottom: 3px solid #2563eb; }
+        .info-cliente { border: 1px solid #cbd5e1; background: #f8fafc; padding: 10px; border-radius: 6px; margin-bottom: 20px; }
+        .info-cliente p { margin: 3px 0; font-size: 11px; }
+
+        .tabela-itens { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        .tabela-itens th { background: #1e293b; color: #fff; font-size: 9px; text-transform: uppercase; padding: 8px; text-align: left; }
+        .tabela-itens td { padding: 8px; border-bottom: 1px solid #cbd5e1; font-size: 10px; font-weight: bold; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+
+        .totais-box { float: right; width: 280px; margin-top: 20px; }
+        .totais-box table { width: 100%; border-collapse: collapse; }
+        .totais-box td { padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 12px; font-weight: bold; }
+        .total-final { font-size: 18px !important; font-weight: 900 !important; color: #2563eb; border-top: 2px solid #2563eb; }
+    </style>
+</head>
+<body>
+<table class="header">
+    <tr>
+        <td width="40%">
+            <img th:if="${empresa.logoBase64 != null}" th:src="${empresa.logoBase64}" class="logo" />
+        </td>
+        <td width="60%" class="info-empresa">
+            <h2 th:text="${empresa.nomeFantasia != null ? empresa.nomeFantasia : 'MINHA LOJA'}">MINHA LOJA</h2>
+            <p th:text="'CNPJ: ' + ${empresa.cnpj != null ? empresa.cnpj : '00.000.000'} + ' | TEL: ' + ${empresa.telefone != null ? empresa.telefone : ''}"></p>
+            <p th:text="${empresa.logradouro != null ? empresa.logradouro : ''}"></p>
+        </td>
+    </tr>
+</table>
+
+<div class="titulo-doc" th:text="${isOrcamento ? 'ORÇAMENTO Nº ' + venda.id : 'PEDIDO DE VENDA Nº ' + venda.id}">PEDIDO DE VENDA</div>
+
+<div class="info-cliente">
+    <p><strong>CLIENTE:</strong> <span th:text="${nomeCliente}"></span></p>
+    <p><strong>DATA:</strong> <span th:text="${venda.dataHora != null ? #temporals.format(venda.dataHora, 'dd/MM/yyyy HH:mm') : ''}"></span> | <strong>VENDEDOR:</strong> <span th:text="${nomeVendedor}"></span></p>
+
+    <div th:if="${venda.veiculo != null}" style="margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+        <p>
+            <strong>VEÍCULO:</strong> <span th:text="${venda.veiculo.marca + ' ' + venda.veiculo.modelo}"></span> |
+            <strong>PLACA:</strong> <span th:text="${venda.veiculo.placa}"></span> |
+            <strong>KM:</strong> <span th:text="${venda.kmVeiculo != null ? venda.kmVeiculo : '--'}"></span>
+        </p>
+    </div>
+</div>
+
+<table class="tabela-itens">
+    <thead>
+    <tr>
+        <th width="10%">CÓD</th>
+        <th width="45%">PRODUTO</th>
+        <th width="10%" class="text-center">QTD</th>
+        <th width="15%" class="text-right">V. UNIT</th>
+        <th width="20%" class="text-right">TOTAL</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="item : ${venda.itens}">
+        <td th:text="${item.produto != null ? item.produto.id : '-'}">01</td>
+        <td th:text="${item.produto != null ? item.produto.nome : 'Produto Diverso'}">Nome do Produto</td>
+        <td class="text-center" th:text="${item.quantidade}">1</td>
+        <td class="text-right">R$ <span th:text="${item.precoUnitario != null ? #numbers.formatDecimal(item.precoUnitario, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+        <td class="text-right" style="color:#2563eb;">R$ <span th:text="${item.precoUnitario != null ? #numbers.formatDecimal(item.precoUnitario * item.quantidade, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+    </tr>
+    </tbody>
+</table>
+
+<div class="totais-box">
+    <table>
+        <tr>
+            <td>Subtotal</td>
+            <td class="text-right">R$ <span th:text="${venda.valorSubtotal != null ? #numbers.formatDecimal(venda.valorSubtotal, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+        </tr>
+        <tr>
+            <td style="color:#dc2626;">Desconto (-)</td>
+            <td class="text-right" style="color:#dc2626;">R$ <span th:text="${venda.desconto != null ? #numbers.formatDecimal(venda.desconto, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+        </tr>
+        <tr>
+            <td class="total-final">TOTAL A PAGAR</td>
+            <td class="text-right total-final">R$ <span th:text="${venda.valorTotal != null ? #numbers.formatDecimal(venda.valorTotal, 1, 'POINT', 2, 'COMMA') : '0,00'}">0.00</span></td>
+        </tr>
+    </table>
+</div>
+
+<div style="clear: both;"></div>
+
+<div style="margin-top: 80px; text-align: center; font-size: 10px; font-weight: bold; color: #64748b;">
+    _______________________________________________________<br/>
+    ASSINATURA DO CLIENTE<br/><br/>
+    Obrigado pela preferência!
+</div>
+</body>
+</html>
