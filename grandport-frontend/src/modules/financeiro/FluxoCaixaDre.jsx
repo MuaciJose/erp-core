@@ -26,14 +26,9 @@ export const FluxoCaixaDre = () => {
         }
     };
 
-    // 🚀 Função corrigida para bater na rota exata do seu Controller Java
     const carregarConfiguracoes = async () => {
         try {
-            // A rota correta do seu ConfiguracaoController
             const res = await api.get('/api/configuracoes');
-
-            // O seu Java devolve o objeto ConfiguracaoSistema inteiro
-            // Vamos procurar as chaves mais prováveis de ter o nome da empresa
             const nomeAPI = res.data?.nomeFantasia || res.data?.razaoSocial || res.data?.nomeEmpresa;
 
             if (nomeAPI) {
@@ -44,10 +39,7 @@ export const FluxoCaixaDre = () => {
             console.log("Erro ao buscar da API, tentando cache local...");
         }
 
-        // Fallback para o cache ou nome padrão
-        const nomeCache = localStorage.getItem('nomeEmpresa')
-            || localStorage.getItem('nomeFantasia');
-
+        const nomeCache = localStorage.getItem('nomeEmpresa') || localStorage.getItem('nomeFantasia');
         setNomeEmpresa(nomeCache || "GrandPort Auto Peças");
     };
 
@@ -57,7 +49,7 @@ export const FluxoCaixaDre = () => {
     }, [mesAno]);
 
     // =======================================================================
-    // 🚀 IMPRESSÃO DO RELATÓRIO OFICIAL
+    // 🚀 IMPRESSÃO DO RELATÓRIO OFICIAL (TURBINADO!)
     // =======================================================================
     const imprimirRelatorio = () => {
         const printWindow = window.open('', '_blank');
@@ -74,93 +66,148 @@ export const FluxoCaixaDre = () => {
 
         const format = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+        // Monta as linhas da tabela de despesas
         let despesasHtml = '';
         Object.entries(dados.despesasOperacionais || {}).forEach(([nome, valor]) => {
             despesasHtml += `
-                <div class="row">
-                    <span class="ident padding-left">${nome.toUpperCase()}</span>
-                    <span>${format(valor)}</span>
-                </div>
+                <tr class="row-item">
+                    <td>${nome.toUpperCase()}</td>
+                    <td class="text-right">${format(valor)}</td>
+                </tr>
             `;
         });
 
         if (Object.keys(dados.despesasOperacionais || {}).length === 0) {
-            despesasHtml = `<div class="row"><span class="ident padding-left italic">Nenhuma despesa no período</span><span>R$ 0,00</span></div>`;
+            despesasHtml = `<tr class="row-item"><td style="font-style: italic;">Nenhuma despesa no período</td><td class="text-right">R$ 0,00</td></tr>`;
         }
 
         const html = `
             <!DOCTYPE html>
             <html>
             <head>
-                <title>DRE - ${mesExtenso}</title>
+                <title>DRE Oficial - ${mesExtenso}</title>
                 <style>
-                    body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-                    .header { text-align: center; border-bottom: 2px solid #222; padding-bottom: 20px; margin-bottom: 30px; }
-                    .header h1 { margin: 0 0 5px 0; font-size: 24px; text-transform: uppercase; }
-                    .header p { margin: 0; color: #666; font-size: 14px; }
-                    .dre-container { width: 100%; border: 1px solid #ccc; border-collapse: collapse; }
-                    .row { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; }
-                    .row.title { background: #f8f9fa; font-weight: bold; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; }
-                    .row.total { font-weight: bold; font-size: 16px; background: #eef2f5;}
-                    .row.result { font-weight: bold; font-size: 18px; background: ${lucroLiquido >= 0 ? '#e6f4ea' : '#fdeded'}; border: 2px solid ${lucroLiquido >= 0 ? '#28a745' : '#dc3545'}; }
-                    .ident { color: #555; }
-                    .padding-left { padding-left: 20px; }
+                    @page { margin: 1.5cm; size: A4 portrait; }
+                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #334155; margin: 0; padding: 0; }
+                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+
+                    /* Header Profissional */
+                    .header { border-bottom: 3px solid #0f172a; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
+                    .title-area h1 { margin: 0; font-size: 20px; font-weight: 900; color: #0f172a; text-transform: uppercase; letter-spacing: -0.5px; }
+                    .title-area p { margin: 4px 0 0; font-size: 10px; color: #10b981; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+                    .company-name { font-size: 14px; font-weight: 900; color: #3b82f6; text-transform: uppercase; text-align: right; }
+
+                    /* Cards de Resumo */
+                    .summary-container { display: flex; gap: 15px; margin-bottom: 30px; }
+                    .summary-box { flex: 1; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; }
+                    .summary-label { font-size: 9px; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
+                    .summary-value { font-size: 18px; font-weight: 900; color: #0f172a; }
+                    .val-green { color: #10b981; }
+                    .val-red { color: #ef4444; }
+
+                    /* Tabela Cascata */
+                    .dre-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+                    .dre-table th { background: #0f172a; color: white; text-align: left; padding: 10px 15px; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
+                    .dre-table td { padding: 8px 15px; border-bottom: 1px solid #e2e8f0; }
                     .text-right { text-align: right; }
-                    .italic { font-style: italic; }
-                    .footer { text-align: center; margin-top: 50px; font-size: 12px; color: #888; }
-                    @media print {
-                        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    }
+
+                    /* Estilos das Linhas */
+                    .row-group { background: #f1f5f9; font-weight: bold; color: #334155; }
+                    .row-subtotal { background: #e2e8f0; font-weight: 900; color: #0f172a; font-size: 12px; }
+                    .row-item td:first-child { padding-left: 30px; color: #64748b; }
+                    
+                    /* Resultado Final */
+                    .row-total-final { background: ${lucroLiquido >= 0 ? '#dcfce7' : '#fee2e2'}; font-weight: 900; font-size: 15px; color: ${lucroLiquido >= 0 ? '#166534' : '#991b1b'}; }
+                    .row-total-final td { border-bottom: none; border-top: 2px solid ${lucroLiquido >= 0 ? '#22c55e' : '#ef4444'}; padding: 15px; }
+
+                    /* Assinaturas */
+                    .footer-signatures { margin-top: 60px; display: flex; justify-content: space-around; text-align: center; page-break-inside: avoid; }
+                    .signature-line { width: 220px; border-top: 1px solid #0f172a; padding-top: 8px; font-size: 10px; font-weight: bold; color: #0f172a; text-transform: uppercase; }
+                    .timestamp { text-align: center; margin-top: 30px; font-size: 9px; color: #94a3b8; }
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <h1>Demonstração do Resultado do Exercício (DRE)</h1>
-                    <p>Empresa: <strong>${nomeEmpresa}</strong></p>
-                    <p>Período de Apuração: <strong>${mesExtenso}</strong></p>
-                </div>
-
-                <div class="dre-container">
-                    <div class="row title">
-                        <span>(+) RECEITA BRUTA DE VENDAS</span>
-                        <span>${format(dados.receitaBruta)}</span>
+                    <div class="title-area">
+                        <h1>Demonstração do Resultado (DRE)</h1>
+                        <p>Período de Apuração Oficial: ${mesExtenso}</p>
                     </div>
-                    <div class="row">
-                        <span class="ident">(-) Devoluções e Descontos</span>
-                        <span>${format(dados.devolucoesDescontos)}</span>
-                    </div>
-                    <div class="row total">
-                        <span>(=) RECEITA LÍQUIDA</span>
-                        <span>${format(receitaLiquida)}</span>
-                    </div>
-
-                    <div class="row mt-10">
-                        <span class="ident">(-) CMV (Custo da Mercadoria Vendida)</span>
-                        <span>${format(dados.cmv)}</span>
-                    </div>
-                    <div class="row total">
-                        <span>(=) LUCRO BRUTO</span>
-                        <span>${format(lucroBruto)}</span>
-                    </div>
-
-                    <div class="row title mt-10">
-                        <span>(-) DESPESAS OPERACIONAIS</span>
-                        <span></span>
-                    </div>
-                    ${despesasHtml}
-                    <div class="row total">
-                        <span>(=) Total de Despesas</span>
-                        <span>${format(totalDespesas)}</span>
-                    </div>
-
-                    <div class="row result mt-20">
-                        <span>(=) RESULTADO LÍQUIDO DO EXERCÍCIO (Margem: ${margemLiquida}%)</span>
-                        <span>${format(lucroLiquido)}</span>
+                    <div class="company-name">
+                        ${nomeEmpresa}
                     </div>
                 </div>
 
-                <div class="footer">
-                    Gerado pelo Sistema ${nomeEmpresa} em ${new Date().toLocaleString('pt-BR')}
+                <div class="summary-container">
+                    <div class="summary-box">
+                        <div class="summary-label">Receita Bruta</div>
+                        <div class="summary-value">${format(dados.receitaBruta)}</div>
+                    </div>
+                    <div class="summary-box">
+                        <div class="summary-label">Custos e Despesas</div>
+                        <div class="summary-value val-red">${format(dados.cmv + totalDespesas)}</div>
+                    </div>
+                    <div class="summary-box" style="background: ${lucroLiquido >= 0 ? '#ecfdf5' : '#fef2f2'}; border-color: ${lucroLiquido >= 0 ? '#10b981' : '#ef4444'};">
+                        <div class="summary-label" style="color: ${lucroLiquido >= 0 ? '#059669' : '#b91c1c'};">Lucro Líquido Real</div>
+                        <div class="summary-value ${lucroLiquido >= 0 ? 'val-green' : 'val-red'}">${format(lucroLiquido)}</div>
+                    </div>
+                </div>
+
+                <table class="dre-table">
+                    <thead>
+                        <tr>
+                            <th>Descrição da Conta Contábil / Gerencial</th>
+                            <th class="text-right" width="25%">Valor (R$)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="row-group">
+                            <td>(+) RECEITA BRUTA DE VENDAS</td>
+                            <td class="text-right">${format(dados.receitaBruta)}</td>
+                        </tr>
+                        <tr class="row-item">
+                            <td>(-) Devoluções e Descontos Concedidos</td>
+                            <td class="text-right val-red">${format(dados.devolucoesDescontos)}</td>
+                        </tr>
+                        <tr class="row-subtotal">
+                            <td>(=) RECEITA LÍQUIDA</td>
+                            <td class="text-right">${format(receitaLiquida)}</td>
+                        </tr>
+
+                        <tr><td colspan="2" style="padding: 4px; border:none;"></td></tr>
+
+                        <tr class="row-group">
+                            <td>(-) CMV (Custo da Mercadoria Vendida)</td>
+                            <td class="text-right val-red">${format(dados.cmv)}</td>
+                        </tr>
+                        <tr class="row-subtotal">
+                            <td>(=) LUCRO BRUTO SOBRE VENDAS</td>
+                            <td class="text-right">${format(lucroBruto)}</td>
+                        </tr>
+
+                        <tr><td colspan="2" style="padding: 4px; border:none;"></td></tr>
+
+                        <tr class="row-group">
+                            <td>(-) DESPESAS OPERACIONAIS</td>
+                            <td class="text-right val-red">${format(totalDespesas)}</td>
+                        </tr>
+                        ${despesasHtml}
+
+                        <tr><td colspan="2" style="padding: 8px; border:none;"></td></tr>
+
+                        <tr class="row-total-final">
+                            <td>(=) RESULTADO LÍQUIDO DO EXERCÍCIO (Margem: ${margemLiquida}%)</td>
+                            <td class="text-right">${format(lucroLiquido)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="footer-signatures">
+                    <div class="signature-line">Assinatura da Diretoria / Sócios</div>
+                    <div class="signature-line">Visto do Departamento Financeiro</div>
+                </div>
+
+                <div class="timestamp">
+                    Documento gerado pelo sistema ERP em ${new Date().toLocaleString('pt-BR')}
                 </div>
             </body>
             </html>
@@ -217,7 +264,7 @@ export const FluxoCaixaDre = () => {
                         onClick={imprimirRelatorio}
                         className="bg-slate-900 text-white px-5 py-3 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-slate-800 shadow-lg transition-transform transform hover:-translate-y-1"
                     >
-                        <Printer size={20}/> IMPRIMIR
+                        <Printer size={20}/> IMPRIMIR DRE
                     </button>
                 </div>
             </div>
