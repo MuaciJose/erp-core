@@ -10,8 +10,9 @@ import java.time.LocalDateTime;
 public class ContaReceberDTO {
     private Long id;
     private String parceiroNome;
-    private String descricao; // 🚀 ADICIONADO: Essencial para mostrar "Parcela 1/3" no Front
+    private String descricao;
     private LocalDateTime dataVencimento;
+    private LocalDateTime dataPagamento; // 🚀 NOVO: Necessário para o filtro de "Recebidos Hoje"
     private BigDecimal valor;
     private String status;
     private boolean atrasado;
@@ -19,12 +20,12 @@ public class ContaReceberDTO {
     public ContaReceberDTO(ContaReceber conta) {
         this.id = conta.getId();
         this.parceiroNome = conta.getParceiro() != null ? conta.getParceiro().getNome() : "Consumidor";
-        this.descricao = conta.getDescricao() != null ? conta.getDescricao() : "Venda a Prazo"; // 🚀 Mapeia a descrição
+        this.descricao = conta.getDescricao() != null ? conta.getDescricao() : "Venda a Prazo";
         this.dataVencimento = conta.getDataVencimento();
+        this.dataPagamento = conta.getDataPagamento(); // 🚀 Mapeia a data de recebimento
         this.valor = conta.getValorOriginal();
         this.status = conta.getStatus() != null ? conta.getStatus().toString() : "PENDENTE";
 
-        // 🚀 Trava de Segurança: Evita erro 500 se alguma conta antiga estiver sem data
         if (this.dataVencimento != null) {
             this.atrasado = this.dataVencimento.isBefore(LocalDateTime.now()) && "PENDENTE".equals(this.status);
         } else {

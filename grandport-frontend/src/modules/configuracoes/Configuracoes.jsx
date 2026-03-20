@@ -4,7 +4,7 @@ import {
     Settings, Building2, Printer, Sliders, Save, CheckCircle,
     AlertTriangle, Info, X, Store, Percent, Search, Loader2, Camera, Plus,
     Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode, RefreshCw, Receipt,
-    ToggleLeft, ToggleRight, Landmark, Wrench
+    Landmark, Wrench
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -89,9 +89,10 @@ export const Configuracoes = () => {
         layoutHtmlFechamentoCaixa: '',
         layoutHtmlEspelhoNota: '',
         layoutHtmlDre: '',
-        layoutHtmlRecibo: '',
-        layoutHtmlReciboPagamento: '',
-        layoutHtmlRelatorioContasPagar: '',
+        layoutHtmlRecibo: '', // Recibo de Entrada (Receber)
+        layoutHtmlReciboPagamento: '', // Recibo de Saída (Pagar)
+        layoutHtmlRelatorioContasPagar: '', // Relatório Dívidas
+        layoutHtmlRelatorioContasReceber: '', // 🚀 NOVO: Relatório Entradas
 
         descontoMaximoPermitido: 10.00,
         permitirEstoqueNegativoGlobal: false,
@@ -171,6 +172,7 @@ export const Configuracoes = () => {
                     layoutHtmlRecibo: data.layoutHtmlRecibo || '',
                     layoutHtmlReciboPagamento: data.layoutHtmlReciboPagamento || '',
                     layoutHtmlRelatorioContasPagar: data.layoutHtmlRelatorioContasPagar || '',
+                    layoutHtmlRelatorioContasReceber: data.layoutHtmlRelatorioContasReceber || '', // 🚀 Mapeando do Banco
 
                     smtpHost: data.smtpHost || 'smtp.gmail.com',
                     smtpPort: data.smtpPort || 587,
@@ -323,8 +325,6 @@ export const Configuracoes = () => {
         const loadId = toast.loading('Salvando configurações...');
 
         try {
-            // Como config já contém layoutHtmlRelatorioComissao atualizado no onChange,
-            // mandar o config inteiro é suficiente!
             const res = await api.put('/api/configuracoes', config);
             const data = Array.isArray(res.data) ? res.data[0] : res.data;
             setConfig(prev => ({ ...prev, ...data }));
@@ -591,9 +591,7 @@ export const Configuracoes = () => {
                 <div className="w-full lg:w-64 flex flex-col gap-2">
                     <button onClick={() => setAbaAtiva('EMPRESA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'EMPRESA' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Building2 size={20} /> Dados da Empresa</button>
                     <button onClick={() => setAbaAtiva('FISCAL')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'FISCAL' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Receipt size={20} /> Fiscal / NF-e (Peças)</button>
-
                     <button onClick={() => setAbaAtiva('PREFEITURA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'PREFEITURA' ? 'bg-orange-500 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Landmark size={20} /> Prefeitura (Serviços)</button>
-
                     <button onClick={() => setAbaAtiva('VENDEDORES')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'VENDEDORES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Users size={20} /> Vendedores</button>
                     <button onClick={() => setAbaAtiva('IMPRESSAO')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'IMPRESSAO' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Printer size={20} /> Impressão</button>
                     <button onClick={() => setAbaAtiva('REGRAS')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'REGRAS' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Sliders size={20} /> Regras</button>
@@ -624,7 +622,7 @@ export const Configuracoes = () => {
                                     <label className="text-xs font-black text-blue-600 uppercase">CNPJ (Auto-Busca)</label>
                                     <div className="relative mt-1">
                                         <input type="text" name="cnpj" value={config.cnpj || ''} onChange={handleChange} title="Digite apenas números para realizar a busca automática" className="w-full p-3 pr-12 bg-blue-50 border-2 border-blue-200 rounded-xl font-black focus:border-blue-500 outline-none" />
-                                        <button onClick={buscarCNPJ} disabled={buscandoCnpj} title="Consultar dados da empresa automaticamente na Receita Federal via API" className="absolute right-2 top-2 bottom-2 bg-blue-600 text-white p-2 rounded-lg transition-all hover:bg-blue-700">{buscandoCnpj ? <Loader2 className="animate-spin" size={18}/> : <Search size={18} />}</button>
+                                        <button onClick={buscarCNPJ} disabled={buscandoCnpj} title="Consultar dados da empresa automatically na Receita Federal" className="absolute right-2 top-2 bottom-2 bg-blue-600 text-white p-2 rounded-lg transition-all hover:bg-blue-700">{buscandoCnpj ? <Loader2 className="animate-spin" size={18}/> : <Search size={18} />}</button>
                                     </div>
                                 </div>
                                 <div>
@@ -669,12 +667,7 @@ export const Configuracoes = () => {
 
                                 <div>
                                     <label className="text-[10px] font-black text-slate-400 uppercase">UF</label>
-                                    <select
-                                        name="uf"
-                                        value={config.uf || ''}
-                                        onChange={handleChange}
-                                        className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500"
-                                    >
+                                    <select name="uf" value={config.uf || ''} onChange={handleChange} className="w-full p-2 mt-1 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-blue-500">
                                         <option value="">Selecione</option>
                                         {ESTADOS_BRASIL.map(estado => (
                                             <option key={estado.uf} value={estado.uf}>{estado.uf} - {estado.nome}</option>
@@ -708,42 +701,18 @@ export const Configuracoes = () => {
                                     <Receipt className="text-blue-500" /> Parâmetros Fiscais (NF-e)
                                 </h2>
 
-                                <button
-                                    onClick={verificarConexaoSefaz}
-                                    disabled={testandoSefaz}
-                                    title="Validar comunicação com os servidores da Receita Federal"
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all border-2 ${
-                                        statusSefaz === 'ONLINE'
-                                            ? 'bg-green-50 border-green-200 text-green-700'
-                                            : 'bg-slate-50 border-slate-200 text-slate-600'
-                                    }`}
-                                >
-                                    {testandoSefaz ? <RefreshCw className="animate-spin" size={14}/> :
-                                        <div className={`w-2.5 h-2.5 rounded-full ${
-                                            statusSefaz === 'ONLINE' ? 'bg-green-500 animate-pulse' :
-                                                statusSefaz === 'OFFLINE' || statusSefaz === 'ERRO' ? 'bg-red-500' : 'bg-slate-400'
-                                        }`} />
-                                    }
+                                <button onClick={verificarConexaoSefaz} disabled={testandoSefaz} title="Validar comunicação com os servidores da Receita Federal" className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all border-2 ${statusSefaz === 'ONLINE' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                                    {testandoSefaz ? <RefreshCw className="animate-spin" size={14}/> : <div className={`w-2.5 h-2.5 rounded-full ${statusSefaz === 'ONLINE' ? 'bg-green-500 animate-pulse' : statusSefaz === 'OFFLINE' || statusSefaz === 'ERRO' ? 'bg-red-500' : 'bg-slate-400'}`} />}
                                     {testandoSefaz ? 'CONSULTANDO...' : 'TESTAR STATUS SEFAZ'}
                                 </button>
                             </div>
 
-                            <div
-                                className={`mt-6 mb-8 p-6 rounded-2xl border-4 transition-all flex items-center justify-between group cursor-pointer ${config.exibirIvaDual ? 'bg-white border-green-500 shadow-lg shadow-green-500/20' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`}
-                                onClick={() => setConfig({...config, exibirIvaDual: !config.exibirIvaDual})}
-                            >
+                            <div className={`mt-6 mb-8 p-6 rounded-2xl border-4 transition-all flex items-center justify-between group cursor-pointer ${config.exibirIvaDual ? 'bg-white border-green-500 shadow-lg shadow-green-500/20' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`} onClick={() => setConfig({...config, exibirIvaDual: !config.exibirIvaDual})}>
                                 <div>
-                                    <h4 className={`font-black text-lg ${config.exibirIvaDual ? 'text-green-700' : 'text-slate-600'}`}>
-                                        Transparência Fiscal (IVA Dual / Padrão Americano) no Caixa
-                                    </h4>
-                                    <p className="text-sm font-medium text-slate-500 mt-1">
-                                        {config.exibirIvaDual ? 'Ativado. O cliente verá o imposto separado no recibo e na tela de pagamento.' : 'Desativado. O imposto continuará embutido no preço total.'}
-                                    </p>
+                                    <h4 className={`font-black text-lg ${config.exibirIvaDual ? 'text-green-700' : 'text-slate-600'}`}>Transparência Fiscal (IVA Dual / Padrão Americano) no Caixa</h4>
+                                    <p className="text-sm font-medium text-slate-500 mt-1">{config.exibirIvaDual ? 'Ativado. O cliente verá o imposto separado no recibo e na tela de pagamento.' : 'Desativado. O imposto continuará embutido no preço total.'}</p>
                                 </div>
-
-                                <div className={`w-16 h-8 rounded-full flex items-center p-1 transition-colors ${config.exibirIvaDual ? 'bg-green-500 justify-end' : 'bg-slate-300 justify-start'}`}>
-                                    <div className="w-6 h-6 bg-white rounded-full shadow-sm"></div>
-                                </div>
+                                <div className={`w-16 h-8 rounded-full flex items-center p-1 transition-colors ${config.exibirIvaDual ? 'bg-green-500 justify-end' : 'bg-slate-300 justify-start'}`}><div className="w-6 h-6 bg-white rounded-full shadow-sm"></div></div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -820,13 +789,9 @@ export const Configuracoes = () => {
                                         <div className="md:col-span-2">
                                             <label className="text-xs font-bold text-blue-700 uppercase">Arquivo do Certificado (Upload)</label>
                                             <div className="mt-1 flex items-center gap-4 p-4 bg-white border-2 border-dashed border-blue-300 rounded-xl transition-all hover:border-blue-500">
-                                                <div className="bg-blue-100 p-3 rounded-lg text-blue-600">
-                                                    <UploadCloud size={24} />
-                                                </div>
+                                                <div className="bg-blue-100 p-3 rounded-lg text-blue-600"><UploadCloud size={24} /></div>
                                                 <div className="flex-1">
-                                                    <p className="text-sm font-bold text-slate-700">
-                                                        {arquivoCertificado ? arquivoCertificado.name : 'Nenhum arquivo selecionado'}
-                                                    </p>
+                                                    <p className="text-sm font-bold text-slate-700">{arquivoCertificado ? arquivoCertificado.name : 'Nenhum arquivo selecionado'}</p>
                                                     <p className="text-xs text-slate-500">Selecione o arquivo do seu certificado (formato .pfx ou .p12)</p>
                                                 </div>
                                                 <label className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold cursor-pointer transition-colors shadow-md">
@@ -847,14 +812,11 @@ export const Configuracoes = () => {
                                 <Landmark size={32} className="text-orange-600 shrink-0"/>
                                 <div>
                                     <h3 className="font-black text-orange-800">Prefeitura Municipal (Imposto Sobre Serviços - ISS)</h3>
-                                    <p className="text-sm font-medium text-orange-700 mt-1">
-                                        Configure as chaves e códigos da sua prefeitura para a emissão automática de <b className="font-black">NFS-e</b> referente à Mão de Obra das Ordens de Serviço.
-                                    </p>
+                                    <p className="text-sm font-medium text-orange-700 mt-1">Configure as chaves e códigos da sua prefeitura para a emissão automática de <b className="font-black">NFS-e</b> referente à Mão de Obra das Ordens de Serviço.</p>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
                                 <div>
                                     <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-1 block">Inscrição Municipal (IM) *</label>
                                     <input type="text" name="inscricaoMunicipal" value={config.inscricaoMunicipal || ''} onChange={handleChange} className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-mono text-slate-700 outline-none focus:border-orange-500" placeholder="Apenas números" />
@@ -862,8 +824,7 @@ export const Configuracoes = () => {
 
                                 <div>
                                     <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-1 flex items-center justify-between">
-                                        <span>Alíquota do ISS (%)</span>
-                                        <span className="text-slate-400 font-medium normal-case">Padrão da Oficina</span>
+                                        <span>Alíquota do ISS (%)</span><span className="text-slate-400 font-medium normal-case">Padrão da Oficina</span>
                                     </label>
                                     <div className="relative">
                                         <input type="number" step="0.01" name="aliquotaIss" value={config.aliquotaIss || ''} onChange={handleChange} className="w-full p-3 pl-10 bg-white border-2 border-slate-200 rounded-xl font-black text-orange-600 outline-none focus:border-orange-500" placeholder="Ex: 5.0" />
@@ -874,15 +835,13 @@ export const Configuracoes = () => {
                                 <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
                                     <div>
                                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center justify-between">
-                                            CNAE Principal (Serviços)
-                                            <a href="https://concla.ibge.gov.br/busca-online-cnae.html" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline normal-case">Consultar IBGE</a>
+                                            CNAE Principal (Serviços) <a href="https://concla.ibge.gov.br/busca-online-cnae.html" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline normal-case">Consultar IBGE</a>
                                         </label>
                                         <input type="text" name="codigoCnae" value={config.codigoCnae || ''} onChange={handleChange} className="w-full p-2 bg-white border-2 border-slate-200 rounded-lg font-mono text-sm outline-none focus:border-orange-500" placeholder="Ex: 4520-0/01" />
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center justify-between">
-                                            Código de Serviço (Lista LC 116)
-                                            <span className="text-slate-400 normal-case text-[9px]">Padrão: 14.01</span>
+                                            Código de Serviço (Lista LC 116)<span className="text-slate-400 normal-case text-[9px]">Padrão: 14.01</span>
                                         </label>
                                         <input type="text" name="codigoServicoLc116" value={config.codigoServicoLc116 || ''} onChange={handleChange} className="w-full p-2 bg-white border-2 border-slate-200 rounded-lg font-mono text-sm outline-none focus:border-orange-500" placeholder="Ex: 14.01" />
                                     </div>
@@ -902,17 +861,9 @@ export const Configuracoes = () => {
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-3">
-                                        <div className="col-span-2">
-                                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-1">
-                                                Acesso ao Portal da Prefeitura (Se Exigido pelo Provedor)
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <input type="text" name="loginPrefeitura" value={config.loginPrefeitura || ''} onChange={handleChange} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-orange-500" placeholder="Login/Usuário" />
-                                        </div>
-                                        <div>
-                                            <input type="password" name="senhaPrefeitura" value={config.senhaPrefeitura || ''} onChange={handleChange} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-orange-500" placeholder="Senha Web" />
-                                        </div>
+                                        <div className="col-span-2"><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-1">Acesso ao Portal da Prefeitura (Se Exigido)</p></div>
+                                        <div><input type="text" name="loginPrefeitura" value={config.loginPrefeitura || ''} onChange={handleChange} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-orange-500" placeholder="Login/Usuário" /></div>
+                                        <div><input type="password" name="senhaPrefeitura" value={config.senhaPrefeitura || ''} onChange={handleChange} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-orange-500" placeholder="Senha Web" /></div>
                                     </div>
                                 </div>
 
@@ -957,6 +908,9 @@ export const Configuracoes = () => {
                         </div>
                     )}
 
+                    {/* ======================================================= */}
+                    {/* 🖨️ ABA DE IMPRESSÃO (NOVA UI PREMIUM COM RELATÓRIO RECEBER) */}
+                    {/* ======================================================= */}
                     {abaAtiva === 'IMPRESSAO' && (
                         <div className="space-y-6 animate-fade-in">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6 border-b pb-4"><Printer className="text-blue-500" /> Configurações de Impressão</h2>
@@ -979,90 +933,55 @@ export const Configuracoes = () => {
                                     <textarea name="mensagemRodape" value={config.mensagemRodape || ''} onChange={handleChange} rows="3" className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="Ex: Orçamento sujeito a alteração de preços após validade."></textarea>
                                 </div>
 
-                                {/* ======================================================= */}
-                                {/* 🚀 CENTRAL DE LAYOUTS DINÂMICOS (PAINEL INTELIGENTE) */}
-                                {/* ======================================================= */}
+                                {/* 🚀 CENTRAL DE LAYOUTS ORGANIZADA POR DEPARTAMENTOS */}
                                 <div className="md:col-span-2 mt-8 border-t border-slate-200 pt-8">
-                                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-4">
+                                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
                                         <div>
                                             <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                                                <Printer size={20} className="text-blue-500"/> Central de Layouts (PDFs)
+                                                <Printer size={20} className="text-blue-500"/> Central de Layouts (HTML/CSS)
                                             </h3>
-                                            <p className="text-xs text-slate-500 mt-1">Selecione o documento abaixo para personalizar o código HTML.</p>
+                                            <p className="text-xs text-slate-500 mt-1">Selecione o documento abaixo para personalizar o código fonte da impressão.</p>
                                         </div>
-                                        <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg uppercase tracking-widest">Avançado</span>
+                                        <span className="text-[10px] font-bold bg-slate-900 text-white px-3 py-1.5 rounded-lg uppercase tracking-widest">Modo Desenvolvedor</span>
                                     </div>
 
-                                    {/* BOTÕES SELETORES DE LAYOUT */}
-                                    <div className="flex flex-wrap gap-2 mb-4 bg-slate-100 p-1.5 rounded-xl inline-flex">
-                                        <button
-                                            onClick={() => setEditorLayoutAtivo('OS')}
-                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'OS' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            Ordem de Serviço (A4)
-                                        </button>
-                                        <button
-                                            onClick={() => setEditorLayoutAtivo('VENDA')}
-                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'VENDA' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            Pedidos e Vendas (A4)
-                                        </button>
-                                        <button
-                                            onClick={() => setEditorLayoutAtivo('COMISSAO')}
-                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'COMISSAO' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            Relatório de Comissões (RH)
-                                        </button>
-                                        <button
-                                            onClick={() => setEditorLayoutAtivo('CAIXA')}
-                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'CAIXA' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            Fechamento de Caixa (80mm)
-                                        </button>
-                                        <button
-                                            onClick={() => setEditorLayoutAtivo('ESPELHO')}
-                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'ESPELHO' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            Espelho de Nota (A4)
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditorLayoutAtivo('DRE')}
-                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'DRE' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            DRE Oficial (A4)
-                                        </button>
+                                    {/* GRUPOS DE BOTÕES */}
+                                    <div className="flex flex-col gap-4 mb-6">
 
-                                        {/* 🚀 O RECIBO AVULSO ANTIGO */}
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditorLayoutAtivo('RECIBO_AVULSO')}
-                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'RECIBO_AVULSO' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            Recibo Avulso (A4)
-                                        </button>
+                                        {/* GRUPO 1: VENDAS */}
+                                        <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3 ml-1 flex items-center gap-2">🛒 Operacional (Vendas e Serviços)</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button type="button" onClick={() => setEditorLayoutAtivo('OS')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'OS' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300'}`}>Ordem de Serviço (A4)</button>
+                                                <button type="button" onClick={() => setEditorLayoutAtivo('VENDA')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'VENDA' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300'}`}>Pedidos e Vendas (A4)</button>
+                                                <button type="button" onClick={() => setEditorLayoutAtivo('ESPELHO')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'ESPELHO' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300'}`}>Espelho de Nota (A4)</button>
+                                            </div>
+                                        </div>
 
-                                        {/* 🚀 O NOVO RECIBO DE PAGAMENTO DE CONTAS */}
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditorLayoutAtivo('RECIBO_CONTAS')}
-                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'RECIBO_CONTAS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            Recibo Contas (Bobina)
-                                        </button>
+                                        {/* GRUPO 2: FINANCEIRO */}
+                                        <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                                            <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-3 ml-1 flex items-center gap-2">💰 Fechamento e Caixa (Recibos)</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button type="button" onClick={() => setEditorLayoutAtivo('RECIBO_AVULSO')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'RECIBO_AVULSO' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-emerald-300'}`}>Recebimento de Cliente (A4)</button>
+                                                <button type="button" onClick={() => setEditorLayoutAtivo('RECIBO_CONTAS')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'RECIBO_CONTAS' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-emerald-300'}`}>Pagamento de Despesa (Bobina)</button>
+                                                <button type="button" onClick={() => setEditorLayoutAtivo('CAIXA')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'CAIXA' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-emerald-300'}`}>Fechamento de Caixa (Bobina)</button>
+                                            </div>
+                                        </div>
 
-                                        {/* 🚀 O NOVO RELATÓRIO GERAL */}
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditorLayoutAtivo('RELATORIO_CONTAS')}
-                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'RELATORIO_CONTAS' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            Relatório de Dívidas (A4)
-                                        </button>
+                                        {/* GRUPO 3: RELATÓRIOS GERENCIAIS */}
+                                        <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+                                            <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-3 ml-1 flex items-center gap-2">📈 Relatórios Gerenciais e RH</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button type="button" onClick={() => setEditorLayoutAtivo('RELATORIO_RECEBER')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'RELATORIO_RECEBER' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-indigo-300'}`}>Relatório de Recebimentos (A4)</button>
+                                                <button type="button" onClick={() => setEditorLayoutAtivo('RELATORIO_CONTAS')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'RELATORIO_CONTAS' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-indigo-300'}`}>Extrato Financeiro / Dívidas (A4)</button>
+                                                <button type="button" onClick={() => setEditorLayoutAtivo('DRE')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'DRE' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-indigo-300'}`}>DRE Oficial (A4)</button>
+                                                <button type="button" onClick={() => setEditorLayoutAtivo('COMISSAO')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'COMISSAO' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-indigo-300'}`}>Comissões de Equipe (A4)</button>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* A CAIXA PRETA MÁGICA QUE MUDA DE CONTEÚDO */}
-                                    <div className="relative group shadow-lg rounded-xl overflow-hidden border-2 border-slate-800">
+                                    <div className="relative group shadow-xl rounded-xl overflow-hidden border-[3px] border-slate-800">
                                         <div className="absolute left-0 top-0 bottom-0 w-10 bg-slate-900 border-r border-slate-700 flex flex-col items-center py-4 text-slate-600 text-[10px] font-mono pointer-events-none select-none">
                                             {Array.from({length: 20}).map((_, i) => <div key={i} className="mb-1">{i+1}</div>)}
                                         </div>
@@ -1081,7 +1000,8 @@ export const Configuracoes = () => {
                                                                     editorLayoutAtivo === 'DRE' ? 'layoutHtmlDre' :
                                                                         editorLayoutAtivo === 'RECIBO_AVULSO' ? 'layoutHtmlRecibo' :
                                                                             editorLayoutAtivo === 'RECIBO_CONTAS' ? 'layoutHtmlReciboPagamento' :
-                                                                                'layoutHtmlRelatorioContasPagar'
+                                                                                editorLayoutAtivo === 'RELATORIO_RECEBER' ? 'layoutHtmlRelatorioContasReceber' :
+                                                                                    'layoutHtmlRelatorioContasPagar'
                                             }
                                             value={
                                                 editorLayoutAtivo === 'OS' ? (config?.layoutHtmlOs || '') :
@@ -1092,7 +1012,8 @@ export const Configuracoes = () => {
                                                                     editorLayoutAtivo === 'DRE' ? (config?.layoutHtmlDre || '') :
                                                                         editorLayoutAtivo === 'RECIBO_AVULSO' ? (config?.layoutHtmlRecibo || '') :
                                                                             editorLayoutAtivo === 'RECIBO_CONTAS' ? (config?.layoutHtmlReciboPagamento || '') :
-                                                                                (config?.layoutHtmlRelatorioContasPagar || '')
+                                                                                editorLayoutAtivo === 'RELATORIO_RECEBER' ? (config?.layoutHtmlRelatorioContasReceber || '') :
+                                                                                    (config?.layoutHtmlRelatorioContasPagar || '')
                                             }
                                         />
                                     </div>

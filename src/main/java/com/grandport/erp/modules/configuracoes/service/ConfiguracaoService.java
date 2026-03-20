@@ -121,7 +121,7 @@ public class ConfiguracaoService {
         // 🚀 AS DUAS LINHAS MÁGICAS QUE ESTAVAM FALTANDO:
         if (dadosAtualizados.getLayoutHtmlReciboPagamento() != null) configBanco.setLayoutHtmlReciboPagamento(dadosAtualizados.getLayoutHtmlReciboPagamento());
         if (dadosAtualizados.getLayoutHtmlRelatorioContasPagar() != null) configBanco.setLayoutHtmlRelatorioContasPagar(dadosAtualizados.getLayoutHtmlRelatorioContasPagar());
-
+        if (dadosAtualizados.getLayoutHtmlRelatorioContasReceber() != null) configBanco.setLayoutHtmlRelatorioContasReceber(dadosAtualizados.getLayoutHtmlRelatorioContasReceber());
 
         ConfiguracaoSistema salva = repository.save(configBanco);
         reagendarBackup();

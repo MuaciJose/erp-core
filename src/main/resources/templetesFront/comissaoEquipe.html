@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Relatório de Comissões</title>
+
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 1cm;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10px;
+            color: #1e293b;
+            margin: 0;
+        }
+
+        /* HEADER */
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0f172a;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+        }
+
+        .titulo {
+            font-size: 16px;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .subtitulo {
+            font-size: 10px;
+            color: #059669;
+            font-weight: bold;
+        }
+
+        .periodo {
+            font-size: 9px;
+            color: #64748b;
+            margin-top: 3px;
+        }
+
+        /* BLOCO DO VENDEDOR */
+        .membro-box {
+            margin-bottom: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .membro-header {
+            background: #f1f5f9;
+            padding: 6px 10px;
+            border-bottom: 1px solid #cbd5e1;
+        }
+
+        .membro-header strong {
+            font-size: 11px;
+        }
+
+        .membro-total {
+            float: right;
+            font-weight: bold;
+            color: #059669;
+        }
+
+        /* TABELA */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            display: table-header-group;
+        }
+
+        th {
+            background: #0f172a;
+            color: #fff;
+            padding: 5px;
+            font-size: 8px;
+            text-transform: uppercase;
+            text-align: left;
+        }
+
+        td {
+            padding: 5px;
+            font-size: 9px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        tr {
+            page-break-inside: avoid;
+        }
+
+        tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        /* RESUMO */
+        .resumo {
+            padding: 8px 10px;
+            background: #ecfdf5;
+            border-top: 1px solid #059669;
+        }
+
+        .resumo div {
+            margin-bottom: 3px;
+        }
+
+        .resumo strong {
+            color: #047857;
+        }
+
+        /* ASSINATURA */
+        .assinatura {
+            margin-top: 12px;
+            text-align: center;
+        }
+
+        .linha {
+            margin-top: 20px;
+            border-top: 1px solid #000;
+            width: 200px;
+            margin-left: auto;
+            margin-right: auto;
+            font-size: 9px;
+            padding-top: 3px;
+        }
+
+        /* FOOTER */
+        .footer {
+            margin-top: 10px;
+            text-align: center;
+            font-size: 8px;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <div class="titulo" th:text="${empresa != null ? empresa.nomeFantasia : 'DEMONSTRATIVO DE COMISSÕES'}"></div>
+    <div class="subtitulo">Fechamento de Comissões</div>
+    <div class="periodo">
+        Período: <span th:text="${dataInicio}"></span> até <span th:text="${dataFim}"></span>
+    </div>
+</div>
+
+<div th:if="${dados == null or #lists.isEmpty(dados)}"
+     style="text-align:center; padding:20px; border:1px dashed #cbd5e1;">
+    Nenhum registro encontrado
+</div>
+
+<div th:each="membro : ${dados}" class="membro-box">
+
+    <div class="membro-header">
+        <strong th:text="${membro.nome}">Nome</strong>
+        <span class="membro-total">
+            R$ <span th:text="${#numbers.formatDecimal(membro.totalComissao,1,'POINT',2,'COMMA')}"></span>
+        </span>
+    </div>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Origem</th>
+            <th>Tipo</th>
+            <th>Descrição</th>
+            <th class="text-center">%</th>
+            <th class="text-right">Base</th>
+            <th class="text-right">Comissão</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        <tr th:each="det : ${membro.detalhes}">
+            <td th:text="${det.origem}"></td>
+            <td th:text="${det.tipoItem}"></td>
+            <td th:text="${det.descricao}"></td>
+            <td class="text-center" th:text="${det.percAplicado + '%'}"></td>
+            <td class="text-right" th:text="${#numbers.formatDecimal(det.valorBase,1,'POINT',2,'COMMA')}"></td>
+            <td class="text-right" style="color:#059669; font-weight:bold;"
+                th:text="${#numbers.formatDecimal(det.valorComissao,1,'POINT',2,'COMMA')}"></td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="resumo">
+        <div>
+            Base Total:
+            <strong>R$ <span th:text="${#numbers.formatDecimal(membro.totalBase,1,'POINT',2,'COMMA')}"></span></strong>
+        </div>
+        <div>
+            Comissão Total:
+            <strong>R$ <span th:text="${#numbers.formatDecimal(membro.totalComissao,1,'POINT',2,'COMMA')}"></span></strong>
+        </div>
+    </div>
+
+    <div class="assinatura">
+        <div class="linha" th:text="${membro.nome}"></div>
+        <div style="font-size:8px;">Assinatura</div>
+    </div>
+
+</div>
+
+<div class="footer">
+    Emitido em <span th:text="${dataEmissao}"></span>
+</div>
+
+</body>
+</html>

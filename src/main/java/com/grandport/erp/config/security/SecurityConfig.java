@@ -49,6 +49,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/financeiro/recibos/gerar-pdf").permitAll()
                         .requestMatchers("/api/financeiro/contas-a-pagar/*/recibo-pdf").permitAll()
                         .requestMatchers("/api/financeiro/contas-a-pagar/relatorio-pdf").permitAll()
+                        .requestMatchers("/api/financeiro/contas-a-receber/*/recibo-pdf").permitAll()
+                        .requestMatchers("/api/financeiro/contas-a-receber/relatorio-pdf").permitAll()
+
 
 
 
