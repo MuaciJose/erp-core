@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Recibo de Pagamento</title>
+    <style>
+        /* Configuração para impressoras térmicas (Bobina 80mm) */
+        @page { margin: 2mm; width: 80mm; }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            color: #000;
+            margin: 0 auto;
+            width: 74mm;
+            padding-top: 2mm;
+        }
+
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .bold { font-weight: bold; }
+
+        .divider { border-top: 1px dashed #000; margin: 8px 0; }
+        .divider-solid { border-top: 1px solid #000; margin: 8px 0; }
+
+        .linha-flex { display: table; width: 100%; margin-bottom: 4px; }
+        .linha-flex > div { display: table-cell; }
+
+        .item-label { width: 35%; text-align: left; font-weight: bold; }
+        .item-valor { width: 65%; text-align: left; }
+
+        .titulo-sessao {
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 10px;
+            margin-bottom: 5px;
+            text-align: center;
+            background: #000;
+            color: #fff;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+
+        .valor-destaque {
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+            border: 1px dashed #000;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="text-center">
+    <h2 style="font-size: 15px; margin: 5px 0; text-transform: uppercase;" th:text="${empresa.nomeFantasia != null ? empresa.nomeFantasia : 'MINHA EMPRESA'}">EMPRESA</h2>
+    <div th:text="'CNPJ: ' + ${empresa.cnpj != null ? empresa.cnpj : '00.000.000/0000-00'}">CNPJ</div>
+    <div th:text="${empresa.logradouro != null ? empresa.logradouro : ''}">ENDERECO</div>
+    <div th:text="${empresa.telefone != null ? 'WhatsApp: ' + empresa.telefone : ''}">TELEFONE</div>
+</div>
+
+<div class="titulo-sessao">COMPROVANTE DE PAGAMENTO</div>
+
+<div style="margin-top: 10px;">
+    <div class="linha-flex">
+        <div class="item-label">DOC Nº:</div>
+        <div class="item-valor" th:text="${conta.id}">000</div>
+    </div>
+    <div class="linha-flex">
+        <div class="item-label">DATA:</div>
+        <div class="item-valor" th:text="${dataEmissao}">00/00/0000</div>
+    </div>
+</div>
+
+<div class="divider"></div>
+
+<div style="margin-top: 5px;">
+    <div class="bold" style="font-size: 12px; margin-bottom: 3px;">FAVORECIDO / CREDOR:</div>
+    <div style="margin-bottom: 8px; text-transform: uppercase;" th:text="${fornecedorNome}">NOME DO FORNECEDOR</div>
+
+    <div class="bold" style="font-size: 12px; margin-bottom: 3px;">DESCRIÇÃO DA DESPESA:</div>
+    <div style="margin-bottom: 5px; text-transform: uppercase;" th:text="${conta.descricao}">DESCRICAO DA CONTA</div>
+</div>
+
+<div class="divider"></div>
+
+<div class="valor-destaque">
+    VALOR PAGO: R$ <span th:text="${#numbers.formatDecimal(valorConta, 1, 'POINT', 2, 'COMMA')}">0,00</span>
+</div>
+
+<div class="divider"></div>
+
+<div style="margin-top: 40px; text-align: center;">
+    ________________________________<br/>
+    Assinatura do Recebedor<br/>
+    <span class="bold" th:text="${fornecedorNome}"></span>
+</div>
+
+<div style="margin-top: 40px; text-align: center;">
+    ________________________________<br/>
+    Visto do Financeiro / Caixa
+</div>
+
+<div style="margin-top: 20px; text-align: center; font-size: 9px; color: #555;">
+    Documento Interno - Sem valor fiscal
+</div>
+<div class="divider-solid" style="margin-top: 10px;"></div>
+
+</body>
+</html>

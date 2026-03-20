@@ -47,6 +47,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/compras/*/pdf").permitAll()
                         .requestMatchers("/api/financeiro/dre/pdf").permitAll()
                         .requestMatchers("/api/financeiro/recibos/gerar-pdf").permitAll()
+                        .requestMatchers("/api/financeiro/contas-a-pagar/*/recibo-pdf").permitAll()
+                        .requestMatchers("/api/financeiro/contas-a-pagar/relatorio-pdf").permitAll()
+
+
+
 
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()

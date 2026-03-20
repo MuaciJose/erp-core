@@ -70,7 +70,7 @@ public class WhatsAppService {
         byte[] pdfBytes = relatorioService.gerarPdfVenda(vendaId);
         String pdfBase64 = Base64.getEncoder().encodeToString(pdfBytes);
 
-        // 🚀 AJUSTE PARA V2.x: O endpoint e a estrutura do payload mudaram
+        // AJUSTE PARA V2.x: O endpoint e a estrutura do payload mudaram
         String urlEnvio = apiUrl + "/message/sendMedia/" + INSTANCIA;
 
         // Na V2, os campos de mídia são enviados no primeiro nível do JSON
@@ -93,7 +93,6 @@ public class WhatsAppService {
             ResponseEntity<String> response = restTemplate.postForEntity(urlEnvio, request, String.class);
             System.out.println("WhatsApp enviado com sucesso! Resposta: " + response.getBody());
         } catch (HttpClientErrorException e) {
-            // 🚀 CAPTURA O ERRO REAL: Imprime o que a API do WhatsApp respondeu (Ex: Instância desconectada)
             String erroApi = e.getResponseBodyAsString();
             System.err.println("Erro 400 da Evolution API: " + erroApi);
             throw new RuntimeException("O motor do WhatsApp recusou o envio: " + erroApi);
@@ -102,6 +101,63 @@ public class WhatsAppService {
             throw new RuntimeException("Falha na comunicação com o WhatsApp.");
         }
     }
+
+    // =======================================================================
+    // 🚀 NOVO: MÉTODO CURINGA PARA ENVIAR QUALQUER PDF PARA QUALQUER NÚMERO
+    // =======================================================================
+    public void enviarArquivoPdfBase64(String telefoneDestino, String pdfBase64, String fileName, String caption) {
+        ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
+        String token = config.getWhatsappToken();
+        String apiUrl = config.getWhatsappApiUrl();
+
+        if (token == null || token.trim().isEmpty()) {
+            throw new RuntimeException("Token do WhatsApp não configurado.");
+        }
+
+        if (apiUrl == null || apiUrl.trim().isEmpty()) {
+            apiUrl = "http://localhost:8081";
+        }
+
+        if (apiUrl.endsWith("/")) {
+            apiUrl = apiUrl.substring(0, apiUrl.length() - 1);
+        }
+
+        // Limpeza do número avulso
+        telefoneDestino = telefoneDestino.replaceAll("\\D", "");
+        if (!telefoneDestino.startsWith("55")) {
+            telefoneDestino = "55" + telefoneDestino;
+        }
+
+        String urlEnvio = apiUrl + "/message/sendMedia/" + INSTANCIA;
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("number", telefoneDestino);
+        payload.put("mediatype", "document");
+        payload.put("media", pdfBase64);
+        payload.put("fileName", fileName);
+        payload.put("caption", caption);
+        payload.put("delay", 1200);
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("apikey", token);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(urlEnvio, request, String.class);
+            System.out.println("WhatsApp Curinga enviado com sucesso! Resposta: " + response.getBody());
+        } catch (HttpClientErrorException e) {
+            String erroApi = e.getResponseBodyAsString();
+            System.err.println("Erro 400 da Evolution API: " + erroApi);
+            throw new RuntimeException("O motor do WhatsApp recusou o envio: " + erroApi);
+        } catch (Exception e) {
+            System.err.println("Erro geral no envio: " + e.getMessage());
+            throw new RuntimeException("Falha na comunicação com o WhatsApp.");
+        }
+    }
+
 
     /**
      * Solicita o QR Code para o Frontend

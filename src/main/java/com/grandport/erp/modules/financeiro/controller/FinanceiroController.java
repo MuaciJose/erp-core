@@ -37,10 +37,10 @@ public class FinanceiroController {
         return ResponseEntity.ok(service.listarContasAReceber());
     }
 
-    @GetMapping("/contas-a-pagar")
-    public ResponseEntity<List<ContaPagarDTO>> getContasAPagar() {
-        return ResponseEntity.ok(service.listarContasAPagar());
-    }
+    //@GetMapping("/contas-a-pagar")
+    //public ResponseEntity<List<ContaPagarDTO>> getContasAPagar() {
+    //    return ResponseEntity.ok(service.listarContasAPagar());
+    //}
 
     @GetMapping("/contas-bancarias")
     public ResponseEntity<List<ContaBancaria>> getContasBancarias() {

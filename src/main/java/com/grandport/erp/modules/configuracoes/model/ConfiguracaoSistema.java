@@ -145,6 +145,12 @@ public class ConfiguracaoSistema {
     @Column(columnDefinition = "TEXT")
     private String layoutHtmlRecibo;
 
+    @Column(columnDefinition = "TEXT")
+    private String layoutHtmlReciboPagamento;
+
+    @Column(columnDefinition = "TEXT")
+    private String layoutHtmlRelatorioContasPagar;
+
 
 
 

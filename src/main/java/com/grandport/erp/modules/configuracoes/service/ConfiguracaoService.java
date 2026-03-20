@@ -109,7 +109,7 @@ public class ConfiguracaoService {
         if (dadosAtualizados.getCscCodigo() != null) configBanco.setCscCodigo(dadosAtualizados.getCscCodigo());
 
 
-        // 🚀 AQUI NÓS SALVAMOS TODOS OS LAYOUTS DE IMPRESSÃO (AGORA BLINDADOS!)
+        // 🚀 AQUI NÓS SALVAMOS TODOS OS LAYOUTS DE IMPRESSÃO (AGORA COM OS NOVOS!)
         if (dadosAtualizados.getLayoutHtmlOs() != null) configBanco.setLayoutHtmlOs(dadosAtualizados.getLayoutHtmlOs());
         if (dadosAtualizados.getLayoutHtmlVenda() != null) configBanco.setLayoutHtmlVenda(dadosAtualizados.getLayoutHtmlVenda());
         if (dadosAtualizados.getLayoutHtmlRelatorioComissao() != null) configBanco.setLayoutHtmlRelatorioComissao(dadosAtualizados.getLayoutHtmlRelatorioComissao());
@@ -117,6 +117,10 @@ public class ConfiguracaoService {
         if (dadosAtualizados.getLayoutHtmlEspelhoNota() != null) configBanco.setLayoutHtmlEspelhoNota(dadosAtualizados.getLayoutHtmlEspelhoNota());
         if (dadosAtualizados.getLayoutHtmlDre() != null) configBanco.setLayoutHtmlDre(dadosAtualizados.getLayoutHtmlDre());
         if (dadosAtualizados.getLayoutHtmlRecibo() != null) configBanco.setLayoutHtmlRecibo(dadosAtualizados.getLayoutHtmlRecibo());
+
+        // 🚀 AS DUAS LINHAS MÁGICAS QUE ESTAVAM FALTANDO:
+        if (dadosAtualizados.getLayoutHtmlReciboPagamento() != null) configBanco.setLayoutHtmlReciboPagamento(dadosAtualizados.getLayoutHtmlReciboPagamento());
+        if (dadosAtualizados.getLayoutHtmlRelatorioContasPagar() != null) configBanco.setLayoutHtmlRelatorioContasPagar(dadosAtualizados.getLayoutHtmlRelatorioContasPagar());
 
 
         ConfiguracaoSistema salva = repository.save(configBanco);

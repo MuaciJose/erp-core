@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Relatório de Contas a Pagar</title>
+    <style>
+        /* Configuração para folha A4 em Retrato */
+        @page { size: A4 portrait; margin: 15mm; }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; color: #333; margin: 0; }
+
+        .header { border-bottom: 2px solid #1e293b; padding-bottom: 15px; margin-bottom: 20px; display: table; width: 100%; }
+        .header-logo { display: table-cell; vertical-align: middle; width: 80px; }
+        .header-logo img { max-width: 70px; max-height: 70px; }
+        .header-info { display: table-cell; vertical-align: middle; text-align: left; padding-left: 15px; }
+        .header-info h1 { margin: 0; font-size: 20px; color: #0f172a; text-transform: uppercase; }
+        .header-info p { margin: 3px 0 0 0; font-size: 11px; color: #64748b; }
+        .header-meta { display: table-cell; vertical-align: middle; text-align: right; font-size: 11px; color: #64748b; }
+
+        .titulo-relatorio { text-align: center; font-size: 18px; font-weight: bold; margin: 20px 0; color: #dc2626; text-transform: uppercase; letter-spacing: 1px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
+        thead { background-color: #f8fafc; display: table-header-group; }
+        th { padding: 10px 8px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-weight: bold; text-transform: uppercase; }
+        td { padding: 8px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+
+        /* 🚀 LARGURAS AJUSTADAS PARA CABER O STATUS */
+        .col-id { width: 5%; font-weight: bold; color: #64748b; }
+        .col-fornecedor { width: 25%; font-weight: bold; color: #0f172a; }
+        .col-descricao { width: 30%; color: #475569; }
+        .col-venc { width: 15%; text-align: center; }
+        .col-status { width: 10%; text-align: center; font-weight: bold; }
+        .col-valor { width: 15%; text-align: right; font-weight: bold; color: #dc2626; font-size: 12px; }
+
+        .totais { margin-top: 30px; border-top: 2px solid #1e293b; padding-top: 15px; text-align: right; }
+        .totais p { margin: 5px 0; font-size: 14px; color: #475569; }
+        .valor-total { font-size: 22px; font-weight: bold; color: #dc2626; }
+
+        .footer { position: fixed; bottom: -10mm; left: 0; right: 0; font-size: 9px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-logo">
+        <img th:if="${empresa.logoBase64 != null and empresa.logoBase64 != ''}" th:src="${empresa.logoBase64}" alt="Logo" />
+    </div>
+    <div class="header-info">
+        <h1 th:text="${empresa.nomeFantasia != null ? empresa.nomeFantasia : 'NOME DA EMPRESA'}">EMPRESA</h1>
+        <p th:text="'CNPJ: ' + ${empresa.cnpj != null ? empresa.cnpj : '00.000.000/0000-00'}">CNPJ</p>
+        <p th:text="${empresa.telefone != null ? 'WhatsApp: ' + empresa.telefone : ''}">TEL</p>
+    </div>
+    <div class="header-meta">
+        <strong>RELATÓRIO FINANCEIRO</strong><br/>
+        Emitido em:<br/>
+        <span th:text="${dataEmissao}">00/00/0000 00:00</span>
+    </div>
+</div>
+
+<div class="titulo-relatorio" th:text="${tituloRelatorio}">EXTRATO DE CONTAS A PAGAR</div>
+
+<table>
+    <thead>
+    <tr>
+        <th class="col-id">ID</th>
+        <th class="col-fornecedor">Favorecido / Credor</th>
+        <th class="col-descricao">Motivo / Descrição</th>
+        <th class="col-venc">Data (Ref)</th>
+        <th class="col-status">Status</th> <th class="col-valor">Valor (R$)</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="c : ${contas}">
+        <td class="col-id" th:text="${c.id}">00</td>
+        <td class="col-fornecedor" th:text="${c.fornecedorNome}">FORNECEDOR</td>
+        <td class="col-descricao" th:text="${c.descricao}">DESCRIÇÃO</td>
+        <td class="col-venc" th:text="${c.dataVencimento}">00/00/0000</td>
+        <td class="col-status" th:text="${c.status}">PENDENTE</td> <td class="col-valor" th:text="${#numbers.formatDecimal(c.valor, 1, 'POINT', 2, 'COMMA')}">0,00</td>
+    </tr>
+    </tbody>
+</table>
+
+<div class="totais">
+    <p>Total de Despesas Listadas</p>
+    <div class="valor-total">R$ <span th:text="${#numbers.formatDecimal(totalGeral, 1, 'POINT', 2, 'COMMA')}">0,00</span></div>
+</div>
+
+<div class="footer">
+    Este documento é para simples conferência e não possui valor fiscal.<br/>
+    Gerado automaticamente pelo Sistema ERP.
+</div>
+
+</body>
+</html>

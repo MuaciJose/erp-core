@@ -90,6 +90,8 @@ export const Configuracoes = () => {
         layoutHtmlEspelhoNota: '',
         layoutHtmlDre: '',
         layoutHtmlRecibo: '',
+        layoutHtmlReciboPagamento: '',
+        layoutHtmlRelatorioContasPagar: '',
 
         descontoMaximoPermitido: 10.00,
         permitirEstoqueNegativoGlobal: false,
@@ -167,6 +169,8 @@ export const Configuracoes = () => {
                     layoutHtmlEspelhoNota: data.layoutHtmlEspelhoNota || '',
                     layoutHtmlDre: data.layoutHtmlDre || '',
                     layoutHtmlRecibo: data.layoutHtmlRecibo || '',
+                    layoutHtmlReciboPagamento: data.layoutHtmlReciboPagamento || '',
+                    layoutHtmlRelatorioContasPagar: data.layoutHtmlRelatorioContasPagar || '',
 
                     smtpHost: data.smtpHost || 'smtp.gmail.com',
                     smtpPort: data.smtpPort || 587,
@@ -1003,44 +1007,58 @@ export const Configuracoes = () => {
                                         >
                                             Pedidos e Vendas (A4)
                                         </button>
-                                        {/* 🚀 BOTÃO DE COMISSÃO AQUI */}
                                         <button
                                             onClick={() => setEditorLayoutAtivo('COMISSAO')}
                                             className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'COMISSAO' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             Relatório de Comissões (RH)
                                         </button>
-
                                         <button
                                             onClick={() => setEditorLayoutAtivo('CAIXA')}
                                             className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'CAIXA' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             Fechamento de Caixa (80mm)
                                         </button>
-
                                         <button
                                             onClick={() => setEditorLayoutAtivo('ESPELHO')}
                                             className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'ESPELHO' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             Espelho de Nota (A4)
                                         </button>
-
                                         <button
-                                            type="button" // Previne o form de dar submit acidental
+                                            type="button"
                                             onClick={() => setEditorLayoutAtivo('DRE')}
                                             className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'DRE' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             DRE Oficial (A4)
                                         </button>
 
+                                        {/* 🚀 O RECIBO AVULSO ANTIGO */}
                                         <button
                                             type="button"
-                                            onClick={() => setEditorLayoutAtivo('RECIBO')}
-                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'RECIBO' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                            onClick={() => setEditorLayoutAtivo('RECIBO_AVULSO')}
+                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'RECIBO_AVULSO' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             Recibo Avulso (A4)
                                         </button>
 
+                                        {/* 🚀 O NOVO RECIBO DE PAGAMENTO DE CONTAS */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditorLayoutAtivo('RECIBO_CONTAS')}
+                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'RECIBO_CONTAS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Recibo Contas (Bobina)
+                                        </button>
+
+                                        {/* 🚀 O NOVO RELATÓRIO GERAL */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditorLayoutAtivo('RELATORIO_CONTAS')}
+                                            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${editorLayoutAtivo === 'RELATORIO_CONTAS' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Relatório de Dívidas (A4)
+                                        </button>
                                     </div>
 
                                     {/* A CAIXA PRETA MÁGICA QUE MUDA DE CONTEÚDO */}
@@ -1052,8 +1070,8 @@ export const Configuracoes = () => {
                                         <textarea
                                             className="w-full h-[600px] bg-slate-900 text-green-400 p-6 font-mono text-sm outline-none resize-none leading-relaxed"
                                             spellCheck="false"
-
-                                            // 🚀 ATUALIZE O NAME:
+                                            onChange={handleChange}
+                                            placeholder="<!DOCTYPE html>..."
                                             name={
                                                 editorLayoutAtivo === 'OS' ? 'layoutHtmlOs' :
                                                     editorLayoutAtivo === 'VENDA' ? 'layoutHtmlVenda' :
@@ -1061,10 +1079,10 @@ export const Configuracoes = () => {
                                                             editorLayoutAtivo === 'CAIXA' ? 'layoutHtmlFechamentoCaixa' :
                                                                 editorLayoutAtivo === 'ESPELHO' ? 'layoutHtmlEspelhoNota' :
                                                                     editorLayoutAtivo === 'DRE' ? 'layoutHtmlDre' :
-                                                                        'layoutHtmlRecibo' // 🚀 NOVO VALOR AQUI
+                                                                        editorLayoutAtivo === 'RECIBO_AVULSO' ? 'layoutHtmlRecibo' :
+                                                                            editorLayoutAtivo === 'RECIBO_CONTAS' ? 'layoutHtmlReciboPagamento' :
+                                                                                'layoutHtmlRelatorioContasPagar'
                                             }
-
-                                            // 🚀 ATUALIZE O VALUE:
                                             value={
                                                 editorLayoutAtivo === 'OS' ? (config?.layoutHtmlOs || '') :
                                                     editorLayoutAtivo === 'VENDA' ? (config?.layoutHtmlVenda || '') :
@@ -1072,13 +1090,11 @@ export const Configuracoes = () => {
                                                             editorLayoutAtivo === 'CAIXA' ? (config?.layoutHtmlFechamentoCaixa || '') :
                                                                 editorLayoutAtivo === 'ESPELHO' ? (config?.layoutHtmlEspelhoNota || '') :
                                                                     editorLayoutAtivo === 'DRE' ? (config?.layoutHtmlDre || '') :
-                                                                        (config?.layoutHtmlRecibo || '') // 🚀 NOVO VALOR AQUI
+                                                                        editorLayoutAtivo === 'RECIBO_AVULSO' ? (config?.layoutHtmlRecibo || '') :
+                                                                            editorLayoutAtivo === 'RECIBO_CONTAS' ? (config?.layoutHtmlReciboPagamento || '') :
+                                                                                (config?.layoutHtmlRelatorioContasPagar || '')
                                             }
-                                            onChange={handleChange}
-                                            placeholder="<!DOCTYPE html>..."
                                         />
-
-
                                     </div>
                                 </div>
                             </div>
