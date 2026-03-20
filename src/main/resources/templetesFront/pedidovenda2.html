@@ -165,6 +165,19 @@
         <b>Data:</b> <span th:text="${#temporals.format(venda.dataHora,'dd/MM/yyyy')}"></span>
         | <b>Vendedor:</b> <span th:text="${nomeVendedor}"></span>
     </p>
+
+    <div th:if="${venda.veiculo != null}" style="margin-top: 5px; border-top: 1px dashed #ccc; padding-top: 5px;">
+        <p>
+            <b>Veículo:</b> <span th:text="${venda.veiculo.marca + ' ' + venda.veiculo.modelo}"></span> |
+            <b>Placa:</b> <span th:text="${venda.veiculo.placa}"></span> |
+            <b>KM:</b> <span th:text="${venda.kmVeiculo != null ? venda.kmVeiculo : '--'}"></span>
+        </p>
+    </div>
+</div>
+
+<div th:if="${imprimirObs != null and imprimirObs == true and venda.observacoes != null and !venda.observacoes.isEmpty()}" style="border: 1px solid #000; padding: 6px; margin-bottom: 10px; background-color: #f9f9f9;">
+    <p style="margin: 0; font-size: 10px;"><b>Observações / Condições:</b></p>
+    <p style="margin: 3px 0 0 0; font-size: 9px; white-space: pre-wrap;" th:text="${venda.observacoes}"></p>
 </div>
 
 <table class="tabela">
@@ -204,7 +217,7 @@
             <td class="text-right">R$ <span th:text="${#numbers.formatDecimal(venda.valorSubtotal,1,'POINT',2,'COMMA')}"></span></td>
         </tr>
 
-        <tr>
+        <tr th:if="${venda.desconto != null and venda.desconto > 0}">
             <td>Desconto</td>
             <td class="text-right">R$ <span th:text="${#numbers.formatDecimal(venda.desconto,1,'POINT',2,'COMMA')}"></span></td>
         </tr>
