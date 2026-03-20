@@ -7,7 +7,9 @@ import com.grandport.erp.modules.financeiro.model.MovimentacaoCaixa;
 import com.grandport.erp.modules.financeiro.model.StatusCaixa;
 import com.grandport.erp.modules.financeiro.repository.CaixaDiarioRepository;
 import com.grandport.erp.modules.financeiro.repository.MovimentacaoCaixaRepository;
+import com.grandport.erp.modules.usuario.model.Usuario;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,12 +40,25 @@ public class CaixaService {
         novoCaixa.setSaldoInicial(saldoInicial);
         novoCaixa.setStatus(StatusCaixa.ABERTO);
 
+        // 🚀 CAPTURA QUEM ESTÁ LOGADO AGORA PARA SER O OPERADOR
+        try {
+            Usuario operador = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+            String nomeParaSalvar = (operador.getNomeCompleto() != null && !operador.getNomeCompleto().trim().isEmpty())
+                    ? operador.getNomeCompleto()
+                    : operador.getUsername();
+
+            novoCaixa.setOperadorNome(nomeParaSalvar);
+        } catch (Exception e) {
+            novoCaixa.setOperadorNome("Administrador"); // Salva-vidas caso não ache o usuário
+        }
+
         registrarMovimentacao(novoCaixa, saldoInicial, "ENTRADA", "Fundo de Caixa (Abertura)");
 
         CaixaDiario salvo = caixaRepository.save(novoCaixa);
 
-        // 🚀 AUDITORIA: Enriquecida com ID do caixa
-        auditoriaService.registrar("CAIXA", "ABERTURA", "Abriu o caixa (ID: " + salvo.getId() + ") com fundo de troco inicial de R$ " + saldoInicial);
+        // 🚀 AUDITORIA: Enriquecida com ID do caixa e Operador
+        auditoriaService.registrar("CAIXA", "ABERTURA", "Abriu o caixa (ID: " + salvo.getId() + ") com fundo de troco inicial de R$ " + saldoInicial + " (Operador: " + salvo.getOperadorNome() + ")");
 
         return salvo;
     }

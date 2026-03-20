@@ -36,4 +36,8 @@ public class CaixaDiario {
 
     @Enumerated(EnumType.STRING)
     private StatusCaixa status;
+
+
+    // Coloque junto com as outras variáveis lá em cima:
+    private String operadorNome;
 }

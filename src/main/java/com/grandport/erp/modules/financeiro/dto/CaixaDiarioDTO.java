@@ -14,6 +14,7 @@ public class CaixaDiarioDTO {
     private BigDecimal sangrias;
     private BigDecimal valorInformadoFechamento;
 
+
     public CaixaDiarioDTO(CaixaDiario caixa) {
         this.status = caixa.getStatus().toString();
         this.saldoInicial = caixa.getSaldoInicial();
