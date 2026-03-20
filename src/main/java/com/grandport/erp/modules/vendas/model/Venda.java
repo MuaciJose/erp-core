@@ -43,6 +43,9 @@ public class Venda {
     private BigDecimal valorSubtotal;
     private BigDecimal valorTotal;
 
+    @Column(columnDefinition = "TEXT")
+    private String observacoes;
+
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "venda_id")
     private List<PagamentoVenda> pagamentos = new ArrayList<>();

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>DRE Oficial</title>
+    <style>
+        @page { margin: 1.5cm; size: A4 portrait; }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #334155; margin: 0; }
+        .header { border-bottom: 3px solid #0f172a; padding-bottom: 15px; margin-bottom: 25px; display: table; width: 100%; }
+        .header td { vertical-align: bottom; }
+        h1 { margin: 0; font-size: 20px; font-weight: 900; color: #0f172a; text-transform: uppercase; }
+        .subtitle { margin: 4px 0 0; font-size: 10px; color: #10b981; font-weight: bold; text-transform: uppercase; }
+        .company { font-size: 14px; font-weight: 900; color: #3b82f6; text-transform: uppercase; text-align: right; }
+
+        .dre-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 20px; }
+        .dre-table th { background: #0f172a; color: white; text-align: left; padding: 10px 15px; font-size: 9px; text-transform: uppercase; }
+        .dre-table td { padding: 8px 15px; border-bottom: 1px solid #e2e8f0; }
+
+        .text-right { text-align: right; }
+        .row-group { background: #f1f5f9; font-weight: bold; color: #334155; }
+        .row-subtotal { background: #e2e8f0; font-weight: 900; color: #0f172a; font-size: 12px; }
+        .row-item td:first-child { padding-left: 30px; color: #64748b; }
+        .row-total-final { font-weight: 900; font-size: 14px; }
+        .val-red { color: #ef4444; }
+    </style>
+</head>
+<body>
+<table class="header">
+    <tr>
+        <td width="60%">
+            <h1>Demonstração do Resultado</h1>
+            <div class="subtitle">Período Oficial: <span th:text="${mesExtenso}"></span></div>
+        </td>
+        <td width="40%" class="company" th:text="${empresa.nomeFantasia}">EMPRESA</td>
+    </tr>
+</table>
+
+<table class="dre-table">
+    <thead>
+    <tr>
+        <th>Descrição Contábil / Gerencial</th>
+        <th class="text-right">Valor (R$)</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr class="row-group">
+        <td>(+) RECEITA BRUTA DE VENDAS</td>
+        <td class="text-right">R$ <span th:text="${#numbers.formatDecimal(dados.receitaBruta, 1, 'POINT', 2, 'COMMA')}"></span></td>
+    </tr>
+    <tr class="row-item">
+        <td>(-) Devoluções e Descontos</td>
+        <td class="text-right val-red">R$ <span th:text="${#numbers.formatDecimal(dados.devolucoesDescontos, 1, 'POINT', 2, 'COMMA')}"></span></td>
+    </tr>
+    <tr class="row-subtotal">
+        <td>(=) RECEITA LÍQUIDA</td>
+        <td class="text-right">R$ <span th:text="${#numbers.formatDecimal(receitaLiquida, 1, 'POINT', 2, 'COMMA')}"></span></td>
+    </tr>
+
+    <tr><td colspan="2" style="border:none; padding:4px;"></td></tr>
+
+    <tr class="row-group">
+        <td>(-) CMV (Custo da Mercadoria Vendida)</td>
+        <td class="text-right val-red">R$ <span th:text="${#numbers.formatDecimal(dados.cmv, 1, 'POINT', 2, 'COMMA')}"></span></td>
+    </tr>
+    <tr class="row-subtotal">
+        <td>(=) LUCRO BRUTO</td>
+        <td class="text-right">R$ <span th:text="${#numbers.formatDecimal(lucroBruto, 1, 'POINT', 2, 'COMMA')}"></span></td>
+    </tr>
+
+    <tr><td colspan="2" style="border:none; padding:4px;"></td></tr>
+
+    <tr class="row-group">
+        <td>(-) DESPESAS OPERACIONAIS</td>
+        <td class="text-right val-red">R$ <span th:text="${#numbers.formatDecimal(totalDespesas, 1, 'POINT', 2, 'COMMA')}"></span></td>
+    </tr>
+
+    <tr class="row-item" th:each="despesa : ${dados.despesasOperacionais}">
+        <td th:text="${#strings.toUpperCase(despesa.key)}"></td>
+        <td class="text-right val-red">R$ <span th:text="${#numbers.formatDecimal(despesa.value, 1, 'POINT', 2, 'COMMA')}"></span></td>
+    </tr>
+
+    <tr><td colspan="2" style="border:none; padding:8px;"></td></tr>
+
+    <tr class="row-total-final" th:style="${lucroLiquido >= 0 ? 'background:#dcfce7; color:#166534;' : 'background:#fee2e2; color:#991b1b;'}">
+        <td th:text="'(=) RESULTADO LÍQUIDO (Margem: ' + ${#numbers.formatDecimal(margemLiquida, 1, 'POINT', 1, 'COMMA')} + '% )'"></td>
+        <td class="text-right">R$ <span th:text="${#numbers.formatDecimal(lucroLiquido, 1, 'POINT', 2, 'COMMA')}"></span></td>
+    </tr>
+    </tbody>
+</table>
+
+<table style="width: 100%; margin-top: 80px; text-align: center; font-size: 10px; font-weight: bold; color: #0f172a;">
+    <tr>
+        <td width="50%">
+            _______________________________________<br/><br/>
+            Assinatura da Diretoria / Sócios
+        </td>
+        <td width="50%">
+            _______________________________________<br/><br/>
+            Visto do Departamento Financeiro
+        </td>
+    </tr>
+</table>
+
+<div style="text-align:center; font-size:9px; margin-top:40px; color:#94a3b8;">
+    Documento gerado pelo sistema ERP em: <span th:text="${dataEmissao}"></span>
+</div>
+</body>
+</html>

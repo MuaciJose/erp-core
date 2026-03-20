@@ -12,5 +12,6 @@ public record VendaRequestDTO(
         BigDecimal desconto,
         Long parceiroId,
         Long veiculoId,
-        Integer kmVeiculo  //  A PEÇA QUE FALTAVA!
+        Integer kmVeiculo,
+        String observacoes // 🚀 A NOVA PEÇA AQUI!
 ) {}

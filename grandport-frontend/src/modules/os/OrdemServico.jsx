@@ -335,9 +335,22 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         const servicoSemMecanico = itensServicos.find(s => !s.mecanicoId);
         if(servicoSemMecanico) { notificar('erro', `Falta selecionar o mecânico para o serviço: ${servicoSemMecanico.nome}`); return false; }
 
+        // 🚀 CAPTURANDO O ID DO CONSULTOR LOGADO
+        let consultorIdLogado = localStorage.getItem('usuarioId') || localStorage.getItem('userId') || null;
+        if (!consultorIdLogado) {
+            try {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    consultorIdLogado = payload.id || payload.userId || null;
+                }
+            } catch(e) {}
+        }
+
         const payload = {
             clienteId: clienteSelecionado.id,
             veiculoId: veiculoSelecionado || null,
+            consultorId: consultorIdLogado, // 🚀 AGORA O CONSULTOR VAI PRO BACK-END!
             kmEntrada: kmVeiculo ? parseInt(kmVeiculo) : null,
             nivelCombustivel: 'NAO_INFORMADO',
             defeitoRelatado,
@@ -406,12 +419,13 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         }
     };
 
-    // 🚀 IMPRESSÃO PROFISSIONAL COM PDF GERADO NO BACK-END (HTML ARRANCADO)
+    // 🚀 IMPRESSÃO PROFISSIONAL COM PDF GERADO NO BACK-END
     const imprimirOrdemServicoSilenciosa = async () => {
         if(!osId) return notificar('erro', 'Salve a OS antes de imprimir.');
         const toastId = toast.loading('Buscando PDF no servidor...');
         try {
-            const response = await api.get(`/api/os/${osId}/imprimir-pdf`, { responseType: 'blob' });
+            // 🚀 PASSANDO O PARÂMETRO imprimirLaudo NA URL
+            const response = await api.get(`/api/os/${osId}/imprimir-pdf?imprimirLaudo=${imprimirLaudo}`, { responseType: 'blob' });
             const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
             window.open(fileURL, '_blank');
             toast.success("Documento gerado com sucesso!", { id: toastId });

@@ -28,6 +28,10 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
     const [veiculoSelecionado, setVeiculoSelecionado] = useState('');
     const [kmVeiculo, setKmVeiculo] = useState('');
 
+    // 🚀 AQUI ENTRAM OS NOVOS ESTADOS DAS OBSERVAÇÕES
+    const [observacoes, setObservacoes] = useState('');
+    const [imprimirObs, setImprimirObs] = useState(true);
+
     const [empresaConfig, setEmpresaConfig] = useState({
         nomeFantasia: '', razaoSocial: '', enderecoString: '', cnpj: '', telefone: '', mensagemRodape: ''
     });
@@ -193,15 +197,13 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 setDescontoInput(orcamentoParaEditar.desconto.toString());
             }
 
-            if (orcamentoParaEditar.notaFiscal) {
-                setNotaFiscalInfo(orcamentoParaEditar.notaFiscal);
-            } else {
-                setNotaFiscalInfo(null);
-            }
+            if (orcamentoParaEditar.notaFiscal) setNotaFiscalInfo(orcamentoParaEditar.notaFiscal);
+            else setNotaFiscalInfo(null);
 
-            if (orcamentoParaEditar.kmVeiculo) {
-                setKmVeiculo(orcamentoParaEditar.kmVeiculo.toString());
-            }
+            if (orcamentoParaEditar.kmVeiculo) setKmVeiculo(orcamentoParaEditar.kmVeiculo.toString());
+
+            // 🚀 CARREGA A OBSERVAÇÃO DO BANCO DE DADOS
+            if (orcamentoParaEditar.observacoes) setObservacoes(orcamentoParaEditar.observacoes);
 
             const itensMapeados = extrairItensBackend(orcamentoParaEditar.itens, orcamentoParaEditar.status);
             setItens(itensMapeados);
@@ -349,19 +351,10 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
             setItens(itens.map(i => (i.id === peca.id || i.produtoId === peca.id) ? { ...i, qtd: i.qtd + 1 } : i));
         } else {
             setItens([...itens, {
-                produtoId: peca.id,
-                id: peca.id,
-                codigo: peca.sku,
-                nome: peca.nome,
-                qtd: 1,
-                preco: peca.precoVenda || 0,
-                estoqueFisicoReal: peca.quantidadeEstoque || 0,
-                qtdBaixada: 0,
-                ncm: getNcmString(peca.ncm),
-                origem: peca.origemMercadoria || 0,
-                cest: peca.cest || '',
-                fotoUrl: peca.fotoUrl || '',
-                fotoLocalPath: peca.fotoLocalPath || ''
+                produtoId: peca.id, id: peca.id, codigo: peca.sku, nome: peca.nome,
+                qtd: 1, preco: peca.precoVenda || 0, estoqueFisicoReal: peca.quantidadeEstoque || 0,
+                qtdBaixada: 0, ncm: getNcmString(peca.ncm), origem: peca.origemMercadoria || 0,
+                cest: peca.cest || '', fotoUrl: peca.fotoUrl || '', fotoLocalPath: peca.fotoLocalPath || ''
             }]);
         }
         toast.success("Item adicionado");
@@ -379,13 +372,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         }
 
         const dadosParaFaturar = {
-            vendaId: orcamentoId,
-            cliente: clienteSelecionado,
-            veiculo: veiculoDetalhado,
-            itens: itens,
-            subtotal: subtotal,
-            desconto: valorDescontoReal,
-            totalFinal: totalFinal
+            vendaId: orcamentoId, cliente: clienteSelecionado, veiculo: veiculoDetalhado,
+            itens: itens, subtotal: subtotal, desconto: valorDescontoReal, totalFinal: totalFinal
         };
 
         if (onIrParaNota) {
@@ -406,11 +394,9 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         try {
             await api.post(`/api/vendas/${orcamentoId}/cancelar-nfe`, { justificativa: justificativaCancelamento });
             toast.success("NF-e Cancelada com sucesso e inutilizada na SEFAZ!", { id: loadId, duration: 5000 });
-
             setNotaFiscalInfo(null);
             setModalCancelamentoAberto(false);
             setJustificativaCancelamento('');
-
         } catch (e) {
             toast.error(extrairErroBackend(e, "Rejeição da SEFAZ ao tentar cancelar a NF-e."), { id: loadId, duration: 6000 });
         } finally {
@@ -464,6 +450,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         const statusFinal = statusDesejado;
         const loadId = toast.loading(statusFinal === 'PEDIDO' ? "Salvando pedido..." : "Processando...");
 
+        // 🚀 AQUI A OBSERVAÇÃO É ENVIADA PRO BACK-END (SALVA NO BANCO)
         const payload = {
             id: orcamentoId,
             status: statusFinal,
@@ -471,7 +458,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
             desconto: valorDescontoReal,
             parceiroId: clienteSelecionado?.id || null,
             veiculoId: veiculoSelecionado ? parseInt(veiculoSelecionado) : null,
-            kmVeiculo: kmVeiculo ? parseInt(kmVeiculo) : null
+            kmVeiculo: kmVeiculo ? parseInt(kmVeiculo) : null,
+            observacoes: observacoes // <-- NOVIDADE AQUI!
         };
 
         try {
@@ -535,6 +523,8 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         setOrcamentoId(null);
         setDescontoInput('');
         setNotaFiscalInfo(null);
+        setObservacoes(''); // 🚀 LIMPA AS OBSERVAÇÕES TAMBÉM
+        setImprimirObs(true);
         inputClienteRef.current?.focus();
     };
 
@@ -548,14 +538,13 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
             setDescontoInput('');
         }
 
-        if (orcamento.notaFiscal) {
-            setNotaFiscalInfo(orcamento.notaFiscal);
-        } else {
-            setNotaFiscalInfo(null);
-        }
+        if (orcamento.notaFiscal) setNotaFiscalInfo(orcamento.notaFiscal);
+        else setNotaFiscalInfo(null);
 
         if (orcamento.clienteObj) selecionarCliente(orcamento.clienteObj);
         else limparCliente();
+
+        if (orcamento.observacoes) setObservacoes(orcamento.observacoes);
 
         const itensFormatados = extrairItensBackend(orcamento.itensRaw, orcamento.status);
         setItens(itensFormatados);
@@ -565,13 +554,13 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
         sincronizarEstoqueSilencioso(itensFormatados).catch(console.error);
     };
 
-    // 🚀 AQUI É O NOVO MOTOR DE IMPRESSÃO VIA JAVA!
+    // 🚀 IMPRESSÃO MANDANDO O PARAMETRO imprimirObs NA URL
     const imprimirDocumento = async () => {
         if (!orcamentoId) return toast.error("Salve o documento (F8) antes de imprimir!");
 
         const toastId = toast.loading('Buscando PDF no servidor...');
         try {
-            const response = await api.get(`/api/vendas/${orcamentoId}/imprimir-pdf`, { responseType: 'blob' });
+            const response = await api.get(`/api/vendas/${orcamentoId}/imprimir-pdf?imprimirObs=${imprimirObs}`, { responseType: 'blob' });
             const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
             window.open(fileURL, '_blank');
             toast.success("Documento gerado com sucesso!", { id: toastId });
@@ -636,7 +625,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                 case 'F12': e.preventDefault(); setModalCrmAberto(true); break;
                 case 'p':
                 case 'P':
-                    if (e.ctrlKey || e.metaKey) { e.preventDefault(); imprimirDocumento(); } // 🚀 ATALHO ATUALIZADO
+                    if (e.ctrlKey || e.metaKey) { e.preventDefault(); imprimirDocumento(); }
                     break;
                 case 'Escape':
                     if (resultadosClientes.length > 0) { setResultadosClientes([]); setIndexFocadoCliente(-1); }
@@ -796,7 +785,6 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
 
                             <button onClick={() => processarVendaAPI(modo)} title="Salvar progresso atual (F8)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Save size={14}/> SALVAR (F8)</button>
 
-                            {/* 🚀 NOVO BOTÃO DE IMPRESSÃO QUE CHAMA O BACKEND */}
                             <button onClick={imprimirDocumento} title="Gerar impressão PDF do documento atual (Ctrl+P)" className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"><Printer size={14}/> IMPRIMIR (Ctrl+P)</button>
 
                             <div className="flex items-center rounded-lg border border-green-200 bg-green-50 overflow-hidden ml-1">
@@ -891,9 +879,34 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
                             )}
                         </div>
                     </div>
+
+                    {/* 🚀 CAIXA DE OBSERVAÇÕES DESENHADA AQUI */}
+                    <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1">
+                                <FileText size={12} className="text-blue-500"/> Observações do Pedido / Orçamento
+                            </label>
+                            <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    disabled={!!notaFiscalInfo}
+                                    checked={imprimirObs}
+                                    onChange={e => setImprimirObs(e.target.checked)}
+                                />
+                                Imprimir no PDF
+                            </label>
+                        </div>
+                        <textarea
+                            disabled={!!notaFiscalInfo}
+                            value={observacoes}
+                            onChange={e => setObservacoes(e.target.value)}
+                            placeholder="Garantia especial, condições de pagamento, validade do orçamento ou anotações internas..."
+                            className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500 min-h-[60px] resize-none"
+                        />
+                    </div>
                 </div>
 
-                <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col z-[60] relative overflow-visible">
+                <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col z-[60] relative overflow-visible mt-6">
 
                     <div className="relative border-b border-slate-200 bg-slate-50 p-2 z-[70] rounded-t-3xl">
                         <Search className="absolute left-6 top-5 text-blue-500" size={20} />

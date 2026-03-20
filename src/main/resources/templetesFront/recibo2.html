@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Recibo</title>
+
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            color: #1e293b;
+        }
+
+        .container {
+            border: 2px solid #1e293b;
+            padding: 40px;
+            position: relative;
+
+            /* ✅ Marca d'água PROFISSIONAL (não quebra no PDF) */
+            background-image: url("data:image/svg+xml;utf8,
+            <svg xmlns='http://www.w3.org/2000/svg' width='600' height='300'>
+            <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle'
+            transform='rotate(-20,300,150)'
+            font-size='90'
+            fill='gray'
+            opacity='0.06'
+            font-family='Arial'>RECIBO</text>
+            </svg>");
+            background-repeat: no-repeat;
+            background-position: center;
+            }
+
+            .header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 2px solid #1e293b;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+            }
+
+            .empresa {
+            max-width: 70%;
+            }
+
+            .empresa h2 {
+            margin: 0;
+            font-size: 22px;
+            text-transform: uppercase;
+            }
+
+            .empresa p {
+            margin: 2px 0;
+            font-size: 12px;
+            }
+
+            .titulo {
+            text-align: right;
+            }
+
+            .titulo h1 {
+            margin: 0;
+            font-size: 36px;
+            letter-spacing: 2px;
+            }
+
+            .valor {
+            margin-top: 10px;
+            font-size: 26px;
+            font-weight: bold;
+            border: 2px solid #1e293b;
+            padding: 8px 18px;
+            display: inline-block;
+            background: #f8fafc;
+            }
+
+            .texto {
+            font-size: 18px;
+            line-height: 1.8;
+            text-align: justify;
+            margin-top: 30px;
+            }
+
+            .campo {
+            font-weight: bold;
+            border-bottom: 1px solid #000;
+            padding: 0 5px;
+            }
+
+            .data {
+            text-align: right;
+            margin-top: 40px;
+            font-size: 16px;
+            }
+
+            .assinatura {
+            margin-top: 60px;
+            text-align: center;
+            }
+
+            .linha {
+            border-top: 1px solid #000;
+            width: 300px;
+            margin: auto;
+            padding-top: 8px;
+            font-weight: bold;
+            }
+
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <div class="empresa">
+            <h2 th:text="${empresa.nomeFantasia}">EMPRESA</h2>
+            <p th:text="'CNPJ: ' + ${empresa.cnpj}"></p>
+            <p th:text="${empresa.logradouro + ', ' + empresa.numero}"></p>
+            <p th:text="${empresa.cidade + '/' + empresa.uf}"></p>
+            <p th:text="'Tel: ' + ${empresa.telefone}"></p>
+        </div>
+
+        <div class="titulo">
+            <h1>RECIBO</h1>
+            <div class="valor">
+                R$ <span th:text="${#numbers.formatDecimal(dados.valor, 1, 'POINT', 2, 'COMMA')}">0,00</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="texto">
+        Recebi(emos) de
+        <span class="campo" th:text="${dados.pagador}">NOME</span>,
+        a quantia de
+        <span class="campo">
+            R$ <span th:text="${#numbers.formatDecimal(dados.valor, 1, 'POINT', 2, 'COMMA')}"></span>
+        </span>
+        (<span class="campo" th:text="${dados.valorExtenso}"></span>),
+        referente a
+        <span class="campo" th:text="${dados.referente}"></span>,
+        dando plena e geral quitação.
+    </div>
+
+    <div class="data">
+        <span th:text="${dados.cidade}">Cidade</span>,
+        <span th:text="${dataFormatada}">00 de mês de 0000</span>
+    </div>
+
+    <div class="assinatura">
+        <div class="linha" th:text="${empresa.nomeFantasia}">EMPRESA</div>
+    </div>
+
+</div>
+
+</body>
+</html>

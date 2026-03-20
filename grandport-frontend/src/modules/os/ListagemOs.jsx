@@ -68,7 +68,7 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
         return badges[status] || badges['ORCAMENTO'];
     };
 
-    // 🚀 IMPRESSÃO PROFISSIONAL COM PDF GERADO NO BACK-END (HTML ARRANCADO)
+    // 🚀 IMPRESSÃO PROFISSIONAL COM PDF GERADO NO BACK-END
     const imprimirOs = async (os) => {
         const toastId = toast.loading(`Gerando PDF da OS #${os.id}...`);
         try {
@@ -77,7 +77,8 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
             window.open(fileURL, '_blank');
             toast.success("Documento gerado com sucesso!", { id: toastId });
         } catch (error) {
-            toast.error("Erro ao gerar o PDF da OS. Verifique se o Back-end está respondendo.", { id: toastId });
+            console.error("Erro no PDF:", error);
+            toast.error("Erro ao gerar o PDF da OS. Verifique se o layout não tem erros.", { id: toastId });
         }
     };
 
@@ -184,10 +185,10 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
                                     </td>
                                     <td className="p-4 pr-6">
                                         <div className="flex justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={() => imprimirOs(os)} className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 rounded-lg transition-colors" title="Reimprimir OS">
+                                            <button onClick={() => imprimirOs(os)} className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg transition-colors shadow-sm" title="Imprimir OS">
                                                 <Printer size={18}/>
                                             </button>
-                                            <button onClick={() => setOsEmVisualizacao(os)} className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors" title="Ver Detalhes da OS">
+                                            <button onClick={() => setOsEmVisualizacao(os)} className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors shadow-sm" title="Ver Detalhes da OS">
                                                 <Eye size={18}/>
                                             </button>
                                         </div>

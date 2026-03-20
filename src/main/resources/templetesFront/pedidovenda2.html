@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Pedido de Venda / Orçamento</title>
+
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 1cm;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10px;
+            color: #222;
+            margin: 0;
+        }
+
+        .header {
+            width: 100%;
+            border-bottom: 2px solid #000;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+        }
+
+        .logo { max-height: 55px; }
+
+        .info-empresa {
+            text-align: right;
+        }
+
+        .info-empresa h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .info-empresa p {
+            margin: 2px 0;
+            font-size: 9px;
+            color: #444;
+        }
+
+        .titulo {
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 0 5px 0;
+        }
+
+        .info-cliente {
+            border: 1px solid #000;
+            padding: 6px;
+            margin-bottom: 10px;
+        }
+
+        .info-cliente p {
+            margin: 3px 0;
+            font-size: 10px;
+        }
+
+        .tabela {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .tabela th {
+            background: #000;
+            color: #fff;
+            font-size: 9px;
+            padding: 6px;
+            border: 1px solid #000;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tabela td {
+            font-size: 9px;
+            padding: 5px;
+            border: 1px solid #000;
+        }
+
+        .tabela tr:nth-child(even) {
+            background: #f5f5f5;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .tabela tr {
+            page-break-inside: avoid;
+        }
+
+        thead {
+            display: table-header-group;
+        }
+
+        .totais {
+            width: 280px;
+            float: right;
+            margin-top: 12px;
+        }
+
+        .totais table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .totais td {
+            padding: 5px;
+            font-size: 10px;
+        }
+
+        .totais tr:nth-child(1) td,
+        .totais tr:nth-child(2) td {
+            border-bottom: 1px solid #ccc;
+        }
+
+        .total-final {
+            font-size: 13px;
+            font-weight: bold;
+            border-top: 2px solid #000;
+        }
+
+        .rodape {
+            margin-top: 60px;
+            text-align: center;
+            font-size: 10px;
+        }
+
+        .linha-assinatura {
+            margin-top: 40px;
+        }
+    </style>
+</head>
+
+<body>
+
+<table class="header">
+    <tr>
+        <td width="40%">
+            <img th:if="${empresa.logoBase64}" th:src="${empresa.logoBase64}" class="logo"/>
+        </td>
+
+        <td width="60%" class="info-empresa">
+            <h2 th:text="${empresa.nomeFantasia}">EMPRESA</h2>
+            <p th:text="'CNPJ: ' + ${empresa.cnpj}"></p>
+            <p th:text="'Telefone: ' + ${empresa.telefone}"></p>
+        </td>
+    </tr>
+</table>
+
+<div class="titulo"
+     th:text="${isOrcamento ? 'ORÇAMENTO Nº ' + venda.id : 'PEDIDO Nº ' + venda.id}">
+</div>
+
+<div class="info-cliente">
+    <p><b>Cliente:</b> <span th:text="${nomeCliente}"></span></p>
+    <p>
+        <b>Data:</b> <span th:text="${#temporals.format(venda.dataHora,'dd/MM/yyyy')}"></span>
+        | <b>Vendedor:</b> <span th:text="${nomeVendedor}"></span>
+    </p>
+</div>
+
+<table class="tabela">
+    <thead>
+    <tr>
+        <th width="8%">Cod</th>
+        <th width="42%">Produto</th>
+        <th width="10%">Qtd</th>
+        <th width="20%">Unitário</th>
+        <th width="20%">Total</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    <tr th:each="item : ${venda.itens}">
+        <td th:text="${item.produto != null ? item.produto.id : '-'}"></td>
+
+        <td th:text="${item.produto != null ? item.produto.nome : 'Produto'}"></td>
+
+        <td class="text-center" th:text="${item.quantidade}"></td>
+
+        <td class="text-right">
+            R$ <span th:text="${#numbers.formatDecimal(item.precoUnitario,1,'POINT',2,'COMMA')}"></span>
+        </td>
+
+        <td class="text-right">
+            R$ <span th:text="${#numbers.formatDecimal(item.precoUnitario * item.quantidade,1,'POINT',2,'COMMA')}"></span>
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+<div class="totais">
+    <table>
+        <tr>
+            <td>Subtotal</td>
+            <td class="text-right">R$ <span th:text="${#numbers.formatDecimal(venda.valorSubtotal,1,'POINT',2,'COMMA')}"></span></td>
+        </tr>
+
+        <tr>
+            <td>Desconto</td>
+            <td class="text-right">R$ <span th:text="${#numbers.formatDecimal(venda.desconto,1,'POINT',2,'COMMA')}"></span></td>
+        </tr>
+
+        <tr class="total-final">
+            <td>Total</td>
+            <td class="text-right">R$ <span th:text="${#numbers.formatDecimal(venda.valorTotal,1,'POINT',2,'COMMA')}"></span></td>
+        </tr>
+    </table>
+</div>
+
+<div style="clear: both;"></div>
+
+<div class="rodape">
+    <div class="linha-assinatura">
+        _______________________________________<br/>
+        ASSINATURA DO CLIENTE
+    </div>
+</div>
+
+</body>
+</html>

@@ -163,7 +163,10 @@ public class VendaController {
 // 🚀 ROTA DE IMPRESSÃO PROFISSIONAL (VENDAS E ORÇAMENTOS)
 // =========================================================
     @GetMapping("/{id}/imprimir-pdf")
-    public org.springframework.http.ResponseEntity<byte[]> imprimirVendaPdf(@PathVariable Long id) {
+    public org.springframework.http.ResponseEntity<byte[]> imprimirVendaPdf(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "true") boolean imprimirObs // 🚀 RECEBE A DECISÃO DO CHECKBOX DO REACT
+    ) {
         // 1. Puxa a Venda e a Configuração
         Venda venda = repository.findById(id).orElseThrow(() -> new RuntimeException("Venda não encontrada"));
         var empresa = configuracaoRepository.findById(1L).orElse(new com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema());
@@ -190,6 +193,9 @@ public class VendaController {
         variaveis.put("isOrcamento", isOrcamento);
         variaveis.put("nomeCliente", nomeCliente);
         variaveis.put("nomeVendedor", nomeVendedor);
+
+        // 🚀 PASSA A INFORMAÇÃO PRO HTML DECIDIR SE IMPRIME AS OBSERVAÇÕES
+        variaveis.put("imprimirObs", imprimirObs);
 
         // 3. Pega o layout específico de VENDAS salvo no banco
         String htmlDoBanco = empresa.getLayoutHtmlVenda();

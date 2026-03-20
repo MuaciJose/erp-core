@@ -6,6 +6,8 @@ import java.util.List;
 public record OsRequestDTO(
         Long clienteId,
         Long veiculoId,
+
+        Long consultorId,
         Integer kmEntrada,
         String defeitoRelatado,
         String diagnosticoTecnico,
@@ -13,4 +15,6 @@ public record OsRequestDTO(
         BigDecimal desconto,
         List<OsItemPecaDTO> pecas,
         List<OsItemServicoDTO> servicos
+
+
 ) {}

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Recibo Oficial</title>
+    <style>
+        @page { margin: 1cm; size: A4 landscape; }
+        body { font-family: 'Times New Roman', Times, serif; color: #0f172a; margin: 0; padding: 0; background-color: #fff; }
+        .recibo-container { border: 5px double #0f172a; padding: 50px; position: relative; min-height: 145mm; box-sizing: border-box; }
+        .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg); font-size: 160px; font-weight: 900; color: rgba(0,0,0,0.03); z-index: -1; text-transform: uppercase; font-family: Arial, sans-serif; }
+        .header-table { width: 100%; border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 40px; }
+        .logo { max-height: 75px; margin-right: 20px; vertical-align: middle; }
+        .empresa-info { font-family: Arial, sans-serif; display: inline-block; vertical-align: middle; }
+        .empresa-nome { font-size: 26px; font-weight: 900; text-transform: uppercase; margin: 0; color: #000; }
+        .empresa-detalhes { font-size: 11px; color: #334155; margin: 2px 0; text-transform: uppercase; font-weight: bold; }
+        .titulo-recibo { font-size: 55px; font-style: italic; font-weight: 900; margin: 0; color: #0f172a; line-height: 1; }
+        .valor-box { display: inline-block; border: 3px solid #0f172a; background: #f1f5f9; padding: 15px 30px; font-size: 35px; font-weight: 900; font-family: Arial, sans-serif; border-radius: 4px; margin-top: 10px; }
+        .corpo-texto { font-size: 24px; line-height: 2.2; text-align: justify; margin-top: 40px; color: #000; }
+        .campo-preenchido { font-weight: 900; border-bottom: 1px solid #000; padding: 0 8px; text-transform: uppercase; }
+        .data-extenso { text-align: right; font-size: 20px; font-weight: bold; margin-top: 40px; margin-bottom: 60px; text-transform: uppercase; }
+        .assinatura-area { width: 100%; text-align: center; }
+        .linha-assinatura { border-top: 2px solid #0f172a; width: 500px; margin: 0 auto; padding-top: 12px; }
+        .nome-assinante { font-size: 20px; font-weight: 900; text-transform: uppercase; font-family: Arial, sans-serif; color: #000; }
+        .cargo-assinante { font-size: 12px; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; }
+    </style>
+</head>
+<body>
+<div class="recibo-container">
+    <div class="watermark">RECIBO</div>
+    <table class="header-table" border="0" cellspacing="0" cellpadding="0">
+        <tr>
+            <td width="65%" align="left" valign="middle">
+                <div style="display: table;">
+                    <div style="display: table-cell; vertical-align: middle;" th:if="${empresa.logoBase64 != null and !empresa.logoBase64.isEmpty()}">
+                        <img th:src="${empresa.logoBase64}" class="logo" />
+                    </div>
+                    <div style="display: table-cell; vertical-align: middle;" class="empresa-info">
+                        <h2 class="empresa-nome" th:text="${empresa.nomeFantasia != null ? empresa.nomeFantasia : 'NOME DA EMPRESA'}">EMPRESA</h2>
+                        <p class="empresa-detalhes" th:text="'CNPJ: ' + ${empresa.cnpj != null ? empresa.cnpj : '00.000.000/0000-00'}"></p>
+                        <p class="empresa-detalhes" th:text="${empresa.logradouro + ', ' + empresa.numero + ' - ' + empresa.cidade + '/' + empresa.uf}"></p>
+                        <p class="empresa-detalhes" th:text="'TELEFONE: ' + ${empresa.telefone != null ? empresa.telefone : '(00) 0000-0000'}"></p>
+                    </div>
+                </div>
+            </td>
+            <td width="35%" align="right" valign="top">
+                <h1 class="titulo-recibo">Recibo</h1>
+                <div class="valor-box">R$ <span th:text="${#numbers.formatDecimal(dados.valor, 1, 'POINT', 2, 'COMMA')}">0,00</span></div>
+            </td>
+        </tr>
+    </table>
+    <div class="corpo-texto">
+        Recebi(emos) de <span class="campo-preenchido" th:text="${dados.pagador}">................................................</span>,
+        a quantia de <span class="campo-preenchido">R$ <span th:text="${#numbers.formatDecimal(dados.valor, 1, 'POINT', 2, 'COMMA')}">0,00</span></span>
+        (<span class="campo-preenchido" style="font-style: italic; text-transform: lowercase;" th:text="${dados.valorExtenso}">................................................</span>),
+        referente a <span class="campo-preenchido" th:text="${dados.referente}">................................................</span>,
+        <span th:text="${dados.textoFinal != null ? dados.textoFinal : 'pelo que firmo(amos) o presente para que produza seus efeitos.'}"></span>
+    </div>
+    <div class="data-extenso">
+        <span th:text="${dados.cidade}">Cidade</span>, <span th:text="${dataFormatada}">00 de Mes de 0000</span>.
+    </div>
+    <div class="assinatura-area">
+        <div class="linha-assinatura">
+            <div class="nome-assinante" th:text="${empresa.nomeFantasia}">NOME DA EMPRESA</div>
+            <div class="cargo-assinante">Assinatura do Emitente</div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

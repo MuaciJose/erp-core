@@ -248,6 +248,9 @@ public class VendaService {
         venda.setCliente(dto.parceiroId() != null ? parceiroRepository.findById(dto.parceiroId()).orElse(null) : null);
         venda.setVeiculo(dto.veiculoId() != null ? veiculoRepository.findById(dto.veiculoId()).orElse(null) : null);
 
+        // 🚀 O DETALHE QUE FALTAVA: PEGANDO AS OBSERVAÇÕES DO DTO
+        venda.setObservacoes(dto.observacoes());
+
         if (dto.kmVeiculo() != null && venda.getVeiculo() != null) {
             venda.setKmVeiculo(dto.kmVeiculo());
             Veiculo v = venda.getVeiculo();

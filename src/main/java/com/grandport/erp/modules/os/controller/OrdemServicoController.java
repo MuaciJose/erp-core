@@ -1,13 +1,20 @@
 package com.grandport.erp.modules.os.controller;
 
+import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.os.dto.OsRequestDTO;
 import com.grandport.erp.modules.os.model.OrdemServico;
 import com.grandport.erp.modules.os.repository.OrdemServicoRepository;
 import com.grandport.erp.modules.os.service.OrdemServicoService;
 import com.grandport.erp.modules.os.service.OsFiscalService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/os")
@@ -90,16 +97,27 @@ public class OrdemServicoController {
         }
     }
 
+
     // =========================================================
 // 🚀 ROTA DE IMPRESSÃO PROFISSIONAL (ORDEM DE SERVIÇO)
 // =========================================================
     @GetMapping("/{id}/imprimir-pdf")
-    public org.springframework.http.ResponseEntity<byte[]> imprimirOsPdf(@PathVariable Long id) {
-        // 1. Puxa a OS e a Empresa do Banco
-        OrdemServico os = osRepository.findById(id).orElseThrow(() -> new RuntimeException("OS não encontrada"));
-        var empresa = configuracaoRepository.findById(1L).orElse(new com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema());
+    public org.springframework.http.ResponseEntity<byte[]> imprimirOsPdf(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "true") boolean imprimirLaudo // 🚀 RECEBE SE A CAIXINHA TÁ MARCADA
+    ) {
 
-        // 🚀 A MÁGICA: Pré-processamos os dados críticos no Java!
+        // 1. Puxa a OS e a Empresa do Banco
+        OrdemServico os = osRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("OS não encontrada"));
+
+        var empresa = configuracaoRepository.findById(1L)
+                .orElse(new com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema());
+
+        // 🔥 Número formatado
+        String numeroOsFormatado = String.format("OS-%06d", os.getId());
+
+        // 2. Pré-processamento de dados
         String nomeCliente = (os.getCliente() != null && os.getCliente().getNome() != null)
                 ? os.getCliente().getNome()
                 : "CONSUMIDOR FINAL";
@@ -108,46 +126,69 @@ public class OrdemServicoController {
                 ? os.getCliente().getTelefone()
                 : "--";
 
-        String nomeConsultor = (os.getConsultor() != null && os.getConsultor().getNomeCompleto() != null)
-                ? os.getConsultor().getNomeCompleto()
-                : "Padrão";
-
-        // 2. Monta o nome do carro bonitinho
-        String veiculoNome = "Não informado";
-        String placaVeiculo = "--";
-        if (os.getVeiculo() != null) {
-            veiculoNome = (os.getVeiculo().getMarca() != null ? os.getVeiculo().getMarca() : "") + " " +
-                    (os.getVeiculo().getModelo() != null ? os.getVeiculo().getModelo() : "");
-            placaVeiculo = os.getVeiculo().getPlaca() != null ? os.getVeiculo().getPlaca() : "--";
+        // 🚀 INTELIGÊNCIA DO CONSULTOR / EXECUTANTE
+        String nomeConsultor = "Padrão";
+        if (os.getConsultor() != null) {
+            nomeConsultor = (os.getConsultor().getNomeCompleto() != null && !os.getConsultor().getNomeCompleto().trim().isEmpty())
+                    ? os.getConsultor().getNomeCompleto()
+                    : os.getConsultor().getUsername();
+        } else if (os.getItensServicos() != null && !os.getItensServicos().isEmpty()) {
+            // Se não tem consultor, pega o nome do MECÂNICO (Executante) do primeiro serviço!
+            var primeiroMecanico = os.getItensServicos().get(0).getMecanico();
+            if (primeiroMecanico != null) {
+                nomeConsultor = (primeiroMecanico.getNomeCompleto() != null && !primeiroMecanico.getNomeCompleto().trim().isEmpty())
+                        ? primeiroMecanico.getNomeCompleto()
+                        : primeiroMecanico.getUsername();
+            }
         }
 
-        // 3. Prepara a maleta de variáveis para entregar pro HTML
+        // 3. Veículo
+        String veiculoNome = "Não informado";
+        String placaVeiculo = "--";
+
+        if (os.getVeiculo() != null) {
+            veiculoNome =
+                    (os.getVeiculo().getMarca() != null ? os.getVeiculo().getMarca() : "") + " " +
+                            (os.getVeiculo().getModelo() != null ? os.getVeiculo().getModelo() : "");
+
+            placaVeiculo = os.getVeiculo().getPlaca() != null
+                    ? os.getVeiculo().getPlaca()
+                    : "--";
+        }
+
+        // ✅ ÚNICA declaração do mapa
         java.util.Map<String, Object> variaveis = new java.util.HashMap<>();
+
+        // 4. Variáveis para o Thymeleaf
         variaveis.put("os", os);
         variaveis.put("empresa", empresa);
-
-        // Injetamos as variáveis mastigadas
+        variaveis.put("numeroOs", numeroOsFormatado);
         variaveis.put("nomeCliente", nomeCliente);
         variaveis.put("telefoneCliente", telefoneCliente);
         variaveis.put("nomeConsultor", nomeConsultor);
         variaveis.put("veiculoNome", veiculoNome.trim());
         variaveis.put("placaVeiculo", placaVeiculo);
 
-        // 4. Manda o serviço gerar o PDF (COM PLANO B CASO O BANCO ESTEJA VAZIO) 🚀
+        // 🚀 INJETA A DECISÃO DO LAUDO PARA O HTML
+        variaveis.put("imprimirLaudo", imprimirLaudo);
+
+
+        // 5. Layout
         String htmlDoBanco = empresa.getLayoutHtmlOs();
 
-        // 🚀 O PLANO DE CONTINGÊNCIA AQUI:
         if (htmlDoBanco == null || htmlDoBanco.trim().isEmpty()) {
-            htmlDoBanco = "<!DOCTYPE html><html xmlns:th=\"http://www.thymeleaf.org\"><head><meta charset=\"UTF-8\"/></head><body><h1>Ordem de Serviço #<span th:text=\"${os.id}\"></span></h1><p>Vá em configurações para definir seu layout!</p></body></html>";
+            htmlDoBanco = "<!DOCTYPE html><html xmlns:th=\"http://www.thymeleaf.org\"><head><meta charset=\"UTF-8\"/></head><body><h1>Ordem de Serviço <span th:text=\"${numeroOs}\"></span></h1><p>Vá em configurações para definir seu layout!</p></body></html>";
         }
 
+        // 6. Geração do PDF
         byte[] arquivoPdf = pdfService.gerarPdfDeStringHtml(htmlDoBanco, variaveis);
 
-        // 5. Devolve o arquivo blindado
+        // 7. Retorno
         return org.springframework.http.ResponseEntity.ok()
                 .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=OS-" + id + ".pdf")
                 .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
                 .body(arquivoPdf);
-        }
 
     }
+
+}
