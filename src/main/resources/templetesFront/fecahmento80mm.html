@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Fechamento de Caixa</title>
+    <style>
+        /* Configuração exata para impressoras de cupom (Bobina 80mm) */
+        @page { margin: 2mm; width: 80mm; }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            color: #000;
+            margin: 0 auto;
+            width: 74mm;
+            padding-top: 5mm;
+        }
+
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .bold { font-weight: bold; }
+
+        .divider { border-top: 1px dashed #000; margin: 5px 0; }
+
+        .linha-flex { display: table; width: 100%; margin-bottom: 3px; }
+        .linha-flex > div { display: table-cell; }
+
+        .header-titulo { font-size: 14px; font-weight: bold; margin: 5px 0; text-transform: uppercase; }
+
+        .item-label { width: 60%; text-align: left; }
+        .item-valor { width: 40%; text-align: right; }
+
+        .titulo-sessao {
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 10px;
+            margin-bottom: 5px;
+            text-align: center;
+            background: #000;
+            color: #fff;
+            padding: 3px 0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+<div class="text-center">
+    <h2 class="header-titulo" th:text="${empresa.nomeFantasia != null ? empresa.nomeFantasia : 'MINHA EMPRESA'}">EMPRESA</h2>
+    <div th:text="'CNPJ: ' + ${empresa.cnpj != null ? empresa.cnpj : '00.000.000/0000-00'}">CNPJ</div>
+    <div th:text="${empresa.logradouro != null ? empresa.logradouro : ''}">ENDERECO</div>
+</div>
+
+<div class="divider"></div>
+<div class="text-center bold" style="font-size: 13px; margin: 5px 0;">FECHAMENTO DE CAIXA</div>
+<div class="divider"></div>
+
+<div style="margin-bottom: 8px;">
+    <div class="linha-flex">
+        <div class="item-label">CAIXA ID:</div>
+        <div class="item-valor bold" th:text="'#' + ${caixa.id}">#0000</div>
+    </div>
+    <div class="linha-flex">
+        <div class="item-label">OPERADOR:</div>
+        <div class="item-valor" th:text="${operadorNome}">OPERADOR</div>
+    </div>
+    <div class="linha-flex">
+        <div class="item-label">ABERTURA:</div>
+        <div class="item-valor" th:text="${#temporals.format(caixa.dataAbertura, 'dd/MM/yyyy HH:mm')}">00/00/0000 00:00</div>
+    </div>
+    <div class="linha-flex">
+        <div class="item-label">FECHAMENTO:</div>
+        <div class="item-valor" th:text="${caixa.dataFechamento != null ? #temporals.format(caixa.dataFechamento, 'dd/MM/yyyy HH:mm') : 'AGORA'}">00/00/0000 00:00</div>
+    </div>
+</div>
+
+<div class="titulo-sessao">RESUMO FINANCEIRO</div>
+
+<div class="linha-flex">
+    <div class="item-label">SALDO INICIAL (+)</div>
+    <div class="item-valor">R$ <span th:text="${#numbers.formatDecimal(caixa.saldoInicial, 1, 'POINT', 2, 'COMMA')}">0,00</span></div>
+</div>
+<div class="linha-flex">
+    <div class="item-label">ENTRADAS (+)</div>
+    <div class="item-valor">R$ <span th:text="${#numbers.formatDecimal(totalEntradas, 1, 'POINT', 2, 'COMMA')}">0,00</span></div>
+</div>
+<div class="linha-flex">
+    <div class="item-label">SAÍDAS/SANGRIAS (-)</div>
+    <div class="item-valor">R$ <span th:text="${#numbers.formatDecimal(totalSaidas, 1, 'POINT', 2, 'COMMA')}">0,00</span></div>
+</div>
+
+<div class="divider"></div>
+
+<div class="linha-flex bold" style="font-size: 14px; margin-top: 5px;">
+    <div class="item-label">SALDO ESPERADO:</div>
+    <div class="item-valor">R$ <span th:text="${#numbers.formatDecimal(saldoFinalCalculado, 1, 'POINT', 2, 'COMMA')}">0,00</span></div>
+</div>
+
+<div class="linha-flex" style="margin-top: 5px;">
+    <div class="item-label">VALOR INFORMADO:</div>
+    <div class="item-valor">R$ <span th:text="${#numbers.formatDecimal(valorInformado, 1, 'POINT', 2, 'COMMA')}">0,00</span></div>
+</div>
+<div class="linha-flex bold" style="margin-top: 2px;">
+    <div class="item-label">SOBRA / FALTA:</div>
+    <div class="item-valor">R$ <span th:text="${#numbers.formatDecimal(diferenca, 1, 'POINT', 2, 'COMMA')}">0,00</span></div>
+</div>
+
+<div class="divider"></div>
+
+<div style="margin-top: 25px; text-align: center;">
+    ________________________________<br/>
+    Assinatura do Operador<br/>
+    <span class="bold" th:text="${operadorNome}"></span>
+</div>
+
+<div style="margin-top: 25px; text-align: center;">
+    ________________________________<br/>
+    Assinatura do Gerente
+</div>
+
+<div style="margin-top: 20px; text-align: center; font-size: 9px; color: #555;">
+    Impresso em: <span th:text="${dataEmissao}"></span><br/>
+    Documento Auxiliar - Sem valor fiscal
+</div>
+<div class="divider" style="margin-top: 15px;"></div>
+
+</body>
+</html>
