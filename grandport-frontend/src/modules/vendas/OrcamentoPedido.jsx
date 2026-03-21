@@ -415,7 +415,7 @@ export const OrcamentoPedido = ({ orcamentoParaEditar, onVoltar, onIrParaNota })
     const verificarConexaoZap = async () => {
         setChecandoZap(true);
         try {
-            const res = await api.get('/api/vendas/whatsapp/status');
+            const res = await api.get('/api/whatsapp/status');
             const estado = res.data?.instance?.state || res.data?.state;
             setStatusZap(estado);
             if (estado === 'open') {

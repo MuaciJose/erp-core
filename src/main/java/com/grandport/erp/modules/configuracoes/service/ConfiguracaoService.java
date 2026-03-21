@@ -108,8 +108,15 @@ public class ConfiguracaoService {
         if (dadosAtualizados.getCscIdToken() != null) configBanco.setCscIdToken(dadosAtualizados.getCscIdToken());
         if (dadosAtualizados.getCscCodigo() != null) configBanco.setCscCodigo(dadosAtualizados.getCscCodigo());
 
+        // =======================================================================
+        // 🚀 INTEGRAÇÃO WHATSAPP (Mapeamento que estava faltando!)
+        // =======================================================================
+        if (dadosAtualizados.getWhatsappToken() != null) configBanco.setWhatsappToken(dadosAtualizados.getWhatsappToken());
+        if (dadosAtualizados.getWhatsappApiUrl() != null) configBanco.setWhatsappApiUrl(dadosAtualizados.getWhatsappApiUrl());
+        if (dadosAtualizados.getWhatsappInstancia() != null) configBanco.setWhatsappInstancia(dadosAtualizados.getWhatsappInstancia());
 
-        // 🚀 AQUI NÓS SALVAMOS TODOS OS LAYOUTS DE IMPRESSÃO (AGORA COM OS NOVOS!)
+
+        // 🚀 AQUI NÓS SALVAMOS TODOS OS LAYOUTS DE IMPRESSÃO
         if (dadosAtualizados.getLayoutHtmlOs() != null) configBanco.setLayoutHtmlOs(dadosAtualizados.getLayoutHtmlOs());
         if (dadosAtualizados.getLayoutHtmlVenda() != null) configBanco.setLayoutHtmlVenda(dadosAtualizados.getLayoutHtmlVenda());
         if (dadosAtualizados.getLayoutHtmlRelatorioComissao() != null) configBanco.setLayoutHtmlRelatorioComissao(dadosAtualizados.getLayoutHtmlRelatorioComissao());

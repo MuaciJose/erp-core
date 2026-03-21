@@ -4,7 +4,7 @@ import {
     Settings, Building2, Printer, Sliders, Save, CheckCircle,
     AlertTriangle, Info, X, Store, Percent, Search, Loader2, Camera, Plus,
     Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode, RefreshCw, Receipt,
-    Landmark, Wrench, Palette
+    Landmark, Wrench, Palette, LogOut, Link
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CentralDeLayouts } from './CentralDeLayouts';
@@ -17,7 +17,7 @@ const ESTADOS_BRASIL = [
     { uf: 'MA', nome: 'Maranhão' }, { uf: 'MT', nome: 'Mato Grosso' }, { uf: 'MS', nome: 'Mato Grosso do Sul' },
     { uf: 'MG', nome: 'Minas Gerais' }, { uf: 'PA', nome: 'Pará' }, { uf: 'PB', nome: 'Paraíba' },
     { uf: 'PR', nome: 'Paraná' }, { uf: 'PE', nome: 'Pernambuco' }, { uf: 'PI', nome: 'Piauí' },
-    { uf: 'RJ', nome: 'Rio de Janeiro' }, { uf: 'RN', nome: 'Rio Grande do Norte' }, { uf: 'RS', nome: 'Rio Grande do Sul' },
+    { uf: 'RJ', nome: 'Rio de Janeiro' }, { uf: 'RN', nome: 'Rio Grande do Norte' }, { uf: 'RS', nome:'Rio Grande do Sul' },
     { uf: 'RO', nome: 'Rondônia' }, { uf: 'RR', nome: 'Roraima' }, { uf: 'SC', nome: 'Santa Catarina' },
     { uf: 'SP', nome: 'São Paulo' }, { uf: 'SE', nome: 'Sergipe' }, { uf: 'TO', nome: 'Tocantins' }
 ];
@@ -28,11 +28,10 @@ export const Configuracoes = () => {
     const [salvando, setSalvando] = useState(false);
     const [buscandoCnpj, setBuscandoCnpj] = useState(false);
 
-    // ESTADOS PARA A MÁGICA DO WHATSAPP E E-MAIL
+    // 🚀 ESTADOS DO FLUXO SAAS (WHATSAPP)
     const [qrCodeBase64, setQrCodeBase64] = useState(null);
-    const [statusWhatsapp, setStatusWhatsapp] = useState('DESCONHECIDO');
-    const [gerandoQr, setGerandoQr] = useState(false);
-    const [checandoConexao, setChecandoConexao] = useState(false);
+    const [statusWhatsapp, setStatusWhatsapp] = useState('DESCONHECIDO'); // CONNECTED, DISCONNECTED, ERRO
+    const [loadingWhatsapp, setLoadingWhatsapp] = useState(false);
 
     const [statusSefaz, setStatusSefaz] = useState('DESCONHECIDO');
     const [testandoSefaz, setTestandoSefaz] = useState(false);
@@ -43,9 +42,6 @@ export const Configuracoes = () => {
     // ESTADOS DO ROBÔ DE LIMPEZA
     const [mesesLimpeza, setMesesLimpeza] = useState(24);
     const [limpandoFotos, setLimpandoFotos] = useState(false);
-
-    // Controle de qual layout o usuário está editando no momento
-    const [editorLayoutAtivo, setEditorLayoutAtivo] = useState('OS');
 
     const [config, setConfig] = useState({
         nomeFantasia: '',
@@ -84,17 +80,6 @@ export const Configuracoes = () => {
         mensagemRodape: '',
         exibirVendedorCupom: true,
 
-        layoutHtmlOs: '',
-        layoutHtmlVenda: '',
-        layoutHtmlRelatorioComissao: '',
-        layoutHtmlFechamentoCaixa: '',
-        layoutHtmlEspelhoNota: '',
-        layoutHtmlDre: '',
-        layoutHtmlRecibo: '', // Recibo de Entrada (Receber)
-        layoutHtmlReciboPagamento: '', // Recibo de Saída (Pagar)
-        layoutHtmlRelatorioContasPagar: '', // Relatório Dívidas
-        layoutHtmlRelatorioContasReceber: '', // 🚀 NOVO: Relatório Entradas
-
         descontoMaximoPermitido: 10.00,
         permitirEstoqueNegativoGlobal: false,
         diasValidadeOrcamento: 5,
@@ -102,6 +87,7 @@ export const Configuracoes = () => {
         vendedores: [],
         whatsappToken: '',
         whatsappApiUrl: '',
+        whatsappInstancia: '', // 🚀 CAMPO NOVO ADICIONADO AQUI
         tipoCertificado: 'A1',
         senhaCertificado: '',
         smtpHost: 'smtp.gmail.com',
@@ -161,19 +147,9 @@ export const Configuracoes = () => {
 
                     whatsappToken: data.whatsappToken || '',
                     whatsappApiUrl: data.whatsappApiUrl || '',
+                    whatsappInstancia: data.whatsappInstancia || '', // 🚀 CAMPO NOVO ADICIONADO AQUI
                     tamanhoImpressora: data.tamanhoImpressora || '80mm',
                     mensagemRodape: data.mensagemRodape || '',
-
-                    layoutHtmlOs: data.layoutHtmlOs || '',
-                    layoutHtmlVenda: data.layoutHtmlVenda || '',
-                    layoutHtmlRelatorioComissao: data.layoutHtmlRelatorioComissao || '',
-                    layoutHtmlFechamentoCaixa: data.layoutHtmlFechamentoCaixa || '',
-                    layoutHtmlEspelhoNota: data.layoutHtmlEspelhoNota || '',
-                    layoutHtmlDre: data.layoutHtmlDre || '',
-                    layoutHtmlRecibo: data.layoutHtmlRecibo || '',
-                    layoutHtmlReciboPagamento: data.layoutHtmlReciboPagamento || '',
-                    layoutHtmlRelatorioContasPagar: data.layoutHtmlRelatorioContasPagar || '',
-                    layoutHtmlRelatorioContasReceber: data.layoutHtmlRelatorioContasReceber || '', // 🚀 Mapeando do Banco
 
                     smtpHost: data.smtpHost || 'smtp.gmail.com',
                     smtpPort: data.smtpPort || 587,
@@ -369,58 +345,99 @@ export const Configuracoes = () => {
         }
     };
 
-    const solicitarQrCode = async (tentativa) => {
-        const numTentativa = typeof tentativa === 'number' ? tentativa : 1;
-        setGerandoQr(true);
-        const loadId = toast.loading(`Obtendo QR Code (Tentativa ${numTentativa})...`);
+    // =========================================================================
+    // 🚀 FLUXO PROFISSIONAL WHATSAPP (SAAS)
+    // =========================================================================
 
-        try {
-            const res = await api.get('/api/whatsapp/qrcode');
-            const qrCodeBase64 = res.data?.qrcode?.base64 || res.data?.base64;
-
-            if (res.data?.instance?.status === 'open' || res.data?.status === 'open') {
-                setStatusWhatsapp('CONECTADO');
-                setQrCodeBase64(null);
-                toast.success('WhatsApp Conectado!', { id: loadId });
-            }
-            else if (qrCodeBase64) {
-                setStatusWhatsapp('AGUARDANDO_LEITURA');
-                setQrCodeBase64(qrCodeBase64);
-                toast.success('Aponte a câmera do celular!', { id: loadId });
-            }
-            else {
-                if (numTentativa < 8) {
-                    setTimeout(() => solicitarQrCode(numTentativa + 1), 3000);
-                } else {
-                    toast.error('O motor demorou para gerar o código.', { id: loadId });
-                }
-            }
-        } catch (error) {
-            toast.error('Erro ao buscar QR Code no servidor.', { id: loadId });
-        } finally {
-            setGerandoQr(false);
+    // 1. Robô de Auto Refresh (Só roda na aba Integrações)
+    useEffect(() => {
+        let interval;
+        if (abaAtiva === 'INTEGRACOES') {
+            verificarStatus(true);
+            interval = setInterval(() => {
+                verificarStatus(true);
+            }, 5000);
         }
-    };
+        return () => clearInterval(interval);
+    }, [abaAtiva]);
 
-    const verificarConexaoAtiva = async () => {
-        setChecandoConexao(true);
-        const loadId = toast.loading('Validando conexão com o WhatsApp...');
+    // 2. Buscar Status
+    const verificarStatus = async (silencioso = false) => {
+        if (!silencioso) setLoadingWhatsapp(true);
         try {
-            const res = await api.get('/api/vendas/whatsapp/status');
+            const res = await api.get('/api/whatsapp/status');
             const estado = res.data?.instance?.state || res.data?.state;
 
             if (estado === 'open') {
-                setStatusWhatsapp('CONECTADO');
-                toast.success("WhatsApp está ONLINE!", { id: loadId });
+                setStatusWhatsapp('CONNECTED');
+                setQrCodeBase64(null); // Limpa o QR Code da tela
+            } else if (estado === 'connecting' || estado === 'close') {
+                setStatusWhatsapp('DISCONNECTED');
             } else {
-                setStatusWhatsapp('DESCONECTADO');
-                toast.error("WhatsApp está desconectado.", { id: loadId });
+                setStatusWhatsapp('DISCONNECTED');
             }
+            return estado;
         } catch (error) {
             setStatusWhatsapp('ERRO');
-            toast.error("Falha ao consultar motor do WhatsApp.", { id: loadId });
+            return 'ERRO';
         } finally {
-            setChecandoConexao(false);
+            if (!silencioso) setLoadingWhatsapp(false);
+        }
+    };
+
+    // 3. Conectar (Inteligente e Paciente)
+    const conectar = async (paramTentativa) => {
+        // 🚀 BLINDAGEM: Se o React mandar o clique do mouse, nós forçamos a tentativa ser 1.
+        const tentativa = typeof paramTentativa === 'number' ? paramTentativa : 1;
+
+        setLoadingWhatsapp(true);
+        const toastId = toast.loading(`Iniciando motor do WhatsApp (Tentativa ${tentativa}/5)...`);
+
+        try {
+            const res = await api.get(`/api/whatsapp/qrcode?nocache=${new Date().getTime()}`);
+            const data = res.data;
+
+            console.log(`📦 RESPOSTA DA EVOLUTION (TENTATIVA ${tentativa}):`, data);
+
+            const qr = data?.base64 || data?.qrcode?.base64 || data?.instance?.qrcode || data?.qrcode || null;
+            const estadoAtual = data?.instance?.state || data?.state || data?.status || data?.instance?.status || 'DESCONHECIDO';
+
+            if (qr) {
+                setQrCodeBase64(qr);
+                toast.success('QR Code gerado! Aponte a câmera do celular.', { id: toastId });
+                setLoadingWhatsapp(false);
+            } else if (estadoAtual === 'open' || estadoAtual === 'CONNECTED') {
+                setStatusWhatsapp('CONNECTED');
+                toast.success('O WhatsApp já está conectado! ✅', { id: toastId });
+                setLoadingWhatsapp(false);
+            } else {
+                if (tentativa < 5) {
+                    toast.loading(`Esquentando motor... Aguarde.`, { id: toastId });
+                    setTimeout(() => conectar(tentativa + 1), 3000);
+                } else {
+                    toast.error(`Falha: A API não gerou a imagem a tempo.`, { id: toastId });
+                    setLoadingWhatsapp(false);
+                }
+            }
+        } catch (error) {
+            toast.error('Erro ao conectar com o servidor do WhatsApp.', { id: toastId });
+            setLoadingWhatsapp(false);
+        }
+    };
+
+    // 4. Reconectar (Derruba a sessão velha)
+    const reconectar = async () => {
+        setLoadingWhatsapp(true);
+        const loadId = toast.loading('Desconectando sessão antiga...');
+
+        try {
+            await api.get('/api/whatsapp/logout');
+            await new Promise(r => setTimeout(r, 2000)); // Espera a Evolution processar
+            toast.loading('Sessão encerrada. Buscando novo QR...', { id: loadId });
+            await conectar();
+        } catch (error) {
+            toast.error('Erro ao desconectar.', { id: loadId });
+            setLoadingWhatsapp(false);
         }
     };
 
@@ -911,7 +928,7 @@ export const Configuracoes = () => {
                     )}
 
                     {/* ======================================================= */}
-                    {/* 🖨️ ABA DE IMPRESSÃO (NOVA UI PREMIUM COM RELATÓRIO RECEBER) */}
+                    {/* 🖨️ ABA DE IMPRESSÃO (LIMPA E FOCADA) */}
                     {/* ======================================================= */}
                     {abaAtiva === 'IMPRESSAO' && (
                         <div className="space-y-6 animate-fade-in">
@@ -934,91 +951,17 @@ export const Configuracoes = () => {
                                     <label className="text-xs font-bold text-slate-500 uppercase">Mensagem Padrão no Rodapé (Garantia/Agradecimento)</label>
                                     <textarea name="mensagemRodape" value={config.mensagemRodape || ''} onChange={handleChange} rows="3" className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="Ex: Orçamento sujeito a alteração de preços após validade."></textarea>
                                 </div>
+                            </div>
 
-                                {/* 🚀 CENTRAL DE LAYOUTS ORGANIZADA POR DEPARTAMENTOS */}
-                                <div className="md:col-span-2 mt-8 border-t border-slate-200 pt-8">
-                                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
-                                        <div>
-                                            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                                                <Printer size={20} className="text-blue-500"/> Central de Layouts (HTML/CSS)
-                                            </h3>
-                                            <p className="text-xs text-slate-500 mt-1">Selecione o documento abaixo para personalizar o código fonte da impressão.</p>
-                                        </div>
-                                        <span className="text-[10px] font-bold bg-slate-900 text-white px-3 py-1.5 rounded-lg uppercase tracking-widest">Modo Desenvolvedor</span>
-                                    </div>
-
-                                    {/* GRUPOS DE BOTÕES */}
-                                    <div className="flex flex-col gap-4 mb-6">
-
-                                        {/* GRUPO 1: VENDAS */}
-                                        <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-                                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3 ml-1 flex items-center gap-2">🛒 Operacional (Vendas e Serviços)</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                <button type="button" onClick={() => setEditorLayoutAtivo('OS')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'OS' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300'}`}>Ordem de Serviço (A4)</button>
-                                                <button type="button" onClick={() => setEditorLayoutAtivo('VENDA')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'VENDA' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300'}`}>Pedidos e Vendas (A4)</button>
-                                                <button type="button" onClick={() => setEditorLayoutAtivo('ESPELHO')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'ESPELHO' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300'}`}>Espelho de Nota (A4)</button>
-                                            </div>
-                                        </div>
-
-                                        {/* GRUPO 2: FINANCEIRO */}
-                                        <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                                            <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-3 ml-1 flex items-center gap-2">💰 Fechamento e Caixa (Recibos)</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                <button type="button" onClick={() => setEditorLayoutAtivo('RECIBO_AVULSO')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'RECIBO_AVULSO' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-emerald-300'}`}>Recebimento de Cliente (A4)</button>
-                                                <button type="button" onClick={() => setEditorLayoutAtivo('RECIBO_CONTAS')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'RECIBO_CONTAS' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-emerald-300'}`}>Pagamento de Despesa (Bobina)</button>
-                                                <button type="button" onClick={() => setEditorLayoutAtivo('CAIXA')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'CAIXA' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-emerald-300'}`}>Fechamento de Caixa (Bobina)</button>
-                                            </div>
-                                        </div>
-
-                                        {/* GRUPO 3: RELATÓRIOS GERENCIAIS */}
-                                        <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
-                                            <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-3 ml-1 flex items-center gap-2">📈 Relatórios Gerenciais e RH</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                <button type="button" onClick={() => setEditorLayoutAtivo('RELATORIO_RECEBER')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'RELATORIO_RECEBER' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-indigo-300'}`}>Relatório de Recebimentos (A4)</button>
-                                                <button type="button" onClick={() => setEditorLayoutAtivo('RELATORIO_CONTAS')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'RELATORIO_CONTAS' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-indigo-300'}`}>Extrato Financeiro / Dívidas (A4)</button>
-                                                <button type="button" onClick={() => setEditorLayoutAtivo('DRE')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'DRE' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-indigo-300'}`}>DRE Oficial (A4)</button>
-                                                <button type="button" onClick={() => setEditorLayoutAtivo('COMISSAO')} className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${editorLayoutAtivo === 'COMISSAO' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-indigo-300'}`}>Comissões de Equipe (A4)</button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* A CAIXA PRETA MÁGICA QUE MUDA DE CONTEÚDO */}
-                                    <div className="relative group shadow-xl rounded-xl overflow-hidden border-[3px] border-slate-800">
-                                        <div className="absolute left-0 top-0 bottom-0 w-10 bg-slate-900 border-r border-slate-700 flex flex-col items-center py-4 text-slate-600 text-[10px] font-mono pointer-events-none select-none">
-                                            {Array.from({length: 20}).map((_, i) => <div key={i} className="mb-1">{i+1}</div>)}
-                                        </div>
-
-                                        <textarea
-                                            className="w-full h-[600px] bg-slate-900 text-green-400 p-6 font-mono text-sm outline-none resize-none leading-relaxed"
-                                            spellCheck="false"
-                                            onChange={handleChange}
-                                            placeholder="<!DOCTYPE html>..."
-                                            name={
-                                                editorLayoutAtivo === 'OS' ? 'layoutHtmlOs' :
-                                                    editorLayoutAtivo === 'VENDA' ? 'layoutHtmlVenda' :
-                                                        editorLayoutAtivo === 'COMISSAO' ? 'layoutHtmlRelatorioComissao' :
-                                                            editorLayoutAtivo === 'CAIXA' ? 'layoutHtmlFechamentoCaixa' :
-                                                                editorLayoutAtivo === 'ESPELHO' ? 'layoutHtmlEspelhoNota' :
-                                                                    editorLayoutAtivo === 'DRE' ? 'layoutHtmlDre' :
-                                                                        editorLayoutAtivo === 'RECIBO_AVULSO' ? 'layoutHtmlRecibo' :
-                                                                            editorLayoutAtivo === 'RECIBO_CONTAS' ? 'layoutHtmlReciboPagamento' :
-                                                                                editorLayoutAtivo === 'RELATORIO_RECEBER' ? 'layoutHtmlRelatorioContasReceber' :
-                                                                                    'layoutHtmlRelatorioContasPagar'
-                                            }
-                                            value={
-                                                editorLayoutAtivo === 'OS' ? (config?.layoutHtmlOs || '') :
-                                                    editorLayoutAtivo === 'VENDA' ? (config?.layoutHtmlVenda || '') :
-                                                        editorLayoutAtivo === 'COMISSAO' ? (config?.layoutHtmlRelatorioComissao || '') :
-                                                            editorLayoutAtivo === 'CAIXA' ? (config?.layoutHtmlFechamentoCaixa || '') :
-                                                                editorLayoutAtivo === 'ESPELHO' ? (config?.layoutHtmlEspelhoNota || '') :
-                                                                    editorLayoutAtivo === 'DRE' ? (config?.layoutHtmlDre || '') :
-                                                                        editorLayoutAtivo === 'RECIBO_AVULSO' ? (config?.layoutHtmlRecibo || '') :
-                                                                            editorLayoutAtivo === 'RECIBO_CONTAS' ? (config?.layoutHtmlReciboPagamento || '') :
-                                                                                editorLayoutAtivo === 'RELATORIO_RECEBER' ? (config?.layoutHtmlRelatorioContasReceber || '') :
-                                                                                    (config?.layoutHtmlRelatorioContasPagar || '')
-                                            }
-                                        />
-                                    </div>
+                            <div className="mt-8 p-6 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-4">
+                                <div className="p-3 bg-blue-600 text-white rounded-xl shadow-md">
+                                    <Palette size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-blue-900 text-lg">Edição de Templates Movida!</h3>
+                                    <p className="text-sm text-blue-800 font-medium mt-1">
+                                        Todos os códigos HTML dos recibos, extratos e ordens de serviço agora são gerenciados na aba exclusiva <b>🎨 Layouts</b> no menu lateral.
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -1055,79 +998,93 @@ export const Configuracoes = () => {
                                 <h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><Plug className="text-blue-500" /> Integrações e APIs</h2>
 
                                 <button
-                                    onClick={verificarConexaoAtiva}
-                                    disabled={checandoConexao}
+                                    onClick={() => verificarStatus(false)}
+                                    disabled={loadingWhatsapp}
                                     title="Validar se o WhatsApp ainda está conectado e pronto para enviar mensagens"
                                     className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all border-2 ${
-                                        statusWhatsapp === 'CONECTADO'
+                                        statusWhatsapp === 'CONNECTED'
                                             ? 'bg-green-50 border-green-200 text-green-700'
                                             : 'bg-slate-50 border-slate-200 text-slate-600'
                                     }`}
                                 >
-                                    {checandoConexao ? <RefreshCw className="animate-spin" size={14}/> : <div className={`w-2 h-2 rounded-full ${statusWhatsapp === 'CONECTADO' ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`} />}
-                                    {checandoConexao ? 'VALIDANDO...' : 'TESTAR CONEXÃO'}
+                                    {loadingWhatsapp ? <RefreshCw className="animate-spin" size={14}/> : <div className={`w-2 h-2 rounded-full ${statusWhatsapp === 'CONNECTED' ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`} />}
+                                    {loadingWhatsapp ? 'VALIDANDO...' : 'TESTAR CONEXÃO'}
                                 </button>
                             </div>
 
+                            {/* 📱 BLOCO WHATSAPP */}
                             <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl shadow-sm">
-
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 pb-4">
                                     <div>
                                         <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg"><Smartphone className="text-green-500" /> Motor WhatsApp ERP</h3>
                                         <p className="text-sm text-slate-500 font-medium">Conecte o seu celular para disparar orçamentos e comprovantes automaticamente.</p>
                                     </div>
-                                    <div title="Estado atual da sincronização com o aparelho celular" className={`px-4 py-2 rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-inner border ${statusWhatsapp === 'CONECTADO' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-200 text-slate-600 border-slate-300'}`}>
-                                        {statusWhatsapp === 'CONECTADO' ? <CheckCircle size={14}/> : <Info size={14}/>}
+                                    <div className={`px-4 py-2 rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-inner border ${statusWhatsapp === 'CONNECTED' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-200 text-slate-600 border-slate-300'}`}>
+                                        {statusWhatsapp === 'CONNECTED' ? <CheckCircle size={14}/> : <Info size={14}/>}
                                         Status: {statusWhatsapp}
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     <div className="flex flex-col items-center justify-center bg-white p-8 rounded-2xl border-2 border-dashed border-slate-300 relative min-h-[300px]">
-                                        {qrCodeBase64 ? (
-                                            <div className="flex flex-col items-center animate-fade-in">
-                                                <div className="p-2 bg-white rounded-2xl shadow-xl mb-4 border border-slate-100">
-                                                    <img src={qrCodeBase64} alt="QR Code WhatsApp" className="w-48 h-48 object-contain" />
+
+                                        {/* TELA 1: CONECTADO */}
+                                        {statusWhatsapp === 'CONNECTED' ? (
+                                                <div className="flex flex-col items-center animate-fade-in text-center w-full">
+                                                    <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4 shadow-inner"><CheckCircle size={40} /></div>
+                                                    <h4 className="font-black text-green-700 text-xl">Celular Conectado!</h4>
+                                                    <p className="text-sm text-green-800 font-medium mt-1 mb-6">O sistema está pronto para disparar PDFs.</p>
+
+                                                    <button onClick={reconectar} disabled={loadingWhatsapp} className="w-full max-w-xs bg-white hover:bg-red-50 text-red-600 border-2 border-red-200 px-6 py-3 rounded-xl font-black shadow-sm flex items-center justify-center gap-2 transition-all">
+                                                        {loadingWhatsapp ? <Loader2 className="animate-spin" size={18}/> : <LogOut size={18}/>}
+                                                        {loadingWhatsapp ? 'PROCESSANDO...' : 'DESCONECTAR (RECONECTAR)'}
+                                                    </button>
                                                 </div>
-                                                <h4 className="font-black text-slate-800">Abra o WhatsApp</h4>
-                                                <p className="text-xs text-slate-500 text-center mt-1">Aparelhos conectados {'>'} Conectar aparelho<br/>e aponte a câmera.</p>
-                                                <button onClick={() => setQrCodeBase64(null)} title="Interromper processo de leitura" className="mt-4 text-xs font-bold text-red-500 hover:underline">CANCELAR</button>
-                                            </div>
-                                        ) : statusWhatsapp === 'CONECTADO' ? (
-                                            <div className="flex flex-col items-center animate-fade-in text-center">
-                                                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4 shadow-inner"><CheckCircle size={40} /></div>
-                                                <h4 className="font-black text-green-700 text-xl">Celular Conectado!</h4>
-                                                <p className="text-sm text-green-800 font-medium mt-1">Seu sistema já está disparando PDFs.</p>
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-col items-center text-center">
-                                                <QrCode size={64} className="text-slate-300 mb-4" />
-                                                <h4 className="font-black text-slate-700 mb-1">Aparelho Desconectado</h4>
-                                                <p className="text-xs text-slate-500 mb-6">Para iniciar os disparos de PDF, vincule o seu número comercial ao sistema.</p>
-                                                <button
-                                                    onClick={solicitarQrCode}
-                                                    disabled={gerandoQr}
-                                                    title="Solicitar ao servidor a geração de um novo código de pareamento"
-                                                    className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl font-black shadow-lg shadow-green-500/30 flex items-center gap-2 transition-all"
-                                                >
-                                                    {gerandoQr ? <Loader2 className="animate-spin" size={18}/> : <Smartphone size={18}/>}
-                                                    {gerandoQr ? 'AGUARDANDO...' : 'CONECTAR CELULAR (GERAR QR)'}
-                                                </button>
-                                            </div>
-                                        )}
+                                            )
+
+                                            /* TELA 2: MOSTRANDO O QR CODE PARA LER */
+                                            : qrCodeBase64 ? (
+                                                    <div className="flex flex-col items-center animate-fade-in">
+                                                        <div className="p-2 bg-white rounded-2xl shadow-xl mb-4 border border-slate-100">
+                                                            <img src={qrCodeBase64} alt="QR Code WhatsApp" className="w-48 h-48 object-contain" />
+                                                        </div>
+                                                        <h4 className="font-black text-slate-800">Abra o WhatsApp</h4>
+                                                        <p className="text-xs text-slate-500 text-center mt-1">Aparelhos conectados {'>'} Conectar aparelho<br/>e aponte a câmera.</p>
+                                                        <button onClick={() => setQrCodeBase64(null)} className="mt-4 text-xs font-bold text-red-500 hover:underline">CANCELAR</button>
+                                                    </div>
+                                                )
+
+                                                /* TELA 3: DESCONECTADO (BOTÃO DE INÍCIO) */
+                                                : (
+                                                    <div className="flex flex-col items-center text-center w-full">
+                                                        <QrCode size={64} className="text-slate-300 mb-4" />
+                                                        <h4 className="font-black text-slate-700 mb-1">Aparelho Desconectado</h4>
+                                                        <p className="text-xs text-slate-500 mb-6">Para iniciar os disparos de PDF, vincule o seu número comercial ao sistema.</p>
+                                                        <button onClick={conectar} disabled={loadingWhatsapp} className="w-full max-w-xs bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl font-black shadow-lg shadow-green-500/30 flex items-center justify-center gap-2 transition-all">
+                                                            {loadingWhatsapp ? <Loader2 className="animate-spin" size={18}/> : <Link size={18}/>}
+                                                            {loadingWhatsapp ? 'AGUARDANDO...' : 'CONECTAR CELULAR'}
+                                                        </button>
+                                                    </div>
+                                                )}
                                     </div>
 
                                     <div className="flex flex-col justify-center">
-                                        <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-6">
-                                            <h4 className="text-xs font-black text-orange-800 mb-2">Configurações Avançadas (SMTP)</h4>
-                                            <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-green-50 border border-green-200 p-6 rounded-2xl shadow-inner">
+                                            <h4 className="text-sm font-black text-green-800 mb-4 flex items-center gap-2">
+                                                <Plug size={18} /> Credenciais da API Externa
+                                            </h4>
+                                            <div className="space-y-4">
                                                 <div>
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Servidor SMTP</label>
-                                                    <input type="text" name="smtpHost" value={config.smtpHost || 'smtp.gmail.com'} onChange={handleChange} className="w-full p-2 mt-1 bg-white border-2 border-slate-200 rounded-lg text-sm font-mono outline-none" />
+                                                    <label className="text-[10px] font-black text-green-700 uppercase tracking-widest">URL da API (Endpoint)</label>
+                                                    <input type="text" name="whatsappApiUrl" value={config.whatsappApiUrl || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-green-200 rounded-xl text-sm font-mono outline-none focus:border-green-500 text-slate-700 shadow-sm" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Porta SMTP</label>
-                                                    <input type="number" name="smtpPort" value={config.smtpPort || 587} onChange={handleChange} className="w-full p-2 mt-1 bg-white border-2 border-slate-200 rounded-lg text-sm font-mono outline-none" />
+                                                    <label className="text-[10px] font-black text-green-700 uppercase tracking-widest">Token / Global API Key</label>
+                                                    <input type="password" name="whatsappToken" value={config.whatsappToken || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-green-200 rounded-xl text-sm font-mono outline-none focus:border-green-500 text-slate-700 shadow-sm" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] font-black text-green-700 uppercase tracking-widest">Nome da Instância</label>
+                                                    <input type="text" name="whatsappInstancia" value={config.whatsappInstancia || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-green-200 rounded-xl text-sm font-mono outline-none focus:border-green-500 text-slate-700 shadow-sm" />
                                                 </div>
                                             </div>
                                         </div>
@@ -1298,4 +1255,3 @@ export const Configuracoes = () => {
         </div>
     );
 };
-

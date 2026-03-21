@@ -162,7 +162,8 @@ public class ConfiguracaoSistema {
     @Column(columnDefinition = "TEXT")
     private String layoutHtmlExtratoFornecedor;
 
-
+    @Column
+    private String whatsappInstancia;
 
 
 

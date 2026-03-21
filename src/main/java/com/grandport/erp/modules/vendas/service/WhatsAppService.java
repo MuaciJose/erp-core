@@ -29,8 +29,14 @@ public class WhatsAppService {
     @Autowired
     private VendaRepository vendaRepository;
 
-    // Garanta que este nome seja exatamente o mesmo que você criou no Insomnia/Docker
-    private final String INSTANCIA = "GrandPort";
+    // 🚀 CORRIGIDO: Removido o acento (til) que quebrava a URL da Evolution API
+    private String getInstanciaConfigurada(ConfiguracaoSistema config) {
+        String instancia = config.getWhatsappInstancia();
+        if (instancia == null || instancia.trim().isEmpty()) {
+            return "Padrao";
+        }
+        return instancia.trim();
+    }
 
     /**
      * Envia o PDF da venda via WhatsApp no padrão Evolution API v2.x
@@ -40,15 +46,14 @@ public class WhatsAppService {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
         String token = config.getWhatsappToken();
         String apiUrl = config.getWhatsappApiUrl();
+        String instancia = getInstanciaConfigurada(config);
 
         if (token == null || token.trim().isEmpty()) {
             throw new RuntimeException("Token do WhatsApp não configurado.");
         }
-
         if (apiUrl == null || apiUrl.trim().isEmpty()) {
             apiUrl = "http://localhost:8081";
         }
-
         if (apiUrl.endsWith("/")) {
             apiUrl = apiUrl.substring(0, apiUrl.length() - 1);
         }
@@ -60,27 +65,27 @@ public class WhatsAppService {
             throw new RuntimeException("Cliente sem telefone válido.");
         }
 
-        // Limpeza do número
         String telefoneDestino = venda.getCliente().getTelefone().replaceAll("\\D", "");
         if (!telefoneDestino.startsWith("55")) {
             telefoneDestino = "55" + telefoneDestino;
         }
 
-        // Geração do PDF
         byte[] pdfBytes = relatorioService.gerarPdfVenda(vendaId);
         String pdfBase64 = Base64.getEncoder().encodeToString(pdfBytes);
 
-        // AJUSTE PARA V2.x: O endpoint e a estrutura do payload mudaram
-        String urlEnvio = apiUrl + "/message/sendMedia/" + INSTANCIA;
+        String urlEnvio = apiUrl + "/message/sendMedia/" + instancia;
 
-        // Na V2, os campos de mídia são enviados no primeiro nível do JSON
         Map<String, Object> payload = new HashMap<>();
         payload.put("number", telefoneDestino);
-        payload.put("mediatype", "document"); // document, image, video, audio
+        payload.put("mediatype", "document");
+
+        // 🚀 CORREÇÃO DEFINITIVA (EVOLUTON V2): Passar o mimetype separado e a string Base64 limpa!
+        payload.put("mimetype", "application/pdf");
         payload.put("media", pdfBase64);
+
         payload.put("fileName", "Recibo_Venda_" + venda.getId() + ".pdf");
         payload.put("caption", "Olá! Segue em anexo o recibo da sua compra na *" + config.getNomeFantasia() + "*.");
-        payload.put("delay", 1200); // Atraso em milissegundos
+        payload.put("delay", 1200);
 
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
@@ -93,47 +98,43 @@ public class WhatsAppService {
             ResponseEntity<String> response = restTemplate.postForEntity(urlEnvio, request, String.class);
             System.out.println("WhatsApp enviado com sucesso! Resposta: " + response.getBody());
         } catch (HttpClientErrorException e) {
-            String erroApi = e.getResponseBodyAsString();
-            System.err.println("Erro 400 da Evolution API: " + erroApi);
-            throw new RuntimeException("O motor do WhatsApp recusou o envio: " + erroApi);
+            throw new RuntimeException("O motor do WhatsApp recusou o envio: " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            System.err.println("Erro geral no envio: " + e.getMessage());
             throw new RuntimeException("Falha na comunicação com o WhatsApp.");
         }
     }
 
-    // =======================================================================
-    // 🚀 NOVO: MÉTODO CURINGA PARA ENVIAR QUALQUER PDF PARA QUALQUER NÚMERO
-    // =======================================================================
     public void enviarArquivoPdfBase64(String telefoneDestino, String pdfBase64, String fileName, String caption) {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
         String token = config.getWhatsappToken();
         String apiUrl = config.getWhatsappApiUrl();
+        String instancia = getInstanciaConfigurada(config);
 
         if (token == null || token.trim().isEmpty()) {
-            throw new RuntimeException("Token do WhatsApp não configurado.");
+            throw new RuntimeException("Token não configurado.");
         }
-
         if (apiUrl == null || apiUrl.trim().isEmpty()) {
             apiUrl = "http://localhost:8081";
         }
-
         if (apiUrl.endsWith("/")) {
             apiUrl = apiUrl.substring(0, apiUrl.length() - 1);
         }
 
-        // Limpeza do número avulso
         telefoneDestino = telefoneDestino.replaceAll("\\D", "");
         if (!telefoneDestino.startsWith("55")) {
             telefoneDestino = "55" + telefoneDestino;
         }
 
-        String urlEnvio = apiUrl + "/message/sendMedia/" + INSTANCIA;
+        String urlEnvio = apiUrl + "/message/sendMedia/" + instancia;
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("number", telefoneDestino);
         payload.put("mediatype", "document");
+
+        // 🚀 CORREÇÃO DEFINITIVA 2 (EVOLUTON V2): Mimetype separado e Base64 limpo!
+        payload.put("media", "data:application/pdf;base64," + pdfBase64);
         payload.put("media", pdfBase64);
+
         payload.put("fileName", fileName);
         payload.put("caption", caption);
         payload.put("delay", 1200);
@@ -147,17 +148,13 @@ public class WhatsAppService {
 
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(urlEnvio, request, String.class);
-            System.out.println("WhatsApp Curinga enviado com sucesso! Resposta: " + response.getBody());
+            System.out.println("WhatsApp Curinga enviado: " + response.getBody());
         } catch (HttpClientErrorException e) {
-            String erroApi = e.getResponseBodyAsString();
-            System.err.println("Erro 400 da Evolution API: " + erroApi);
-            throw new RuntimeException("O motor do WhatsApp recusou o envio: " + erroApi);
+            throw new RuntimeException("O motor do WhatsApp recusou o envio: " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            System.err.println("Erro geral no envio: " + e.getMessage());
             throw new RuntimeException("Falha na comunicação com o WhatsApp.");
         }
     }
-
 
     /**
      * Solicita o QR Code para o Frontend
@@ -166,12 +163,13 @@ public class WhatsAppService {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
         String url = config.getWhatsappApiUrl();
         String token = config.getWhatsappToken();
+        String instancia = getInstanciaConfigurada(config);
 
         if (token == null || token.isEmpty()) throw new RuntimeException("Token não configurado.");
         if (url == null || url.isEmpty()) url = "http://localhost:8081";
         if (url.endsWith("/")) url = url.substring(0, url.length() - 1);
 
-        String endpoint = url + "/instance/connect/" + INSTANCIA;
+        String endpoint = url + "/instance/connect/" + instancia;
 
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
@@ -180,15 +178,18 @@ public class WhatsAppService {
         HttpEntity<String> request = new HttpEntity<>(headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     endpoint,
                     org.springframework.http.HttpMethod.GET,
                     request,
-                    Map.class
+                    new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {}
             );
             return response.getBody();
+        } catch (HttpClientErrorException e) {
+            System.err.println("❌ ERRO DA EVOLUTION (QR CODE): " + e.getResponseBodyAsString());
+            throw new RuntimeException("Erro da API: " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            System.err.println("Erro ao buscar QR Code: " + e.getMessage());
+            System.err.println("❌ ERRO GERAL (QR CODE): " + e.getMessage());
             throw new RuntimeException("Erro ao conectar ao motor do WhatsApp.");
         }
     }
@@ -197,30 +198,52 @@ public class WhatsAppService {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
         String url = config.getWhatsappApiUrl();
         String token = config.getWhatsappToken();
+        String instancia = getInstanciaConfigurada(config);
 
         if (url == null || url.isEmpty()) url = "http://localhost:8081";
         if (url.endsWith("/")) url = url.substring(0, url.length() - 1);
 
-        // Endpoint específico da Evolution para ver o estado da conexão
-        String endpoint = url + "/instance/connectionState/" + INSTANCIA;
+        String endpoint = url + "/instance/connectionState/" + instancia;
 
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.set("apikey", token);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     endpoint,
                     org.springframework.http.HttpMethod.GET,
                     new HttpEntity<>(headers),
-                    Map.class
+                    new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {}
             );
             return response.getBody();
         } catch (Exception e) {
-            // Se der erro, retornamos que está desconectado
             Map<String, Object> erro = new HashMap<>();
             erro.put("instance", Map.of("state", "DISCONNECTED"));
             return erro;
         }
+    }
+
+    public void desconectarInstancia() {
+        ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
+        String url = config.getWhatsappApiUrl();
+        String token = config.getWhatsappToken();
+        String instancia = getInstanciaConfigurada(config);
+
+        if (url == null || url.isEmpty()) url = "http://localhost:8081";
+        if (url.endsWith("/")) url = url.substring(0, url.length() - 1);
+
+        String endpoint = url + "/instance/logout/" + instancia;
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("apikey", token);
+
+        restTemplate.exchange(
+                endpoint,
+                org.springframework.http.HttpMethod.DELETE,
+                new HttpEntity<>(headers),
+                String.class
+        );
     }
 }
