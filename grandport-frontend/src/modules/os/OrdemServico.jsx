@@ -299,7 +299,7 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
             }
             if((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
                 e.preventDefault();
-                imprimirOrdemServicoSilenciosa();
+                imprimirOS();
             }
         };
         window.addEventListener('keydown', handleGlobalKeyDown);
@@ -335,7 +335,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         const servicoSemMecanico = itensServicos.find(s => !s.mecanicoId);
         if(servicoSemMecanico) { notificar('erro', `Falta selecionar o mecânico para o serviço: ${servicoSemMecanico.nome}`); return false; }
 
-        // 🚀 CAPTURANDO O ID DO CONSULTOR LOGADO
         let consultorIdLogado = localStorage.getItem('usuarioId') || localStorage.getItem('userId') || null;
         if (!consultorIdLogado) {
             try {
@@ -350,7 +349,7 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         const payload = {
             clienteId: clienteSelecionado.id,
             veiculoId: veiculoSelecionado || null,
-            consultorId: consultorIdLogado, // 🚀 AGORA O CONSULTOR VAI PRO BACK-END!
+            consultorId: consultorIdLogado,
             kmEntrada: kmVeiculo ? parseInt(kmVeiculo) : null,
             nivelCombustivel: 'NAO_INFORMADO',
             defeitoRelatado,
@@ -385,7 +384,7 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
             if (pecasSemEstoque.length > 0) {
                 setModalEnviarCaixaAberto(false);
                 const nomes = pecasSemEstoque.map(p => p.nome).join(', ');
-                return toast.error(`ESTOQUE INSUFICIENTE!\nVocê não tem saldo para: ${nomes}. (O estoque negativo está bloqueado nas configurações do sistema)`, { duration: 6000 });
+                return toast.error(`ESTOQUE INSUFICIENTE!\nVocê não tem saldo para: ${nomes}.`, { duration: 6000 });
             }
         }
 
@@ -407,30 +406,59 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                         status: 'PENDENTE'
                     });
                     toast.success("Próxima revisão agendada no CRM!");
-                } catch(err) { console.log("Erro ao salvar revisão", err); }
+                } catch(err) {}
             }
 
             setStatus('AGUARDANDO_PAGAMENTO');
             toast.success("OS Enviada ao Caixa! Peças baixadas do estoque.", { id: loadId });
             if (onVoltar) setTimeout(() => onVoltar(), 2000);
         } catch (error) {
-            const msg = error.response?.data?.message || "Erro ao enviar a OS ao caixa.";
-            toast.error(msg, { id: loadId });
+            toast.error(error.response?.data?.message || "Erro ao enviar a OS ao caixa.", { id: loadId });
         }
     };
 
-    // 🚀 IMPRESSÃO PROFISSIONAL COM PDF GERADO NO BACK-END
-    const imprimirOrdemServicoSilenciosa = async () => {
-        if(!osId) return notificar('erro', 'Salve a OS antes de imprimir.');
-        const toastId = toast.loading('Buscando PDF no servidor...');
+    // =========================================================================
+    // 🚀 1. BOTÃO DE WHATSAPP (ENVIA O PDF A4 FEITO EM JAVA)
+    // =========================================================================
+    const enviarWhatsApp = async () => {
+        if (!osId) return notificar('erro', 'Salve a OS primeiro antes de enviar por WhatsApp.');
+        if (!clienteSelecionado?.telefone) return notificar('erro', 'O cliente selecionado não possui telefone cadastrado.');
+
+        const loadId = toast.loading('Gerando PDF e enviando para o WhatsApp do cliente...');
         try {
-            // 🚀 PASSANDO O PARÂMETRO imprimirLaudo NA URL
-            const response = await api.get(`/api/os/${osId}/imprimir-pdf?imprimirLaudo=${imprimirLaudo}`, { responseType: 'blob' });
-            const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-            window.open(fileURL, '_blank');
-            toast.success("Documento gerado com sucesso!", { id: toastId });
+            await api.post(`/api/os/${osId}/enviar-whatsapp`);
+            toast.success('OS enviada com sucesso pelo WhatsApp! ✅', { id: loadId });
         } catch (error) {
-            toast.error("Erro ao gerar o PDF da OS.", { id: toastId });
+            toast.error(error.response?.data?.message || 'Erro ao enviar. Verifique o celular na aba Integrações.', { id: loadId });
+        }
+    };
+
+    // =========================================================================
+    // 🖨️ 2. BOTÃO DE IMPRIMIR (PUXA O HTML DA CENTRAL DE LAYOUTS 'os')
+    // =========================================================================
+    const imprimirOS = async () => {
+        if (!osId) return notificar('erro', 'Salve a OS antes de imprimir.');
+        const toastId = toast.loading('Buscando Layout de Impressão (HTML)...');
+        try {
+            // O Java processa o Thymeleaf do layout 'os' e devolve o HTML puro
+            const res = await api.get(`/api/os/${osId}/imprimir-html`);
+            const htmlProcessado = res.data;
+
+            // Abre uma nova janela invisível e joga o HTML lá dentro
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(htmlProcessado);
+            printWindow.document.close();
+            printWindow.focus();
+
+            // Espera meio segundo para as imagens/css carregarem e chama a impressora
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+
+            toast.success("Documento gerado!", { id: toastId });
+        } catch (error) {
+            toast.error("Erro ao gerar a impressão HTML. A rota /imprimir-html existe no Backend?", { id: toastId });
         }
     };
 
@@ -459,13 +487,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                                 <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${isBloqueada ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
                                     STATUS: {status.replace(/_/g, ' ')}
                                 </span>
-                                {!isBloqueada && (
-                                    <>
-                                        <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">F2: Cliente</span>
-                                        <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">F3: Peça</span>
-                                        <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">F4: Serviço</span>
-                                    </>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -476,16 +497,35 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                                 Voltar
                             </button>
                         )}
+
                         <button
                             onClick={salvarOrdemServico}
                             disabled={isBloqueada}
                             className={`px-4 py-2.5 font-black rounded-lg shadow-md flex items-center gap-2 uppercase text-xs transition-transform ${isBloqueada ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white hover:scale-105'}`}
                         >
-                            <Save size={16}/> Salvar OS
+                            <Save size={16}/> Salvar
                         </button>
-                        <button onClick={imprimirOrdemServicoSilenciosa} className="p-2.5 bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors shadow-sm">
+
+                        {/* 🚀 NOVO: BOTÃO WHATSAPP ELEGANT */}
+                        <button
+                            onClick={enviarWhatsApp}
+                            disabled={!osId}
+                            title="Enviar PDF A4 para o cliente via WhatsApp"
+                            className="p-2.5 bg-white text-green-600 hover:bg-green-50 border border-green-200 rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                        >
+                            <MessageCircle size={18}/>
+                        </button>
+
+                        {/* 🖨️ NOVO: BOTÃO DE IMPRESSÃO (CARREGA A CENTRAL DE LAYOUTS) */}
+                        <button
+                            onClick={imprimirOS}
+                            disabled={!osId}
+                            title="Imprimir na Térmica (Usando o layout da Central)"
+                            className="p-2.5 bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                        >
                             <Printer size={18}/>
                         </button>
+
                         {osId && (
                             <button
                                 onClick={abrirModalEnviarCaixa}
@@ -594,7 +634,6 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                                 <div>
                                     <div className="flex justify-between items-center mb-1">
                                         <label className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-1"><FileText size={12} className="text-blue-500"/> Laudo Final</label>
-                                        <label className="text-[8px] font-bold text-slate-500 flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={imprimirLaudo} onChange={e => setImprimirLaudo(e.target.checked)}/> Imprimir</label>
                                     </div>
                                     <textarea disabled={isBloqueada} value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="O que foi feito..." className="w-full p-2 bg-blue-50/30 border border-blue-100 rounded-lg text-xs font-bold text-blue-900 outline-none focus:border-blue-400 min-h-[50px] resize-none" />
                                 </div>
@@ -922,4 +961,3 @@ const ModalAplicacaoPeca = ({ modalAplicacao, setModalAplicacao }) => {
         </div>
     );
 };
-

@@ -191,4 +191,100 @@ public class OrdemServicoController {
 
     }
 
+    // =========================================================
+    // 🚀 ROTAS DE INTEGRAÇÃO FRONT-END (WHATSAPP E TÉRMICA)
+    // =========================================================
+
+    @PostMapping("/{id}/enviar-whatsapp")
+    public org.springframework.http.ResponseEntity<?> enviarOsPorWhatsApp(@PathVariable Long id) {
+        try {
+            // 1. PUXAR A OS E A CONFIGURAÇÃO DO BANCO
+            OrdemServico os = osRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("OS não encontrada"));
+            var config = configuracaoRepository.findById(1L)
+                    .orElseThrow(() -> new RuntimeException("Configuração do sistema não encontrada"));
+
+            String token = config.getWhatsappToken();
+            String apiUrl = config.getWhatsappApiUrl();
+            String instancia = config.getWhatsappInstancia();
+
+            if (token == null || instancia == null || token.trim().isEmpty()) {
+                return org.springframework.http.ResponseEntity.badRequest()
+                        .body(java.util.Map.of("message", "WhatsApp não está configurado no painel."));
+            }
+
+            if (os.getCliente() == null || os.getCliente().getTelefone() == null || os.getCliente().getTelefone().isEmpty()) {
+                return org.springframework.http.ResponseEntity.badRequest()
+                        .body(java.util.Map.of("message", "O cliente não possui um telefone válido cadastrado."));
+            }
+
+            // Formatar telefone (Colocar o 55 na frente se não tiver)
+            String telefoneDestino = os.getCliente().getTelefone().replaceAll("\\D", "");
+            if (!telefoneDestino.startsWith("55")) {
+                telefoneDestino = "55" + telefoneDestino;
+            }
+
+            // 🚀 2. A MÁGICA: Pedir para a própria função do Controller fabricar o PDF!
+            org.springframework.http.ResponseEntity<byte[]> responsePdf = imprimirOsPdf(id, true);
+            byte[] pdfBytes = responsePdf.getBody();
+            if (pdfBytes == null) throw new RuntimeException("Falha ao gerar o PDF da OS.");
+
+            String pdfBase64 = java.util.Base64.getEncoder().encodeToString(pdfBytes);
+
+            // 3. MONTAR A MENSAGEM DO WHATSAPP (Pegando do Painel)
+            String nomeLoja = (config.getNomeFantasia() != null) ? config.getNomeFantasia() : "Nossa Oficina";
+            String textoZap = (config.getMensagemWhatsapp() != null && !config.getMensagemWhatsapp().trim().isEmpty())
+                    ? config.getMensagemWhatsapp()
+                    : "Olá! Segue em anexo a sua Ordem de Serviço da *" + nomeLoja + "*.";
+
+            // 4. PREPARAR O PACOTE DA EVOLUTION API V2
+            if (apiUrl.endsWith("/")) apiUrl = apiUrl.substring(0, apiUrl.length() - 1);
+            String urlEnvio = apiUrl + "/message/sendMedia/" + instancia;
+
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("number", telefoneDestino);
+            payload.put("mediatype", "document");
+            payload.put("mimetype", "application/pdf");
+            payload.put("media", pdfBase64);
+            payload.put("fileName", "OS_" + os.getId() + ".pdf");
+            payload.put("caption", textoZap);
+            payload.put("delay", 1200);
+
+            // 5. ENTREGAR A CAIXA PARA O MOTOR (RestTemplate)
+            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+            headers.set("apikey", token);
+
+            org.springframework.http.HttpEntity<java.util.Map<String, Object>> request = new org.springframework.http.HttpEntity<>(payload, headers);
+
+            org.springframework.http.ResponseEntity<String> response = restTemplate.postForEntity(urlEnvio, request, String.class);
+
+            return org.springframework.http.ResponseEntity.ok(java.util.Map.of("message", "OS enviada com sucesso pelo WhatsApp! ✅"));
+
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            return org.springframework.http.ResponseEntity.badRequest()
+                    .body(java.util.Map.of("message", "O motor do WhatsApp recusou o envio. O celular está conectado?"));
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.badRequest()
+                    .body(java.util.Map.of("message", "Erro interno ao enviar Zap: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/imprimir-html")
+    public org.springframework.http.ResponseEntity<String> imprimirOsHtml(@PathVariable Long id) {
+        try {
+
+            // Para a impressora térmica funcionar, você precisa retornar aqui
+            // o HTML processado com os dados da OS.
+            // Se você já tiver um método que processa o Thymeleaf e devolve a String, chame-o aqui.
+
+            String htmlProcessado = "<h1>O HTML da sua OS vai aparecer aqui!</h1>";
+
+            return org.springframework.http.ResponseEntity.ok(htmlProcessado);
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.badRequest().body("Erro ao gerar HTML: " + e.getMessage());
+        }
+    }
+
 }
