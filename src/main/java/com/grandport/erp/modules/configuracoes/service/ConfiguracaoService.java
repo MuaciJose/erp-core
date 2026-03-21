@@ -114,6 +114,7 @@ public class ConfiguracaoService {
         if (dadosAtualizados.getWhatsappToken() != null) configBanco.setWhatsappToken(dadosAtualizados.getWhatsappToken());
         if (dadosAtualizados.getWhatsappApiUrl() != null) configBanco.setWhatsappApiUrl(dadosAtualizados.getWhatsappApiUrl());
         if (dadosAtualizados.getWhatsappInstancia() != null) configBanco.setWhatsappInstancia(dadosAtualizados.getWhatsappInstancia());
+        if (dadosAtualizados.getMensagemWhatsapp() != null) configBanco.setMensagemWhatsapp(dadosAtualizados.getMensagemWhatsapp());
 
 
         // 🚀 AQUI NÓS SALVAMOS TODOS OS LAYOUTS DE IMPRESSÃO

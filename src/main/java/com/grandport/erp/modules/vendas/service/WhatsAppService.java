@@ -84,7 +84,11 @@ public class WhatsAppService {
         payload.put("media", pdfBase64);
 
         payload.put("fileName", "Recibo_Venda_" + venda.getId() + ".pdf");
-        payload.put("caption", "Olá! Segue em anexo o recibo da sua compra na *" + config.getNomeFantasia() + "*.");
+        String textoZap = (config.getMensagemWhatsapp() != null && !config.getMensagemWhatsapp().trim().isEmpty())
+                ? config.getMensagemWhatsapp()
+                : "Olá! Segue em anexo o documento da sua compra na *" + config.getNomeFantasia() + "*.";
+
+        payload.put("caption", textoZap);
         payload.put("delay", 1200);
 
         RestTemplate restTemplate = new RestTemplate();

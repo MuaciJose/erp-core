@@ -166,6 +166,10 @@ public class ConfiguracaoSistema {
     private String whatsappInstancia;
 
 
+    @Column(columnDefinition = "TEXT")
+    private String mensagemWhatsapp;
+    public String getMensagemWhatsapp() { return mensagemWhatsapp; }
+    public void setMensagemWhatsapp(String mensagemWhatsapp) { this.mensagemWhatsapp = mensagemWhatsapp; }
 
 
 

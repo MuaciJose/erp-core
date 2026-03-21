@@ -87,7 +87,8 @@ export const Configuracoes = () => {
         vendedores: [],
         whatsappToken: '',
         whatsappApiUrl: '',
-        whatsappInstancia: '', // 🚀 CAMPO NOVO ADICIONADO AQUI
+        whatsappInstancia: '',
+        mensagemWhatsapp: '',// 🚀 CAMPO NOVO ADICIONADO AQUI
         tipoCertificado: 'A1',
         senhaCertificado: '',
         smtpHost: 'smtp.gmail.com',
@@ -951,6 +952,20 @@ export const Configuracoes = () => {
                                     <label className="text-xs font-bold text-slate-500 uppercase">Mensagem Padrão no Rodapé (Garantia/Agradecimento)</label>
                                     <textarea name="mensagemRodape" value={config.mensagemRodape || ''} onChange={handleChange} rows="3" className="w-full p-3 mt-1 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-blue-500 outline-none" placeholder="Ex: Orçamento sujeito a alteração de preços após validade."></textarea>
                                 </div>
+                            </div>
+                            <div className="mt-4">
+                                <label className="text-[10px] font-black text-green-700 uppercase tracking-widest">
+                                    Texto Padrão do WhatsApp (Envio de PDF)
+                                </label>
+                                <textarea
+                                    name="mensagemWhatsapp"
+                                    value={config.mensagemWhatsapp || ''}
+                                    onChange={handleChange}
+                                    rows="3"
+                                    placeholder="Ex: Olá! Seu pedido já está pronto. Segue o recibo em anexo! 🚀"
+                                    className="w-full p-3 mt-1 bg-white border-2 border-green-200 rounded-xl text-sm outline-none focus:border-green-500 text-slate-700 shadow-sm"
+                                ></textarea>
+                                <p className="text-[10px] text-slate-500 mt-1 font-medium">Esta mensagem acompanhará o PDF enviado para o cliente.</p>
                             </div>
 
                             <div className="mt-8 p-6 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-4">
