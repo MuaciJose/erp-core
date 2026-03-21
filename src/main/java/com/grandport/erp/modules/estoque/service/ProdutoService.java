@@ -202,4 +202,90 @@ public class ProdutoService {
         mov.setSaldoAtual(produto.getQuantidadeEstoque());
         movimentacaoRepository.save(mov);
     }
+
+    /**
+     * 🔍 AUDITORIA FISCAL: Verifica integridade de dados fiscais de todos os produtos
+     * Identifica quais produtos estão prontos para emitir NF-e
+     * 
+     * @return Mapa contendo status de sincronização fiscal
+     */
+    public java.util.Map<String, Object> validarIntegridadeFiscal() {
+        java.util.List<Produto> todosProdutos = produtoRepository.findAll();
+        java.util.List<Produto> produtosIncompletos = new java.util.ArrayList<>();
+
+        // Verificar cada produto
+        for (Produto p : todosProdutos) {
+            java.util.List<String> problemas = new java.util.ArrayList<>();
+
+            // Validação 1: NCM
+            if (p.getNcm() == null || p.getNcm().getCodigo() == null || p.getNcm().getCodigo().trim().isEmpty()) {
+                problemas.add("NCM");
+            }
+
+            // Validação 2: CFOP
+            if (p.getCfopPadrao() == null || p.getCfopPadrao().trim().isEmpty()) {
+                problemas.add("CFOP");
+            }
+
+            // Validação 3: CSOSN ou CST
+            if ((p.getCsosnPadrao() == null || p.getCsosnPadrao().trim().isEmpty()) &&
+                (p.getCstPadrao() == null || p.getCstPadrao().trim().isEmpty())) {
+                problemas.add("CSOSN/CST");
+            }
+
+            // Validação 4: Alíquota ICMS
+            if (p.getAliquotaIcms() == null) {
+                problemas.add("Alíquota ICMS");
+            }
+
+            // Validação 5: Marca
+            if (p.getMarca() == null) {
+                problemas.add("Marca");
+            }
+
+            // Se encontrou problemas, adiciona à lista de incompletos
+            if (!problemas.isEmpty()) {
+                produtosIncompletos.add(p);
+            }
+        }
+
+        // Montar resultado
+        java.util.Map<String, Object> resultado = new java.util.HashMap<>();
+        resultado.put("total_produtos", todosProdutos.size());
+        resultado.put("produtos_ok_para_fiscal", todosProdutos.size() - produtosIncompletos.size());
+        resultado.put("produtos_incompletos", produtosIncompletos.size());
+
+        // Calcular percentual
+        int percentual = todosProdutos.isEmpty() ? 100 : 
+            ((todosProdutos.size() - produtosIncompletos.size()) * 100 / todosProdutos.size());
+        resultado.put("percentual_completo", percentual);
+
+        // Detalhar produtos incompletos
+        resultado.put("lista_incompletos", 
+            produtosIncompletos.stream()
+                .map(p -> {
+                    java.util.Map<String, Object> item = new java.util.HashMap<>();
+                    item.put("id", p.getId());
+                    item.put("nome", p.getNome());
+                    item.put("sku", p.getSku() != null ? p.getSku() : "SEM SKU");
+                    item.put("ncm", p.getNcm() != null ? p.getNcm().getCodigo() : "❌ FALTANDO");
+                    item.put("cfop", p.getCfopPadrao() != null ? p.getCfopPadrao() : "❌ FALTANDO");
+                    item.put("csosn", p.getCsosnPadrao() != null ? p.getCsosnPadrao() : "❌ FALTANDO");
+                    item.put("cst", p.getCstPadrao() != null ? p.getCstPadrao() : "❌ FALTANDO");
+                    item.put("marca", p.getMarca() != null ? p.getMarca().getNome() : "❌ FALTANDO");
+                    item.put("aliquota_icms", p.getAliquotaIcms() != null ? p.getAliquotaIcms() : "❌ FALTANDO");
+                    return item;
+                })
+                .collect(java.util.stream.Collectors.toList())
+        );
+
+        // 🚀 AUDITORIA: Registrar auditoria desta verificação
+        auditoriaService.registrar("ESTOQUE", "AUDITORIA_FISCAL", 
+            String.format("Auditoria Fiscal: %d de %d produtos prontos (%.1f%%)",
+                todosProdutos.size() - produtosIncompletos.size(),
+                todosProdutos.size(),
+                percentual));
+
+        return resultado;
+    }
 }

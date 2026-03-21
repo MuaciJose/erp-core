@@ -94,6 +94,11 @@ public class NfeService {
         String chaveSemDV = montarChaveAcesso(config, "65", serieNfce, numeroNfce);
         String chaveAcessoReal = chaveSemDV + calcularDV(chaveSemDV);
 
+        // ✅ NOVA VALIDAÇÃO CRÍTICA: Verifica dados fiscais ANTES de emitir
+        for (ItemVenda item : venda.getItens()) {
+            validarDadosFiscaisDoProduto(item.getProduto());
+        }
+
         double totalIBS = 0.0; double totalCBS = 0.0;
         for (ItemVenda item : venda.getItens()) {
             Map<String, String> impostos = motorFiscalService.calcularTributosDoItem(item.getProduto(), config.getUf(), config.getUf(), config.getCrt());
@@ -406,5 +411,68 @@ public class NfeService {
         xml.append("<emit><CNPJ>").append(config.getCnpj().replaceAll("\\D", "")).append("</CNPJ><xNome>").append(config.getRazaoSocial()).append("</xNome></emit>\n");
         xml.append("</infNFe></NFe></nfeProc>");
         salvarArquivoXml(nota.getChaveAcesso(), xml.toString());
+    }
+
+    /**
+     * 🔍 VALIDAÇÃO CRÍTICA: Verifica se produtos têm dados fiscais completos
+     * Se faltar algo, lança exceção com mensagem clara e específica
+     * 
+     * @param produto Produto a validar
+     * @throws Exception Se faltarem dados obrigatórios
+     */
+    private void validarDadosFiscaisDoProduto(com.grandport.erp.modules.estoque.model.Produto produto) throws Exception {
+        if (produto == null) {
+            throw new Exception("❌ ERRO CRÍTICO: Produto nulo não pode ser processado!");
+        }
+
+        StringBuilder erros = new StringBuilder();
+
+        // ❌ Validação 1: NCM obrigatório (classificação fiscal)
+        if (produto.getNcm() == null || produto.getNcm().getCodigo() == null || produto.getNcm().getCodigo().trim().isEmpty()) {
+            erros.append("- NCM (Classificação Fiscal) não configurado\n");
+        }
+
+        // ❌ Validação 2: CFOP obrigatório (tipo de operação)
+        if (produto.getCfopPadrao() == null || produto.getCfopPadrao().trim().isEmpty()) {
+            erros.append("- CFOP (Tipo de Operação) não configurado\n");
+        }
+
+        // ❌ Validação 3: CSOSN ou CST obrigatório (tributação)
+        if ((produto.getCsosnPadrao() == null || produto.getCsosnPadrao().trim().isEmpty()) &&
+            (produto.getCstPadrao() == null || produto.getCstPadrao().trim().isEmpty())) {
+            erros.append("- Nem CSOSN (Simples Nacional) nem CST (Regime Normal) configurados\n");
+        }
+
+        // ❌ Validação 4: Alíquota ICMS obrigatória
+        if (produto.getAliquotaIcms() == null) {
+            erros.append("- Alíquota ICMS não configurada\n");
+        }
+
+        // ❌ Validação 5: Marca obrigatória
+        if (produto.getMarca() == null) {
+            erros.append("- Marca do Produto não configurada\n");
+        }
+
+        // 🚨 Se encontrou erros, lança exceção com lista clara
+        if (erros.length() > 0) {
+            String mensagemErro = "❌ PRODUTO SEM DADOS FISCAIS COMPLETOS\n" +
+                    "═════════════════════════════════════════════════\n" +
+                    "Produto: " + produto.getNome() + "\n" +
+                    "SKU: " + (produto.getSku() != null ? produto.getSku() : "N/A") + "\n" +
+                    "ID: " + produto.getId() + "\n" +
+                    "─────────────────────────────────────────────────\n" +
+                    "Erros encontrados:\n" +
+                    erros.toString() +
+                    "─────────────────────────────────────────────────\n" +
+                    "⚠️  Configure todos esses campos no cadastro de\n" +
+                    "   produtos ANTES de emitir a NF-e.\n" +
+                    "═════════════════════════════════════════════════";
+
+            // 🚀 AUDITORIA DO ERRO
+            auditoriaService.registrar("FISCAL", "ERRO_DADOS_INCOMPLETOS", 
+                "Tentativa de emitir NF-e com produto incompleto: " + produto.getNome() + " (ID: " + produto.getId() + ")");
+
+            throw new Exception(mensagemErro);
+        }
     }
 }

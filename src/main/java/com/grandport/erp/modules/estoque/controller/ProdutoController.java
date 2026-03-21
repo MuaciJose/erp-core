@@ -166,4 +166,13 @@ public class ProdutoController {
         }
         return ResponseEntity.ok(produtoRepository.findByReferenciaOriginalAndIdNot(p.getReferenciaOriginal(), id));
     }
+
+    // ========================================================================
+    // 🔍 AUDITORIA DE SINCRONIZAÇÃO FISCAL
+    // ========================================================================
+    @GetMapping("/auditoria-fiscal")
+    @Operation(summary = "Verifica quais produtos estão prontos para emitir NF-e (com dados fiscais completos)")
+    public ResponseEntity<Map<String, Object>> auditarDadosFiscais() {
+        return ResponseEntity.ok(service.validarIntegridadeFiscal());
+    }
 }
