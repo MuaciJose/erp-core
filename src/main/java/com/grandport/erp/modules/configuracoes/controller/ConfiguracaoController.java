@@ -102,4 +102,187 @@ public class ConfiguracaoController {
         Map<String, Object> resultado = manutencaoService.limparFotosVistoriasAntigas(meses);
         return ResponseEntity.ok(resultado);
     }
+
+    // =======================================================================
+    // 🎨 CENTRAL DE LAYOUTS - GERENCIADOR DE TEMPLATES HTML
+    // =======================================================================
+
+    @GetMapping("/layouts")
+    public ResponseEntity<Map<String, Object>> obterTodosLayouts() {
+        ConfiguracaoSistema config = service.obterConfiguracao();
+        
+        Map<String, Object> layouts = new java.util.HashMap<>();
+        layouts.put("extratoCliente", config.getLayoutHtmlExtratoCliente());
+        layouts.put("extratoFornecedor", config.getLayoutHtmlExtratoFornecedor());
+        layouts.put("os", config.getLayoutHtmlOs());
+        layouts.put("venda", config.getLayoutHtmlVenda());
+        layouts.put("recibo", config.getLayoutHtmlRecibo());
+        layouts.put("reciboPagamento", config.getLayoutHtmlReciboPagamento());
+        layouts.put("fechamentoCaixa", config.getLayoutHtmlFechamentoCaixa());
+        layouts.put("espelhoNota", config.getLayoutHtmlEspelhoNota());
+        layouts.put("dre", config.getLayoutHtmlDre());
+        layouts.put("relatorioComissao", config.getLayoutHtmlRelatorioComissao());
+        layouts.put("relatorioContasPagar", config.getLayoutHtmlRelatorioContasPagar());
+        layouts.put("relatorioContasReceber", config.getLayoutHtmlRelatorioContasReceber());
+        
+        return ResponseEntity.ok(layouts);
+    }
+
+    @GetMapping("/layouts/{tipoLayout}")
+    public ResponseEntity<Map<String, String>> obterLayout(@PathVariable String tipoLayout) {
+        ConfiguracaoSistema config = service.obterConfiguracao();
+        String html = null;
+        
+        switch (tipoLayout.toLowerCase()) {
+            case "extratocliente":
+                html = config.getLayoutHtmlExtratoCliente();
+                break;
+            case "extratofornecedor":
+                html = config.getLayoutHtmlExtratoFornecedor();
+                break;
+            case "os":
+                html = config.getLayoutHtmlOs();
+                break;
+            case "venda":
+                html = config.getLayoutHtmlVenda();
+                break;
+            case "recibo":
+                html = config.getLayoutHtmlRecibo();
+                break;
+            case "recibopagamento":
+                html = config.getLayoutHtmlReciboPagamento();
+                break;
+            case "fechamentocaixa":
+                html = config.getLayoutHtmlFechamentoCaixa();
+                break;
+            case "espelhonota":
+                html = config.getLayoutHtmlEspelhoNota();
+                break;
+            case "dre":
+                html = config.getLayoutHtmlDre();
+                break;
+            case "relatoriocomissao":
+                html = config.getLayoutHtmlRelatorioComissao();
+                break;
+            case "relatoriocontaspagar":
+                html = config.getLayoutHtmlRelatorioContasPagar();
+                break;
+            case "relatoriocontasreceber":
+                html = config.getLayoutHtmlRelatorioContasReceber();
+                break;
+            default:
+                return ResponseEntity.badRequest().body(Map.of("error", "Tipo de layout não encontrado: " + tipoLayout));
+        }
+        
+        return ResponseEntity.ok(Map.of("tipoLayout", tipoLayout, "html", html != null ? html : ""));
+    }
+
+    @PutMapping("/layouts/{tipoLayout}")
+    public ResponseEntity<Map<String, String>> atualizarLayout(
+            @PathVariable String tipoLayout,
+            @RequestBody Map<String, String> payload) {
+        
+        String html = payload.get("html");
+        if (html == null || html.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "HTML não pode estar vazio"));
+        }
+        
+        ConfiguracaoSistema config = service.obterConfiguracao();
+        
+        switch (tipoLayout.toLowerCase()) {
+            case "extratocliente":
+                config.setLayoutHtmlExtratoCliente(html);
+                break;
+            case "extratofornecedor":
+                config.setLayoutHtmlExtratoFornecedor(html);
+                break;
+            case "os":
+                config.setLayoutHtmlOs(html);
+                break;
+            case "venda":
+                config.setLayoutHtmlVenda(html);
+                break;
+            case "recibo":
+                config.setLayoutHtmlRecibo(html);
+                break;
+            case "recibopagamento":
+                config.setLayoutHtmlReciboPagamento(html);
+                break;
+            case "fechamentocaixa":
+                config.setLayoutHtmlFechamentoCaixa(html);
+                break;
+            case "espelhonota":
+                config.setLayoutHtmlEspelhoNota(html);
+                break;
+            case "dre":
+                config.setLayoutHtmlDre(html);
+                break;
+            case "relatoriocomissao":
+                config.setLayoutHtmlRelatorioComissao(html);
+                break;
+            case "relatoriocontaspagar":
+                config.setLayoutHtmlRelatorioContasPagar(html);
+                break;
+            case "relatoriocontasreceber":
+                config.setLayoutHtmlRelatorioContasReceber(html);
+                break;
+            default:
+                return ResponseEntity.badRequest().body(Map.of("error", "Tipo de layout não encontrado: " + tipoLayout));
+        }
+        
+        service.atualizarConfiguracao(config);
+        
+        return ResponseEntity.ok(Map.of("mensagem", "Layout atualizado com sucesso!", "tipoLayout", tipoLayout));
+    }
+
+    @PostMapping("/layouts/reset/{tipoLayout}")
+    public ResponseEntity<Map<String, String>> resetarLayout(@PathVariable String tipoLayout) {
+        ConfiguracaoSistema config = service.obterConfiguracao();
+        
+        // Define templates padrão vazios (será usado o template padrão do código)
+        switch (tipoLayout.toLowerCase()) {
+            case "extratocliente":
+                config.setLayoutHtmlExtratoCliente(null);
+                break;
+            case "extratofornecedor":
+                config.setLayoutHtmlExtratoFornecedor(null);
+                break;
+            case "os":
+                config.setLayoutHtmlOs(null);
+                break;
+            case "venda":
+                config.setLayoutHtmlVenda(null);
+                break;
+            case "recibo":
+                config.setLayoutHtmlRecibo(null);
+                break;
+            case "recibopagamento":
+                config.setLayoutHtmlReciboPagamento(null);
+                break;
+            case "fechamentocaixa":
+                config.setLayoutHtmlFechamentoCaixa(null);
+                break;
+            case "espelhonota":
+                config.setLayoutHtmlEspelhoNota(null);
+                break;
+            case "dre":
+                config.setLayoutHtmlDre(null);
+                break;
+            case "relatoriocomissao":
+                config.setLayoutHtmlRelatorioComissao(null);
+                break;
+            case "relatoriocontaspagar":
+                config.setLayoutHtmlRelatorioContasPagar(null);
+                break;
+            case "relatoriocontasreceber":
+                config.setLayoutHtmlRelatorioContasReceber(null);
+                break;
+            default:
+                return ResponseEntity.badRequest().body(Map.of("error", "Tipo de layout não encontrado: " + tipoLayout));
+        }
+        
+        service.atualizarConfiguracao(config);
+        
+        return ResponseEntity.ok(Map.of("mensagem", "Layout resetado para padrão!", "tipoLayout", tipoLayout));
+    }
 }

@@ -138,21 +138,29 @@ public class ConfiguracaoSistema {
     private String layoutHtmlEspelhoNota;
 
     // 🚀 NOVO: LAYOUT DO DRE (A4)
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String layoutHtmlDre;
 
     // 🚀 NOVO: LAYOUT DO RECIBO AVULSO (A4 Paisagem)
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String layoutHtmlRecibo;
 
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String layoutHtmlReciboPagamento;
 
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String layoutHtmlRelatorioContasPagar;
 
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String layoutHtmlRelatorioContasReceber;
+
+    // 🚀 NOVO: LAYOUT DO EXTRATO FINANCEIRO DE CLIENTES
+    @Column(columnDefinition = "TEXT")
+    private String layoutHtmlExtratoCliente;
+
+    // 🚀 NOVO: LAYOUT DO EXTRATO FINANCEIRO DE FORNECEDORES
+    @Column(columnDefinition = "TEXT")
+    private String layoutHtmlExtratoFornecedor;
 
 
 
@@ -165,3 +173,4 @@ public class ConfiguracaoSistema {
 
 
 }
+

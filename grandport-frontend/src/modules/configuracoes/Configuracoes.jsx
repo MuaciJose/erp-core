@@ -4,9 +4,10 @@ import {
     Settings, Building2, Printer, Sliders, Save, CheckCircle,
     AlertTriangle, Info, X, Store, Percent, Search, Loader2, Camera, Plus,
     Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode, RefreshCw, Receipt,
-    Landmark, Wrench
+    Landmark, Wrench, Palette
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { CentralDeLayouts } from './CentralDeLayouts';
 
 // 🚀 LISTA OFICIAL PARA GARANTIR QUE O DADO ENVIADO AO JAVA SEJA SEMPRE VÁLIDO
 const ESTADOS_BRASIL = [
@@ -594,6 +595,7 @@ export const Configuracoes = () => {
                     <button onClick={() => setAbaAtiva('PREFEITURA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'PREFEITURA' ? 'bg-orange-500 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Landmark size={20} /> Prefeitura (Serviços)</button>
                     <button onClick={() => setAbaAtiva('VENDEDORES')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'VENDEDORES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Users size={20} /> Vendedores</button>
                     <button onClick={() => setAbaAtiva('IMPRESSAO')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'IMPRESSAO' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Printer size={20} /> Impressão</button>
+                    <button onClick={() => setAbaAtiva('LAYOUTS')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'LAYOUTS' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Palette size={20} /> 🎨 Layouts</button>
                     <button onClick={() => setAbaAtiva('REGRAS')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'REGRAS' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Sliders size={20} /> Regras</button>
                     <button onClick={() => setAbaAtiva('INTEGRACOES')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'INTEGRACOES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Plug size={20} /> Integrações</button>
                     <button onClick={() => setAbaAtiva('SISTEMA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'SISTEMA' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Database size={20} /> Sistema</button>
@@ -1117,22 +1119,17 @@ export const Configuracoes = () => {
 
                                     <div className="flex flex-col justify-center">
                                         <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-6">
-                                            <h4 className="font-bold text-orange-800 flex items-center gap-2 text-sm"><Sliders size={16}/> Configuração Técnica (Avançado)</h4>
-                                            <p className="text-xs text-orange-700 mt-1">Deixe vazio para usar o servidor local nativo, ou insira os dados do seu provedor terceirizado (Ex: Z-API, ChatPro).</p>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            <div>
-                                                <label className="text-xs font-bold text-slate-500 uppercase">URL da API (Endpoint Base)</label>
-                                                <input type="text" name="whatsappApiUrl" value={config.whatsappApiUrl || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-mono text-sm focus:border-blue-500 outline-none" placeholder="Ex: http://localhost:8081" />
+                                            <h4 className="text-xs font-black text-orange-800 mb-2">Configurações Avançadas (SMTP)</h4>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Servidor SMTP</label>
+                                                    <input type="text" name="smtpHost" value={config.smtpHost || 'smtp.gmail.com'} onChange={handleChange} className="w-full p-2 mt-1 bg-white border-2 border-slate-200 rounded-lg text-sm font-mono outline-none" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Porta SMTP</label>
+                                                    <input type="number" name="smtpPort" value={config.smtpPort || 587} onChange={handleChange} className="w-full p-2 mt-1 bg-white border-2 border-slate-200 rounded-lg text-sm font-mono outline-none" />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label className="text-xs font-bold text-slate-500 uppercase">Token de Autenticação (Global)</label>
-                                                <input type="password" name="whatsappToken" value={config.whatsappToken || ''} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-slate-200 rounded-xl font-mono text-sm focus:border-blue-500 outline-none" placeholder="Cole o token fornecido..." />
-                                            </div>
-                                            <button onClick={salvarConfiguracoes} title="Salvar apenas os dados de endereço e token da API de WhatsApp" className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl mt-2 transition-colors">
-                                                SALVAR DADOS TÉCNICOS
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -1223,7 +1220,7 @@ export const Configuracoes = () => {
                                 </div>
                             </div>
 
-                            <div className="mt-8 p-6 bg-slate-50 border border-slate-200 rounded-3xl">
+                            <div className="mt-8 p-6 bg-slate-50 border border-slate-200 rounded-3xl shadow-sm">
                                 <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-4">
                                     <div>
                                         <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-1">
@@ -1246,7 +1243,7 @@ export const Configuracoes = () => {
                                             onClick={limparFotosAntigas}
                                             disabled={limpandoFotos}
                                             title="Acionar robô para excluir arquivos físicos do servidor"
-                                            className="bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 font-bold px-6 py-3 rounded-xl flex items-center gap-2 transition-colors whitespace-nowrap disabled:opacity-50 shadow-sm active:scale-95"
+                                            className="bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-sm px-6 py-3 transition-colors shadow-md flex items-center gap-2 disabled:opacity-50"
                                         >
                                             {limpandoFotos ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
                                             {limpandoFotos ? 'LIMPANDO...' : 'EXECUTAR FAXINA'}
@@ -1290,8 +1287,15 @@ export const Configuracoes = () => {
                         </div>
                     )}
 
+                    {abaAtiva === 'LAYOUTS' && (
+                        <div className="animate-fade-in">
+                            <CentralDeLayouts />
+                        </div>
+                    )}
+
                 </div>
             </div>
         </div>
     );
 };
+

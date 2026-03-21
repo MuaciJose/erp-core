@@ -332,4 +332,9 @@ public class FinanceiroService {
 
         auditoriaService.registrar("FINANCEIRO", "BAIXA_RECEBER", detalhesLog);
     }
+
+    // 🟦 MÉTODO AUXILIAR: Busca um Parceiro por ID (necessário para Extratos)
+    public java.util.Optional<Parceiro> findParceiro(Long parceiroId) {
+        return parceiroRepository.findById(parceiroId);
+    }
 }
