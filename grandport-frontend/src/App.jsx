@@ -60,6 +60,8 @@ import { ChecklistTablet } from './modules/checklist/ChecklistTablet';
 // 🚀 MÓDULO SERVIÇOS / MÃO DE OBRA
 import { GestaoServicos } from './modules/servicos/GestaoServicos';
 
+import { InventarioPWA } from './modules/estoque/InventarioPWA';
+
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
     const [paginaAtiva, setPaginaAtiva] = useState('');
@@ -120,7 +122,7 @@ function App() {
     }
 
     // 🚀 Liberando as rotas extras (INCLUINDO O CHECKLIST) para acesso temporário/testes
-    const permissoesExtra = ['revisoes', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual', 'checklist'];
+    const permissoesExtra = ['revisoes', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual', 'checklist', 'inventario', 'estoque'];
     const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva) || permissoesExtra.includes(paginaAtiva);
 
     return (
@@ -172,7 +174,7 @@ function App() {
 
                             {paginaAtiva === 'servicos' && <GestaoServicos />}
 
-                            {paginaAtiva === 'estoque' && <Produtos />}
+                            {paginaAtiva === 'estoque' && <Produtos setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'marcas' && <Marcas />}
                             {paginaAtiva === 'ajuste_estoque' && <AjusteEstoque />}
                             {paginaAtiva === 'parceiros' && <Parceiros />}
@@ -198,6 +200,7 @@ function App() {
                             {paginaAtiva === 'categorias' && <Categorias />}
                             {paginaAtiva === 'gerenciador-nfe' && <GerenciadorFiscal setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'emitir-nfe-avulsa' && <EmitirNfeAvulsa setPaginaAtiva={setPaginaAtiva} />}
+                            {paginaAtiva === 'inventario' && <InventarioPWA  setPaginaAtiva={setPaginaAtiva} />}
                         </>
                     )}
                 </div>

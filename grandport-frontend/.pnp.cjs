@@ -41,6 +41,7 @@ const RAW_RUNTIME_STATE =
           ["eslint-plugin-react-refresh", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:0.4.26"],\
           ["globals", "npm:16.5.0"],\
           ["grandport-frontend", "workspace:."],\
+          ["html5-qrcode", "npm:2.3.8"],\
           ["lucide-react", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:0.575.0"],\
           ["postcss", "npm:8.5.6"],\
           ["prop-types", "npm:15.8.1"],\
@@ -5145,6 +5146,7 @@ const RAW_RUNTIME_STATE =
           ["eslint-plugin-react-refresh", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:0.4.26"],\
           ["globals", "npm:16.5.0"],\
           ["grandport-frontend", "workspace:."],\
+          ["html5-qrcode", "npm:2.3.8"],\
           ["lucide-react", "virtual:a140f0fdb72968d6af16b8942a0969a95a92db5e8c1ecad98f363a03ae9711ec859e6fc00b349100f20f1b2af2888166923995055b79ff144dca5d05e22a62f2#npm:0.575.0"],\
           ["postcss", "npm:8.5.6"],\
           ["prop-types", "npm:15.8.1"],\
@@ -5246,6 +5248,15 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["hermes-estree", "npm:0.25.1"],\
           ["hermes-parser", "npm:0.25.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["html5-qrcode", [\
+      ["npm:2.3.8", {\
+        "packageLocation": "../../../.yarn/berry/cache/html5-qrcode-npm-2.3.8-2e0c8061e2-10c0.zip/node_modules/html5-qrcode/",\
+        "packageDependencies": [\
+          ["html5-qrcode", "npm:2.3.8"]\
         ],\
         "linkType": "HARD"\
       }]\

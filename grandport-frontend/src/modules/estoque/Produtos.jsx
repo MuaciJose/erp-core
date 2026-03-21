@@ -4,12 +4,12 @@ import toast from 'react-hot-toast';
 import {
     Package, Plus, Search, Edit, Trash2, CheckCircle, Ban, X, Save,
     FileText, DollarSign, Box, ShieldAlert, Image as ImageIcon, Info, ArrowLeft,
-    History, Car, Upload, FileJson, Loader2, UploadCloud, Link as LinkIcon
+    History, Car, Upload, FileJson, Loader2, UploadCloud, Link as LinkIcon, ScanBarcode
 } from 'lucide-react';
 
 import { ExtratoEstoque } from './ExtratoEstoque';
 
-export const Produtos = () => {
+export const Produtos = ({ setPaginaAtiva }) => {
     const [produtos, setProdutos] = useState([]);
     const [marcas, setMarcas] = useState([]);
     const [categorias, setCategorias] = useState([]);
@@ -440,12 +440,25 @@ export const Produtos = () => {
                             <h1 className="text-3xl font-black text-slate-800 flex items-center gap-3"><Package className="text-blue-600 bg-blue-100 p-1 rounded-lg" size={36} /> GESTÃO DE PEÇAS</h1>
                             <p className="text-slate-500 mt-1">Cadastro unificado: Operacional, Fiscal e Precificação</p>
                         </div>
-                        <button
-                            onClick={abrirNovo}
-                            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 shadow-lg transition-transform transform hover:scale-105"
-                        >
-                            <Plus size={20} /> NOVO PRODUTO
-                        </button>
+
+                        {/* 🚀 CAIXA DOS BOTÕES DE AÇÃO */}
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setPaginaAtiva('inventario')}
+                                className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold uppercase transition-all shadow-md active:scale-95"
+                                title="Abrir o leitor de código de barras (PWA)"
+                            >
+                                <ScanBarcode size={20} className="text-blue-400" />
+                                <span className="hidden sm:inline">Modo Coletor</span>
+                            </button>
+
+                            <button
+                                onClick={abrirNovo}
+                                className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 shadow-lg transition-transform transform hover:scale-105"
+                            >
+                                <Plus size={20} /> NOVO PRODUTO
+                            </button>
+                        </div>
                     </div>
 
                     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
