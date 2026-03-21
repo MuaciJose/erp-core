@@ -286,33 +286,269 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
     };
 
     // =========================================================================
-    // 🚀 LÓGICA FISCAL DE OS (AGORA COM A CHAVE SELETORA E ATUALIZAÇÃO DA TELA)
+    // 🚨 NOVOS HANDLERS: CANCELAMENTO, COMPLEMENTAÇÃO, CONTINGÊNCIA
     // =========================================================================
-    const emitirFiscalPecas = async (osId, modelo) => {
-        setProcessandoId(`pecas-${modelo}-${osId}`);
-        const nomeDoc = modelo === '55' ? 'NF-e (A4)' : 'NFC-e (Cupom)';
-        const toastId = toast.loading(`Transmitindo ${nomeDoc} de Peças da OS #${osId}...`);
+
+    /**
+     * Cancela uma NFC-e autorizada
+     */
+    const handleCancelarNfce = async (notaId) => {
+        const justificativa = window.prompt(
+            "Motivo do cancelamento (mín. 15 caracteres):",
+            "Cancelamento conforme solicitação do cliente"
+        );
+
+        if (!justificativa || justificativa.length < 15) {
+            toast.error("Justificativa deve ter no mínimo 15 caracteres");
+            return;
+        }
+
+        const confirmado = window.confirm(
+            "⚠️ ATENÇÃO!\n\nVocê está prestes a CANCELAR esta nota na SEFAZ.\n\nEsta ação é IRREVERSÍVEL e será registrada em auditoria.\n\nDeseja continuar?"
+        );
+
+        if (!confirmado) return;
+
+        setCancelandoNfe(true);
+        const toastId = toast.loading("Cancelando NFC-e na SEFAZ...");
+
         try {
-            // A API foi atualizada no Java para receber o ?modelo=
-            const res = await api.post(`/api/os/${osId}/fiscal/emitir-pecas?modelo=${modelo}`);
-            toast.success(res.data.message || `${nomeDoc} autorizada pela SEFAZ!`, { id: toastId });
-            carregarDadosFiscais(); // 🚀 Atualiza os registros para aparecer na aba de Vendas na hora
+            const response = await api.post(
+                `/api/fiscal/cancelar-nfce/${notaId}`,
+                { justificativa }
+            );
+
+            toast.success("NFC-e cancelada com sucesso! ✅", { id: toastId });
+            carregarDadosFiscais();
+            setModalCancelamentoAberto(false);
+            setJustificativaCancelamento("");
+            setNotaParaCancelar(null);
         } catch (error) {
-            toast.error(extrairErroBackend(error, 'Erro ao comunicar com a SEFAZ.'), { id: toastId, duration: 6000 });
+            toast.error(
+                extrairErroBackend(error, "Erro ao cancelar a NFC-e."),
+                { id: toastId }
+            );
+        } finally {
+            setCancelandoNfe(false);
+        }
+    };
+
+    /**
+     * Emite uma nota em modo contingência (quando SEFAZ está offline)
+     */
+    const handleEmitirContingencia = async (vendaId) => {
+        const confirmado = window.confirm(
+            "🚨 MODO CONTINGÊNCIA\n\n" +
+            "A SEFAZ está indisponível.\n" +
+            "Esta nota será emitida LOCALMENTE e sincronizada quando a SEFAZ voltar.\n\n" +
+            "Deseja continuar?"
+        );
+
+        if (!confirmado) return;
+
+        setProcessandoId(`venda-contingencia-${vendaId}`);
+        const toastId = toast.loading("Emitindo em modo offline...");
+
+        try {
+            const response = await api.post(
+                `/api/fiscal/contingencia/emitir/${vendaId}`,
+                { justificativa: "SEFAZ indisponível" }
+            );
+
+            toast.success(
+                "✅ Cupom emitido em CONTINGÊNCIA!\n" +
+                "Será sincronizado quando SEFAZ voltar.",
+                { id: toastId, duration: 5000 }
+            );
+            carregarDadosFiscais();
+        } catch (error) {
+            toast.error(
+                extrairErroBackend(error, "Erro ao emitir em contingência."),
+                { id: toastId }
+            );
         } finally {
             setProcessandoId(null);
         }
     };
 
+    /**
+     * Cria uma complementação fiscal (devolução, desconto, etc)
+     */
+    const handleCriarComplementacao = async (notaId) => {
+        const tipo = window.prompt(
+            "Tipo de complementação:\n\n" +
+            "DEVOLUCAO - Cliente devolveu produtos\n" +
+            "DESCONTO - Conceder desconto\n" +
+            "ACRESCIMO - Cobrar valor a mais\n" +
+            "CORRECAO - Corrigir erro\n\n" +
+            "Digite o tipo:",
+            "DEVOLUCAO"
+        );
+
+        if (!tipo) return;
+
+        if (!["DEVOLUCAO", "DESCONTO", "ACRESCIMO", "CORRECAO"].includes(tipo.toUpperCase())) {
+            toast.error("Tipo de complementação inválido");
+            return;
+        }
+
+        const motivo = window.prompt(
+            `Motivo da ${tipo.toLowerCase()} (mín. 10 caracteres):`,
+            "Cliente solicitou"
+        );
+
+        if (!motivo || motivo.length < 10) {
+            toast.error("Descrição deve ter no mínimo 10 caracteres");
+            return;
+        }
+
+        const valor = window.prompt(
+            "Valor da complementação (ex: 150.00):",
+            "0.00"
+        );
+
+        if (!valor || parseFloat(valor) <= 0) {
+            toast.error("Valor deve ser maior que zero");
+            return;
+        }
+
+        setProcessandoId(`complementacao-${notaId}`);
+        const toastId = toast.loading("Criando complementação...");
+
+        try {
+            const response = await api.post("/api/fiscal/complementar/criar", {
+                notaOriginalId: notaId,
+                tipoComplementacao: tipo.toUpperCase(),
+                descricaoMotivo: motivo,
+                valorComplementacao: parseFloat(valor)
+            });
+
+            toast.success(
+                `✅ Complementação de ${tipo.toLowerCase()} criada!\n` +
+                `Nº: ${response.data.numeroComplementar}`,
+                { id: toastId, duration: 5000 }
+            );
+
+            carregarDadosFiscais();
+        } catch (error) {
+            toast.error(
+                extrairErroBackend(error, "Erro ao criar complementação."),
+                { id: toastId }
+            );
+        } finally {
+            setProcessandoId(null);
+        }
+    };
+
+    /**
+     * Verifica status de contingências
+     */
+    const handleVerificarContingencias = async () => {
+        const toastId = toast.loading("Verificando contingências...");
+
+        try {
+            const response = await api.get("/api/fiscal/contingencia/status");
+
+            if (response.data.notasEmContingencia > 0) {
+                const sincronizar = window.confirm(
+                    `⚠️ Há ${response.data.notasEmContingencia} nota(s) em contingência.\n\n` +
+                    "A SEFAZ está online agora?\n\n" +
+                    "OK = Sincronizar agora\n" +
+                    "Cancelar = Deixar para depois"
+                );
+
+                if (sincronizar) {
+                    await handleSincronizarContingencias(toastId);
+                }
+            } else {
+                toast.success("✅ Nenhuma nota em contingência", { id: toastId });
+            }
+        } catch (error) {
+            toast.error(
+                "Erro ao verificar contingências",
+                { id: toastId }
+            );
+        }
+    };
+
+    /**
+     * Sincroniza notas em contingência com SEFAZ
+     */
+    const handleSincronizarContingencias = async (toastId = null) => {
+        const loadId = toastId || toast.loading("Sincronizando contingências...");
+
+        try {
+            const response = await api.post("/api/fiscal/contingencia/sincronizar");
+
+            toast.success(
+                `✅ ${response.data.sincronizadas} nota(s) sincronizada(s)!\n` +
+                `❌ ${response.data.rejeitadas} rejeitada(s)`,
+                { id: loadId, duration: 5000 }
+            );
+
+            carregarDadosFiscais();
+        } catch (error) {
+            toast.error(
+                "Erro ao sincronizar contingências",
+                { id: loadId }
+            );
+        }
+    };
+
+    // =========================================================================
+    // 🚀 FUNÇÕES PARA EMISSÃO EM OS
+    // =========================================================================
+
+    /**
+     * Emite nota fiscal de peças em uma Ordem de Serviço
+     */
+    const emitirFiscalPecas = async (osId, modelo) => {
+        setProcessandoId(`pecas-${modelo}-${osId}`);
+        const nomeDoc = modelo === '55' ? 'NF-e (A4)' : 'NFC-e (Cupom)';
+        const toastId = toast.loading(`Transmitindo ${nomeDoc} de Peças da OS #${osId}...`);
+
+        try {
+            const response = await api.post(
+                `/api/os/${osId}/fiscal/emitir-pecas?modelo=${modelo}`
+            );
+
+            toast.success(
+                response.data.message || `${nomeDoc} autorizada pela SEFAZ!`,
+                { id: toastId, duration: 5000 }
+            );
+
+            carregarDadosFiscais();
+        } catch (error) {
+            toast.error(
+                extrairErroBackend(error, `Erro ao emitir ${nomeDoc}.`),
+                { id: toastId }
+            );
+        } finally {
+            setProcessandoId(null);
+        }
+    };
+
+    /**
+     * Emite Nota Fiscal de Serviço (NFS-e) de uma Ordem de Serviço
+     */
     const emitirNfseServicos = async (osId) => {
         setProcessandoId(`servicos-${osId}`);
-        const toastId = toast.loading(`Transmitindo NFS-e (Serviços) da OS #${osId} para a Prefeitura...`);
+        const toastId = toast.loading(`Transmitindo NFS-e de Serviços da OS #${osId}...`);
+
         try {
-            const res = await api.post(`/api/os/${osId}/fiscal/nfse-servicos`);
-            toast.success(res.data.message || 'NFS-e autorizada pela Prefeitura!', { id: toastId });
-            carregarDadosFiscais(); // 🚀 Atualiza a tela se necessário
+            const response = await api.post(`/api/os/${osId}/fiscal/emitir-nfse`);
+
+            toast.success(
+                response.data.message || "NFS-e autorizada pela Prefeitura!",
+                { id: toastId, duration: 5000 }
+            );
+
+            carregarDadosFiscais();
         } catch (error) {
-            toast.error(extrairErroBackend(error, 'Erro ao comunicar com a Prefeitura.'), { id: toastId, duration: 6000 });
+            toast.error(
+                extrairErroBackend(error, "Erro ao emitir NFS-e."),
+                { id: toastId }
+            );
         } finally {
             setProcessandoId(null);
         }
@@ -525,12 +761,65 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
                                                                 </button>
                                                                 <button onClick={() => handleBaixarXML(reg)} className="bg-white hover:bg-slate-100 text-green-700 border border-green-300 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm"><Download size={14} /></button>
                                                                 <button onClick={() => handleEnviarContador(reg)} className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm"><Mail size={14} /></button>
+                                                                
+                                                                {/* 🚀 NOVOS BOTÕES: CANCELAMENTO NFCE, COMPLEMENTAÇÃO E CONTINGÊNCIA */}
+                                                                {reg.statusFiscal === 'AUTORIZADA' && (
+                                                                    <>
+                                                                        <button 
+                                                                            onClick={() => handleCancelarNfce(reg.nfeId)}
+                                                                            disabled={cancelandoNfe}
+                                                                            title="Cancela esta NFC-e na SEFAZ"
+                                                                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm disabled:opacity-50"
+                                                                        >
+                                                                            {cancelandoNfe ? <Loader2 size={12} className="animate-spin"/> : <XCircle size={12}/>}
+                                                                            CANCELAR NFC-e
+                                                                        </button>
+
+                                                                        <button 
+                                                                            onClick={() => handleCriarComplementacao(reg.nfeId)}
+                                                                            disabled={processandoId === `complementacao-${reg.nfeId}`}
+                                                                            title="Cria devolução, desconto ou correção"
+                                                                            className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm disabled:opacity-50"
+                                                                        >
+                                                                            {processandoId === `complementacao-${reg.nfeId}` ? <Loader2 size={12} className="animate-spin"/> : <FileArchive size={12}/>}
+                                                                            COMPLEMENTAÇÃO
+                                                                        </button>
+                                                                    </>
+                                                                )}
+
+                                                                {/* 🚨 BOTÃO CONTINGÊNCIA */}
+                                                                {reg.statusFiscal === 'PENDENTE' && reg.tipo === 'PDV' && (
+                                                                    <button 
+                                                                        onClick={() => handleEmitirContingencia(reg.vendaId)}
+                                                                        disabled={processandoId === `venda-contingencia-${reg.vendaId}`}
+                                                                        title="Emitir em modo offline (SEFAZ indisponível)"
+                                                                        className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm disabled:opacity-50"
+                                                                    >
+                                                                        {processandoId === `venda-contingencia-${reg.vendaId}` ? <Loader2 size={12} className="animate-spin"/> : <AlertTriangle size={12}/>}
+                                                                        CONTINGÊNCIA
+                                                                    </button>
+                                                                )}
+
+                                                                {/* ✅ VERIFICADOR DE CONTINGÊNCIAS */}
+                                                                {reg.statusFiscal === 'CONTINGENCIA' && (
+                                                                    <button 
+                                                                        onClick={() => handleVerificarContingencias()}
+                                                                        title="Sincronizar com SEFAZ quando voltar online"
+                                                                        className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-sm"
+                                                                    >
+                                                                        <Clock size={12}/>
+                                                                        SINCRONIZAR
+                                                                    </button>
+                                                                )}
+
                                                                 {verificarPrazoCancelamento(reg.data, reg.chaveAcesso).expirado ? (
                                                                     <span className="px-3 py-2 border border-transparent text-slate-400 font-bold text-[9px] uppercase flex items-center gap-1"><Clock size={12} /> NÃO CANCELÁVEL</span>
                                                                 ) : (
-                                                                    <button onClick={() => abrirModalCancelamento(reg)} className="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 px-3 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm">
-                                                                        <XCircle size={14} /> CANCELAR
-                                                                    </button>
+                                                                    reg.statusFiscal !== 'AUTORIZADA' && (
+                                                                        <button onClick={() => abrirModalCancelamento(reg)} className="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 px-3 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm">
+                                                                            <XCircle size={14} /> CANCELAR
+                                                                        </button>
+                                                                    )
                                                                 )}
                                                             </>
                                                         )}
@@ -705,3 +994,6 @@ export const GerenciadorFiscal = ({ setPaginaAtiva }) => {
         </div>
     );
 };
+
+
+

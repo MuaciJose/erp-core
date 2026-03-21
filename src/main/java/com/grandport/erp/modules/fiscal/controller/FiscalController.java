@@ -6,17 +6,26 @@ import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 import com.grandport.erp.modules.fiscal.repository.NotaFiscalRepository;
 import com.grandport.erp.modules.fiscal.service.DanfeService;
 import com.grandport.erp.modules.fiscal.service.NfeService;
+import com.grandport.erp.modules.fiscal.service.NfeSetupService;
+import com.grandport.erp.modules.fiscal.service.NfceCancelamentoService;
+import com.grandport.erp.modules.fiscal.service.NfceContingenciaService;
+import com.grandport.erp.modules.fiscal.service.NotaFiscalComplementarService;
+import com.grandport.erp.modules.fiscal.service.SincronizacaoErpService;
+import com.grandport.erp.modules.vendas.model.Venda;
+import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.grandport.erp.modules.fiscal.dto.NfceCancelamentoRequestDTO;
+import com.grandport.erp.modules.fiscal.dto.NotaFiscalComplementarRequestDTO;
+import jakarta.validation.Valid;
 import br.com.swconsultoria.nfe.Nfe;
 import br.com.swconsultoria.nfe.dom.ConfiguracoesNfe;
 import br.com.swconsultoria.nfe.dom.enuns.DocumentoEnum;
 import br.com.swconsultoria.nfe.schema_4.retConsStatServ.TRetConsStatServ;
-import com.grandport.erp.modules.fiscal.service.NfeSetupService;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +48,9 @@ public class FiscalController {
     private NotaFiscalRepository notaFiscalRepository;
 
     @Autowired
+    private VendaRepository vendaRepository;
+
+    @Autowired
     private com.grandport.erp.modules.fiscal.service.EmailFiscalService emailFiscalService;
 
     @Autowired
@@ -46,6 +58,18 @@ public class FiscalController {
 
     @Autowired
     private NfeSetupService nfeSetupService;
+
+    @Autowired
+    private com.grandport.erp.modules.fiscal.service.NfceCancelamentoService nfceCancelamentoService;
+
+    @Autowired
+    private NfceContingenciaService nfceContingenciaService;
+
+    @Autowired
+    private NotaFiscalComplementarService notaFiscalComplementarService;
+
+    @Autowired
+    private SincronizacaoErpService sincronizacaoErpService;
 
     // =======================================================================
     // 🚀 LISTAR TODAS AS NOTAS (PARA O GERENCIADOR FISCAL)
@@ -245,39 +269,248 @@ public class FiscalController {
     }
 
     // =======================================================================
-    // 🚀 CANCELAR NF-E AVULSA (Aquela que não tem uma venda PDV atrelada)
+    // 🚀 CANCELAR NFC-e (Cupom Fiscal Eletrônico autorizado)
     // =======================================================================
-    @PostMapping("/cancelar-nfe/{id}")
-    public ResponseEntity<?> cancelarNotaFiscalAvulsa(@PathVariable Long id, @RequestBody Map<String, String> payload) {
-        String justificativa = payload.get("justificativa");
-
-        if (justificativa == null || justificativa.trim().length() < 15) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "A justificativa deve conter no mínimo 15 caracteres."));
-        }
-
+    // 📋 Documentação:
+    //    - Apenas notas com status AUTORIZADA podem ser canceladas
+    //    - Requer justificativa entre 15 e 255 caracteres
+    //    - Comunica com SEFAZ para registrar o cancelamento
+    //    - Mantém auditoria completa da operação
+    // =======================================================================
+    @PostMapping("/cancelar-nfce/{id}")
+    public ResponseEntity<?> cancelarNfce(
+            @PathVariable Long id,
+            @Valid @RequestBody NfceCancelamentoRequestDTO request) {
+        
         try {
+            // ✅ PASSO 1: Localizar a nota no banco de dados
             NotaFiscal nota = notaFiscalRepository.findById(id)
-                    .orElseThrow(() -> new Exception("Nota Fiscal não encontrada."));
+                    .orElseThrow(() -> new Exception("Nota Fiscal com ID " + id + " não encontrada."));
 
-            if (!"AUTORIZADA".equals(nota.getStatus())) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Apenas notas autorizadas podem ser canceladas na SEFAZ."));
-            }
+            // ✅ PASSO 2: Chamar serviço de cancelamento (faz todas as validações)
+            String mensagem = nfceCancelamentoService.executarCancelamento(
+                nota, 
+                request.getJustificativa()
+            );
 
-            // AQUI VOCÊ CHAMA O SEU SERVIÇO QUE FALA COM A SEFAZ
-            // Exemplo: motorFiscalService.cancelarNota(nota.getChaveAcesso(), justificativa);
-
-            System.out.println(">>> Enviando CANCELAMENTO AVULSO para a SEFAZ...");
-            System.out.println("Chave: " + nota.getChaveAcesso());
-
-            nota.setStatus("CANCELADA");
+            // ✅ PASSO 3: Se sucesso, persiste a mudança no banco
             notaFiscalRepository.save(nota);
 
-            return ResponseEntity.ok(Map.of("message", "Nota Fiscal cancelada com sucesso na SEFAZ."));
+            // ✅ PASSO 4: Retorna resposta de sucesso
+            return ResponseEntity.ok(Map.of(
+                "status", "SUCESSO",
+                "mensagem", mensagem,
+                "notaId", nota.getId(),
+                "numeroNota", nota.getNumero(),
+                "chaveAcesso", nota.getChaveAcesso(),
+                "statusAtualizado", nota.getStatus()
+            ));
 
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Rejeição SEFAZ: " + e.getMessage()));
+            System.err.println("❌ ERRO NO CANCELAMENTO: " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERRO",
+                "mensagem", e.getMessage(),
+                "detalhes", "Verifique se a nota está autorizada e se os dados de configuração estão corretos."
+            ));
+        }
+    }
+
+    // ...existing code...
+
+    // =======================================================================
+    // 🚨 CONTINGÊNCIA: Emissão Offline quando SEFAZ cai
+    // =======================================================================
+    @PostMapping("/contingencia/emitir/{vendaId}")
+    public ResponseEntity<?> emitirEmContingencia(
+            @PathVariable Long vendaId,
+            @RequestBody Map<String, String> payload) {
+        
+        String justificativa = payload != null ? payload.get("justificativa") : "SEFAZ indisponível";
+
+        try {
+            Venda venda = vendaRepository.findById(vendaId)
+                .orElseThrow(() -> new Exception("Venda não encontrada"));
+
+            Map<String, Object> resultado = nfceContingenciaService.emitirEmContingencia(venda);
+            return ResponseEntity.ok(resultado);
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERRO",
+                "mensagem", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/contingencia/status")
+    public ResponseEntity<?> statusContingencias() {
+        try {
+            long totalContingencias = nfceContingenciaService.contarNodasContingencia();
+            return ResponseEntity.ok(Map.of(
+                "status", "OK",
+                "notasEmContingencia", totalContingencias,
+                "mensagem", "Há " + totalContingencias + " nota(s) aguardando sincronização"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERRO",
+                "mensagem", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/contingencia/sincronizar")
+    public ResponseEntity<?> sincronizarContingencias() {
+        try {
+            Map<String, Object> resultado = nfceContingenciaService.sincronizarContingencias();
+            return ResponseEntity.ok(resultado);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERRO",
+                "mensagem", e.getMessage()
+            ));
+        }
+    }
+
+    // =======================================================================
+    // 📋 NOTA FISCAL COMPLEMENTAR: Devoluções e Correções
+    // =======================================================================
+    @PostMapping("/complementar/criar")
+    public ResponseEntity<?> criarComplementacao(
+            @Valid @RequestBody NotaFiscalComplementarRequestDTO request) {
+        
+        try {
+            Map<String, Object> resultado = notaFiscalComplementarService.criarComplementacao(
+                request.getNotaOriginalId(),
+                request.getTipoComplementacao(),
+                request.getDescricaoMotivo(),
+                request.getValorComplementacao()
+            );
+            return ResponseEntity.ok(resultado);
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERRO",
+                "mensagem", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/complementar/{complementarId}/enviar")
+    public ResponseEntity<?> enviarComplementacao(@PathVariable Long complementarId) {
+        try {
+            Map<String, Object> resultado = notaFiscalComplementarService.enviarComplementacao(complementarId);
+            return ResponseEntity.ok(resultado);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERRO",
+                "mensagem", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/complementar/nota/{notaOriginalId}")
+    public ResponseEntity<?> listarComplementacoes(@PathVariable Long notaOriginalId) {
+        try {
+            var complementacoes = notaFiscalComplementarService.listarComplementacoes(notaOriginalId);
+            var totalComplementado = notaFiscalComplementarService.calcularTotalComplementacoes(notaOriginalId);
+            
+            return ResponseEntity.ok(Map.of(
+                "status", "OK",
+                "complementacoes", complementacoes,
+                "totalComplementado", totalComplementado
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERRO",
+                "mensagem", e.getMessage()
+            ));
+        }
+    }
+
+    // =======================================================================
+    // 🔄 SINCRONIZAÇÃO ERP: Mantém série/número sincronizados
+    // =======================================================================
+    @PostMapping("/sincronizar/serie-numero/{notaId}")
+    public ResponseEntity<?> sincronizarSerieNumero(
+            @PathVariable Long notaId,
+            @RequestBody Map<String, Object> payload) {
+        
+        try {
+            NotaFiscal nota = notaFiscalRepository.findById(notaId)
+                .orElseThrow(() -> new Exception("Nota não encontrada"));
+
+            Long numeroSefaz = ((Number) payload.get("numeroSefaz")).longValue();
+            Integer serieSefaz = ((Number) payload.get("serieSefaz")).intValue();
+
+            sincronizacaoErpService.sincronizarSerieNumero(nota, numeroSefaz, serieSefaz);
+
+            return ResponseEntity.ok(Map.of(
+                "status", "SINCRONIZADO",
+                "mensagem", "Série/Número sincronizado com sucesso",
+                "numero", numeroSefaz,
+                "serie", serieSefaz
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERRO",
+                "mensagem", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/sincronizar/validar-integridade")
+    public ResponseEntity<?> validarIntegridade() {
+        try {
+            var resultado = sincronizacaoErpService.validarIntegridade();
+            return ResponseEntity.ok(Map.of(
+                "status", "OK",
+                "validacao", resultado
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERRO",
+                "mensagem", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/sincronizar/limpar-inconsistencias")
+    public ResponseEntity<?> limparInconsistencias() {
+        try {
+            sincronizacaoErpService.limparInconsistencias();
+            return ResponseEntity.ok(Map.of(
+                "status", "LIMPEZA_REALIZADA",
+                "mensagem", "Inconsistências limpas com sucesso"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERRO",
+                "mensagem", e.getMessage()
+            ));
+        }
+    }
+
+    // =======================================================================
+    // 🧪 ENDPOINT LEGADO: Manter para compatibilidade retroativa
+    // =======================================================================
+    @PostMapping("/cancelar-nfe/{id}")
+    public ResponseEntity<?> cancelarNotaFiscalAvulsa(
+            @PathVariable Long id, 
+            @RequestBody Map<String, String> payload) {
+        
+        // Converte Map para DTO e redireciona
+        try {
+            String justificativa = payload != null ? payload.get("justificativa") : null;
+            NfceCancelamentoRequestDTO dto = new NfceCancelamentoRequestDTO(justificativa);
+            return this.cancelarNfce(id, dto);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERRO",
+                "mensagem", e.getMessage()
+            ));
         }
     }
 }
