@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, Image, StyleSheet, Vibration, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, Image, StyleSheet, Vibration, ScrollView, TextInput, TouchableOpacity, Button } from 'react-native';
 import { Audio } from 'expo-av';
-import api from '../api/axios';
+import Toast from 'react-native-toast-message'; // 🚀 IMPORTANDO O TOAST PROFISSIONAL
 import Scanner from '../components/Scanner';
+import api from '../api/axios';
 
 // Componente para Ajuste de Estoque
 const AjusteEstoque = ({ produto, onUpdate }) => {
@@ -14,10 +15,25 @@ const AjusteEstoque = ({ produto, onUpdate }) => {
                 quantidade: parseInt(novaQtd),
                 motivo: "Inventário Manual Mobile"
             });
-            Alert.alert("Sucesso", "Estoque da GrandPort atualizado!");
+
+            // 🚀 TOAST DE SUCESSO (Verde e Bonito)
+            Toast.show({
+                type: 'success',
+                text1: 'Operação Concluída!',
+                text2: 'O estoque foi atualizado com sucesso. 📦',
+                position: 'top',
+                visibilityTime: 3000,
+            });
+
             onUpdate(); // Recarrega os dados da peça
         } catch (err) {
-            Alert.alert("Erro", "Não foi possível atualizar o saldo.");
+            // 🚨 TOAST DE ERRO (Vermelho)
+            Toast.show({
+                type: 'error',
+                text1: 'Acesso Negado',
+                text2: 'Não foi possível atualizar o saldo.',
+                position: 'top',
+            });
         }
     };
 
@@ -47,7 +63,6 @@ const DetalheProduto = ({ produto, onVoltar, onReload }) => {
     const [similares, setSimilares] = useState([]);
 
     useEffect(() => {
-        // Busca as peças que partilham a mesma Referência Original
         const carregarSimilares = async () => {
             try {
                 const res = await api.get(`/api/produtos/${produto.id}/similares`);
@@ -63,8 +78,6 @@ const DetalheProduto = ({ produto, onVoltar, onReload }) => {
         <ScrollView style={styles.container}>
             <View style={styles.imageContainer}>
                 <Image
-                    // Usa fotoUrl se existir, senão tenta o caminho local, senão placeholder
-                    // ATENÇÃO: Substitua 'SEU_IP' pelo IP da sua máquina na rede local
                     source={{ uri: produto.fotoUrl || (produto.fotoLocalPath ? `http://SEU_IP:8080${produto.fotoLocalPath}` : 'https://via.placeholder.com/300') }}
                     style={styles.foto}
                     resizeMode="contain"
@@ -97,7 +110,7 @@ const DetalheProduto = ({ produto, onVoltar, onReload }) => {
                     </Text>
                 </View>
 
-                {/* SECÇÃO DE REFERÊNCIA CRUZADA (NOVO) */}
+                {/* SECÇÃO DE REFERÊNCIA CRUZADA */}
                 <View style={styles.sectionSimilares}>
                     <Text style={styles.tituloSecao}>Equivalentes (Mesma Ref. Original)</Text>
                     <Text style={styles.refOriginalText}>Cód. Original: {produto.referenciaOriginal || 'N/A'}</Text>
@@ -146,17 +159,25 @@ export const Inventario = () => {
 
     const buscarProduto = async (ean) => {
         try {
-            // Toca o som de Bip
             const { sound } = await Audio.Sound.createAsync(
-                require('../../assets/bip.mp3')
+                { uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' }
             );
             await sound.playAsync();
 
             const res = await api.get(`/api/produtos/mobile/scan/${ean}`);
             setProduto(res.data);
+
         } catch (err) {
             Vibration.vibrate();
-            alert("Peça não encontrada no estoque da GrandPort");
+            // 🚨 TOAST DE ERRO DA CÂMERA
+            Toast.show({
+                type: 'error',
+                text1: 'Ops! Peça não encontrada',
+                text2: `O código lido não está no seu estoque.`,
+                position: 'top',
+                visibilityTime: 4000,
+            });
+            console.log("Erro na busca:", err);
         }
     };
 
@@ -187,7 +208,6 @@ const styles = StyleSheet.create({
     badgeEstoque: { backgroundColor: '#e1f5fe', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start', marginBottom: 10 },
     estoqueText: { color: '#0288d1', fontWeight: 'bold', fontSize: 16 },
 
-    // Estilos do Ajuste de Estoque
     ajusteContainer: { padding: 15, backgroundColor: '#f0f4f8', borderRadius: 10, marginBottom: 20, borderWidth: 1, borderColor: '#cfd8dc' },
     ajusteLabel: { fontWeight: 'bold', marginBottom: 8, color: '#455a64' },
     ajusteInputRow: { flexDirection: 'row', gap: 10 },
@@ -195,17 +215,7 @@ const styles = StyleSheet.create({
     ajusteBotao: { backgroundColor: '#2e7d32', paddingHorizontal: 20, borderRadius: 5, justifyContent: 'center' },
     ajusteBotaoTexto: { color: '#fff', fontWeight: 'bold' },
 
-    // Estilos da Localização
-    localizacaoCard: {
-        marginTop: 10,
-        marginBottom: 20,
-        padding: 15,
-        backgroundColor: '#fff3e0',
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#ffb74d',
-        alignItems: 'center'
-    },
+    localizacaoCard: { marginTop: 10, marginBottom: 20, padding: 15, backgroundColor: '#fff3e0', borderRadius: 12, borderWidth: 2, borderColor: '#ffb74d', alignItems: 'center' },
     localizacaoLabel: { fontSize: 12, color: '#e65100', fontWeight: 'bold', marginBottom: 4 },
     localizacaoValue: { fontSize: 20, fontWeight: '900', color: '#bf360c', textAlign: 'center' },
 
@@ -213,19 +223,10 @@ const styles = StyleSheet.create({
     similarContainer: { padding: 15, backgroundColor: '#f5f5f5', borderRadius: 8, marginBottom: 20 },
     similarText: { fontSize: 15, color: '#333', lineHeight: 22 },
 
-    // Estilos dos Similares
     sectionSimilares: { padding: 15, marginTop: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee' },
     tituloSecao: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 5 },
     refOriginalText: { fontSize: 12, color: '#0288d1', marginBottom: 15, fontWeight: 'bold' },
-    cardSimilar: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        padding: 10,
-        borderWidth: 1,
-        borderColor: '#eee',
-        borderRadius: 8,
-        marginBottom: 8
-    },
+    cardSimilar: { flexDirection: 'row', justifyContent: 'space-between', padding: 10, borderWidth: 1, borderColor: '#eee', borderRadius: 8, marginBottom: 8 },
     miniFoto: { width: 40, height: 40, borderRadius: 4 },
     nomeSimilar: { fontSize: 14, fontWeight: 'bold', color: '#333' },
     marcaSimilar: { fontSize: 12, color: '#666' },

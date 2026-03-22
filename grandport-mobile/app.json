@@ -24,6 +24,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "O GrandPort ERP precisa acessar a câmera para ler os códigos de barras das peças."
+        }
+      ]
+    ]
   }
 }

@@ -1694,6 +1694,27 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@react-native-async-storage/async-storage@npm:2.2.0":
+  version: 2.2.0
+  resolution: "@react-native-async-storage/async-storage@npm:2.2.0"
+  dependencies:
+    merge-options: "npm:^3.0.4"
+  peerDependencies:
+    react-native: ^0.0.0-0 || >=0.65 <1.0
+  checksum: 10c0/84900eba46a40225c4ac9bf5eb58885200dc1e789d873ecda46a2a213870cc7110536ed1fd7a74b873071f3603c093958fbd84c635d6f6d4f94bfbb616ffa0ef
+  languageName: node
+  linkType: hard
+
+"@react-native-picker/picker@npm:^2.11.4":
+  version: 2.11.4
+  resolution: "@react-native-picker/picker@npm:2.11.4"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 10c0/3c9947c1a3022ffa35008cc479b718585b106ff70a5fb0f24c4117bf2eaaf5f60795cba20271af50a01d3a878d5dc06661ea1c1315664898524e291e7412a18f
+  languageName: node
+  linkType: hard
+
 "@react-native/assets-registry@npm:0.81.5":
   version: 0.81.5
   resolution: "@react-native/assets-registry@npm:0.81.5"
@@ -3158,14 +3179,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"expo-barcode-scanner@npm:~13.0.0":
-  version: 13.0.1
-  resolution: "expo-barcode-scanner@npm:13.0.1"
-  dependencies:
-    expo-image-loader: "npm:~4.7.0"
+"expo-av@npm:~16.0.8":
+  version: 16.0.8
+  resolution: "expo-av@npm:16.0.8"
   peerDependencies:
     expo: "*"
-  checksum: 10c0/a3b55a9f725957f9fad3fdee7afd7053cbcb0c246fb9487b5f9412b23caeb39d18e82cee80d2f747f5f3d631d695d0f6828af7194be5cb00d80f0a3240a4f5cc
+    react: "*"
+    react-native: "*"
+    react-native-web: "*"
+  peerDependenciesMeta:
+    react-native-web:
+      optional: true
+  checksum: 10c0/2f40b8fcc7824d4f3e0078e6dff25ccb5b12b21abfcf6de30f4ea831716c6be18f9b59ab085e7b88ece5b0d314f998798e864f4b4a3c0f493c66060f4fc94955
   languageName: node
   linkType: hard
 
@@ -3222,12 +3247,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"expo-image-loader@npm:~4.7.0":
-  version: 4.7.0
-  resolution: "expo-image-loader@npm:4.7.0"
+"expo-image-loader@npm:~55.0.0":
+  version: 55.0.0
+  resolution: "expo-image-loader@npm:55.0.0"
   peerDependencies:
     expo: "*"
-  checksum: 10c0/7db9df154f1b44e9877361e0707715503eaaf2b18968b6aecb6b0205612cf40bfd99ab8c6e6d7de3a5abd35267e9636963d5050e082af063d8e527763d597eb1
+  checksum: 10c0/4e8d9a7cd69af109f818639afd1f2106825950b4d7eaa304645939710a84bec59b70fd7dc4a7543ee2f31fc517b9ed23afc750e4c20ed4f7cf114d3686efece3
+  languageName: node
+  linkType: hard
+
+"expo-image-picker@npm:^55.0.13":
+  version: 55.0.13
+  resolution: "expo-image-picker@npm:55.0.13"
+  dependencies:
+    expo-image-loader: "npm:~55.0.0"
+  peerDependencies:
+    expo: "*"
+  checksum: 10c0/8612f9a4665e8b6f1da429339a6d7a357a9c8a9078596521ef10d2d98eb2dcfef82c3371dd058d66b650c208d412cb87cb93b848ab9fcf0c61d0d76e2a91e9b1
   languageName: node
   linkType: hard
 
@@ -3604,14 +3640,18 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "grandport-mobile@workspace:."
   dependencies:
+    "@react-native-async-storage/async-storage": "npm:2.2.0"
+    "@react-native-picker/picker": "npm:^2.11.4"
     axios: "npm:^1.13.6"
     expo: "npm:~54.0.0"
-    expo-barcode-scanner: "npm:~13.0.0"
+    expo-av: "npm:~16.0.8"
     expo-camera: "npm:~17.0.10"
+    expo-image-picker: "npm:^55.0.13"
     expo-status-bar: "npm:~3.0.9"
     lucide-react-native: "npm:^0.575.0"
     react: "npm:19.1.0"
     react-native: "npm:0.81.5"
+    react-native-toast-message: "npm:^2.3.3"
   languageName: unknown
   linkType: soft
 
@@ -3861,6 +3901,13 @@ __metadata:
   version: 7.0.0
   resolution: "is-number@npm:7.0.0"
   checksum: 10c0/b4686d0d3053146095ccd45346461bc8e53b80aeb7671cc52a4de02dbbf7dc0d1d2a986e2fe4ae206984b4d34ef37e8b795ebc4f4295c978373e6575e295d811
+  languageName: node
+  linkType: hard
+
+"is-plain-obj@npm:^2.1.0":
+  version: 2.1.0
+  resolution: "is-plain-obj@npm:2.1.0"
+  checksum: 10c0/e5c9814cdaa627a9ad0a0964ded0e0491bfd9ace405c49a5d63c88b30a162f1512c069d5b80997893c4d0181eadc3fed02b4ab4b81059aba5620bfcdfdeb9c53
   languageName: node
   linkType: hard
 
@@ -4371,6 +4418,15 @@ __metadata:
   version: 5.2.1
   resolution: "memoize-one@npm:5.2.1"
   checksum: 10c0/fd22dbe9a978a2b4f30d6a491fc02fb90792432ad0dab840dc96c1734d2bd7c9cdeb6a26130ec60507eb43230559523615873168bcbe8fafab221c30b11d54c1
+  languageName: node
+  linkType: hard
+
+"merge-options@npm:^3.0.4":
+  version: 3.0.4
+  resolution: "merge-options@npm:3.0.4"
+  dependencies:
+    is-plain-obj: "npm:^2.1.0"
+  checksum: 10c0/02b5891ceef09b0b497b5a0154c37a71784e68ed71b14748f6fd4258ffd3fe4ecd5cb0fd6f7cae3954fd11e7686c5cb64486daffa63c2793bbe8b614b61c7055
   languageName: node
   linkType: hard
 
@@ -5544,6 +5600,16 @@ __metadata:
     react: "*"
     react-native: "*"
   checksum: 10c0/87d20b900aded7d44c90afb946a7aa03c23a94ca3dd547bdddc2303b85357e4aab22567a57b19f1558d6c8be7058e3dcf34faa1e15182d1604f90974266d9a1d
+  languageName: node
+  linkType: hard
+
+"react-native-toast-message@npm:^2.3.3":
+  version: 2.3.3
+  resolution: "react-native-toast-message@npm:2.3.3"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 10c0/10c7cad8ce287786c555c032f03040ecbaeaa920f44b08161364408ccd18bd0fc3a3e6622f80724ad2c0c7366f667e0d946317045aec08d934ca73358811f782
   languageName: node
   linkType: hard
 
