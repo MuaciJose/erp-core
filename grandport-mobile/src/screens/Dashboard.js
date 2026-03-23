@@ -87,6 +87,8 @@ export default function Dashboard({ onNavigate, onLogout }) {
                             </Text>
                         </View>
                     </TouchableOpacity>
+
+
                 </View>
             </View>
 
@@ -118,13 +120,13 @@ export default function Dashboard({ onNavigate, onLogout }) {
                         <Text style={styles.subGrid}>Ajuste Rápido e Inventário</Text>
                     </TouchableOpacity>
 
-                    {/* BOTÃO 3: VENDAS / PDV (Futuro) */}
-                    <TouchableOpacity style={[styles.btnGrid, { opacity: 0.6 }]} disabled>
+                    {/* BOTÃO 3: ORÇAMENTO / PDV MOBILE */}
+                    <TouchableOpacity style={styles.btnGrid} onPress={() => onNavigate('orcamento')}>
                         <View style={[styles.iconeGrid, { backgroundColor: '#fefce8' }]}>
                             <Feather name="shopping-cart" size={32} color="#ca8a04" />
                         </View>
-                        <Text style={styles.tituloGrid}>Ponto de Venda</Text>
-                        <Text style={styles.subGrid}>Em breve...</Text>
+                        <Text style={styles.tituloGrid}>PDV Mobile</Text>
+                        <Text style={styles.subGrid}>Orçamento pelo WhatsApp</Text>
                     </TouchableOpacity>
 
                     {/* BOTÃO 4: RELATÓRIOS (Futuro) */}

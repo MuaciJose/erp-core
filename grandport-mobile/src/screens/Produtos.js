@@ -5,8 +5,9 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import Toast from 'react-native-toast-message';
 import api from '../api/axios';
 
-// IMPORTAÇÃO DA TELA DE CADASTRO/EDIÇÃO
+// IMPORTAÇÃO DA TELA DE CADASTRO/EDIÇÃO E EXTRATO
 import CadastroProduto from './CadastroProduto';
+import ExtratoEstoque from './ExtratoEstoque';
 
 export default function Produtos({ onVoltar, onNavigate }) {
     // Controle de Telas (Lista vs Formulário de Edição)
@@ -80,6 +81,11 @@ export default function Produtos({ onVoltar, onNavigate }) {
         setFiltroModal('');
     };
 
+    const abrirExtrato = (prod) => {
+        setProdutoSelecionado(prod);
+        setTelaAtual('extrato'); // 🚀 CHAMA O ECRÃ DO EXTRATO
+    };
+
     const todasAsLinhas = modalAplicacao.texto
         ? modalAplicacao.texto.split(/[;|\n,\/]/).map(item => item.trim()).filter(item => item.length > 1)
         : [];
@@ -126,15 +132,21 @@ export default function Produtos({ onVoltar, onNavigate }) {
                     <Text style={styles.precoTxt}>R$ {(item.precoVenda || 0).toFixed(2)}</Text>
                 </View>
 
+                {/* 🚀 RODAPÉ COM OS 3 BOTÕES BEM DISTRIBUÍDOS */}
                 <View style={styles.cardFooter}>
                     <TouchableOpacity onPress={() => setModalAplicacao({ aberto: true, texto: item.aplicacao, nome: item.nome })} style={[styles.btnAcao, {backgroundColor: '#eff6ff', borderColor: '#bfdbfe'}]}>
                         <Feather name="info" size={18} color="#2563eb" />
                         <Text style={[styles.btnAcaoTxt, {color: '#2563eb'}]}>Aplicação</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={() => abrirEditar(item)} style={[styles.btnAcao, {backgroundColor: '#f8fafc', borderColor: '#cbd5e1', flex: 0.8}]}>
+                    <TouchableOpacity onPress={() => abrirEditar(item)} style={[styles.btnAcao, {backgroundColor: '#f8fafc', borderColor: '#cbd5e1'}]}>
                         <Feather name="edit" size={18} color="#475569" />
                         <Text style={[styles.btnAcaoTxt, {color: '#475569'}]}>Editar</Text>
+                    </TouchableOpacity>
+
+                    {/* 🚀 BOTÃO DO EXTRATO ADICIONADO AQUI! */}
+                    <TouchableOpacity onPress={() => abrirExtrato(item)} style={[styles.btnAcao, {backgroundColor: '#fffbeb', borderColor: '#fde68a', flex: 0.4}]}>
+                        <Feather name="clock" size={18} color="#d97706" />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -145,7 +157,6 @@ export default function Produtos({ onVoltar, onNavigate }) {
     // 📱 CONTROLE DE ROTEAMENTO INTERNO
     // ============================================================================
 
-    // Se a câmera de pesquisa estiver aberta, renderiza tela preta de scan
     if (cameraAtiva) {
         return (
             <View style={{ flex: 1, backgroundColor: '#000' }}>
@@ -173,6 +184,16 @@ export default function Produtos({ onVoltar, onNavigate }) {
         );
     }
 
+    // 🚀 TELA DO EXTRATO PERFEITAMENTE LIGADA
+    if (telaAtual === 'extrato') {
+        return (
+            <ExtratoEstoque
+                produto={produtoSelecionado}
+                onVoltar={() => setTelaAtual('lista')}
+            />
+        );
+    }
+
     return (
         <View style={styles.container}>
             <View style={styles.header}>
@@ -193,7 +214,6 @@ export default function Produtos({ onVoltar, onNavigate }) {
                 </View>
             </View>
 
-            {/* 🚀 BARRA DE BUSCA ARTILHADA COM SCANNER */}
             <View style={styles.searchContainer}>
                 <View style={styles.inputWrapper}>
                     <Feather name="search" size={20} color="#94a3b8" style={styles.searchIcon} />
@@ -205,7 +225,6 @@ export default function Produtos({ onVoltar, onNavigate }) {
                     />
                     {carregando && <ActivityIndicator size="small" color="#2563eb" style={{position: 'absolute', right: 65}} />}
 
-                    {/* Botão de abrir a câmera */}
                     <TouchableOpacity onPress={abrirCameraBusca} style={styles.btnScanBar}>
                         <Feather name="maximize" size={20} color="#2563eb" />
                     </TouchableOpacity>
@@ -301,14 +320,12 @@ const styles = StyleSheet.create({
     headerBtns: { flexDirection: 'row', gap: 10 },
     btnColetor: { backgroundColor: '#1e293b', padding: 12, borderRadius: 12 },
 
-    // 🚀 ESTILOS DA NOVA BARRA DE BUSCA
     searchContainer: { margin: 15 },
     inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, overflow: 'hidden' },
     searchIcon: { position: 'absolute', left: 15, zIndex: 10 },
     searchInput: { flex: 1, padding: 15, paddingLeft: 45, fontSize: 16, fontWeight: 'bold', color: '#1e293b' },
     btnScanBar: { padding: 15, backgroundColor: '#eff6ff', borderLeftWidth: 1, borderLeftColor: '#e2e8f0' },
 
-    // ESTILOS DA CÂMERA SOBREPOSTA
     scannerOverlay: { position: 'absolute', inset: 0, justifyContent: 'center', alignItems: 'center', pointerEvents: 'none' },
     scannerBox: { width: 250, height: 150, borderWidth: 4, borderColor: '#22c55e', borderRadius: 20, backgroundColor: 'rgba(34, 197, 94, 0.1)' },
     scannerText: { color: '#22c55e', fontWeight: '900', marginTop: 20, fontSize: 16, backgroundColor: 'rgba(0,0,0,0.7)', padding: 10, borderRadius: 10 },
