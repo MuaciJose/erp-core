@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system/legacy';
+import { Audio } from 'expo-av'; // 🚀 1. RECRUTANDO O MOTOR DE ÁUDIO
 import api from '../api/axios';
 
 export default function Inventario({ onVoltar }) {
@@ -15,6 +15,34 @@ export default function Inventario({ onVoltar }) {
     const [codigoManual, setCodigoManual] = useState('');
     const [produtoEncontrado, setProdutoEncontrado] = useState(null);
     const [novaQuantidade, setNovaQuantidade] = useState('');
+
+    // 🚀 2. ESTADO PARA O SOM DO BIP
+    const [somBip, setSomBip] = useState();
+
+    // 🚀 3. CARREGAR O SOM AO ABRIR A TELA (EVITA DELAY)
+    async function carregarSom() {
+        try {
+            const { sound } = await Audio.Sound.createAsync(
+                require('../../assets/bip.mp3') // Certifique-se que o arquivo existe nesta pasta!
+            );
+            setSomBip(sound);
+        } catch (error) {
+            console.log("Erro ao carregar áudio:", error);
+        }
+    }
+
+    async function tocarBip() {
+        if (somBip) {
+            await somBip.replayAsync(); // Toca instantaneamente
+        }
+    }
+
+    useEffect(() => {
+        carregarSom();
+        return () => {
+            if (somBip) somBip.unloadAsync(); // Descarrega ao sair
+        };
+    }, []);
 
     // ============================================================================
     // 🔍 MOTOR DE BUSCA (BIPAGEM OU MANUAL)
@@ -32,6 +60,7 @@ export default function Inventario({ onVoltar }) {
             const prod = lista.find(p => p.codigoBarras === codigo || p.sku === codigo || p.referenciaOriginal === codigo);
 
             if (prod) {
+                await tocarBip(); // 🚀 4. TOCAR BIP AO ENCONTRAR!
                 setProdutoEncontrado(prod);
                 setNovaQuantidade(prod.quantidadeEstoque?.toString() || '0');
                 Toast.show({ type: 'success', text1: 'Peça Localizada!' });
@@ -48,18 +77,15 @@ export default function Inventario({ onVoltar }) {
     };
 
     // ============================================================================
-    // 🚀 SALVAR A NOVA CONTAGEM (USANDO A ROTA CORRETA DE AJUSTE DO BACKEND)
+    // 🚀 SALVAR A NOVA CONTAGEM
     // ============================================================================
     const salvarEstoque = async () => {
         if (!produtoEncontrado) return;
 
         setProcessando(true);
         try {
-            Toast.show({ type: 'info', text1: 'Enviando ajuste para o ERP...' });
-
             const quantidadeNumerica = Number(novaQuantidade) >= 0 ? Number(novaQuantidade) : 0;
 
-            // 🚀 PACOTE MINÚSCULO E DIRETO AO PONTO!
             const payload = {
                 quantidade: quantidadeNumerica,
                 motivo: "Ajuste via Coletor Mobile"
@@ -68,7 +94,6 @@ export default function Inventario({ onVoltar }) {
             let tokenRaw = await AsyncStorage.getItem('grandport_token');
             let tokenLimpo = tokenRaw ? tokenRaw.replace(/['"]+/g, '') : '';
 
-            // 🚀 DISPARO PARA A ROTA ESPECÍFICA DE ESTOQUE (PATCH)
             const response = await fetch(`${api.defaults.baseURL}/api/produtos/${produtoEncontrado.id}/ajuste-estoque`, {
                 method: 'PATCH',
                 body: JSON.stringify(payload),
@@ -84,7 +109,6 @@ export default function Inventario({ onVoltar }) {
             setProdutoEncontrado(null);
 
         } catch (error) {
-            console.log("Erro no servidor:", error.message);
             Toast.show({ type: 'error', text1: 'Falha no Ajuste:', text2: error.message.substring(0, 60) });
         } finally {
             setProcessando(false);

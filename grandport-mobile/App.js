@@ -14,6 +14,7 @@ import PrevisaoCompras from './src/screens/PrevisaoCompras';
 import OrcamentoMobile from './src/screens/OrcamentoMobile';
 import RecebimentoMercadoria from './src/screens/RecebimentoMercadoria';
 import SeparacaoPedidos from './src/screens/SeparacaoPedidos';
+import GestaoVendas from './src/screens/GestaoVendas';
 
 export default function App() {
   const [carregando, setCarregando] = useState(true);
@@ -71,6 +72,10 @@ export default function App() {
 
         {telaAtual === 'picking' && (
             <SeparacaoPedidos onVoltar={() => setTelaAtual('dashboard')} />
+        )}
+
+        {telaAtual === 'vendas' && (
+            <GestaoVendas onVoltar={() => setTelaAtual('dashboard')} onNavigate={setTelaAtual} />
         )}
 
         <StatusBar style="auto" />
