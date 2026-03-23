@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Image, M
 import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Toast from 'react-native-toast-message';
+import { Audio } from 'expo-av'; // 🚀 1. IMPORTANDO O MOTOR DE ÁUDIO
 import api from '../api/axios';
 
 // IMPORTAÇÃO DA TELA DE CADASTRO/EDIÇÃO E EXTRATO
@@ -22,10 +23,40 @@ export default function Produtos({ onVoltar, onNavigate }) {
     const [permissao, pedirPermissao] = useCameraPermissions();
     const [cameraAtiva, setCameraAtiva] = useState(false);
 
+    // 🚀 2. ESTADO DO SOM DO BIP
+    const [somBip, setSomBip] = useState();
+
     // Estados dos Modais
     const [modalAplicacao, setModalAplicacao] = useState({ aberto: false, texto: '', nome: '' });
     const [filtroModal, setFiltroModal] = useState('');
     const [previewImagemModal, setPreviewImagemModal] = useState(null);
+
+    // ============================================================================
+    // 🔊 MOTOR DE ÁUDIO (CARREGAMENTO E DISPARO)
+    // ============================================================================
+    async function carregarSom() {
+        try {
+            const { sound } = await Audio.Sound.createAsync(
+                require('../../assets/bip.mp3') // Certifique-se que o arquivo existe nesta pasta!
+            );
+            setSomBip(sound);
+        } catch (error) {
+            console.log("Erro ao carregar áudio:", error);
+        }
+    }
+
+    async function tocarBip() {
+        if (somBip) {
+            await somBip.replayAsync(); // Toca instantaneamente
+        }
+    }
+
+    useEffect(() => {
+        carregarSom();
+        return () => {
+            if (somBip) somBip.unloadAsync(); // Descarrega ao sair da tela
+        };
+    }, []);
 
     // ============================================================================
     // 📡 BUSCA DE DADOS NO SERVIDOR
@@ -62,7 +93,8 @@ export default function Produtos({ onVoltar, onNavigate }) {
         setCameraAtiva(true);
     };
 
-    const lidarComScan = ({ data }) => {
+    const lidarComScan = async ({ data }) => {
+        await tocarBip(); // 🚀 3. TOCA O BIP AO LER O CÓDIGO!
         setBusca(data); // Joga o código lido direto na barra de pesquisa!
         setCameraAtiva(false); // Fecha a câmera
         Toast.show({ type: 'success', text1: 'Código lido!', text2: data });
@@ -144,7 +176,7 @@ export default function Produtos({ onVoltar, onNavigate }) {
                         <Text style={[styles.btnAcaoTxt, {color: '#475569'}]}>Editar</Text>
                     </TouchableOpacity>
 
-                    {/* 🚀 BOTÃO DO EXTRATO ADICIONADO AQUI! */}
+                    {/* 🚀 BOTÃO DO EXTRATO */}
                     <TouchableOpacity onPress={() => abrirExtrato(item)} style={[styles.btnAcao, {backgroundColor: '#fffbeb', borderColor: '#fde68a', flex: 0.4}]}>
                         <Feather name="clock" size={18} color="#d97706" />
                     </TouchableOpacity>
@@ -184,7 +216,6 @@ export default function Produtos({ onVoltar, onNavigate }) {
         );
     }
 
-    // 🚀 TELA DO EXTRATO PERFEITAMENTE LIGADA
     if (telaAtual === 'extrato') {
         return (
             <ExtratoEstoque

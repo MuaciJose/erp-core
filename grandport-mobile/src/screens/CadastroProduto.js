@@ -6,6 +6,7 @@ import { CameraView } from 'expo-camera';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Audio } from 'expo-av'; // 🚀 1. RECRUTANDO O MOTOR DE ÁUDIO
 import api from '../api/axios';
 
 // ============================================================================
@@ -101,6 +102,9 @@ export default function CadastroProduto({ onVoltar, produtoParaEditar }) {
     const [imagem, setImagem] = useState(null);
     const [preview, setPreview] = useState(null);
 
+    // 🚀 2. ESTADO DO SOM DO BIP
+    const [somBip, setSomBip] = useState();
+
     const [form, setForm] = useState({
         sku: '',
         nome: '',
@@ -117,6 +121,33 @@ export default function CadastroProduto({ onVoltar, produtoParaEditar }) {
         ncmCodigo: '',
         fotoUrl: ''
     });
+
+    // ============================================================================
+    // 🔊 MOTOR DE ÁUDIO (CARREGAMENTO E DISPARO)
+    // ============================================================================
+    async function carregarSom() {
+        try {
+            const { sound } = await Audio.Sound.createAsync(
+                require('../../assets/bip.mp3') // Certifique-se que o arquivo existe nesta pasta!
+            );
+            setSomBip(sound);
+        } catch (error) {
+            console.log("Erro ao carregar áudio:", error);
+        }
+    }
+
+    async function tocarBip() {
+        if (somBip) {
+            await somBip.replayAsync(); // Toca instantaneamente
+        }
+    }
+
+    useEffect(() => {
+        carregarSom();
+        return () => {
+            if (somBip) somBip.unloadAsync(); // Limpa a memória ao sair da tela
+        };
+    }, []);
 
     useEffect(() => {
         if (isEditing && produtoParaEditar) {
@@ -181,6 +212,14 @@ export default function CadastroProduto({ onVoltar, produtoParaEditar }) {
             setPreview(result.assets[0].uri);
             handleChange('fotoUrl', '');
         }
+    };
+
+    // 🚀 LÓGICA DO SCANNER COM BIP
+    const processarScanEan = async ({ data }) => {
+        await tocarBip(); // 🚀 TOCA O BIP ASSIM QUE CAPTURA O EAN
+        handleChange('codigoBarras', data);
+        setLendoEan(false);
+        Toast.show({ type: 'success', text1: 'EAN Capturado com sucesso!' });
     };
 
     const handleSubmit = async () => {
@@ -251,8 +290,11 @@ export default function CadastroProduto({ onVoltar, produtoParaEditar }) {
     if (lendoEan) {
         return (
             <View style={{ flex: 1, backgroundColor: '#000' }}>
-                <CameraView style={{ flex: 1 }} facing="back" onBarcodeScanned={({ data }) => { handleChange('codigoBarras', data); setLendoEan(false); }} />
-                <TouchableOpacity onPress={() => setLendoEan(false)} style={styles.btnVoltarScan}><Text style={styles.btnTextoBranco}>CANCELAR SCAN</Text></TouchableOpacity>
+                {/* 🚀 ONBARCODESCANNED AGORA CHAMA O NOSSO PROCESSAR COM O BIP! */}
+                <CameraView style={{ flex: 1 }} facing="back" onBarcodeScanned={processarScanEan} />
+                <TouchableOpacity onPress={() => setLendoEan(false)} style={styles.btnVoltarScan}>
+                    <Text style={styles.btnTextoBranco}>CANCELAR SCAN</Text>
+                </TouchableOpacity>
             </View>
         );
     }

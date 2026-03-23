@@ -1,17 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Audio } from 'expo-av'; // 🚀 1. RECRUTANDO O MOTOR DE ÁUDIO
 import api from '../api/axios';
 
 export default function ExtratoEstoque({ produto, onVoltar }) {
     const [movimentacoes, setMovimentacoes] = useState([]);
     const [carregando, setCarregando] = useState(true);
 
+    // 🚀 2. ESTADO DO SOM DO BIP
+    const [somBip, setSomBip] = useState();
+
+    // ============================================================================
+    // 🔊 MOTOR DE ÁUDIO (CARREGAMENTO E DISPARO)
+    // ============================================================================
+    async function carregarSom() {
+        try {
+            const { sound } = await Audio.Sound.createAsync(
+                require('../../assets/bip.mp3') // Certifique-se que o arquivo existe nesta pasta!
+            );
+            setSomBip(sound);
+            return sound; // Retornamos para garantir o disparo imediato na primeira carga
+        } catch (error) {
+            console.log("Erro ao carregar áudio:", error);
+            return null;
+        }
+    }
+
+    async function tocarBip(soundRef) {
+        const somAtivo = soundRef || somBip;
+        if (somAtivo) {
+            await somAtivo.replayAsync(); // Toca instantaneamente
+        }
+    }
+
     useEffect(() => {
-        carregarHistorico();
+        let soundRef = null;
+
+        async function iniciarAuditoria() {
+            soundRef = await carregarSom();
+            await carregarHistorico(soundRef);
+        }
+
+        iniciarAuditoria();
+
+        return () => {
+            if (soundRef) soundRef.unloadAsync(); // Limpa a memória ao sair da tela
+        };
     }, []);
 
-    const carregarHistorico = async () => {
+    // ============================================================================
+    // 📡 BUSCA DO EXTRATO NO SERVIDOR
+    // ============================================================================
+    const carregarHistorico = async (soundRef) => {
         try {
             // Vai buscar TODAS as movimentações ao backend
             const res = await api.get('/api/produtos/movimentacoes');
@@ -23,6 +64,12 @@ export default function ExtratoEstoque({ produto, onVoltar }) {
             historicoPeca.sort((a, b) => new Date(b.dataHora) - new Date(a.dataHora));
 
             setMovimentacoes(historicoPeca);
+
+            // 🚀 3. TOCA O BIP AO CARREGAR OS DADOS COM SUCESSO!
+            if (historicoPeca.length > 0) {
+                await tocarBip(soundRef);
+            }
+
         } catch (error) {
             console.log("Erro ao carregar extrato:", error);
         } finally {

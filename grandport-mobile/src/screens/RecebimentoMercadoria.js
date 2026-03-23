@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
+import { Audio } from 'expo-av'; // 🚀 1. RECRUTANDO O MOTOR DE ÁUDIO
 import api from '../api/axios';
 
 export default function RecebimentoMercadoria({ onVoltar }) {
@@ -16,6 +17,36 @@ export default function RecebimentoMercadoria({ onVoltar }) {
     // Motor da Câmera
     const [permissao, pedirPermissao] = useCameraPermissions();
     const [cameraAtiva, setCameraAtiva] = useState(false);
+
+    // 🚀 2. ESTADO DO SOM DO BIP
+    const [somBip, setSomBip] = useState();
+
+    // ============================================================================
+    // 🔊 MOTOR DE ÁUDIO (CARREGAMENTO E DISPARO)
+    // ============================================================================
+    async function carregarSom() {
+        try {
+            const { sound } = await Audio.Sound.createAsync(
+                require('../../assets/bip.mp3') // Certifique-se que o arquivo existe nesta pasta!
+            );
+            setSomBip(sound);
+        } catch (error) {
+            console.log("Erro ao carregar áudio:", error);
+        }
+    }
+
+    async function tocarBip() {
+        if (somBip) {
+            await somBip.replayAsync(); // Toca instantaneamente
+        }
+    }
+
+    useEffect(() => {
+        carregarSom();
+        return () => {
+            if (somBip) somBip.unloadAsync(); // Limpa a memória ao sair da tela
+        };
+    }, []);
 
     // ============================================================================
     // 🔍 BUSCA DE PRODUTOS PARA ADICIONAR AO LOTE
@@ -49,8 +80,12 @@ export default function RecebimentoMercadoria({ onVoltar }) {
             const lista = Array.isArray(res.data) ? res.data : (res.data.content || []);
             const prod = lista.find(p => p.codigoBarras === data || p.sku === data);
 
-            if (prod) adicionarAoLote(prod);
-            else Toast.show({ type: 'error', text1: 'Peça não encontrada no sistema!' });
+            if (prod) {
+                await tocarBip(); // 🚀 3. TOCA O BIP AO LER A CAIXA!
+                adicionarAoLote(prod);
+            } else {
+                Toast.show({ type: 'error', text1: 'Peça não encontrada no sistema!' });
+            }
         } catch (error) {
             Toast.show({ type: 'error', text1: 'Erro ao buscar código lido!' });
         } finally {
@@ -199,7 +234,10 @@ export default function RecebimentoMercadoria({ onVoltar }) {
                 {resultados.length > 0 && (
                     <View style={styles.resultadosBox}>
                         {resultados.slice(0, 4).map(prod => (
-                            <TouchableOpacity key={prod.id} style={styles.itemResultado} onPress={() => adicionarAoLote(prod)}>
+                            <TouchableOpacity key={prod.id} style={styles.itemResultado} onPress={() => {
+                                tocarBip(); // 🚀 4. TOCA O BIP AO ESCOLHER DA LISTA!
+                                adicionarAoLote(prod);
+                            }}>
                                 <View style={{flex: 1}}>
                                     <Text style={styles.resNome} numberOfLines={1}>{prod.nome}</Text>
                                     <Text style={styles.resSku}>{prod.sku} • Saldo Atual: {prod.quantidadeEstoque}</Text>

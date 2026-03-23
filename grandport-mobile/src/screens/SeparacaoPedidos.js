@@ -1,21 +1,53 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Toast from 'react-native-toast-message';
+import { Audio } from 'expo-av'; // 🚀 1. RECRUTANDO O MOTOR DE ÁUDIO
 import api from '../api/axios';
 
 export default function SeparacaoPedidos({ onVoltar }) {
     const [numPedido, setNumPedido] = useState('');
     const [buscando, setBuscando] = useState(false);
+    const [salvando, setSalvando] = useState(false);
     const [pedidoAtual, setPedidoAtual] = useState(null);
 
     // Motor da Câmera
     const [permissao, pedirPermissao] = useCameraPermissions();
     const [cameraAtiva, setCameraAtiva] = useState(false);
 
+    // 🚀 2. ESTADO DO SOM DO BIP
+    const [somBip, setSomBip] = useState();
+
     // ============================================================================
-    // 🔍 BUSCA DO PEDIDO (CONECTADO AO JAVA REAL!)
+    // 🔊 MOTOR DE ÁUDIO (CARREGAMENTO E DISPARO)
+    // ============================================================================
+    async function carregarSom() {
+        try {
+            const { sound } = await Audio.Sound.createAsync(
+                require('../../assets/bip.mp3') // Certifique-se que o arquivo existe nesta pasta!
+            );
+            setSomBip(sound);
+        } catch (error) {
+            console.log("Erro ao carregar áudio:", error);
+        }
+    }
+
+    async function tocarBip() {
+        if (somBip) {
+            await somBip.replayAsync(); // Toca instantaneamente
+        }
+    }
+
+    useEffect(() => {
+        carregarSom();
+        return () => {
+            if (somBip) somBip.unloadAsync(); // Limpa a memória ao sair da tela
+        };
+    }, []);
+
+    // ============================================================================
+    // 🔍 BUSCA DO PEDIDO (COM TRAVA DE SEGURANÇA)
     // ============================================================================
     const buscarPedido = async () => {
         if (numPedido.length < 1) return Toast.show({ type: 'info', text1: 'Digite o número do pedido' });
@@ -26,6 +58,15 @@ export default function SeparacaoPedidos({ onVoltar }) {
             const res = await api.get(`/api/vendas/${numPedido}`);
             const vendaDb = res.data;
 
+            // 🚀 TRAVA DE SEGURANÇA REATIVADA: Bloqueia pedidos já separados
+            if (vendaDb.status === 'CONCLUIDA' || vendaDb.status === 'AGUARDANDO_PAGAMENTO') {
+                setNumPedido('');
+                return Alert.alert(
+                    "Pedido já Separado! ⚠️",
+                    `Este pedido (#${vendaDb.id}) já foi conferido e está no Caixa ou já foi Entregue.\n\nNão é permitido separar novamente.`
+                );
+            }
+
             if (!vendaDb.itens || vendaDb.itens.length === 0) {
                 return Toast.show({ type: 'error', text1: 'Pedido Vazio!', text2: 'Esta venda não possui itens.' });
             }
@@ -34,8 +75,8 @@ export default function SeparacaoPedidos({ onVoltar }) {
             const itensMapeados = vendaDb.itens.map(itemVenda => ({
                 id: itemVenda.id,
                 produto: itemVenda.produto,
-                qtdeSolicitada: itemVenda.quantidade, // A quantidade que o cliente comprou
-                qtdeSeparada: 0 // Começa zerado para o funcionário bipar
+                qtdeSolicitada: itemVenda.quantidade,
+                qtdeSeparada: 0
             }));
 
             // Monta o cabeçalho do pedido
@@ -44,7 +85,8 @@ export default function SeparacaoPedidos({ onVoltar }) {
                 cliente: vendaDb.cliente?.nome || 'CONSUMIDOR FINAL',
                 vendedor: vendaDb.vendedorNome || 'Não informado',
                 status: vendaDb.status,
-                itens: itensMapeados
+                itens: itensMapeados,
+                dadosOriginais: vendaDb // 🚀 Guardado para podermos fechar o pedido depois
             });
 
             Toast.show({ type: 'success', text1: 'Ordem de Separação Localizada!' });
@@ -57,7 +99,7 @@ export default function SeparacaoPedidos({ onVoltar }) {
     };
 
     // ============================================================================
-    // 📸 MOTOR DE SCANNER (VALIDAÇÃO DE PEÇA)
+    // 📸 MOTOR DE SCANNER (VALIDAÇÃO DE PEÇA E BIP)
     // ============================================================================
     const abrirCamera = async () => {
         if (!permissao?.granted) {
@@ -67,12 +109,12 @@ export default function SeparacaoPedidos({ onVoltar }) {
         setCameraAtiva(true);
     };
 
-    const lidarComScan = ({ data }) => {
+    const lidarComScan = async ({ data }) => {
         setCameraAtiva(false); // Fecha a câmera
 
         if (!pedidoAtual) return;
 
-        // Procura se a peça lida pertence a este pedido (Busca por Código de Barras ou SKU)
+        // Procura se a peça lida pertence a este pedido
         const itemEncontrado = pedidoAtual.itens.find(i =>
             i.produto.codigoBarras === data || i.produto.sku === data
         );
@@ -84,6 +126,9 @@ export default function SeparacaoPedidos({ onVoltar }) {
         if (itemEncontrado.qtdeSeparada >= itemEncontrado.qtdeSolicitada) {
             return Toast.show({ type: 'info', text1: 'Atenção', text2: 'Você já separou todas as unidades desta peça!' });
         }
+
+        // 🚀 3. TOCA O BIP ASSIM QUE A PEÇA FOR VALIDADA COM SUCESSO!
+        await tocarBip();
 
         // Atualiza a quantidade separada
         const novosItens = pedidoAtual.itens.map(i => {
@@ -98,19 +143,34 @@ export default function SeparacaoPedidos({ onVoltar }) {
     };
 
     // ============================================================================
-    // 🚀 FINALIZAR SEPARAÇÃO
+    // 🚀 FINALIZAR SEPARAÇÃO E MANDAR PRO CAIXA (JAVA)
     // ============================================================================
-    const finalizarSeparacao = () => {
+    const finalizarSeparacao = async () => {
         const incompleto = pedidoAtual.itens.some(i => i.qtdeSeparada < i.qtdeSolicitada);
 
         if (incompleto) {
             return Toast.show({ type: 'error', text1: 'Pedido Incompleto!', text2: 'Ainda faltam peças para separar.' });
         }
 
-        // Aqui, futuramente, você pode fazer um PUT para o backend mudando o StatusVenda para "PRONTO_PARA_ENTREGA"
-        Toast.show({ type: 'success', text1: 'Separação Concluída!', text2: 'Pedido conferido e pronto para o cliente.' });
-        setPedidoAtual(null);
-        setNumPedido('');
+        setSalvando(true);
+        try {
+            // 🚀 ENVIO REAL PARA O JAVA MUDANDO O STATUS!
+            const payload = {
+                ...pedidoAtual.dadosOriginais,
+                status: 'AGUARDANDO_PAGAMENTO',
+                observacoes: (pedidoAtual.dadosOriginais.observacoes || "") + "\n[Separação realizada via Mobile]"
+            };
+
+            await api.put(`/api/vendas/${pedidoAtual.numero}`, payload);
+
+            Alert.alert("Sucesso! ✅", "Separação concluída. O pedido foi enviado para o Caixa e a baixa no estoque foi autorizada.");
+            setPedidoAtual(null);
+            setNumPedido('');
+        } catch (error) {
+            Toast.show({ type: 'error', text1: 'Erro ao fechar pedido no servidor' });
+        } finally {
+            setSalvando(false);
+        }
     };
 
     const progresso = pedidoAtual ?
@@ -217,9 +277,13 @@ export default function SeparacaoPedidos({ onVoltar }) {
 
                     {/* RODAPÉ */}
                     <View style={styles.footer}>
-                        <TouchableOpacity style={[styles.btnFinalizar, progresso < 100 && {backgroundColor: '#cbd5e1'}]} onPress={finalizarSeparacao}>
-                            <Feather name="check" size={24} color="#fff" />
-                            <Text style={styles.txtFinalizar}>Concluir Separação</Text>
+                        <TouchableOpacity style={[styles.btnFinalizar, (progresso < 100 || salvando) && {backgroundColor: '#cbd5e1'}]} onPress={finalizarSeparacao} disabled={progresso < 100 || salvando}>
+                            {salvando ? <ActivityIndicator color="#fff" /> : (
+                                <>
+                                    <Feather name="check" size={24} color="#fff" />
+                                    <Text style={styles.txtFinalizar}>Concluir Separação</Text>
+                                </>
+                            )}
                         </TouchableOpacity>
                     </View>
                 </>
