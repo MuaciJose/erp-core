@@ -25,16 +25,19 @@ const AutocompleteMobile = ({ label, placeholder, onSearch, onSelect, displayVal
 
     const handleTextChange = async (texto) => {
         setBusca(texto);
+        setAberto(true); // Abre a caixa imediatamente para dar feedback
+
         if (texto.length >= 2) {
-            setAberto(true);
             setCarregando(true);
             try {
                 const data = await onSearch(texto);
-                setResultados(Array.isArray(data) ? data : (data.content || []));
-            } catch (error) { console.log(error); }
-            finally { setCarregando(false); }
+                setResultados(Array.isArray(data) ? data : (data.content || data.data || []));
+            } catch (error) {
+                console.log("Erro na busca:", error);
+            } finally {
+                setCarregando(false);
+            }
         } else {
-            setAberto(false);
             setResultados([]);
             onSelect(null); // Limpa a seleção se o usuário apagar
         }
@@ -55,13 +58,28 @@ const AutocompleteMobile = ({ label, placeholder, onSearch, onSelect, displayVal
                     value={busca}
                     onChangeText={handleTextChange}
                     placeholder={placeholder}
-                    onFocus={() => busca.length >= 2 && setAberto(true)}
+                    onFocus={() => { setAberto(true); }}
                 />
                 {carregando && <ActivityIndicator size="small" color="#3b82f6" style={{ paddingRight: 10 }} />}
             </View>
 
-            {aberto && resultados.length > 0 && (
+            {aberto && (
                 <View style={styles.dropdown}>
+                    {/* Se tem menos de 2 letras, mostra o aviso */}
+                    {busca.length < 2 && !carregando && (
+                        <Text style={{ padding: 15, color: '#94a3b8', fontSize: 12, textAlign: 'center', fontWeight: 'bold' }}>
+                            Digite pelo menos 2 caracteres para buscar no servidor...
+                        </Text>
+                    )}
+
+                    {/* Se digitou 2 letras, carregou, mas não achou nada */}
+                    {busca.length >= 2 && !carregando && resultados.length === 0 && (
+                        <Text style={{ padding: 15, color: '#ef4444', fontSize: 12, textAlign: 'center', fontWeight: 'bold' }}>
+                            Nenhum resultado encontrado.
+                        </Text>
+                    )}
+
+                    {/* Se achou, mostra a lista */}
                     {resultados.slice(0, 5).map((item, index) => (
                         <TouchableOpacity key={index} style={styles.dropItem} onPress={() => handleSelect(item)}>
                             {renderItem(item)}
@@ -135,9 +153,19 @@ export default function CadastroProduto({ onVoltar, produtoParaEditar }) {
         return res.data;
     };
 
+    // BLINDAGEM DUPLA NA MARCA
     const buscarMarca = async (termo) => {
-        const res = await api.get(`/api/marcas/buscar?nome=${termo}`);
-        return res.data;
+        try {
+            // Plano A: Tenta a rota de busca inteligente
+            const res = await api.get(`/api/marcas/buscar?nome=${termo}`);
+            return res.data;
+        } catch (error) {
+            // Plano B: Se a rota de busca não existir no Java, ele puxa todas as marcas e filtra no celular na hora!
+            console.log("Plano A falhou, buscando todas as marcas...");
+            const res = await api.get(`/api/marcas`);
+            const lista = Array.isArray(res.data) ? res.data : (res.data.content || []);
+            return lista.filter(m => m.nome.toLowerCase().includes(termo.toLowerCase()));
+        }
     };
 
     const tirarFoto = async () => {
