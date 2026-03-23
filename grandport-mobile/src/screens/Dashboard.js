@@ -129,6 +129,24 @@ export default function Dashboard({ onNavigate, onLogout }) {
                         <Text style={styles.subGrid}>Orçamento pelo WhatsApp</Text>
                     </TouchableOpacity>
 
+                    {/* BOTÃO 4: RECEBIMENTO DE MERCADORIAS */}
+                    <TouchableOpacity style={styles.btnGrid} onPress={() => onNavigate('recebimento')}>
+                        <View style={[styles.iconeGrid, { backgroundColor: '#ecfdf5' }]}>
+                            <Feather name="box" size={32} color="#10b981" />
+                        </View>
+                        <Text style={styles.tituloGrid}>Entrada de Carga</Text>
+                        <Text style={styles.subGrid}>Conferência Cega</Text>
+                    </TouchableOpacity>
+
+                    {/* BOTÃO 5: MODO PICKING (SEPARAÇÃO) */}
+                    <TouchableOpacity style={styles.btnGrid} onPress={() => onNavigate('picking')}>
+                        <View style={[styles.iconeGrid, { backgroundColor: '#f3e8ff' }]}>
+                            <Feather name="check-square" size={32} color="#8b5cf6" />
+                        </View>
+                        <Text style={styles.tituloGrid}>Picking</Text>
+                        <Text style={styles.subGrid}>Separação de Pedidos</Text>
+                    </TouchableOpacity>
+
                     {/* BOTÃO 4: RELATÓRIOS (Futuro) */}
                     <TouchableOpacity style={[styles.btnGrid, { opacity: 0.6 }]} disabled>
                         <View style={[styles.iconeGrid, { backgroundColor: '#f3e8ff' }]}>

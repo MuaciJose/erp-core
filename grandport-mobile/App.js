@@ -12,6 +12,8 @@ import CadastroProduto from './src/screens/CadastroProduto';
 import Produtos from './src/screens/Produtos';
 import PrevisaoCompras from './src/screens/PrevisaoCompras';
 import OrcamentoMobile from './src/screens/OrcamentoMobile';
+import RecebimentoMercadoria from './src/screens/RecebimentoMercadoria';
+import SeparacaoPedidos from './src/screens/SeparacaoPedidos';
 
 export default function App() {
   const [carregando, setCarregando] = useState(true);
@@ -61,6 +63,14 @@ export default function App() {
 
         {telaAtual === 'orcamento' && (
             <OrcamentoMobile onVoltar={() => setTelaAtual('dashboard')} />
+        )}
+
+        {telaAtual === 'recebimento' && (
+            <RecebimentoMercadoria onVoltar={() => setTelaAtual('dashboard')} />
+        )}
+
+        {telaAtual === 'picking' && (
+            <SeparacaoPedidos onVoltar={() => setTelaAtual('dashboard')} />
         )}
 
         <StatusBar style="auto" />
