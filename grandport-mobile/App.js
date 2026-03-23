@@ -1,68 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import Toast from 'react-native-toast-message'; // 🚀 1. IMPORTANDO O TOAST
+import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import Login from './src/screens/Login';
-import { Inventario } from './src/screens/Inventario';
+import Dashboard from './src/screens/Dashboard';
+// 🚀 CORREÇÃO 1: Tirei as chaves {} da importação!
+import Inventario from './src/screens/Inventario';
+import CadastroProduto from './src/screens/CadastroProduto';
+import Produtos from './src/screens/Produtos';
 
 export default function App() {
-  const [estaLogado, setEstaLogado] = useState(false);
   const [carregando, setCarregando] = useState(true);
+  const [telaAtual, setTelaAtual] = useState('login');
 
-  // Quando o app abre, ele vai no cofre ver se já tem o token salvo
   useEffect(() => {
     const verificarAcesso = async () => {
       try {
         const token = await AsyncStorage.getItem('grandport_token');
-        if (token) {
-          setEstaLogado(true); // Achou a chave! Pode liberar a entrada.
-        }
-      } catch (error) {
-        console.error("Erro ao ler a memória do celular:", error);
-      } finally {
-        setCarregando(false); // Terminou de procurar, pode tirar a tela de carregamento
-      }
+        if (token) setTelaAtual('dashboard');
+      } catch (error) { console.error(error); }
+      finally { setCarregando(false); }
     };
     verificarAcesso();
   }, []);
 
-  // Tela de "Carregando..." enquanto o app procura a chave
-  if (carregando) {
-    return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563eb" />
-          <StatusBar style="light" />
-        </View>
-    );
-  }
+  if (carregando) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#2563eb" /></View>;
 
-  // O Roteamento de Combate
   return (
       <View style={styles.container}>
-        {estaLogado ? (
-            <Inventario />
-        ) : (
-            <Login onLoginSuccess={() => setEstaLogado(true)} />
-        )}
-        <StatusBar style="auto" />
 
-        {/* 🚀 2. O TOAST FICA AQUI, OLHANDO TUDO LÁ DE CIMA! */}
+        {telaAtual === 'login' && <Login onLoginSuccess={() => setTelaAtual('dashboard')} />}
+
+        {telaAtual === 'dashboard' && (
+            <Dashboard
+                onNavigate={(tela) => setTelaAtual(tela)}
+                onLogout={() => setTelaAtual('login')}
+            />
+        )}
+
+        {/* 🚀 CORREÇÃO 2: Mudei o nome da propriedade para 'onVoltar' */}
+        {telaAtual === 'inventario' && (
+            <Inventario onVoltar={() => setTelaAtual('dashboard')} />
+        )}
+
+        {telaAtual === 'cadastro' && (
+            <CadastroProduto onVoltar={() => setTelaAtual('dashboard')} />
+        )}
+
+        {telaAtual === 'produtos' && (
+            <Produtos onVoltar={() => setTelaAtual('dashboard')} />
+        )}
+
+        <StatusBar style="auto" />
         <Toast />
       </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0f172a',
-  }
+  container: { flex: 1, backgroundColor: '#0f172a' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0f172a' }
 });

@@ -1705,13 +1705,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-native-picker/picker@npm:^2.11.4":
-  version: 2.11.4
-  resolution: "@react-native-picker/picker@npm:2.11.4"
+"@react-native-picker/picker@npm:2.11.1":
+  version: 2.11.1
+  resolution: "@react-native-picker/picker@npm:2.11.1"
   peerDependencies:
     react: "*"
     react-native: "*"
-  checksum: 10c0/3c9947c1a3022ffa35008cc479b718585b106ff70a5fb0f24c4117bf2eaaf5f60795cba20271af50a01d3a878d5dc06661ea1c1315664898524e291e7412a18f
+  checksum: 10c0/d2e9aeb32ae80f2ab56fa025f1afd6d8ff8051e7078bfd17c6794ff0cc1538d4a2f548098826eb652e6cb64d998070b0111777c78de4dcb468cb71e7e4d93097
   languageName: node
   linkType: hard
 
@@ -3247,23 +3247,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"expo-image-loader@npm:~55.0.0":
-  version: 55.0.0
-  resolution: "expo-image-loader@npm:55.0.0"
+"expo-image-loader@npm:~6.0.0":
+  version: 6.0.0
+  resolution: "expo-image-loader@npm:6.0.0"
   peerDependencies:
     expo: "*"
-  checksum: 10c0/4e8d9a7cd69af109f818639afd1f2106825950b4d7eaa304645939710a84bec59b70fd7dc4a7543ee2f31fc517b9ed23afc750e4c20ed4f7cf114d3686efece3
+  checksum: 10c0/36f1e80d2b3d2a1cce440c7d938cd3cf3138f2b1fa706a1954e415bfae87b5b8eeaec65be0ab17880eb7585dd28c9225d056ebdb98ac81e0ffbfe880d952b0eb
   languageName: node
   linkType: hard
 
-"expo-image-picker@npm:^55.0.13":
-  version: 55.0.13
-  resolution: "expo-image-picker@npm:55.0.13"
+"expo-image-picker@npm:~17.0.10":
+  version: 17.0.10
+  resolution: "expo-image-picker@npm:17.0.10"
   dependencies:
-    expo-image-loader: "npm:~55.0.0"
+    expo-image-loader: "npm:~6.0.0"
   peerDependencies:
     expo: "*"
-  checksum: 10c0/8612f9a4665e8b6f1da429339a6d7a357a9c8a9078596521ef10d2d98eb2dcfef82c3371dd058d66b650c208d412cb87cb93b848ab9fcf0c61d0d76e2a91e9b1
+  checksum: 10c0/d05ed6ce53463acc86af062df33a648aaafb27549f875ebf907f0f438c09727ae9b75fb8c333fdcaceb0249d9de16929d2cd65ba81f256403745a30af9a7f8c3
   languageName: node
   linkType: hard
 
@@ -3641,12 +3641,13 @@ __metadata:
   resolution: "grandport-mobile@workspace:."
   dependencies:
     "@react-native-async-storage/async-storage": "npm:2.2.0"
-    "@react-native-picker/picker": "npm:^2.11.4"
+    "@react-native-picker/picker": "npm:2.11.1"
     axios: "npm:^1.13.6"
     expo: "npm:~54.0.0"
     expo-av: "npm:~16.0.8"
     expo-camera: "npm:~17.0.10"
-    expo-image-picker: "npm:^55.0.13"
+    expo-file-system: "npm:~19.0.21"
+    expo-image-picker: "npm:~17.0.10"
     expo-status-bar: "npm:~3.0.9"
     lucide-react-native: "npm:^0.575.0"
     react: "npm:19.1.0"
