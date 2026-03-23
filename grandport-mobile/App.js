@@ -10,6 +10,7 @@ import Dashboard from './src/screens/Dashboard';
 import Inventario from './src/screens/Inventario';
 import CadastroProduto from './src/screens/CadastroProduto';
 import Produtos from './src/screens/Produtos';
+import PrevisaoCompras from './src/screens/PrevisaoCompras';
 
 export default function App() {
   const [carregando, setCarregando] = useState(true);
@@ -51,6 +52,10 @@ export default function App() {
 
         {telaAtual === 'produtos' && (
             <Produtos onVoltar={() => setTelaAtual('dashboard')} />
+        )}
+
+        {telaAtual === 'previsao' && (
+            <PrevisaoCompras onVoltar={() => setTelaAtual('dashboard')} />
         )}
 
         <StatusBar style="auto" />
