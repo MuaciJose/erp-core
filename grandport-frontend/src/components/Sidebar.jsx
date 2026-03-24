@@ -80,7 +80,8 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Ajuste de Estoque', acao: 'ajuste_estoque' },
                 { titulo: 'Importar NF-e (XML)', acao: 'compras' },
                 { titulo: 'Previsão de Compras', acao: 'previsao' },
-                { titulo: 'Relatório de Faltas', acao: 'faltas' }
+                { titulo: 'Relatório de Faltas', acao: 'faltas' },
+                { titulo: 'Curva ABC', acao: 'curva-abc' }
             ]
         },
         {

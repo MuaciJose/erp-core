@@ -54,7 +54,8 @@ export const GestaoUsuarios = () => {
                 { acao: 'ajuste_estoque', nome: 'Ajuste de Estoque / Inventário' },
                 { acao: 'compras', nome: 'Importar NF-e (XML)' },
                 { acao: 'previsao', nome: 'Previsão de Compras' },
-                { acao: 'faltas', nome: 'Relatório de Faltas' }
+                { acao: 'faltas', nome: 'Relatório de Faltas' },
+                { acao: 'curva-abc', nome: 'Curva ABC' }
             ]
         },
         {

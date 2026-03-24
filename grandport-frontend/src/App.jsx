@@ -57,6 +57,8 @@ import { ListagemOs } from './modules/os/ListagemOs';
 // 🚀 MÓDULO CHECKLIST DE VEÍCULOS (NOVO)
 import { ChecklistTablet } from './modules/checklist/ChecklistTablet';
 
+import { CurvaABC } from './modules/estoque/curvaABC';
+
 // 🚀 MÓDULO SERVIÇOS / MÃO DE OBRA
 import { GestaoServicos } from './modules/servicos/GestaoServicos';
 
@@ -202,6 +204,7 @@ function App() {
                             {paginaAtiva === 'gerenciador-nfe' && <GerenciadorFiscal setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'emitir-nfe-avulsa' && <EmitirNfeAvulsa setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'inventario' && <InventarioPWA  setPaginaAtiva={setPaginaAtiva} />}
+                            {paginaAtiva === 'curva-abc' && <CurvaABC />}
                         </>
                     )}
                 </div>
