@@ -165,6 +165,7 @@ function App() {
                             {paginaAtiva === 'relatorio-comissoes' && <RelatorioComissoes />}
 
                             {paginaAtiva === 'revisoes' && <PainelRevisoes />}
+                            {paginaAtiva === 'crm' && <PainelRevisoes />}
                             {paginaAtiva === 'etiquetas' && <GeradorEtiquetas />}
 
                             {/* 🚀 TELAS DA OFICINA */}

@@ -11,7 +11,8 @@ import {
     LogOut,
     Menu,
     ChevronLeft,
-    HelpCircle
+    HelpCircle,
+    MessageCircle // 🚀 ADICIONADO PARA O MENU DE CRM
 } from 'lucide-react';
 import apiSidebar from '../api/axios';
 
@@ -42,6 +43,9 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
 
     const permissoesUsuario = usuarioLogado?.permissoes || [];
 
+    // ============================================================================
+    // 🚀 MENUS ATUALIZADOS E SINCRONIZADOS COM A GESTÃO DE USUÁRIOS
+    // ============================================================================
     const menus = [
         { id: 'dashboard', titulo: 'Dashboard', icone: <LayoutDashboard size={20} />, acao: 'dash' },
         {
@@ -49,13 +53,21 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             submenus: [
                 { titulo: 'Ponto de Venda (PDV)', acao: 'pdv' },
                 { titulo: 'Balcão / Central', acao: 'vendas' },
-                { titulo: 'Checklist de Entrada', acao: 'checklist' }, // 🚀 ADICIONADO AQUI
+                { titulo: 'Checklist de Entrada', acao: 'checklist' },
                 { titulo: 'Painel de OS (Kanban)', acao: 'os' },
                 { titulo: 'Consulta de OS (Lista)', acao: 'listagem-os' },
+                { titulo: 'Orçamentos e Pedidos', acao: 'orcamentos' }, // 🚀 ADICIONADO
                 { titulo: 'Fila do Caixa', acao: 'fila-caixa' },
                 { titulo: 'Controle de Caixa', acao: 'caixa' },
-                { titulo: 'Relatório de Comissões', acao: 'relatorio-comissoes' },
-                { titulo: 'CRM de Revisões', acao: 'revisoes' }
+                { titulo: 'Relatório de Comissões', acao: 'relatorio-comissoes' }
+            ]
+        },
+        {
+            id: 'crm', titulo: 'CRM & Relacionamento', icone: <MessageCircle size={20} />, // 🚀 NOVO GRUPO CRIADO
+            submenus: [
+                { titulo: 'Painel de CRM', acao: 'crm' },
+                { titulo: 'Gestão de Revisões', acao: 'revisoes' }, // 🚀 MOVIDO PARA CÁ
+                { titulo: 'Integração WhatsApp', acao: 'whatsapp' }
             ]
         },
         {
@@ -80,7 +92,8 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Conciliação Bancária', acao: 'conciliacao' },
                 { titulo: 'Plano de Contas', acao: 'plano-contas' },
                 { titulo: 'Resultado (DRE)', acao: 'dre' },
-                { titulo: 'Recibo Avulso', acao: 'recibo-avulso' }
+                { titulo: 'Recibo Avulso', acao: 'recibo-avulso' },
+                { titulo: 'Histórico de Recibos', acao: 'historico-recibos' } // 🚀 ADICIONADO
             ]
         },
         {
@@ -100,18 +113,20 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         { id: 'manual', titulo: 'Manual do Usuário', icone: <HelpCircle size={20} />, acao: 'manual' }
     ];
 
-    // 🚀 INCLUÍDO AQUI TAMBÉM O CHECKLIST
     const rotasLivres = ['manual'];
 
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {
+            // Verifica se o usuário tem permissão para alguma tela do submenu
             const submenusPermitidos = menu.submenus.filter(sub =>
                 permissoesUsuario.includes(sub.acao) || rotasLivres.includes(sub.acao)
             );
+            // Se tiver pelo menos um submenu liberado, renderiza o menu principal
             if (submenusPermitidos.length > 0) return { ...menu, submenus: submenusPermitidos };
             return null;
         }
 
+        // Menus sem submenus (Dashboard, Config, Manual)
         if (rotasLivres.includes(menu.acao) || permissoesUsuario.includes(menu.acao)) {
             return menu;
         }
