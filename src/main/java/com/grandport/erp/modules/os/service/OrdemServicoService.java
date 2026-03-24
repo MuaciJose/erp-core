@@ -7,17 +7,20 @@ import com.grandport.erp.modules.os.model.*;
 import com.grandport.erp.modules.os.repository.OrdemServicoRepository;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 import com.grandport.erp.modules.servicos.repository.ServicoRepository;
+import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
 import com.grandport.erp.modules.veiculo.repository.VeiculoRepository;
 import com.grandport.erp.modules.admin.service.AuditoriaService;
-// 🚀 AS DUAS IMPORTAÇÕES CERTAS AQUI EM CIMA:
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Service
 public class OrdemServicoService {
@@ -29,10 +32,36 @@ public class OrdemServicoService {
     @Autowired private ServicoRepository servicoRepository;
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private AuditoriaService auditoriaService;
-
-    // 🚀 O REPOSITÓRIO COM O NOME EXATO QUE VOCÊ CRIOU:
     @Autowired private ConfiguracaoRepository configuracaoRepository;
 
+    // =========================================================================
+    // 🛡️ MOTOR DE SEGURANÇA E ESCOPO DE VISÃO (ROW-LEVEL SECURITY)
+    // =========================================================================
+    public List<OrdemServico> listarTodasAsOs() {
+        Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Sort ordem = Sort.by(Sort.Direction.DESC, "dataEntrada"); // Ordena das mais recentes para as mais velhas
+
+        if (usuarioLogado.getPermissoes() == null) return List.of();
+
+        boolean isGestor = usuarioLogado.getPermissoes().contains("usuarios");
+        boolean isCaixa = usuarioLogado.getPermissoes().contains("caixa");
+        boolean isMecanico = Boolean.TRUE.equals(usuarioLogado.getIsMecanico());
+
+        if (isGestor || isCaixa) {
+            // Chefe ou Caixa vê todas as OSs da oficina inteira!
+            return osRepository.findAll(ordem);
+        } else if (isMecanico) {
+            // Mecânico só vê as OSs onde ele tem serviço pra executar
+            return osRepository.findByMecanicoId(usuarioLogado.getId(), ordem);
+        } else {
+            // Consultor/Vendedor só vê as OSs que ele abriu
+            return osRepository.findByConsultorId(usuarioLogado.getId(), ordem);
+        }
+    }
+
+    // =========================================================================
+    // MÉTODOS MANTIDOS (CRIAÇÃO, FATURAMENTO E AUDITORIA)
+    // =========================================================================
     @Transactional
     public OrdemServico salvarRascunho(OsRequestDTO dto, Long osId) {
         boolean isNovaOs = (osId == null);
@@ -42,7 +71,14 @@ public class OrdemServicoService {
         os.setCliente(dto.clienteId() != null ? parceiroRepository.findById(dto.clienteId()).orElse(null) : null);
         os.setVeiculo(dto.veiculoId() != null ? veiculoRepository.findById(dto.veiculoId()).orElse(null) : null);
         os.setKmEntrada(dto.kmEntrada());
-        os.setConsultor(dto.consultorId() != null ? usuarioRepository.findById(dto.consultorId()).orElse(null) : null);
+
+        // 🚀 SE FOR NOVA OS, FORÇA O CONSULTOR COMO O USUÁRIO LOGADO, A NÃO SER QUE SEJA UM GESTOR PASSANDO PRA OUTRO
+        if (isNovaOs && dto.consultorId() == null) {
+            Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            os.setConsultor(usuarioLogado);
+        } else {
+            os.setConsultor(dto.consultorId() != null ? usuarioRepository.findById(dto.consultorId()).orElse(null) : null);
+        }
 
         os.setDefeitoRelatado(dto.defeitoRelatado());
         os.setDiagnosticoTecnico(dto.diagnosticoTecnico());
@@ -106,18 +142,13 @@ public class OrdemServicoService {
             throw new RuntimeException("Esta OS já foi faturada e fechada!");
         }
 
-        // 1. LÊ A REGRA GLOBAL DA OFICINA
         var config = configuracaoRepository.findById(1L).orElse(null);
         boolean globalLiberado = config != null && Boolean.TRUE.equals(config.getPermitirEstoqueNegativoGlobal());
 
-        // 2. BAIXA O ESTOQUE FISICAMENTE
         for (OsItemPeca item : os.getItensPecas()) {
             Produto p = item.getProduto();
-
-            // LÊ A REGRA ESPECÍFICA DESTA PEÇA
             boolean produtoLiberado = Boolean.TRUE.equals(p.getPermitirEstoqueNegativo());
 
-            // A REGRA DE OURO DA ARQUITETURA
             if (p.getQuantidadeEstoque() < item.getQuantidade()) {
                 if (!globalLiberado && !produtoLiberado) {
                     throw new RuntimeException("Estoque insuficiente para a peça: " + p.getNome());
@@ -126,13 +157,10 @@ public class OrdemServicoService {
 
             p.setQuantidadeEstoque(p.getQuantidadeEstoque() - item.getQuantidade());
             produtoRepository.save(p);
-
             auditoriaService.registrar("ESTOQUE", "SAIDA_OS", "Baixa de " + item.getQuantidade() + "un de '" + p.getNome() + "' ref. OS #" + os.getId());
         }
 
-        // 4. TRAVA A OS COMO FATURADA
         os.setStatus(com.grandport.erp.modules.os.model.StatusOS.FATURADA);
-
         OrdemServico salva = osRepository.save(os);
 
         auditoriaService.registrar("ORDEM_SERVICO", "FATURAMENTO_OS", "Faturou e fechou a OS #" + salva.getId() + ". Peças baixadas do estoque e valor consolidado de R$ " + salva.getValorTotal());

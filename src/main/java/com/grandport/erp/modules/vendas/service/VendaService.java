@@ -20,6 +20,7 @@ import com.grandport.erp.modules.vendas.model.*;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,9 +40,49 @@ public class VendaService {
     @Autowired private CaixaService caixaService;
     @Autowired private ConfiguracaoService configService;
     @Autowired private EstoqueService estoqueService;
-
-    // 🚀 O MOTOR DE AUDITORIA ESTÁ AQUI
     @Autowired private AuditoriaService auditoriaService;
+
+    // =========================================================================
+    // 🛡️ MOTOR DE SEGURANÇA E ESCOPO DE VISÃO (ROW-LEVEL SECURITY)
+    // =========================================================================
+
+    // Verifica se o usuário é o Chefe (Admin) ou se é do Caixa
+    private boolean isGestorOuCaixa(Usuario usuario) {
+        if (usuario == null || usuario.getPermissoes() == null) return false;
+        // Quem tem acesso a 'usuarios' é chefe. Quem tem acesso a 'caixa' é financeiro.
+        return usuario.getPermissoes().contains("usuarios") || usuario.getPermissoes().contains("caixa");
+    }
+
+    public List<Venda> listarTodasAsVendas() {
+        Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Sort ordem = Sort.by(Sort.Direction.DESC, "dataHora");
+
+        if (isGestorOuCaixa(usuarioLogado)) {
+            return vendaRepository.findAll(ordem); // Chefe vê tudo
+        } else {
+            return vendaRepository.findByVendedorId(usuarioLogado.getId(), ordem); // Vendedor vê só o dele
+        }
+    }
+
+    public List<Venda> listarOrcamentos() {
+        Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        if (isGestorOuCaixa(usuarioLogado)) {
+            return vendaRepository.findByStatus(StatusVenda.ORCAMENTO);
+        } else {
+            return vendaRepository.findByStatusAndVendedorId(StatusVenda.ORCAMENTO, usuarioLogado.getId());
+        }
+    }
+
+    public List<Venda> listarFilaCaixa() {
+        Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        if (isGestorOuCaixa(usuarioLogado)) {
+            return vendaRepository.findByStatus(StatusVenda.AGUARDANDO_PAGAMENTO);
+        } else {
+            return vendaRepository.findByStatusAndVendedorId(StatusVenda.AGUARDANDO_PAGAMENTO, usuarioLogado.getId());
+        }
+    }
 
     // =========================================================================
     // 🚀 NOVO MOTOR DE COMISSÃO: ITEM POR ITEM (MISTO)
@@ -248,7 +289,6 @@ public class VendaService {
         venda.setCliente(dto.parceiroId() != null ? parceiroRepository.findById(dto.parceiroId()).orElse(null) : null);
         venda.setVeiculo(dto.veiculoId() != null ? veiculoRepository.findById(dto.veiculoId()).orElse(null) : null);
 
-        // 🚀 O DETALHE QUE FALTAVA: PEGANDO AS OBSERVAÇÕES DO DTO
         venda.setObservacoes(dto.observacoes());
 
         if (dto.kmVeiculo() != null && venda.getVeiculo() != null) {

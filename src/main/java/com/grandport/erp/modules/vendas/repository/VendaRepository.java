@@ -6,6 +6,7 @@ import com.grandport.erp.modules.vendas.model.Venda;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -18,6 +19,11 @@ public interface VendaRepository extends JpaRepository<Venda, Long> {
     List<Venda> findByClienteIdOrderByDataHoraDesc(Long clienteId);
 
     List<Venda> findByStatus(StatusVenda status);
+
+    List<Venda> findByVendedorId(Long vendedorId);
+
+    List<Venda> findByVendedorId(Long vendedorId, Sort sort);
+    List<Venda> findByStatusAndVendedorId(StatusVenda status, Long vendedorId);
 
     @Query("SELECT SUM(v.valorTotal) FROM Venda v WHERE v.status = 'CONCLUIDA' AND v.dataHora BETWEEN :inicio AND :fim")
     Optional<BigDecimal> sumTotalVendasPeriodo(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);

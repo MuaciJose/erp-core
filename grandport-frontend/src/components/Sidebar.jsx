@@ -56,7 +56,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Checklist de Entrada', acao: 'checklist' },
                 { titulo: 'Painel de OS (Kanban)', acao: 'os' },
                 { titulo: 'Consulta de OS (Lista)', acao: 'listagem-os' },
-                { titulo: 'Orçamentos e Pedidos', acao: 'orcamentos' }, // 🚀 ADICIONADO
+                //{ titulo: 'Orçamentos e Pedidos', acao: 'orcamentos' }, // 🚀 ADICIONADO
                 { titulo: 'Fila do Caixa', acao: 'fila-caixa' },
                 { titulo: 'Controle de Caixa', acao: 'caixa' },
                 { titulo: 'Relatório de Comissões', acao: 'relatorio-comissoes' }

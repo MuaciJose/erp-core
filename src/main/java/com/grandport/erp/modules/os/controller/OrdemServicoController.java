@@ -27,11 +27,11 @@ public class OrdemServicoController {
     @Autowired private com.grandport.erp.modules.pdf.service.PdfService pdfService;
     @Autowired private com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository configuracaoRepository;
 
+    // PARA: 🚀 (AQUI ESTÁ A BLINDAGEM)
     @GetMapping
     public List<OrdemServico> listarTodas() {
-        return osRepository.findAll();
+        return osService.listarTodasAsOs(); // A mágica da segurança ativada!
     }
-
     @GetMapping("/{id}")
     public OrdemServico buscarPorId(@PathVariable Long id) {
         return osRepository.findById(id).orElseThrow(() -> new RuntimeException("OS não encontrada"));
