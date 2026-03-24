@@ -1,9 +1,12 @@
 package com.grandport.erp.modules.vendas.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.veiculo.model.Veiculo;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -12,7 +15,8 @@ import java.util.List;
 @Entity
 @Table(name = "vendas")
 @Data
-public class Venda {
+@EqualsAndHashCode(callSuper = true)
+public class Venda extends BaseEntityMultiEmpresa {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -36,7 +40,7 @@ public class Venda {
     @Enumerated(EnumType.STRING)
     private StatusVenda status = StatusVenda.CONCLUIDA;
 
-    @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<ItemVenda> itens = new ArrayList<>();
 
     private BigDecimal desconto = BigDecimal.ZERO;
@@ -46,12 +50,12 @@ public class Venda {
     @Column(columnDefinition = "TEXT")
     private String observacoes;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "venda_id")
     private List<PagamentoVenda> pagamentos = new ArrayList<>();
 
     // 🚀 ================= FISCAL =================
     // Mapeia que esta venda pode ter uma Nota Fiscal vinculada
-    @OneToOne(mappedBy = "venda", cascade = CascadeType.ALL)
+    @OneToOne(mappedBy = "venda", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private com.grandport.erp.modules.fiscal.model.NotaFiscal notaFiscal;
 }

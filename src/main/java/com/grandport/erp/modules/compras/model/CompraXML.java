@@ -1,16 +1,19 @@
 package com.grandport.erp.modules.compras.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "compras_xml")
 @Data
-public class CompraXML {
+@EqualsAndHashCode(callSuper = true)
+public class CompraXML extends BaseEntityMultiEmpresa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

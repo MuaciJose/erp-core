@@ -1,13 +1,17 @@
 package com.grandport.erp.modules.servicos.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.math.BigDecimal;
 
 @Entity
 @Table(name = "servicos_catalogo")
 @Data
-public class Servico {
+@EqualsAndHashCode(callSuper = true)
+public class Servico extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

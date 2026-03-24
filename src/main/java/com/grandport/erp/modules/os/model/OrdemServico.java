@@ -1,10 +1,13 @@
 package com.grandport.erp.modules.os.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.veiculo.model.Veiculo;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -13,7 +16,8 @@ import java.util.List;
 @Entity
 @Table(name = "ordens_servico")
 @Data
-public class OrdemServico {
+@EqualsAndHashCode(callSuper = true)
+public class OrdemServico extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -64,10 +68,10 @@ public class OrdemServico {
     private BigDecimal valorTotal = BigDecimal.ZERO;
 
     // --- ITENS ---
-    @OneToMany(mappedBy = "ordemServico", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "ordemServico", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OsItemPeca> itensPecas = new ArrayList<>();
 
-    @OneToMany(mappedBy = "ordemServico", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "ordemServico", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OsItemServico> itensServicos = new ArrayList<>();
 
     @Column(name = "data_envio_caixa")

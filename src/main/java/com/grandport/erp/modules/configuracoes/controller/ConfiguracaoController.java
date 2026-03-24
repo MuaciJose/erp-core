@@ -7,6 +7,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -23,12 +24,21 @@ public class ConfiguracaoController {
     private com.grandport.erp.modules.configuracoes.service.ManutencaoService manutencaoService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
     public ResponseEntity<ConfiguracaoSistema> obterConfig() {
         return ResponseEntity.ok(service.obterConfiguracao());
     }
 
     @PutMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
     public ResponseEntity<ConfiguracaoSistema> salvarConfig(@RequestBody ConfiguracaoSistema config) {
+        return ResponseEntity.ok(service.atualizarConfiguracao(config));
+    }
+
+    // 🆕 POST também funciona (alternativa ao PUT para compatibilidade)
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<ConfiguracaoSistema> salvarConfigPost(@RequestBody ConfiguracaoSistema config) {
         return ResponseEntity.ok(service.atualizarConfiguracao(config));
     }
 

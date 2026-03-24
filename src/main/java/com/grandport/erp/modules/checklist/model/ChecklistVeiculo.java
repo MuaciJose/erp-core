@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.checklist.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.veiculo.model.Veiculo;
@@ -8,11 +9,13 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "checklists_veiculo")
 @Data
-public class ChecklistVeiculo {
+@EqualsAndHashCode(callSuper = true)
+public class ChecklistVeiculo  extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -46,7 +49,7 @@ public class ChecklistVeiculo {
 
     // 🚀 O SISTEMA DE FOTOS OPCIONAIS (Pode ter 0, 1 ou 20 fotos)
     // O Hibernate vai criar uma tabela auxiliar "checklist_fotos" automaticamente no banco
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "checklist_fotos", joinColumns = @JoinColumn(name = "checklist_id"))
     @Column(name = "url_foto")
     private List<String> fotos = new ArrayList<>();

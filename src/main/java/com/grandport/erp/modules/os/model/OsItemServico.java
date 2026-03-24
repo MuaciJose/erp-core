@@ -1,16 +1,20 @@
 package com.grandport.erp.modules.os.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import com.grandport.erp.modules.servicos.model.Servico;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.math.BigDecimal;
 
 @Entity
 @Table(name = "os_itens_servicos")
 @Data
-public class OsItemServico {
+@EqualsAndHashCode(callSuper = true)
+public class OsItemServico extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -1,13 +1,16 @@
 package com.grandport.erp.modules.estoque.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "movimentacoes_estoque")
 @Data
-public class MovimentacaoEstoque {
+@EqualsAndHashCode(callSuper = true)
+public class MovimentacaoEstoque extends BaseEntityMultiEmpresa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

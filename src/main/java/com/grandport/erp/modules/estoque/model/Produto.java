@@ -5,10 +5,12 @@ import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "produtos")
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class Produto extends BaseEntityMultiEmpresa {
 
     @Id

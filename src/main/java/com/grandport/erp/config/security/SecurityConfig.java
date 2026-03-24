@@ -51,6 +51,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/financeiro/contas-a-pagar/relatorio-pdf").permitAll()
                         .requestMatchers("/api/financeiro/contas-a-receber/*/recibo-pdf").permitAll()
                         .requestMatchers("/api/financeiro/contas-a-receber/relatorio-pdf").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/assinaturas/nova-empresa").permitAll()
 
 
 

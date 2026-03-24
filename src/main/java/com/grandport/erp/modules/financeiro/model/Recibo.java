@@ -1,7 +1,10 @@
 package com.grandport.erp.modules.financeiro.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -9,7 +12,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "recibos_avulsos")
 @Data
-public class Recibo {
+@EqualsAndHashCode(callSuper = true)
+public class Recibo extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

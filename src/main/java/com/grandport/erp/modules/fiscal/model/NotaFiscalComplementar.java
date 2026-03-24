@@ -1,7 +1,10 @@
 package com.grandport.erp.modules.fiscal.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 
@@ -14,7 +17,8 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "notas_fiscais_complementares")
 @Data
-public class NotaFiscalComplementar {
+@EqualsAndHashCode(callSuper = true)
+public class NotaFiscalComplementar extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

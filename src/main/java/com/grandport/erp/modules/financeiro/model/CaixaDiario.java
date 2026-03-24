@@ -1,14 +1,18 @@
 package com.grandport.erp.modules.financeiro.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "caixa_diario")
 @Data
-public class CaixaDiario {
+@EqualsAndHashCode(callSuper = true)
+public class CaixaDiario extends BaseEntityMultiEmpresa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

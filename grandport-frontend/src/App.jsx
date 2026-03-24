@@ -14,6 +14,7 @@ import { PrevisaoCompras } from './modules/estoque/PrevisaoCompras';
 import { Parceiros } from './modules/cadastro/Parceiros';
 import { ImportarXml } from './modules/compras/ImportarXml';
 import { Login } from './modules/auth/Login';
+import CadastroEmpresa from './modules/auth/CadastroEmpresa'; // 🚀 IMPORTAÇÃO DA NOVA TELA AQUI
 import { CargaNcm } from './modules/admin/CargaNcm';
 import { RelatorioFaltas } from './modules/admin/RelatorioFaltas';
 import { ContasReceber } from './modules/financeiro/ContasReceber';
@@ -70,6 +71,9 @@ function App() {
     const [carregandoApp, setCarregandoApp] = useState(true);
     const [isFullScreen, setIsFullScreen] = useState(false);
 
+    // 🚀 NOVO ESTADO: Controla as telas antes do usuário logar
+    const [telaPublica, setTelaPublica] = useState('login');
+
     const definirTelaInicial = (usuario) => {
         const permissoes = usuario.permissoes || [];
         if (permissoes.includes('dash')) return 'dash';
@@ -119,11 +123,14 @@ function App() {
 
     if (carregandoApp) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white font-black tracking-widest">CARREGANDO GRANDPORT ERP...</div>;
 
+    // 🚀 O NOVO PÁTIO DE ENTRADA DO SAAS
     if (!usuarioLogado) {
-        return <Login onLoginSuccess={handleLoginSucesso} />;
+        if (telaPublica === 'cadastro') {
+            return <CadastroEmpresa onVoltarLogin={() => setTelaPublica('login')} />;
+        }
+        return <Login onLoginSuccess={handleLoginSucesso} onIrParaCadastro={() => setTelaPublica('cadastro')} />;
     }
 
-    // 🚀 Liberando as rotas extras (INCLUINDO O CHECKLIST) para acesso temporário/testes
     const permissoesExtra = ['revisoes', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual', 'checklist', 'inventario', 'estoque'];
     const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva) || permissoesExtra.includes(paginaAtiva);
 

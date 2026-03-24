@@ -1,7 +1,9 @@
 package com.grandport.erp.modules.fiscal.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.math.BigDecimal;
@@ -11,7 +13,8 @@ import java.math.BigDecimal;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class RegraFiscal {
+@EqualsAndHashCode(callSuper = true)
+public class RegraFiscal extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

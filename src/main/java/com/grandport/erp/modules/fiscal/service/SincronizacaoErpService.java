@@ -8,8 +8,11 @@ import com.grandport.erp.modules.fiscal.repository.NotaFiscalRepository;
 import com.grandport.erp.modules.vendas.model.StatusVenda;
 import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
+import com.grandport.erp.modules.usuario.model.Usuario;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +49,35 @@ public class SincronizacaoErpService {
 
     @Autowired
     private AuditoriaService auditoriaService;
+
+    // =========================================================================
+    // 🔐 MÉTODO AUXILIAR: Obter Empresa do Usuário Autenticado
+    // =========================================================================
+
+    /**
+     * 🆕 Obtém o ID da empresa do usuário atualmente autenticado
+     * Usado para isolamento de dados em sincronizações automáticas
+     * 
+     * Fallback para empresaId = 1L se não conseguir extrair
+     */
+    private Long obterEmpresaIdDoUsuarioAutenticado() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof Usuario) {
+                Usuario usuario = (Usuario) auth.getPrincipal();
+                Long empresaId = usuario.getEmpresaId();
+                if (empresaId != null && empresaId > 0) {
+                    System.out.println("🏢 Empresa do usuário: " + empresaId);
+                    return empresaId;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Erro ao extrair empresa do contexto: " + e.getMessage());
+        }
+        // Fallback seguro
+        System.out.println("🏢 Usando empresa padrão: 1L");
+        return 1L;
+    }
 
     // =========================================================================
     // 🔄 SINCRONIZAÇÃO DE SÉRIE/NÚMERO
@@ -303,5 +335,4 @@ public class SincronizacaoErpService {
         }
     }
 }
-
 

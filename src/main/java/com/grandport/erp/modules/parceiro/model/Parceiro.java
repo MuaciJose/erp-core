@@ -1,13 +1,17 @@
 package com.grandport.erp.modules.parceiro.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.math.BigDecimal;
 
 @Entity
 @Table(name = "parceiros")
 @Data
-public class Parceiro {
+@EqualsAndHashCode(callSuper = true)
+public class Parceiro extends BaseEntityMultiEmpresa {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 

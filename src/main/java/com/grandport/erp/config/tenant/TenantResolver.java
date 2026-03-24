@@ -11,23 +11,30 @@ public class TenantResolver implements CurrentTenantIdentifierResolver<Long> {
 
     @Override
     public Long resolveCurrentTenantIdentifier() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
-        // Se tem alguém logado, pegamos o ID da empresa do crachá dele
-        if (authentication != null && authentication.getPrincipal() instanceof Usuario) {
-            Usuario usuarioLogado = (Usuario) authentication.getPrincipal();
-            if (usuarioLogado.getEmpresaId() != null) {
-                return usuarioLogado.getEmpresaId();
+        if (auth != null && auth.getPrincipal() != null) {
+            Object principal = auth.getPrincipal();
+
+            // Verifica se o Spring Security guardou o usuário completo na sessão
+            if (principal instanceof Usuario) {
+                Usuario usuario = (Usuario) principal;
+                System.out.println("🟢 RADAR SAAS: Liberando dados da Empresa [" + usuario.getEmpresaId() + "] para o usuário: " + usuario.getUsername());
+
+                return usuario.getEmpresaId() != null ? usuario.getEmpresaId() : 1L;
+            } else {
+                // Se cair aqui, é porque o seu filtro de segurança está guardando só o Nome/String em vez do objeto Usuario!
+                System.out.println("🔴 ALERTA SAAS: O crachá está incompleto! Formato encontrado: " + principal.getClass().getName());
             }
         }
 
-        // Se for uma rota pública (como a tela de login) ou sistema Local (Monousuário)
-        // Definimos a Empresa 1 como padrão para não quebrar o sistema
-        return 1L;
+        return 1L; // Fallback de emergência
     }
 
     @Override
     public boolean validateExistingCurrentSessions() {
-        return true; // Garante que a empresa não mude no meio de uma transação do banco
+        // 🚀 ISTO DEVE SER FALSE EM APIS REST!
+        // Se for true, o Hibernate "decora" a Empresa 1 no momento que o servidor liga e nunca mais muda.
+        return false;
     }
 }

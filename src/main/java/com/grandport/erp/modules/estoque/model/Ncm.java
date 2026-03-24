@@ -1,13 +1,16 @@
 package com.grandport.erp.modules.estoque.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "ncms")
 @Data
-public class Ncm {
+@EqualsAndHashCode(callSuper = true)
+public class Ncm extends BaseEntityMultiEmpresa {
 
     @Id
     @Column(name = "codigo", length = 20)

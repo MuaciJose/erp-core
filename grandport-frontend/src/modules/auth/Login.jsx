@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import api from '../../api/axios';
+import api from '../../api/axios'; // Verifique se o caminho do seu axios está correto
 import { Lock, User, ShieldCheck, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
-export const Login = ({ onLoginSuccess }) => {
+export const Login = ({ onLoginSuccess, onIrParaCadastro }) => {
     const [credenciais, setCredenciais] = useState({ username: '', senha: '' });
     const [erro, setErro] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // 🚀 NOVO ESTADO: Controla a visibilidade da senha
+    // 🚀 ESTADO: Controla a visibilidade da senha
     const [mostrarSenha, setMostrarSenha] = useState(false);
 
     const handleChange = (e) => {
@@ -86,7 +86,6 @@ export const Login = ({ onLoginSuccess }) => {
                             <div className="relative flex items-center">
                                 <Lock className="absolute left-4 text-slate-400" size={20} />
 
-                                {/* 🚀 INPUT ATUALIZADO: Muda o type dinamicamente e tem pr-12 para dar espaço ao ícone */}
                                 <input
                                     type={mostrarSenha ? "text" : "password"}
                                     name="senha"
@@ -97,7 +96,6 @@ export const Login = ({ onLoginSuccess }) => {
                                     placeholder="••••••••"
                                 />
 
-                                {/* 🚀 BOTÃO DE VER SENHA */}
                                 <button
                                     type="button"
                                     onClick={() => setMostrarSenha(!mostrarSenha)}
@@ -117,6 +115,18 @@ export const Login = ({ onLoginSuccess }) => {
                     >
                         {loading ? 'AUTENTICANDO...' : 'ENTRAR NO ERP'} <ArrowRight size={20} />
                     </button>
+
+                    {/* 🚀 AQUI ENTRA A NOSSA NOVA ROTA PARA O CADASTRO SAAS */}
+                    <div className="mt-8 text-center border-t border-slate-100 pt-6">
+                        <p className="text-xs text-slate-500 font-medium mb-2">Ainda não usa nosso ERP?</p>
+                        <button
+                            type="button"
+                            onClick={onIrParaCadastro}
+                            className="text-blue-600 font-black hover:text-blue-800 transition-colors uppercase tracking-wider text-sm flex items-center justify-center gap-1 mx-auto bg-transparent border-none cursor-pointer"
+                        >
+                            Crie sua conta e teste agora <ArrowRight size={16} />
+                        </button>
+                    </div>
 
                     <p className="text-center text-xs text-slate-400 mt-6 font-medium">
                         Esqueceu a senha? Contate o administrador.

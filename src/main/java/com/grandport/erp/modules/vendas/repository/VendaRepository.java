@@ -44,4 +44,44 @@ public interface VendaRepository extends JpaRepository<Venda, Long> {
 
     @Query("SELECT v FROM Venda v WHERE v.status = 'CONCLUIDA' AND v.dataHora BETWEEN :inicio AND :fim ORDER BY v.vendedorNome, v.dataHora")
     List<Venda> buscarVendasParaRelatorio(LocalDateTime inicio, LocalDateTime fim);
+
+    // ============================================================================
+    // 🔐 NOVOS MÉTODOS COM FILTRO DE EMPRESA (Defesa em Profundidade - SEGURO!)
+    // ============================================================================
+
+    /**
+     * 🚀 Novo: Buscar todas as vendas de uma empresa específica
+     */
+    @Query("SELECT v FROM Venda v WHERE v.empresaId = :empresaId ORDER BY v.dataHora DESC")
+    List<Venda> findAllByEmpresa(@Param("empresaId") Long empresaId);
+
+    /**
+     * 🚀 Novo: Buscar vendas por status e empresa
+     */
+    @Query("SELECT v FROM Venda v WHERE v.status = :status AND v.empresaId = :empresaId ORDER BY v.dataHora DESC")
+    List<Venda> findByStatusAndEmpresa(@Param("status") StatusVenda status, @Param("empresaId") Long empresaId);
+
+    /**
+     * 🚀 Novo: Buscar vendas de um vendedor em uma empresa específica
+     */
+    @Query("SELECT v FROM Venda v WHERE v.vendedorId = :vendedorId AND v.empresaId = :empresaId ORDER BY v.dataHora DESC")
+    List<Venda> findByVendedorIdAndEmpresa(@Param("vendedorId") Long vendedorId, @Param("empresaId") Long empresaId);
+
+    /**
+     * 🚀 Novo: Somar vendas por período de uma empresa específica
+     */
+    @Query("SELECT SUM(v.valorTotal) FROM Venda v WHERE v.status = 'CONCLUIDA' AND v.dataHora BETWEEN :inicio AND :fim AND v.empresaId = :empresaId")
+    Optional<BigDecimal> sumTotalVendasPeriodoEmpresa(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim, @Param("empresaId") Long empresaId);
+
+    /**
+     * 🚀 Novo: Somar descontos por período de uma empresa específica
+     */
+    @Query("SELECT SUM(v.desconto) FROM Venda v WHERE v.status = 'CONCLUIDA' AND v.dataHora BETWEEN :inicio AND :fim AND v.empresaId = :empresaId")
+    Optional<BigDecimal> sumTotalDescontosPeriodoEmpresa(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim, @Param("empresaId") Long empresaId);
+
+    /**
+     * 🚀 Novo: Contar vendas por período de uma empresa específica
+     */
+    @Query("SELECT COUNT(v) FROM Venda v WHERE v.status = 'CONCLUIDA' AND v.dataHora BETWEEN :inicio AND :fim AND v.empresaId = :empresaId")
+    Long countVendasByDataEmpresa(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim, @Param("empresaId") Long empresaId);
 }

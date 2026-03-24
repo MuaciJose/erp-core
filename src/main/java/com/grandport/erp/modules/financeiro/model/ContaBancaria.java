@@ -1,13 +1,17 @@
 package com.grandport.erp.modules.financeiro.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.math.BigDecimal;
 
 @Entity
 @Table(name = "contas_bancarias")
 @Data
-public class ContaBancaria {
+@EqualsAndHashCode(callSuper = true)
+public class ContaBancaria  extends BaseEntityMultiEmpresa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

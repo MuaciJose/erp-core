@@ -234,10 +234,54 @@ public class FiscalController {
     @GetMapping("/testar-email")
     public ResponseEntity<?> verificarStatusEmail() {
         try {
-            emailFiscalService.testarConexaoEmail();
-            return ResponseEntity.ok(Map.of("status", "ONLINE", "mensagem", "E-mail OK"));
+            ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
+            
+            // Validação básica antes de testar
+            if (config.getEmailRemetente() == null || config.getEmailRemetente().isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                    "status", "NAO_CONFIGURADO",
+                    "configurado", false,
+                    "mensagem", "Email remetente não configurado",
+                    "detalhes", "Vá em Configurações > Integrações e preencha o campo 'Email Remetente'"
+                ));
+            }
+            
+            if (config.getSenhaEmailRemetente() == null || config.getSenhaEmailRemetente().isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                    "status", "NAO_CONFIGURADO",
+                    "configurado", false,
+                    "mensagem", "Senha de email não configurada",
+                    "detalhes", "Vá em Configurações > Integrações e preencha o campo 'Senha de Aplicativo'"
+                ));
+            }
+            
+            // Testar conexão
+            try {
+                emailFiscalService.testarConexaoEmail();
+                return ResponseEntity.ok(Map.of(
+                    "status", "OK",
+                    "configurado", true,
+                    "mensagem", "Conexão SMTP estabelecida com sucesso!",
+                    "email", config.getEmailRemetente(),
+                    "host", config.getSmtpHost() != null ? config.getSmtpHost() : "smtp.gmail.com"
+                ));
+            } catch (Exception emailError) {
+                return ResponseEntity.ok(Map.of(
+                    "status", "ERRO_CONEXAO",
+                    "configurado", true,
+                    "mensagem", "Falha ao conectar com servidor de email",
+                    "detalhes", emailError.getMessage(),
+                    "dicas", "1. Verifique se o email/senha estão corretos\n2. Ative a 'Senha de Aplicativo' se usar Gmail\n3. Verifique firewall/proxy"
+                ));
+            }
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("status", "ERRO", "mensagem", "Falha SMTP."));
+            System.err.println("❌ Erro ao testar email: " + e.getMessage());
+            return ResponseEntity.ok(Map.of(
+                "status", "ERRO_SISTEMA",
+                "configurado", false,
+                "mensagem", "Erro ao carregar configurações",
+                "detalhes", e.getMessage()
+            ));
         }
     }
 

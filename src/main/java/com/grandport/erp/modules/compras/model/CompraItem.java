@@ -1,14 +1,17 @@
 package com.grandport.erp.modules.compras.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "compras_xml_itens")
 @Data
-public class CompraItem {
+@EqualsAndHashCode(callSuper = true)
+public class CompraItem extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

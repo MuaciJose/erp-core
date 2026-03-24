@@ -1,13 +1,17 @@
 package com.grandport.erp.modules.vendas.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "vendas_perdidas")
 @Data
-public class VendaPerdida {
+@EqualsAndHashCode(callSuper = true)
+public class VendaPerdida extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

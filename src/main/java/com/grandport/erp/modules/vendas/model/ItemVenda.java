@@ -2,8 +2,10 @@ package com.grandport.erp.modules.vendas.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.grandport.erp.modules.estoque.model.Produto;
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
@@ -14,7 +16,8 @@ import java.math.BigDecimal;
 @Data
 @NoArgsConstructor
 @ToString(exclude = "venda") // Evita recursão no toString
-public class ItemVenda {
+@EqualsAndHashCode(callSuper = true)
+public class ItemVenda extends BaseEntityMultiEmpresa {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 

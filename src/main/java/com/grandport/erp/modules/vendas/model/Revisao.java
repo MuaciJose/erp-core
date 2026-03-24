@@ -1,12 +1,16 @@
 package com.grandport.erp.modules.vendas.model;
 
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
+
 import java.time.LocalDate;
 
 @Entity
 @Table(name = "revisoes_crm")
-public class Revisao {
+@EqualsAndHashCode(callSuper = true)
+public class Revisao extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

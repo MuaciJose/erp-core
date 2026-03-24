@@ -1,11 +1,13 @@
 package com.grandport.erp.modules.parceiro.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.Embeddable;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Embeddable
 @Data
-public class Endereco {
+public class Endereco  {
     private String cep;
     private String logradouro;
     private String bairro;

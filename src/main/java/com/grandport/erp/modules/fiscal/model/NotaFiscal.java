@@ -2,7 +2,10 @@ package com.grandport.erp.modules.fiscal.model;
 
 // ⚠️ ATENÇÃO: Ajuste este import para apontar para a sua classe de Orçamento/Pedido real
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import com.grandport.erp.modules.vendas.model.Venda;
+import lombok.EqualsAndHashCode;
+
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -11,7 +14,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "notas_fiscais")
 @Data
-public class NotaFiscal {
+@EqualsAndHashCode(callSuper = true)
+public class NotaFiscal extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,7 +40,7 @@ public class NotaFiscal {
     private LocalDateTime dataEmissao = LocalDateTime.now();
 
     // 🚀 RELACIONAMENTO: Uma Nota Fiscal pertence a 1 único Pedido
-    @OneToOne
+    @OneToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "pedido_id", unique = true, nullable = true)
     @JsonIgnore // java nã entrar no loop
     private Venda venda;

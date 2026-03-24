@@ -1,13 +1,17 @@
 package com.grandport.erp.modules.financeiro.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @MappedSuperclass
 @Data
-public abstract class Conta {
+@EqualsAndHashCode(callSuper = true)
+public abstract class Conta  extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

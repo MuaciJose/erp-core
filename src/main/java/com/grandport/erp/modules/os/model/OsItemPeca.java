@@ -2,14 +2,18 @@ package com.grandport.erp.modules.os.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.grandport.erp.modules.estoque.model.Produto;
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.math.BigDecimal;
 
 @Entity
 @Table(name = "os_itens_pecas")
 @Data
-public class OsItemPeca {
+@EqualsAndHashCode(callSuper = true)
+public class OsItemPeca extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

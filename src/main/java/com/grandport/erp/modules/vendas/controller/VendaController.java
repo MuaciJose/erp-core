@@ -76,11 +76,31 @@ public class VendaController {
     public ResponseEntity<Venda> criarPedido(@RequestBody VendaRequestDTO dto) {
         return ResponseEntity.ok(service.criarPedido(dto));
     }
-
     @PostMapping("/{id}/pagar")
-    public ResponseEntity<Venda> finalizarPagamento(@PathVariable Long id, @RequestBody List<PagamentoVendaDTO> pagamentos) {
-        Venda vendaPaga = service.finalizarPagamentoPedido(id, pagamentos);
-        return ResponseEntity.ok(vendaPaga);
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CAIXA', 'VENDEDOR')")
+    public ResponseEntity<?> finalizarPagamento(@PathVariable Long id, @RequestBody List<Map<String, Object>> payload) {
+        try {
+            // 🚀 O AMORTECEDOR: Converte os dados do React ignorando qualquer campo "intruso" (como cpfConsumidorFinal)
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+            // Converte a lista segura para o seu DTO original
+            List<PagamentoVendaDTO> pagamentos = mapper.convertValue(
+                    payload,
+                    new com.fasterxml.jackson.core.type.TypeReference<List<PagamentoVendaDTO>>() {}
+            );
+
+            // Envia para o Service processar a baixa no caixa
+            Venda vendaPaga = service.finalizarPagamentoPedido(id, pagamentos);
+
+            return ResponseEntity.ok(vendaPaga);
+
+        } catch (Exception e) {
+            // Removemos o print do Back-end e enviamos direto para o Front-end
+            // usando a chave "message" que o Axios/Toast do React sabe ler!
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", e.getMessage()));
+        }
     }
 
     @PostMapping("/{id}/devolver")

@@ -1,17 +1,20 @@
 package com.grandport.erp.modules.configuracoes.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "configuracoes_sistema")
 @Data
-public class ConfiguracaoSistema {
+@EqualsAndHashCode(callSuper = true)
+public class ConfiguracaoSistema extends BaseEntityMultiEmpresa {
 
-    @Id
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id = 1L;
 
     // ================= DADOS DA EMPRESA =================
@@ -108,7 +111,7 @@ public class ConfiguracaoSistema {
     private String horarioBackupAuto = "03:00";
 
     // ================= VENDEDORES E COMISSÕES =================
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
             name = "configuracao_vendedores_comissao",
             joinColumns = @JoinColumn(name = "configuracao_id")

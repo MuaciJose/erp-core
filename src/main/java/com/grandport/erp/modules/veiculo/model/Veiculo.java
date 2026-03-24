@@ -1,13 +1,16 @@
 package com.grandport.erp.modules.veiculo.model;
 
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "veiculos")
 @Data
-public class Veiculo {
+@EqualsAndHashCode(callSuper = true)
+public class Veiculo extends BaseEntityMultiEmpresa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

@@ -83,54 +83,23 @@ public class ConfiguracaoService {
         return config;
     }
 
+    @Transactional
     public ConfiguracaoSistema atualizarConfiguracao(ConfiguracaoSistema dadosAtualizados) {
 
+        // 1. Busca a configuração da empresa atual (ou cria uma nova se não existir)
         ConfiguracaoSistema configBanco = repository.findById(1L).orElseGet(ConfiguracaoSistema::new);
-        configBanco.setId(1L); // Garante que o ID é sempre 1
 
-        // Copiamos os dados básicos (só se não vierem nulos)
-        if (dadosAtualizados.getNomeFantasia() != null) configBanco.setNomeFantasia(dadosAtualizados.getNomeFantasia());
-        if (dadosAtualizados.getRazaoSocial() != null) configBanco.setRazaoSocial(dadosAtualizados.getRazaoSocial());
-        if (dadosAtualizados.getCnpj() != null) configBanco.setCnpj(dadosAtualizados.getCnpj());
-        if (dadosAtualizados.getTelefone() != null) configBanco.setTelefone(dadosAtualizados.getTelefone());
-        if (dadosAtualizados.getEndereco() != null) configBanco.setEndereco(dadosAtualizados.getEndereco());
-        if (dadosAtualizados.getMensagemRodape() != null) configBanco.setMensagemRodape(dadosAtualizados.getMensagemRodape());
+        // 2. Opcional: Salvar o ID para não perder na cópia
+        Long idOriginal = configBanco.getId();
 
-        // Copiamos a Logo
-        if (dadosAtualizados.getLogoBase64() != null) configBanco.setLogoBase64(dadosAtualizados.getLogoBase64());
+        // 🚀 3. A MÁGICA: Copia TODOS os campos (Logradouro, E-mail, TUDO) do objeto novo para o do banco.
+        // O terceiro parâmetro ("id") diz para o copiador ignorar o ID, para não quebrar o banco de dados.
+        org.springframework.beans.BeanUtils.copyProperties(dadosAtualizados, configBanco, "id");
 
-        // Copiamos as configurações fiscais/sistema
-        if (dadosAtualizados.getHorarioBackupAuto() != null) configBanco.setHorarioBackupAuto(dadosAtualizados.getHorarioBackupAuto());
-        if (dadosAtualizados.getSerieNfe() != null) configBanco.setSerieNfe(dadosAtualizados.getSerieNfe());
-        if (dadosAtualizados.getNumeroProximaNfe() != null) configBanco.setNumeroProximaNfe(dadosAtualizados.getNumeroProximaNfe());
-        if (dadosAtualizados.getSerieNfce() != null) configBanco.setSerieNfce(dadosAtualizados.getSerieNfce());
-        if (dadosAtualizados.getNumeroProximaNfce() != null) configBanco.setNumeroProximaNfce(dadosAtualizados.getNumeroProximaNfce());
-        if (dadosAtualizados.getCscIdToken() != null) configBanco.setCscIdToken(dadosAtualizados.getCscIdToken());
-        if (dadosAtualizados.getCscCodigo() != null) configBanco.setCscCodigo(dadosAtualizados.getCscCodigo());
+        // Garante que o ID continua o mesmo
+        configBanco.setId(idOriginal != null ? idOriginal : 1L);
 
-        // =======================================================================
-        // 🚀 INTEGRAÇÃO WHATSAPP (Mapeamento que estava faltando!)
-        // =======================================================================
-        if (dadosAtualizados.getWhatsappToken() != null) configBanco.setWhatsappToken(dadosAtualizados.getWhatsappToken());
-        if (dadosAtualizados.getWhatsappApiUrl() != null) configBanco.setWhatsappApiUrl(dadosAtualizados.getWhatsappApiUrl());
-        if (dadosAtualizados.getWhatsappInstancia() != null) configBanco.setWhatsappInstancia(dadosAtualizados.getWhatsappInstancia());
-        if (dadosAtualizados.getMensagemWhatsapp() != null) configBanco.setMensagemWhatsapp(dadosAtualizados.getMensagemWhatsapp());
-
-
-        // 🚀 AQUI NÓS SALVAMOS TODOS OS LAYOUTS DE IMPRESSÃO
-        if (dadosAtualizados.getLayoutHtmlOs() != null) configBanco.setLayoutHtmlOs(dadosAtualizados.getLayoutHtmlOs());
-        if (dadosAtualizados.getLayoutHtmlVenda() != null) configBanco.setLayoutHtmlVenda(dadosAtualizados.getLayoutHtmlVenda());
-        if (dadosAtualizados.getLayoutHtmlRelatorioComissao() != null) configBanco.setLayoutHtmlRelatorioComissao(dadosAtualizados.getLayoutHtmlRelatorioComissao());
-        if (dadosAtualizados.getLayoutHtmlFechamentoCaixa() != null) configBanco.setLayoutHtmlFechamentoCaixa(dadosAtualizados.getLayoutHtmlFechamentoCaixa());
-        if (dadosAtualizados.getLayoutHtmlEspelhoNota() != null) configBanco.setLayoutHtmlEspelhoNota(dadosAtualizados.getLayoutHtmlEspelhoNota());
-        if (dadosAtualizados.getLayoutHtmlDre() != null) configBanco.setLayoutHtmlDre(dadosAtualizados.getLayoutHtmlDre());
-        if (dadosAtualizados.getLayoutHtmlRecibo() != null) configBanco.setLayoutHtmlRecibo(dadosAtualizados.getLayoutHtmlRecibo());
-
-        // 🚀 AS DUAS LINHAS MÁGICAS QUE ESTAVAM FALTANDO:
-        if (dadosAtualizados.getLayoutHtmlReciboPagamento() != null) configBanco.setLayoutHtmlReciboPagamento(dadosAtualizados.getLayoutHtmlReciboPagamento());
-        if (dadosAtualizados.getLayoutHtmlRelatorioContasPagar() != null) configBanco.setLayoutHtmlRelatorioContasPagar(dadosAtualizados.getLayoutHtmlRelatorioContasPagar());
-        if (dadosAtualizados.getLayoutHtmlRelatorioContasReceber() != null) configBanco.setLayoutHtmlRelatorioContasReceber(dadosAtualizados.getLayoutHtmlRelatorioContasReceber());
-
+        // 4. Salva no banco e reagenda o backup
         ConfiguracaoSistema salva = repository.save(configBanco);
         reagendarBackup();
 
@@ -139,7 +108,6 @@ public class ConfiguracaoService {
 
         return salva;
     }
-
     // =======================================================================
     // 🔐 UPLOAD DO CERTIFICADO DIGITAL (Salvando pelo CNPJ)
     // =======================================================================
