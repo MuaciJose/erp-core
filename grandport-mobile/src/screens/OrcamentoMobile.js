@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
-import { Audio } from 'expo-av'; // 🚀 1. RECRUTANDO O MOTOR DE ÁUDIO
+import { useAudioPlayer } from 'expo-audio'; // 🚀 1. NOVO MOTOR DE ÁUDIO RECRUTADO
 import api from '../api/axios';
 
 export default function OrcamentoMobile({ onVoltar }) {
@@ -31,35 +31,15 @@ export default function OrcamentoMobile({ onVoltar }) {
     const [permissao, pedirPermissao] = useCameraPermissions();
     const [cameraAtiva, setCameraAtiva] = useState(false);
 
-    // 🚀 2. ESTADO PARA O SOM DO BIP
-    const [somBip, setSomBip] = useState();
-
     // ============================================================================
-    // 🔊 MOTOR DE ÁUDIO (CARREGAMENTO E DISPARO)
+    // 🔊 NOVO MOTOR DE ÁUDIO (EXPO-AUDIO)
     // ============================================================================
-    async function carregarSom() {
-        try {
-            const { sound } = await Audio.Sound.createAsync(
-                require('../../assets/bip.mp3') // Certifique-se que o arquivo existe nesta pasta!
-            );
-            setSomBip(sound);
-        } catch (error) {
-            console.log("Erro ao carregar áudio:", error);
-        }
-    }
+    const playerBip = useAudioPlayer(require('../../assets/bip.mp3'));
 
-    async function tocarBip() {
-        if (somBip) {
-            await somBip.replayAsync(); // Toca instantaneamente ao bipar
-        }
-    }
-
-    useEffect(() => {
-        carregarSom();
-        return () => {
-            if (somBip) somBip.unloadAsync(); // Descarrega ao sair da tela
-        };
-    }, []);
+    const tocarBip = () => {
+        playerBip.seekTo(0);
+        playerBip.play();
+    };
 
     // ============================================================================
     // 👤 BUSCA INTELIGENTE DE CLIENTES
@@ -167,7 +147,7 @@ export default function OrcamentoMobile({ onVoltar }) {
             const prod = lista.find(p => p.codigoBarras === data || p.sku === data);
 
             if (prod) {
-                await tocarBip(); // 🚀 3. TOCAR BIP AO ENCONTRAR NO SCANNER!
+                tocarBip(); // 🚀 2. TOCA O BIP AO ENCONTRAR NO SCANNER!
                 adicionarAoCarrinho(prod);
             } else {
                 Toast.show({ type: 'error', text1: 'Peça não encontrada!' });
@@ -516,16 +496,26 @@ export default function OrcamentoMobile({ onVoltar }) {
                             </TouchableOpacity>
                         </View>
 
-                        <View style={styles.modalInputBox}>
-                            <Feather name="search" size={20} color="#94a3b8" />
-                            <TextInput
-                                style={styles.modalInput}
-                                placeholder="Digite o nome ou CPF do cliente..."
-                                value={buscaCliente}
-                                onChangeText={setBuscaCliente}
-                                autoFocus
-                            />
-                            {buscandoCliente && <ActivityIndicator size="small" color="#ca8a04" />}
+                        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 15}}>
+                            <View style={[styles.modalInputBox, {flex: 1, marginBottom: 0}]}>
+                                <Feather name="search" size={20} color="#94a3b8" />
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="Digite o nome ou CPF do cliente..."
+                                    value={buscaCliente}
+                                    onChangeText={setBuscaCliente}
+                                    autoFocus
+                                />
+                                {buscandoCliente && <ActivityIndicator size="small" color="#ca8a04" />}
+                            </View>
+
+                            {/* 🚀 BOTÃO PARA CRIAR CLIENTE NOVO NA HORA */}
+                            <TouchableOpacity
+                                onPress={() => { setModalCliente(false); /* Aqui você pode acionar uma rota se quiser */ }}
+                                style={{backgroundColor: '#ca8a04', padding: 15, borderRadius: 16}}
+                            >
+                                <Feather name="user-plus" size={20} color="#fff" />
+                            </TouchableOpacity>
                         </View>
 
                         <ScrollView style={styles.modalLista} keyboardShouldPersistTaps="handled">

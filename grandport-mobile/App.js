@@ -6,7 +6,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import Login from './src/screens/Login';
 import Dashboard from './src/screens/Dashboard';
-// 🚀 CORREÇÃO 1: Tirei as chaves {} da importação!
 import Inventario from './src/screens/Inventario';
 import CadastroProduto from './src/screens/CadastroProduto';
 import Produtos from './src/screens/Produtos';
@@ -15,6 +14,8 @@ import OrcamentoMobile from './src/screens/OrcamentoMobile';
 import RecebimentoMercadoria from './src/screens/RecebimentoMercadoria';
 import SeparacaoPedidos from './src/screens/SeparacaoPedidos';
 import GestaoVendas from './src/screens/GestaoVendas';
+import Parceiros from './src/screens/Parceiros';
+import ChecklistMobile from './src/screens/ChecklistMobile';
 
 export default function App() {
   const [carregando, setCarregando] = useState(true);
@@ -41,11 +42,14 @@ export default function App() {
         {telaAtual === 'dashboard' && (
             <Dashboard
                 onNavigate={(tela) => setTelaAtual(tela)}
-                onLogout={() => setTelaAtual('login')}
+                onLogout={() => {
+                  // Limpa o token ao sair para garantir segurança
+                  AsyncStorage.removeItem('grandport_token');
+                  setTelaAtual('login');
+                }}
             />
         )}
 
-        {/* 🚀 CORREÇÃO 2: Mudei o nome da propriedade para 'onVoltar' */}
         {telaAtual === 'inventario' && (
             <Inventario onVoltar={() => setTelaAtual('dashboard')} />
         )}
@@ -70,12 +74,21 @@ export default function App() {
             <RecebimentoMercadoria onVoltar={() => setTelaAtual('dashboard')} />
         )}
 
-        {telaAtual === 'picking' && (
+        {/* 🚀 CORREÇÃO DO COMUNICADOR: Mudado de 'picking' para 'separacao' */}
+        {telaAtual === 'separacao' && (
             <SeparacaoPedidos onVoltar={() => setTelaAtual('dashboard')} />
         )}
 
         {telaAtual === 'vendas' && (
             <GestaoVendas onVoltar={() => setTelaAtual('dashboard')} onNavigate={setTelaAtual} />
+        )}
+
+        {telaAtual === 'parceiros' && (
+            <Parceiros onVoltar={() => setTelaAtual('dashboard')} />
+        )}
+
+        {telaAtual === 'checklist' && (
+            <ChecklistMobile onVoltar={() => setTelaAtual('dashboard')} />
         )}
 
         <StatusBar style="auto" />

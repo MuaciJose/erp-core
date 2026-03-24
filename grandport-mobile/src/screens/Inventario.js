@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Audio } from 'expo-av'; // 🚀 1. RECRUTANDO O MOTOR DE ÁUDIO
+import { useAudioPlayer } from 'expo-audio'; // 🚀 1. NOVO MOTOR DE ÁUDIO RECRUTADO
 import api from '../api/axios';
 
 export default function Inventario({ onVoltar }) {
@@ -16,33 +16,15 @@ export default function Inventario({ onVoltar }) {
     const [produtoEncontrado, setProdutoEncontrado] = useState(null);
     const [novaQuantidade, setNovaQuantidade] = useState('');
 
-    // 🚀 2. ESTADO PARA O SOM DO BIP
-    const [somBip, setSomBip] = useState();
+    // ============================================================================
+    // 🔊 NOVO MOTOR DE ÁUDIO (EXPO-AUDIO)
+    // ============================================================================
+    const playerBip = useAudioPlayer(require('../../assets/bip.mp3'));
 
-    // 🚀 3. CARREGAR O SOM AO ABRIR A TELA (EVITA DELAY)
-    async function carregarSom() {
-        try {
-            const { sound } = await Audio.Sound.createAsync(
-                require('../../assets/bip.mp3') // Certifique-se que o arquivo existe nesta pasta!
-            );
-            setSomBip(sound);
-        } catch (error) {
-            console.log("Erro ao carregar áudio:", error);
-        }
-    }
-
-    async function tocarBip() {
-        if (somBip) {
-            await somBip.replayAsync(); // Toca instantaneamente
-        }
-    }
-
-    useEffect(() => {
-        carregarSom();
-        return () => {
-            if (somBip) somBip.unloadAsync(); // Descarrega ao sair
-        };
-    }, []);
+    const tocarBip = () => {
+        playerBip.seekTo(0);
+        playerBip.play();
+    };
 
     // ============================================================================
     // 🔍 MOTOR DE BUSCA (BIPAGEM OU MANUAL)
@@ -60,7 +42,7 @@ export default function Inventario({ onVoltar }) {
             const prod = lista.find(p => p.codigoBarras === codigo || p.sku === codigo || p.referenciaOriginal === codigo);
 
             if (prod) {
-                await tocarBip(); // 🚀 4. TOCAR BIP AO ENCONTRAR!
+                tocarBip(); // 🚀 2. TOCA O BIP ASSIM QUE ACHAR A PEÇA!
                 setProdutoEncontrado(prod);
                 setNovaQuantidade(prod.quantidadeEstoque?.toString() || '0');
                 Toast.show({ type: 'success', text1: 'Peça Localizada!' });

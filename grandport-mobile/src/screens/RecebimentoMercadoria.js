@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
-import { Audio } from 'expo-av'; // 🚀 1. RECRUTANDO O MOTOR DE ÁUDIO
+import { useAudioPlayer } from 'expo-audio'; // 🚀 1. NOVO MOTOR DE ÁUDIO RECRUTADO
 import api from '../api/axios';
 
 export default function RecebimentoMercadoria({ onVoltar }) {
@@ -18,35 +18,15 @@ export default function RecebimentoMercadoria({ onVoltar }) {
     const [permissao, pedirPermissao] = useCameraPermissions();
     const [cameraAtiva, setCameraAtiva] = useState(false);
 
-    // 🚀 2. ESTADO DO SOM DO BIP
-    const [somBip, setSomBip] = useState();
-
     // ============================================================================
-    // 🔊 MOTOR DE ÁUDIO (CARREGAMENTO E DISPARO)
+    // 🔊 NOVO MOTOR DE ÁUDIO (EXPO-AUDIO)
     // ============================================================================
-    async function carregarSom() {
-        try {
-            const { sound } = await Audio.Sound.createAsync(
-                require('../../assets/bip.mp3') // Certifique-se que o arquivo existe nesta pasta!
-            );
-            setSomBip(sound);
-        } catch (error) {
-            console.log("Erro ao carregar áudio:", error);
-        }
-    }
+    const playerBip = useAudioPlayer(require('../../assets/bip.mp3'));
 
-    async function tocarBip() {
-        if (somBip) {
-            await somBip.replayAsync(); // Toca instantaneamente
-        }
-    }
-
-    useEffect(() => {
-        carregarSom();
-        return () => {
-            if (somBip) somBip.unloadAsync(); // Limpa a memória ao sair da tela
-        };
-    }, []);
+    const tocarBip = () => {
+        playerBip.seekTo(0);
+        playerBip.play();
+    };
 
     // ============================================================================
     // 🔍 BUSCA DE PRODUTOS PARA ADICIONAR AO LOTE
@@ -81,7 +61,7 @@ export default function RecebimentoMercadoria({ onVoltar }) {
             const prod = lista.find(p => p.codigoBarras === data || p.sku === data);
 
             if (prod) {
-                await tocarBip(); // 🚀 3. TOCA O BIP AO LER A CAIXA!
+                tocarBip(); // 🚀 2. TOCA O BIP AO LER A CAIXA!
                 adicionarAoLote(prod);
             } else {
                 Toast.show({ type: 'error', text1: 'Peça não encontrada no sistema!' });
@@ -235,7 +215,7 @@ export default function RecebimentoMercadoria({ onVoltar }) {
                     <View style={styles.resultadosBox}>
                         {resultados.slice(0, 4).map(prod => (
                             <TouchableOpacity key={prod.id} style={styles.itemResultado} onPress={() => {
-                                tocarBip(); // 🚀 4. TOCA O BIP AO ESCOLHER DA LISTA!
+                                tocarBip(); // 🚀 3. TOCA O BIP AO ESCOLHER DA LISTA!
                                 adicionarAoLote(prod);
                             }}>
                                 <View style={{flex: 1}}>
