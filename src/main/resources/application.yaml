@@ -16,6 +16,7 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        tenant_identifier_resolver: com.grandport.erp.config.tenant.TenantResolver # 🚀 MOTOR DO MULTI-EMPRESA (SAAS) ATIVADO AQUI:
 
   flyway:
     enabled: true

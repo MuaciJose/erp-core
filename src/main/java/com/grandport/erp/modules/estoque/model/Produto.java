@@ -1,6 +1,7 @@
 package com.grandport.erp.modules.estoque.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.grandport.erp.modules.multiEmpresa.BaseEntityMultiEmpresa;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -8,7 +9,7 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "produtos")
 @Data
-public class Produto {
+public class Produto extends BaseEntityMultiEmpresa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
