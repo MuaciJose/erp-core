@@ -28,12 +28,12 @@ public class AssinaturaService {
     public Empresa registarNovaEmpresa(NovaEmpresaDTO dto) {
         // 1. Validação Tática
         if (empresaRepository.existsByCnpj(dto.cnpj())) {
-            throw new RuntimeException("Operação Negada: Já existe uma empresa registada com este CNPJ.");
+            throw new RuntimeException("Operação Negada: Já existe uma empresa registrada com este CNPJ.");
         }
 
         // 🚀 Verificação direta para nulo (sem o isPresent)
         if (usuarioRepository.findByUsername(dto.emailAdmin()) != null) {
-            throw new RuntimeException("Operação Negada: Este login/e-mail já está em uso por outro utilizador.");
+            throw new RuntimeException("Operação Negada: Este login/e-mail já está em uso por outro usuário.");
         }
 
         // 2. Cria o Quartel-General (A Empresa)
@@ -45,10 +45,9 @@ public class AssinaturaService {
 
         Empresa empresaSalva = empresaRepository.save(empresa);
 
-        // 3. Cria o General (O Utilizador Admin da nova empresa)
+        // 3. Cria o General (O Usuário Admin da nova empresa)
         Usuario admin = new Usuario();
 
-        // 🚀 CORREÇÕES 2 e 3: Usando os métodos exatos da sua classe Usuario
         admin.setNomeCompleto(dto.nomeAdmin());
         admin.setUsername(dto.emailAdmin()); // Onde vai ficar salvo o e-mail de login
         admin.setSenha(passwordEncoder.encode(dto.senhaAdmin()));
@@ -56,8 +55,15 @@ public class AssinaturaService {
         // O motor do SaaS ativado
         admin.setEmpresaId(empresaSalva.getId());
 
-        // Dá o crachá de acesso total ao dono
-        admin.setPermissoes(List.of("dash", "vendas", "estoque", "financeiro", "caixa", "usuarios", "configuracoes"));
+        // 🚀 O ARSENAL COMPLETO: Dá o crachá de acesso total absoluto ao dono da nova empresa!
+        admin.setPermissoes(java.util.Arrays.asList(
+                "dash", "pdv", "vendas", "orcamentos", "fila-caixa", "caixa", "relatorio-comissoes",
+                "estoque", "marcas", "ajuste_estoque", "compras", "previsao", "faltas",
+                "contas-pagar", "contas-receber", "bancos", "conciliacao", "plano-contas", "dre",
+                "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes", "calculadora", "recibo-avulso","historico-recibos","ncm", "whatsapp",
+                "backup","regras-fiscais","categorias","gerenciador-nfe","emitir-nfe-avulsa","manual","revisoes","crm","etiquetas",
+                "os","servicos","listagem-os","checklist","curva-abc"
+        ));
 
         usuarioRepository.save(admin);
 
