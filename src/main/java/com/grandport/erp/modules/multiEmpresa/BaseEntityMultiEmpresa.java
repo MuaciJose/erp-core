@@ -12,8 +12,8 @@ import org.hibernate.annotations.TenantId;
 public abstract class BaseEntityMultiEmpresa {
 
     @TenantId
-    // 🚀 A MÁGICA AQUI: Diz pro banco colocar "1" em tudo que já existe!
-    @Column(name = "empresa_id", nullable = false, columnDefinition = "bigint default 1")
-    private Long empresaId = 1L;
+    // 🔐 CRÍTICO: Sem valor padrão! Força que empresaId seja explicitamente atribuído
+    @Column(name = "empresa_id", nullable = false, columnDefinition = "bigint")
+    private Long empresaId;
 
 }

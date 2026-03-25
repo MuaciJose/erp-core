@@ -22,8 +22,8 @@ public class Usuario implements UserDetails {
     private Long id;
 
     // 🚀 A MESMA MÁGICA PARA OS USUÁRIOS
-    @Column(name = "empresa_id", nullable = false, columnDefinition = "bigint default 1")
-    private Long empresaId = 1L;// Colocamos 1 como padrão para não quebrar os usuários que você já tem cadastrados
+    @Column(name = "empresa_id", nullable = false)
+    private Long empresaId;  // SEM valor padrão - força carregar do banco
 
     @Column(unique = true, nullable = false)
     private String username;

@@ -320,7 +320,7 @@ public class VendaService {
     }
 
     // =========================================================================
-    // 💰 FINALIZAÇÃO E FATURAMENTO
+    // 💰 FINALIZAÇÃO E FATURAMENTO (AGORA COM CARTÃO INTELIGENTE)
     // =========================================================================
     @Transactional
     public Venda finalizarPagamentoPedido(Long vendaId, List<PagamentoVendaDTO> pagamentos) {
@@ -337,11 +337,22 @@ public class VendaService {
             pagamento.setParcelas(pagDTO.parcelas());
             venda.getPagamentos().add(pagamento);
 
-            if ("A_PRAZO".equals(pagDTO.metodo()) || "PROMISSORIA".equals(pagDTO.metodo())) {
+            // 🚀 O EXTRATOR INTELIGENTE
+            String metodoStr = pagDTO.metodo() != null ? pagDTO.metodo().toUpperCase() : "DINHEIRO";
+
+            // 🚀 ADICIONAMOS O "FIADO" AQUI NA BLINDAGEM:
+            if ("A_PRAZO".equals(metodoStr) || "PROMISSORIA".equals(metodoStr) || "FIADO".equals(metodoStr)) {
+                // 1. CLIENTE FICA DEVENDO
                 processarVendaAPrazo(venda, venda.getCliente() != null ? venda.getCliente().getId() : null, pagDTO.parcelas());
+
+            } else if (metodoStr.contains("CARTAO") || metodoStr.contains("CREDITO")) {
+                // 2. MAQUININHA FICA DEVENDO (Conta a Receber do Cartão)
+                financeiroService.gerarContaReceberCartao(pagDTO.valor(), pagDTO.parcelas(), venda.getCliente(), "Venda #" + venda.getId());
+
             } else {
+                // 3. DINHEIRO ou PIX (Entrada direta no caixa/conta corrente)
                 caixaService.adicionarVendaAoCaixa(pagDTO.metodo(), pagDTO.valor());
-                financeiroService.registrarEntradaImediata(pagDTO.valor(), pagDTO.metodo());
+                financeiroService.registrarEntradaImediata(pagDTO.valor(), "Venda #" + venda.getId() + " - " + pagDTO.metodo());
             }
         }
 

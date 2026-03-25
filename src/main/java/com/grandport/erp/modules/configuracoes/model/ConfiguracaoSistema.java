@@ -14,8 +14,10 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class ConfiguracaoSistema extends BaseEntityMultiEmpresa {
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id = 1L;
+    @Id 
+    @GeneratedValue(strategy = GenerationType.IDENTITY, generator = "configuracoes_sistema_id_seq")
+    @SequenceGenerator(name = "configuracoes_sistema_id_seq", sequenceName = "configuracoes_sistema_id_seq", allocationSize = 1)
+    private Long id;  // 🔐 Cada empresa terá suas próprias configs com IDs auto-gerados
 
     // ================= DADOS DA EMPRESA =================
     private String nomeFantasia = "Minha Autopeças";

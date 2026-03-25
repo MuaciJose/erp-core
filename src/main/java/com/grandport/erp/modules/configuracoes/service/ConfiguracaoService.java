@@ -4,7 +4,10 @@ import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
 // 🚀 1. IMPORTAÇÃO DA AUDITORIA
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+import com.grandport.erp.modules.usuario.model.Usuario;
 import jakarta.annotation.PostConstruct;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
@@ -62,17 +65,15 @@ public class ConfiguracaoService {
     }
 
     public ConfiguracaoSistema obterConfiguracao() {
-        ConfiguracaoSistema config = repository.findById(1L).orElseGet(() -> {
-            ConfiguracaoSistema configPadrao = new ConfiguracaoSistema();
-            configPadrao.setId(1L);
-            configPadrao.setHorarioBackupAuto("03:00");
-            configPadrao.setSerieNfe(1);
-            configPadrao.setNumeroProximaNfe(1L);
-            configPadrao.setSerieNfce(1);
-            configPadrao.setNumeroProximaNfce(1L);
-            return repository.save(configPadrao);
-        });
+        // 🔐 Extrair empresaId do usuário autenticado
+        Long empresaId = obterEmpresaIdDoUsuario();
+        
+        // 🔐 Buscar configuração DA EMPRESA ATUAL
+        ConfiguracaoSistema config = repository
+            .findFirstByEmpresaIdOrderByIdDesc(empresaId)
+            .orElseGet(() -> criarConfiguracaoPadraoParaEmpresa(empresaId));
 
+        // Aplicar defaults de campos nulos
         if (config.getHorarioBackupAuto() == null) config.setHorarioBackupAuto("03:00");
         if (config.getTipoCertificado() == null) config.setTipoCertificado("A1");
         if (config.getSerieNfce() == null) config.setSerieNfce(1);
@@ -83,28 +84,83 @@ public class ConfiguracaoService {
         return config;
     }
 
+    // 🔐 Helper para extrair empresaId do contexto de segurança
+    private Long obterEmpresaIdDoUsuario() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof Usuario) {
+                Usuario usuario = (Usuario) auth.getPrincipal();
+                if (usuario.getEmpresaId() != null && usuario.getEmpresaId() > 0) {
+                    return usuario.getEmpresaId();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ ConfiguracaoService: Erro ao extrair empresaId: " + e.getMessage());
+        }
+        return 1L; // Fallback para empresa padrão
+    }
+
+    // 🔐 Criar configuração padrão para nova empresa
+    private ConfiguracaoSistema criarConfiguracaoPadraoParaEmpresa(Long empresaId) {
+        ConfiguracaoSistema config = new ConfiguracaoSistema();
+        config.setId(null);  // 🔐 ESSENCIAL: Deixar nulo para Hibernate auto-gerar
+        config.setEmpresaId(empresaId);  // 🔐 ESSENCIAL: Atribuir empresaId explicitamente
+        config.setHorarioBackupAuto("03:00");
+        config.setSerieNfe(1);
+        config.setNumeroProximaNfe(1L);
+        config.setSerieNfce(1);
+        config.setNumeroProximaNfce(1L);
+        config.setCrt("1");
+        config.setAmbienteSefaz(2);
+        config.setAmbienteNfse(2);
+        config.setTipoCertificado("A1");
+        config.setNomeFantasia("Minha Autopeças");  // Valores padrão
+        config.setRazaoSocial("");
+        config.setCnpj("");
+        config.setTelefone("");
+        System.out.println("✅ ConfiguracaoService: Configuração padrão criada para empresa [" + empresaId + "]");
+        ConfiguracaoSistema salva = repository.save(config);
+        System.out.println("✅ ConfiguracaoService: ID gerado: " + salva.getId());
+        return salva;
+    }
+
     @Transactional
     public ConfiguracaoSistema atualizarConfiguracao(ConfiguracaoSistema dadosAtualizados) {
+        // 🔐 Extrair empresaId do contexto de segurança
+        Long empresaId = obterEmpresaIdDoUsuario();
 
-        // 1. Busca a configuração da empresa atual (ou cria uma nova se não existir)
-        ConfiguracaoSistema configBanco = repository.findById(1L).orElseGet(ConfiguracaoSistema::new);
+        // 1. Buscar configuração ATUAL da empresa
+        ConfiguracaoSistema configBanco = repository
+            .findFirstByEmpresaIdOrderByIdDesc(empresaId)
+            .orElseThrow(() -> new RuntimeException(
+                "Configuração não encontrada para a empresa: " + empresaId + 
+                ". Execute: POST /api/configuracoes/inicializar"
+            ));
 
-        // 2. Opcional: Salvar o ID para não perder na cópia
+        // 🔐 CRÍTICO: Pegar empresaId ANTES de sobrescrever
+        Long empresaIdOriginal = configBanco.getEmpresaId();
         Long idOriginal = configBanco.getId();
 
-        // 🚀 3. A MÁGICA: Copia TODOS os campos (Logradouro, E-mail, TUDO) do objeto novo para o do banco.
-        // O terceiro parâmetro ("id") diz para o copiador ignorar o ID, para não quebrar o banco de dados.
-        org.springframework.beans.BeanUtils.copyProperties(dadosAtualizados, configBanco, "id");
+        // 2. Copiar EXCLUINDO empresaId e id para não quebrá-los
+        org.springframework.beans.BeanUtils.copyProperties(
+            dadosAtualizados, 
+            configBanco, 
+            "id", "empresaId"  // 🔐 Não sobrescrever estes campos
+        );
 
-        // Garante que o ID continua o mesmo
-        configBanco.setId(idOriginal != null ? idOriginal : 1L);
+        // 🔐 3. Restaurar valores originais (garantir integridade)
+        configBanco.setEmpresaId(empresaIdOriginal);
+        configBanco.setId(idOriginal);
 
         // 4. Salva no banco e reagenda o backup
         ConfiguracaoSistema salva = repository.save(configBanco);
         reagendarBackup();
 
-        // 🚀 AUDITORIA: Alteração de Configurações Globais
-        auditoriaService.registrar("SISTEMA", "ALTERACAO_CONFIGURACAO", "As configurações globais do sistema e layouts de impressão foram atualizados.");
+        // 🚀 AUDITORIA: Alteração de Configurações
+        auditoriaService.registrar("SISTEMA", "ALTERACAO_CONFIGURACAO", 
+            "Configurações do sistema foram atualizadas para a empresa [" + empresaId + "]");
+
+        System.out.println("✅ ConfiguracaoService: Configuração atualizada para empresa [" + empresaId + "]");
 
         return salva;
     }

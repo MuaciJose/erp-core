@@ -13,6 +13,8 @@ import com.grandport.erp.modules.veiculo.repository.VeiculoRepository;
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
+// 🚀 INJEÇÃO DO FINANCEIRO AQUI:
+import com.grandport.erp.modules.financeiro.service.FinanceiroService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
@@ -34,12 +36,15 @@ public class OrdemServicoService {
     @Autowired private AuditoriaService auditoriaService;
     @Autowired private ConfiguracaoRepository configuracaoRepository;
 
+    // 🚀 DECLARAÇÃO DO FINANCEIRO AQUI:
+    @Autowired private FinanceiroService financeiroService;
+
     // =========================================================================
     // 🛡️ MOTOR DE SEGURANÇA E ESCOPO DE VISÃO (ROW-LEVEL SECURITY)
     // =========================================================================
     public List<OrdemServico> listarTodasAsOs() {
         Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        Sort ordem = Sort.by(Sort.Direction.DESC, "dataEntrada"); // Ordena das mais recentes para as mais velhas
+        Sort ordem = Sort.by(Sort.Direction.DESC, "dataEntrada");
 
         if (usuarioLogado.getPermissoes() == null) return List.of();
 
@@ -48,13 +53,10 @@ public class OrdemServicoService {
         boolean isMecanico = Boolean.TRUE.equals(usuarioLogado.getIsMecanico());
 
         if (isGestor || isCaixa) {
-            // Chefe ou Caixa vê todas as OSs da oficina inteira!
             return osRepository.findAll(ordem);
         } else if (isMecanico) {
-            // Mecânico só vê as OSs onde ele tem serviço pra executar
             return osRepository.findByMecanicoId(usuarioLogado.getId(), ordem);
         } else {
-            // Consultor/Vendedor só vê as OSs que ele abriu
             return osRepository.findByConsultorId(usuarioLogado.getId(), ordem);
         }
     }
@@ -72,7 +74,6 @@ public class OrdemServicoService {
         os.setVeiculo(dto.veiculoId() != null ? veiculoRepository.findById(dto.veiculoId()).orElse(null) : null);
         os.setKmEntrada(dto.kmEntrada());
 
-        // 🚀 SE FOR NOVA OS, FORÇA O CONSULTOR COMO O USUÁRIO LOGADO, A NÃO SER QUE SEJA UM GESTOR PASSANDO PRA OUTRO
         if (isNovaOs && dto.consultorId() == null) {
             Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
             os.setConsultor(usuarioLogado);
@@ -177,6 +178,26 @@ public class OrdemServicoService {
             throw new RuntimeException("Esta OS já foi faturada e fechada!");
         }
 
+        // 🚀 O EXTRATOR INTELIGENTE
+        for (java.util.Map<String, Object> mapa : pagamentosRequest) {
+            String metodoStr = mapa.get("metodo") != null ? String.valueOf(mapa.get("metodo")).toUpperCase() : "DINHEIRO";
+            java.math.BigDecimal valor = mapa.get("valor") != null ? new java.math.BigDecimal(String.valueOf(mapa.get("valor"))) : java.math.BigDecimal.ZERO;
+            Integer parcelas = mapa.get("parcelas") != null ? Integer.parseInt(String.valueOf(mapa.get("parcelas"))) : 1;
+
+            // 🚀 ADICIONAMOS O "FIADO" AQUI TAMBÉM:
+            if ("A_PRAZO".equals(metodoStr) || "PROMISSORIA".equals(metodoStr) || "FIADO".equals(metodoStr)) {
+                financeiroService.gerarContaReceberPrazoOS(os, os.getCliente(), parcelas, valor);
+
+            } else if (metodoStr.contains("CARTAO") || metodoStr.contains("CREDITO")) {
+                financeiroService.gerarContaReceberCartao(valor, parcelas, os.getCliente(), "OS #" + os.getId());
+
+            } else {
+                financeiroService.registrarEntradaImediata(valor, "OS #" + os.getId() + " - " + metodoStr);
+            }
+        }
+
+
+        // Depois de gravar o dinheiro com segurança, fecha a OS!
         return this.faturarOS(osId);
     }
 }

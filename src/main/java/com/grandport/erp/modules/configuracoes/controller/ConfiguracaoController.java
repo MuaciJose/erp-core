@@ -42,6 +42,14 @@ public class ConfiguracaoController {
         return ResponseEntity.ok(service.atualizarConfiguracao(config));
     }
 
+    // 🆕 Inicializar configuração para nova empresa
+    @PostMapping("/inicializar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<ConfiguracaoSistema> inicializarConfiguracao() {
+        ConfiguracaoSistema config = service.obterConfiguracao();
+        return ResponseEntity.ok(config);
+    }
+
     // =======================================================================
     // 🚀 CERTIFICADO DIGITAL (.PFX) - ATUALIZADO
     // =======================================================================

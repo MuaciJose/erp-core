@@ -24,8 +24,6 @@ public class AuditoriaService {
     @Autowired
     private LogAuditoriaRepository repository;
 
-    // 🚀 @Async: Faz a gravação ocorrer em segundo plano. Não atrasa o sistema!
-    // 🚀 REQUIRES_NEW: Se der erro na Venda e fizer Rollback, o Log continua sendo salvo (mostra a tentativa).
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void registrar(String modulo, String acao, String detalhes) {
@@ -34,6 +32,28 @@ public class AuditoriaService {
         log.setModulo(modulo);
         log.setAcao(acao);
         log.setDetalhes(detalhes);
+
+        // 🚀 NOVO: Preencher empresaId com a empresa do usuário autenticado
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof Usuario) {
+                Usuario usuario = (Usuario) auth.getPrincipal();
+                Long empresaId = usuario.getEmpresaId();
+                if (empresaId != null && empresaId > 0) {
+                    log.setEmpresaId(empresaId);
+                    System.out.println("🔐 AuditoriaService: Log criado para empresa [" + empresaId + "]");
+                } else {
+                    log.setEmpresaId(1L); // Fallback
+                    System.out.println("⚠️ AuditoriaService: Usuario sem empresaId, usando 1L");
+                }
+            } else {
+                log.setEmpresaId(1L); // Fallback para sistema interno
+                System.out.println("⚠️ AuditoriaService: Autenticação não encontrada, usando empresa 1L");
+            }
+        } catch (Exception e) {
+            log.setEmpresaId(1L);
+            System.out.println("❌ AuditoriaService: Erro ao extrair empresaId: " + e.getMessage());
+        }
 
         // 🛡️ Captura o IP limpando proxys
         try {

@@ -21,14 +21,15 @@ export const Pdv = ({ setPaginaAtiva }) => {
     const [vendaFinalizada, setVendaFinalizada] = useState(null);
     const [clienteSelecionado, setClienteSelecionado] = useState(null);
 
-    // 🚀 ESTADOS DA VENDA PERDIDA
     const [descVendaPerdida, setDescVendaPerdida] = useState('');
 
-    // 🚀 ESTADOS DE PAGAMENTO MÚLTIPLO (MISTO)
+    // 🚀 ESTADOS DE PAGAMENTO E PARCELAS
     const [pagamentosAdicionados, setPagamentosAdicionados] = useState([]);
     const [metodoSelecionado, setMetodoSelecionado] = useState('PIX');
     const [valorInput, setValorInput] = useState('');
+    const [parcelasInput, setParcelasInput] = useState(1);
     const inputValorRecebidoRef = useRef(null);
+    const inputParcelasRef = useRef(null);
 
     // 🚀 ESTADOS DO CAIXA E CONFIG
     const [caixaStatus, setCaixaStatus] = useState(null);
@@ -90,7 +91,14 @@ export const Pdv = ({ setPaginaAtiva }) => {
     const selecionarPagamento = (metodo) => {
         setMetodoSelecionado(metodo);
         setValorInput(faltaPagar > 0 ? faltaPagar.toString() : '0');
-        setTimeout(() => inputValorRecebidoRef.current?.focus(), 50);
+        setParcelasInput(1);
+        setTimeout(() => {
+            if (metodo === 'CARTAO_CREDITO' || metodo === 'FIADO') {
+                inputParcelasRef.current?.focus();
+            } else {
+                inputValorRecebidoRef.current?.focus();
+            }
+        }, 50);
     };
 
     const adicionarPagamentoLinha = () => {
@@ -98,9 +106,15 @@ export const Pdv = ({ setPaginaAtiva }) => {
         if (valorDigitado <= 0) return toast.error("Digite um valor maior que zero.");
         if (faltaPagar <= 0) return toast.error("O valor da compra já foi totalmente atingido.");
 
-        setPagamentosAdicionados([...pagamentosAdicionados, { metodo: metodoSelecionado, valor: valorDigitado }]);
+        setPagamentosAdicionados([...pagamentosAdicionados, {
+            metodo: metodoSelecionado,
+            valor: valorDigitado,
+            parcelas: parcelasInput
+        }]);
+
         const novoFaltaPagar = faltaPagar - valorDigitado;
         setValorInput(novoFaltaPagar > 0 ? novoFaltaPagar.toString() : '');
+        setParcelasInput(1);
     };
 
     const removerPagamentoLinha = (index) => setPagamentosAdicionados(prev => prev.filter((_, i) => i !== index));
@@ -109,6 +123,7 @@ export const Pdv = ({ setPaginaAtiva }) => {
         setPagamentosAdicionados([]);
         setMetodoSelecionado('PIX');
         setValorInput(totalLiquido.toString());
+        setParcelasInput(1);
         setModoAtual('PAGAMENTO');
         setTimeout(() => inputValorRecebidoRef.current?.focus(), 100);
     };
@@ -125,63 +140,101 @@ export const Pdv = ({ setPaginaAtiva }) => {
         toast.success(`${produto.nome} adicionado!`, { position: 'bottom-left' });
     };
 
-    const alterarQuantidade = (index, delta) => {
-        setCarrinho(prev => { const novo = [...prev]; if (novo[index].qtd + delta > 0) novo[index].qtd += delta; return novo; });
-    };
-
-    const removerDoCarrinho = (index) => {
-        setCarrinho(prev => { const novo = prev.filter((_, i) => i !== index); if (novo.length === 0) setIndexFocado(-1); return novo; });
-    };
+    const alterarQuantidade = (index, delta) => setCarrinho(prev => { const novo = [...prev]; if (novo[index].qtd + delta > 0) novo[index].qtd += delta; return novo; });
+    const removerDoCarrinho = (index) => setCarrinho(prev => { const novo = prev.filter((_, i) => i !== index); if (novo.length === 0) setIndexFocado(-1); return novo; });
 
     const abrirVendaPerdida = () => { setDescVendaPerdida(''); setModoAtual('VENDA_PERDIDA'); };
     const voltarParaPdv = () => { setModoAtual('PDV'); setDescVendaPerdida(''); };
     const novaVenda = () => { setCarrinho([]); setClienteSelecionado(null); setVendaFinalizada(null); setIndexFocado(-1); setPagamentosAdicionados([]); setModoAtual('PDV'); };
 
     // =======================================================================
-    // 🚀 HOTKEYS
+    // 🚀 HOTKEYS COM ENABLE_ON_FORM_TAGS (Permite usar mesmo dentro do Input)
     // =======================================================================
-    useHotkeys('f10', (e) => { e.preventDefault(); if (carrinho.length > 0 && !vendaFinalizada && modoAtual === 'PDV') abrirPagamento(); else if (modoAtual === 'PAGAMENTO' && faltaPagar === 0) processarVenda(); }, { preventDefault: true }, [carrinho, vendaFinalizada, modoAtual, faltaPagar, pagamentosAdicionados]);
-    useHotkeys('f9', (e) => { e.preventDefault(); if(!vendaFinalizada && modoAtual === 'PDV') abrirVendaPerdida(); }, { preventDefault: true }, [vendaFinalizada, modoAtual]);
-    useHotkeys('esc', (e) => { if (vendaFinalizada) novaVenda(); else if (modoAtual === 'VENDA_PERDIDA' || modoAtual === 'PAGAMENTO') voltarParaPdv(); else if (carrinho.length > 0 && window.confirm("Limpar carrinho?")) { setCarrinho([]); setIndexFocado(-1); } }, { preventDefault: true }, [carrinho, modoAtual, vendaFinalizada]);
-    useHotkeys('f1', (e) => { e.preventDefault(); if(modoAtual === 'PAGAMENTO') selecionarPagamento('PIX'); }, { preventDefault: true }, [modoAtual, faltaPagar]);
-    useHotkeys('f2', (e) => { e.preventDefault(); if(modoAtual === 'PAGAMENTO') selecionarPagamento('DINHEIRO'); }, { preventDefault: true }, [modoAtual, faltaPagar]);
-    useHotkeys('f3', (e) => { e.preventDefault(); if(modoAtual === 'PAGAMENTO') selecionarPagamento('CARTAO_CREDITO'); }, { preventDefault: true }, [modoAtual, faltaPagar]);
-    useHotkeys('f4', (e) => { e.preventDefault(); if(modoAtual === 'PAGAMENTO') selecionarPagamento('CARTAO_DEBITO'); }, { preventDefault: true }, [modoAtual, faltaPagar]);
-    useHotkeys('f5', (e) => { e.preventDefault(); if(modoAtual === 'PAGAMENTO' && clienteSelecionado) selecionarPagamento('FIADO'); }, { preventDefault: true }, [modoAtual, faltaPagar, clienteSelecionado]);
+    const hotkeyConfig = { enableOnFormTags: true, preventDefault: true };
 
+    useHotkeys('f10', (e) => {
+        if (carrinho.length > 0 && !vendaFinalizada && modoAtual === 'PDV') abrirPagamento();
+        else if (modoAtual === 'PAGAMENTO' && faltaPagar <= 0) processarVenda();
+    }, hotkeyConfig, [carrinho, vendaFinalizada, modoAtual, faltaPagar, pagamentosAdicionados]);
+
+    useHotkeys('f9', (e) => { if(!vendaFinalizada && modoAtual === 'PDV') abrirVendaPerdida(); }, hotkeyConfig, [vendaFinalizada, modoAtual]);
+
+    useHotkeys('esc', (e) => {
+        if (vendaFinalizada) novaVenda();
+        else if (modoAtual === 'VENDA_PERDIDA' || modoAtual === 'PAGAMENTO') voltarParaPdv();
+        else if (carrinho.length > 0) { setCarrinho([]); setIndexFocado(-1); toast('Venda cancelada / Carrinho limpo', { icon: '🧹' }); }
+    }, hotkeyConfig, [carrinho, modoAtual, vendaFinalizada]);
+
+    useHotkeys('f1', (e) => { if(modoAtual === 'PAGAMENTO') selecionarPagamento('PIX'); }, hotkeyConfig, [modoAtual]);
+    useHotkeys('f2', (e) => { if(modoAtual === 'PAGAMENTO') selecionarPagamento('DINHEIRO'); }, hotkeyConfig, [modoAtual]);
+    useHotkeys('f3', (e) => { if(modoAtual === 'PAGAMENTO') selecionarPagamento('CARTAO_CREDITO'); }, hotkeyConfig, [modoAtual]);
+    useHotkeys('f4', (e) => { if(modoAtual === 'PAGAMENTO') selecionarPagamento('CARTAO_DEBITO'); }, hotkeyConfig, [modoAtual]);
+    useHotkeys('f5', (e) => { if(modoAtual === 'PAGAMENTO' && clienteSelecionado) selecionarPagamento('FIADO'); }, hotkeyConfig, [modoAtual, clienteSelecionado]);
+
+    // Atalho ENTER para confirmar a venda se o valor já foi totalmente pago
+    useHotkeys('enter', (e) => {
+        if (modoAtual === 'PAGAMENTO' && faltaPagar <= 0) {
+            e.preventDefault();
+            processarVenda();
+        }
+    }, hotkeyConfig, [modoAtual, faltaPagar]);
+
+    // =======================================================================
+    // 🚀 MOTOR DE NAVEGAÇÃO POR SETAS
+    // =======================================================================
     useEffect(() => {
         const handleKeyDown = (e) => {
-            if (modoAtual !== 'PDV' || vendaFinalizada) return;
+            if (vendaFinalizada) return;
             const isInput = document.activeElement.tagName === 'INPUT';
-            if (isInput && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === '+' || e.key === '-')) return;
 
-            if (carrinho.length > 0) {
-                switch (e.key) {
-                    case 'ArrowDown': e.preventDefault(); setIndexFocado(prev => Math.min(carrinho.length - 1, prev + 1)); break;
-                    case 'ArrowUp': e.preventDefault(); setIndexFocado(prev => Math.max(0, prev - 1)); break;
-                    case 'Delete': if (!isInput) { e.preventDefault(); if (indexFocado >= 0) removerDoCarrinho(indexFocado); } break;
-                    case '+': if (!isInput) { e.preventDefault(); if (indexFocado >= 0) alterarQuantidade(indexFocado, 1); } break;
-                    case '-': if (!isInput) { e.preventDefault(); if (indexFocado >= 0) alterarQuantidade(indexFocado, -1); } break;
-                    default: break;
+            if (modoAtual === 'PDV') {
+                if (isInput && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === '+' || e.key === '-')) return;
+                if (carrinho.length > 0) {
+                    switch (e.key) {
+                        case 'ArrowDown': e.preventDefault(); setIndexFocado(prev => Math.min(carrinho.length - 1, prev + 1)); break;
+                        case 'ArrowUp': e.preventDefault(); setIndexFocado(prev => Math.max(0, prev - 1)); break;
+                        case 'Delete': if (!isInput) { e.preventDefault(); if (indexFocado >= 0) removerDoCarrinho(indexFocado); } break;
+                        case '+': if (!isInput) { e.preventDefault(); if (indexFocado >= 0) alterarQuantidade(indexFocado, 1); } break;
+                        case '-': if (!isInput) { e.preventDefault(); if (indexFocado >= 0) alterarQuantidade(indexFocado, -1); } break;
+                        default: break;
+                    }
+                }
+            } else if (modoAtual === 'PAGAMENTO') {
+                // Se apertar Seta para CIMA ou Seta para BAIXO, troca a forma de pagamento (F1 a F5 automático)
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault(); // Impede o input number de ficar subindo o valor sozinho
+                    const metodos = ['PIX', 'DINHEIRO', 'CARTAO_CREDITO', 'CARTAO_DEBITO', 'FIADO'];
+                    const currentIndex = metodos.indexOf(metodoSelecionado);
+                    let nextIndex = e.key === 'ArrowDown' ? (currentIndex + 1) % metodos.length : (currentIndex - 1 + metodos.length) % metodos.length;
+
+                    if (metodos[nextIndex] === 'FIADO' && !clienteSelecionado) {
+                        nextIndex = e.key === 'ArrowDown' ? (nextIndex + 1) % metodos.length : (nextIndex - 1 + metodos.length) % metodos.length;
+                    }
+                    selecionarPagamento(metodos[nextIndex]);
                 }
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [carrinho, indexFocado, modoAtual, vendaFinalizada]);
+    }, [carrinho, indexFocado, modoAtual, vendaFinalizada, metodoSelecionado, clienteSelecionado]);
 
     // =======================================================================
-    // 🚀 FINALIZAÇÃO DE VENDA
+    // 🚀 FINALIZAÇÃO DE VENDA (COM EXTRATOR DE CLIENTE BLINDADO)
     // =======================================================================
     const processarVenda = async () => {
         if (faltaPagar > 0) return toast.error("A venda ainda não foi totalmente paga!");
         const idVendaToast = toast.loading("Registrando pagamento e baixando estoque...");
 
+        // 🚀 O EXTRATOR BLINDADO: Caça o ID do cliente não importa onde ele esteja escondido
+        const idDoClienteExtraido = clienteSelecionado
+            ? (clienteSelecionado.id || clienteSelecionado.value || clienteSelecionado.parceiroId || clienteSelecionado)
+            : null;
+
         const dadosVenda = {
             status: 'CONCLUIDA',
             itens: carrinho.map(item => ({ produtoId: item.id, quantidade: Number(item.qtd) || 1, precoUnitario: Number(item.precoVenda) || Number(item.preco) || 0 })),
             pagamentos: pagamentosAdicionados,
-            parceiroId: clienteSelecionado ? clienteSelecionado.id : null,
+            parceiroId: idDoClienteExtraido, // AGORA O NOME DO CLIENTE CHEGA NO BANCO DE DADOS!
             desconto: valorDesconto
         };
 
@@ -211,24 +264,21 @@ export const Pdv = ({ setPaginaAtiva }) => {
     };
 
     // =======================================================================
-    // 🚀 O NOVO MOTOR V8: IMPRESSÃO A4 (VIA JAVA / BANCO DE DADOS)
+    // 🚀 IMPRESSÃO A4 E BOBINA TÉRMICA
     // =======================================================================
     const imprimirDocumentoBackend = async () => {
         if (!vendaFinalizada) return;
-        const toastId = toast.loading('Buscando PDF no servidor (Layout do Banco)...');
+        const toastId = toast.loading('Buscando PDF no servidor...');
         try {
             const response = await api.get(`/api/vendas/${vendaFinalizada.id}/imprimir-pdf`, { responseType: 'blob' });
             const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
             window.open(fileURL, '_blank');
-            toast.success("Documento gerado com sucesso!", { id: toastId });
+            toast.success("Documento gerado!", { id: toastId });
         } catch (error) {
-            toast.error("Erro ao gerar o PDF. Verifique a conexão com o servidor.", { id: toastId });
+            toast.error("Erro ao gerar PDF.", { id: toastId });
         }
     };
 
-    // =======================================================================
-    // 🖨️ IMPRESSÃO GERENCIAL ANTIGA: MANTIDA APENAS PARA BOBINA TÉRMICA
-    // =======================================================================
     const imprimirBobinaLocal = () => {
         if (!vendaFinalizada) return;
         const printWindow = window.open('', '_blank');
@@ -267,19 +317,14 @@ export const Pdv = ({ setPaginaAtiva }) => {
         setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
     };
 
-    // 🚀 EMISSÃO FISCAL SEFAZ (NFC-e)
     const emitirFiscal = async () => {
-        const toastId = toast.loading("Comunicando com a SEFAZ para emitir NFC-e...");
+        const toastId = toast.loading("Emitindo NFC-e...");
         try {
             const res = await api.post(`/api/fiscal/emitir/${vendaFinalizada.id}`);
             toast.success("NFC-e Autorizada com Sucesso!", { id: toastId });
-
-            if (res.data.urlPdf) {
-                window.open(res.data.urlPdf, '_blank');
-            }
+            if (res.data.urlPdf) window.open(res.data.urlPdf, '_blank');
         } catch (err) {
-            const msgRealDoJava = err.response?.data?.mensagem || err.response?.data?.message || err.message;
-            toast.error("Erro na SEFAZ: " + msgRealDoJava, { id: toastId, duration: 8000 });
+            toast.error("Erro na SEFAZ: " + (err.response?.data?.message || err.message), { id: toastId, duration: 8000 });
         }
     };
 
@@ -316,13 +361,11 @@ export const Pdv = ({ setPaginaAtiva }) => {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 max-w-4xl w-full">
-                    {/* 🚀 BOTÃO DA BOBINA (MANTÉM O SISTEMA LOCAL) */}
                     <button onClick={imprimirBobinaLocal} className="bg-slate-800 border border-slate-700 text-white px-6 py-6 rounded-2xl font-black hover:bg-slate-700 shadow-lg flex flex-col items-center gap-3 transition-transform hover:-translate-y-1">
                         <Receipt size={32} className="text-slate-400" />
                         <span className="text-center">RECIBO GERENCIAL<br/><span className="text-xs text-slate-400 font-normal">Bobina Térmica 80mm</span></span>
                     </button>
 
-                    {/* 🚀 BOTÃO DO A4 (CHAMA O MOTOR V8 DO JAVA/BANCO DE DADOS) */}
                     <button onClick={imprimirDocumentoBackend} className="bg-slate-800 border border-slate-700 text-white px-6 py-6 rounded-2xl font-black hover:bg-blue-600 shadow-lg flex flex-col items-center gap-3 transition-transform hover:-translate-y-1 border-b-4 border-b-blue-500">
                         <FileText size={32} className="text-blue-400" />
                         <span className="text-center">PEDIDO DE VENDA<br/><span className="text-xs text-blue-200 font-normal">Folha A4 (Layout DB)</span></span>
@@ -457,7 +500,7 @@ export const Pdv = ({ setPaginaAtiva }) => {
 
                         <div className="flex-1 p-8 grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto w-full">
                             <div className="space-y-6 flex flex-col">
-                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">1. Selecione a Forma (F1 a F5)</p>
+                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">1. Selecione a Forma (F1 a F5 ou Setas)</p>
                                 <div className="grid grid-cols-2 gap-3">
                                     <button onClick={() => selecionarPagamento('PIX')} className={`p-4 rounded-xl border-2 flex items-center gap-3 transition-all ${metodoSelecionado === 'PIX' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500'}`}>
                                         <QrCode size={24} /> <span className="font-black text-sm">PIX (F1)</span>
@@ -479,9 +522,31 @@ export const Pdv = ({ setPaginaAtiva }) => {
                                 <div className="mt-4 p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">
                                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">2. Valor a Lançar em {metodoSelecionado.replace('_', ' ')}</label>
                                     <div className="flex gap-4">
+
+                                        {(metodoSelecionado === 'CARTAO_CREDITO' || metodoSelecionado === 'FIADO') && (
+                                            <div className="w-24 flex items-center gap-2 bg-slate-50 border-2 border-slate-200 p-4 rounded-xl focus-within:border-blue-500 transition-all">
+                                                <span className="text-xs font-black text-slate-400">Qtd</span>
+                                                <input
+                                                    ref={inputParcelasRef}
+                                                    type="number"
+                                                    min="1" max="12"
+                                                    value={parcelasInput}
+                                                    onChange={(e) => setParcelasInput(Number(e.target.value))}
+                                                    className="w-full bg-transparent outline-none font-black text-slate-800 text-2xl text-center"
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); inputValorRecebidoRef.current?.focus(); } }}
+                                                />
+                                            </div>
+                                        )}
+
                                         <div className="flex-1 flex items-center gap-3 bg-slate-50 border-2 border-slate-200 p-4 rounded-xl focus-within:border-blue-500">
                                             <span className="text-xl font-black text-slate-400 pl-2">R$</span>
-                                            <input ref={inputValorRecebidoRef} value={formatCurrency(valorInput).replace('R$', '').trim()} onChange={handleValorInputChange} className="w-full bg-transparent outline-none font-black text-slate-800 text-3xl" onKeyDown={(e) => { if (e.key === 'Enter') adicionarPagamentoLinha(); }} />
+                                            <input
+                                                ref={inputValorRecebidoRef}
+                                                value={formatCurrency(valorInput).replace('R$', '').trim()}
+                                                onChange={handleValorInputChange}
+                                                className="w-full bg-transparent outline-none font-black text-slate-800 text-3xl"
+                                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); adicionarPagamentoLinha(); } }}
+                                            />
                                         </div>
                                         <button onClick={adicionarPagamentoLinha} disabled={faltaPagar <= 0} className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-6 rounded-xl font-black shadow-md flex flex-col items-center justify-center">
                                             <Plus size={24}/> <span className="text-[10px] mt-1">ENTER</span>
@@ -503,7 +568,12 @@ export const Pdv = ({ setPaginaAtiva }) => {
                                         <div className="space-y-2">
                                             {pagamentosAdicionados.map((p, i) => (
                                                 <div key={i} className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                                    <div className="flex items-center gap-3"><span className="font-black text-slate-700">{p.metodo.replace('_', ' ')}</span></div>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="font-black text-slate-700">{p.metodo.replace('_', ' ')}</span>
+                                                        {(p.metodo === 'CARTAO_CREDITO' || p.metodo === 'FIADO') && p.parcelas > 1 && (
+                                                            <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded-full">{p.parcelas}x</span>
+                                                        )}
+                                                    </div>
                                                     <div className="flex items-center gap-4"><span className="font-black text-xl text-slate-800">{formatCurrency(p.valor)}</span><button onClick={() => removerPagamentoLinha(i)} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={18}/></button></div>
                                                 </div>
                                             ))}
@@ -514,7 +584,7 @@ export const Pdv = ({ setPaginaAtiva }) => {
                                 <div className="mt-6 pt-6 border-t border-slate-100">
                                     <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl mb-6"><span className="text-xs font-black text-slate-500 uppercase">Troco a Devolver</span><span className={`text-3xl font-black ${troco > 0 ? 'text-red-500' : 'text-slate-400'}`}>{formatCurrency(troco)}</span></div>
                                     <button onClick={processarVenda} disabled={faltaPagar > 0} className="w-full bg-green-500 hover:bg-green-400 disabled:bg-slate-200 disabled:text-slate-400 text-slate-900 py-6 rounded-2xl font-black text-2xl shadow-xl hover:-translate-y-1 flex justify-center items-center gap-3">
-                                        {faltaPagar > 0 ? <Lock size={28}/> : <CheckCircle size={28}/>} CONFIRMAR PAGAMENTO (F10)
+                                        {faltaPagar > 0 ? <Lock size={28}/> : <CheckCircle size={28}/>} CONFIRMAR PAGAMENTO (ENTER)
                                     </button>
                                 </div>
                             </div>
@@ -524,10 +594,23 @@ export const Pdv = ({ setPaginaAtiva }) => {
 
                 {modoAtual === 'VENDA_PERDIDA' && (
                     <div className="flex-1 bg-slate-50 flex flex-col items-center justify-center p-8 relative">
-                        {/* MANTIDO SEU CÓDIGO DA VENDA PERDIDA AQUI PARA NÃO FICAR LONGO */}
+                        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full text-center">
+                            <Ban size={64} className="mx-auto text-red-500 mb-4" />
+                            <h2 className="text-2xl font-black text-slate-800 mb-2">Registrar Venda Perdida</h2>
+                            <p className="text-slate-500 mb-6">Informe o motivo para gerar estatísticas gerenciais.</p>
+                            <textarea
+                                value={descVendaPerdida}
+                                onChange={(e) => setDescVendaPerdida(e.target.value)}
+                                className="w-full border-2 border-slate-200 p-4 rounded-xl mb-6 focus:border-red-500 outline-none resize-none h-32"
+                                placeholder="Ex: Produto muito caro, não tinha a peça, etc..."
+                            />
+                            <div className="flex gap-4">
+                                <button onClick={voltarParaPdv} className="flex-1 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
+                                <button onClick={() => { toast.success("Venda perdida registrada."); voltarParaPdv(); }} className="flex-1 py-3 rounded-xl font-bold bg-red-500 text-white hover:bg-red-600">Salvar Registro</button>
+                            </div>
+                        </div>
                     </div>
                 )}
-
             </div>
         </div>
     );

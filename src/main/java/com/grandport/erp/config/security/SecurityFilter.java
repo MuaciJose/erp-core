@@ -38,6 +38,14 @@ public class SecurityFilter extends OncePerRequestFilter {
                 if (login != null && !login.isEmpty()) {
                     UserDetails user = usuarioRepository.findByUsername(login);
 
+                    // Adicione para diagnosticar o problema
+                    if (user instanceof com.grandport.erp.modules.usuario.model.Usuario) {
+                        com.grandport.erp.modules.usuario.model.Usuario u = 
+                            (com.grandport.erp.modules.usuario.model.Usuario) user;
+                        System.out.println("🔍 DEBUG SecurityFilter - Usuario: " + u.getUsername() + 
+                            " | empresaId carregado: " + u.getEmpresaId());
+                    }
+
                     // Adiciona a verificação para garantir que o usuário existe no banco
                     if (user != null) {
                         var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());

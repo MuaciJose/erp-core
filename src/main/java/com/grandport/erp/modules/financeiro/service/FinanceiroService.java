@@ -4,6 +4,7 @@ import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.financeiro.dto.*;
 import com.grandport.erp.modules.financeiro.model.*;
 import com.grandport.erp.modules.financeiro.repository.*;
+import com.grandport.erp.modules.os.model.OrdemServico;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 import com.grandport.erp.modules.vendas.model.Venda;
@@ -221,23 +222,35 @@ public class FinanceiroService {
         auditoriaService.registrar("CAIXA", "ENTRADA_AVULSA", "Entrada imediata de R$ " + valor + " via " + metodo);
     }
 
+    // =========================================================================
+    // 🚀 LÓGICA DE CARTÃO DE CRÉDITO (AGORA VINCULADA AO CLIENTE)
+    // =========================================================================
     @Transactional
-    public void gerarContaReceberCartao(BigDecimal valor, Integer parcelas) {
+    public void gerarContaReceberCartao(BigDecimal valor, Integer parcelas, Parceiro cliente, String referencia) {
+        if (parcelas == null || parcelas < 1) parcelas = 1;
+
         for (int i = 1; i <= parcelas; i++) {
             ContaReceber conta = new ContaReceber();
-            conta.setDescricao("Venda Cartão PDV " + i + "/" + parcelas);
+
+            // 🚀 AGORA O NOME DO CLIENTE ENTRA AQUI!
+            if (cliente != null) {
+                conta.setParceiro(cliente);
+            }
+
+            conta.setDescricao("Cartão " + i + "/" + parcelas + " - " + referencia);
             conta.setValorOriginal(valor.divide(BigDecimal.valueOf(parcelas), 2, RoundingMode.HALF_UP));
             conta.setDataVencimento(LocalDateTime.now().plusDays(30L * i));
             conta.setStatus(StatusFinanceiro.PENDENTE);
+
             recebaRepo.save(conta);
         }
 
-        // 🚀 AUDITORIA: Adicionada
-        auditoriaService.registrar("FINANCEIRO", "GERACAO_RECEBER_CARTAO", "Gerou " + parcelas + " parcela(s) a receber em Cartão totalizando R$ " + valor);
+        String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
+        auditoriaService.registrar("FINANCEIRO", "GERACAO_RECEBER_CARTAO", "Gerou " + parcelas + " parcela(s) no Cartão (Ref: " + referencia + ") do cliente '" + nomeCliente + "' totalizando R$ " + valor);
     }
 
     // =========================================================================
-    // 🚀 LÓGICA DE PROMISSÓRIAS (ATUALIZADA)
+    // 🚀 1. LÓGICA DE PROMISSÓRIAS (PARA VENDAS DE BALCÃO/PDV)
     // =========================================================================
     @Transactional
     public void gerarContaReceberPrazo(Venda venda, Parceiro cliente, Integer parcelas) {
@@ -260,9 +273,38 @@ public class FinanceiroService {
             recebaRepo.save(conta);
         }
 
-        // 🚀 AUDITORIA: CRÍTICA! Adicionada para rastrear geração de fiado/promissórias
         String nomeCliente = cliente != null ? cliente.getNome() : "Desconhecido";
         auditoriaService.registrar("FINANCEIRO", "GERACAO_PROMISSORIAS", "Gerou " + parcelas + " promissória(s) para o cliente '" + nomeCliente + "' ref. Venda #" + venda.getId() + " totalizando R$ " + venda.getValorTotal());
+    }
+
+    // =========================================================================
+    // 🚀 2. LÓGICA DE PROMISSÓRIAS EXCLUSIVA (PARA ORDEM DE SERVIÇO - OS)
+    // =========================================================================
+    @Transactional
+    public void gerarContaReceberPrazoOS(OrdemServico os, Parceiro cliente, Integer parcelas, BigDecimal valorTotalPrazo) {
+        if (cliente == null) throw new RuntimeException("Cliente não informado para faturamento a prazo da OS.");
+        if (parcelas == null || parcelas < 1) parcelas = 1;
+
+        int intervaloDias = (cliente.getIntervaloDiasPagamento() != null && cliente.getIntervaloDiasPagamento() > 0)
+                ? cliente.getIntervaloDiasPagamento() : 30;
+
+        BigDecimal valorParcela = valorTotalPrazo.divide(new BigDecimal(parcelas), 2, RoundingMode.HALF_UP);
+
+        for (int i = 1; i <= parcelas; i++) {
+            ContaReceber conta = new ContaReceber();
+            conta.setParceiro(cliente);
+            conta.setDescricao("Parcela " + i + "/" + parcelas + " - OS #" + os.getId());
+            conta.setValorOriginal(valorParcela);
+            conta.setDataVencimento(LocalDateTime.now().plusDays((long) intervaloDias * i));
+            conta.setStatus(StatusFinanceiro.PENDENTE);
+
+            recebaRepo.save(conta);
+        }
+
+        cliente.setSaldoDevedor(cliente.getSaldoDevedor().add(valorTotalPrazo));
+        parceiroRepository.save(cliente);
+
+        auditoriaService.registrar("FINANCEIRO", "GERACAO_PROMISSORIAS_OS", "Gerou " + parcelas + " promissória(s) para o cliente '" + cliente.getNome() + "' ref. OS #" + os.getId() + " totalizando R$ " + valorTotalPrazo);
     }
 
     // =========================================================================
