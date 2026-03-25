@@ -93,6 +93,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Conciliação Bancária', acao: 'conciliacao' },
                 { titulo: 'Plano de Contas', acao: 'plano-contas' },
                 { titulo: 'Resultado (DRE)', acao: 'dre' },
+                {titulo: 'Fluxo de Caixa Projetado', acao: 'fluxo-caixa-projecao'}, // 🚀 ADICIONADO
                 { titulo: 'Recibo Avulso', acao: 'recibo-avulso' },
                 { titulo: 'Histórico de Recibos', acao: 'historico-recibos' } // 🚀 ADICIONADO
             ]

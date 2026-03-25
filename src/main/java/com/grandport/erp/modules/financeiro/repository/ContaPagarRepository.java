@@ -26,4 +26,11 @@ public interface ContaPagarRepository extends JpaRepository<ContaPagar, Long> {
     List<DespesaPorPlanoContaDTO> sumDespesasPagasAgrupadasPorPlanoConta(
             @Param("inicio") LocalDateTime inicio, 
             @Param("fim") LocalDateTime fim);
+
+    // Busca todas as contas a pagar de uma empresa num intervalo de datas
+    List<ContaPagar> findByEmpresaIdAndDataVencimentoBetweenOrderByDataVencimentoAsc(
+            Long empresaId,
+            java.time.LocalDateTime inicio,
+            java.time.LocalDateTime fim
+    );
 }

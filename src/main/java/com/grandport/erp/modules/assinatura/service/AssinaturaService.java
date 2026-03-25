@@ -62,7 +62,7 @@ public class AssinaturaService {
                 "contas-pagar", "contas-receber", "bancos", "conciliacao", "plano-contas", "dre",
                 "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes", "calculadora", "recibo-avulso","historico-recibos","ncm", "whatsapp",
                 "backup","regras-fiscais","categorias","gerenciador-nfe","emitir-nfe-avulsa","manual","revisoes","crm","etiquetas",
-                "os","servicos","listagem-os","checklist","curva-abc"
+                "os","servicos","listagem-os","checklist","curva-abc","fluxo-caixa-projecao"
         ));
 
         usuarioRepository.save(admin);

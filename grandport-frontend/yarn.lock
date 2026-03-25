@@ -1581,7 +1581,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@reduxjs/toolkit@npm:1.x.x || 2.x.x":
+"@reduxjs/toolkit@npm:^1.9.0 || 2.x.x":
   version: 2.11.2
   resolution: "@reduxjs/toolkit@npm:2.11.2"
   dependencies:
@@ -3700,7 +3700,7 @@ __metadata:
     react-is: "npm:^19.2.4"
     react-router-dom: "npm:^7.13.2"
     react-signature-canvas: "npm:^1.1.0-alpha.2"
-    recharts: "npm:^3.7.0"
+    recharts: "npm:^3.8.1"
     tailwindcss: "npm:^3.0.0"
     vite: "npm:^7.3.1"
     vite-plugin-pwa: "npm:^1.2.0"
@@ -5182,11 +5182,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"recharts@npm:^3.7.0":
-  version: 3.7.0
-  resolution: "recharts@npm:3.7.0"
+"recharts@npm:^3.8.1":
+  version: 3.8.1
+  resolution: "recharts@npm:3.8.1"
   dependencies:
-    "@reduxjs/toolkit": "npm:1.x.x || 2.x.x"
+    "@reduxjs/toolkit": "npm:^1.9.0 || 2.x.x"
     clsx: "npm:^2.1.1"
     decimal.js-light: "npm:^2.5.1"
     es-toolkit: "npm:^1.39.3"
@@ -5201,7 +5201,7 @@ __metadata:
     react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
     react-dom: ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
     react-is: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-  checksum: 10c0/ca59c1530983e8b6ce40652dd8c72e220c47c01fd35bca4d50791bf75f864a889adfb9adeac4a3cc8d3efa2e6b731462ad10a61887341870d7cc70feb862bd4e
+  checksum: 10c0/71a40596e95c4f683a78e6be5f7c27d1713e7bdd5f012c22c19c07b26375e87703a6620d0a553e810ebb5f15a3a972ab89283a689e8e45dfac29eef028e0c2ca
   languageName: node
   linkType: hard
 

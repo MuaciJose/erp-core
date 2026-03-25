@@ -21,6 +21,7 @@ import { ContasReceber } from './modules/financeiro/ContasReceber';
 import { ContasPagar } from './modules/financeiro/ContasPagar';
 import { ControleCaixa } from './modules/financeiro/ControleCaixa';
 import { FluxoCaixaDre } from './modules/financeiro/FluxoCaixaDre';
+import { FluxoCaixaProjecao } from './modules/financeiro/FluxoCaixaProjecao'; // 🚀 A NOVA TELA DO FUTURO AQUI!
 import { ContasBancarias } from './modules/financeiro/ContasBancarias';
 import { PlanoContas } from './modules/financeiro/PlanoContas';
 import { ConciliacaoBancaria } from './modules/financeiro/ConciliacaoBancaria';
@@ -195,7 +196,7 @@ function App() {
                             {paginaAtiva === 'contas-receber' && <ContasReceber />}
                             {paginaAtiva === 'contas-pagar' && <ContasPagar />}
                             {paginaAtiva === 'dre' && <FluxoCaixaDre />}
-                            {paginaAtiva === 'bancos' && <ContasBancarias />}
+                            {paginaAtiva === 'fluxo-caixa-projecao' && <FluxoCaixaProjecao setPaginaAtiva={setPaginaAtiva}/>}                            {paginaAtiva === 'bancos' && <ContasBancarias />}
                             {paginaAtiva === 'plano-contas' && <PlanoContas />}
                             {paginaAtiva === 'conciliacao' && <ConciliacaoBancaria />}
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}

@@ -17,4 +17,11 @@ public interface ContaReceberRepository extends JpaRepository<ContaReceber, Long
 
     @Query("SELECT SUM(c.valorOriginal) FROM ContaReceber c WHERE c.status = 'PENDENTE' AND c.dataVencimento < CURRENT_DATE")
     Optional<BigDecimal> sumContasAtrasadas();
+
+    // Busca todas as contas a receber de uma empresa num intervalo de datas
+    List<ContaReceber> findByEmpresaIdAndDataVencimentoBetweenOrderByDataVencimentoAsc(
+            Long empresaId,
+            java.time.LocalDateTime inicio,
+            java.time.LocalDateTime fim
+    );
 }
