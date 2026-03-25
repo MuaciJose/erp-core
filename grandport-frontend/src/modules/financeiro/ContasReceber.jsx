@@ -11,6 +11,8 @@ import { BotaoGerarRemessa } from './BotaoGerarRemessa';
 // 🚀 INJETANDO A NOVA ARMA DE LEITURA
 import { BotaoImportarRetorno } from './BotaoImportarRetorno';
 
+import { BotaoImprimirBoleto } from './BotaoImprimirBoleto';
+
 export const ContasReceber = () => {
     const [contas, setContas] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -524,9 +526,15 @@ export const ContasReceber = () => {
     if (modoAtual === 'BAIXA') {
         return (
             <div className="p-8 max-w-5xl mx-auto animate-fade-in">
-                <button onClick={voltarParaLista} className="mb-6 flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold transition-colors">
-                    <ArrowLeft size={20} /> Voltar para Lista (Esc)
-                </button>
+                {/* 🚀 AQUI: O botão de Voltar e o Botão de Boleto lado a lado */}
+                <div className="flex justify-between items-center mb-6">
+                    <button onClick={voltarParaLista} className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold transition-colors">
+                        <ArrowLeft size={20} /> Voltar para Lista (Esc)
+                    </button>
+
+                    {/* INJETAMOS AQUI, PASSANDO O ID DA CONTA QUE ESTÁ SENDO LIQUIDADA */}
+                    <BotaoImprimirBoleto contaReceberId={contaSelecionada.id} />
+                </div>
 
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-8 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
