@@ -7,6 +7,9 @@ import {
     MessageCircle, Smartphone, Wallet, TrendingDown,Lock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { BotaoGerarRemessa } from './BotaoGerarRemessa';
+// 🚀 INJETANDO A NOVA ARMA DE LEITURA
+import { BotaoImportarRetorno } from './BotaoImportarRetorno';
 
 export const ContasReceber = () => {
     const [contas, setContas] = useState([]);
@@ -28,7 +31,7 @@ export const ContasReceber = () => {
     const [valorAcrescimoInput, setValorAcrescimoInput] = useState('0');
     const [valorDescontoInput, setValorDescontoInput] = useState('0');
 
-    // 🚀 ESTADOS DO ZAP
+    // ? ESTADOS DO ZAP
     const [modalZap, setModalZap] = useState(false);
     const [telefoneZap, setTelefoneZap] = useState('');
     const [enviandoZap, setEnviandoZap] = useState(false);
@@ -117,7 +120,7 @@ export const ContasReceber = () => {
     const indexInicialPaginacao = (paginaAtual - 1) * itensPorPagina;
     const contasPaginadas = contasFiltradas.slice(indexInicialPaginacao, indexInicialPaginacao + itensPorPagina);
 
-    // 🚀 LÓGICA DO DASHBOARD INTELIGENTE
+    // ? LOGICA DO DASHBOARD INTELIGENTE
     const totalAtrasado = contasFiltradas.filter(c => {
         const st = c.status ? c.status.toUpperCase() : '';
         const estaPaga = st.includes('PAG') || st.includes('LIQUID');
@@ -163,7 +166,7 @@ export const ContasReceber = () => {
                     case 'ArrowDown': e.preventDefault(); setIndexFocado(prev => Math.min(contasPaginadas.length - 1, prev + 1)); break;
                     case 'ArrowUp': e.preventDefault(); setIndexFocado(prev => Math.max(0, prev - 1)); break;
                     case 'ArrowRight': if (!isInputFocused) { e.preventDefault(); setPaginaAtual(prev => Math.min(totalPaginas, prev + 1)); setIndexFocado(-1); } break;
-                    case 'ArrowLeft': if (!isInputFocused) { e.preventDefault(); setPaginaAtual(prev => Math.max(1, prev - 1)); setIndexFocado(-1); } break;
+                    case 'ArrowLeft': if (!isInputFocused) { e.preventDefault(); setPaginaAtual(prev => Math.min(1, prev - 1)); setIndexFocado(-1); } break;
                     case 'Enter':
                         e.preventDefault();
                         if (isInputFocused && document.activeElement === buscaInputRef.current) {
@@ -204,7 +207,7 @@ export const ContasReceber = () => {
 
     const voltarParaLista = () => { setContaSelecionada(null); setModoAtual('LISTA'); };
 
-    // 🚀 IMPRESSÃO EM MASSA (Aba Fantasma)
+    // ? IMPRESSÃO EM MASSA (Aba Fantasma)
     const imprimirRelatorioGeral = async () => {
         const idToast = toast.loading("Gerando relatório financeiro...");
         const novaAba = window.open('', '_blank');
@@ -223,7 +226,7 @@ export const ContasReceber = () => {
         }
     };
 
-    // 🚀 DISPARO WHATSAPP (Relatório)
+    // ? DISPARO WHATSAPP (Relatório)
     const dispararRelatorioWhatsapp = async () => {
         const numLimpo = telefoneZap.replace(/\D/g, '');
         if (numLimpo.length < 10) return toast.error('Digite um número de WhatsApp válido.');
@@ -295,7 +298,12 @@ export const ContasReceber = () => {
                         </h1>
                         <p className="text-slate-500 font-medium mt-1">Gestão de caixa, boletos, pendências e recebimentos diários.</p>
                     </div>
+
                     <div className="flex flex-col md:flex-row w-full md:w-auto gap-3">
+                        {/* 🚀 ARMAS BANCÁRIAS ACIONADAS */}
+                        <BotaoGerarRemessa />
+                        <BotaoImportarRetorno onSucesso={carregarContas} />
+
                         <button onClick={() => setModalZap(true)} className="w-full md:w-auto bg-green-500 text-white px-6 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-md shadow-green-500/20">
                             <MessageCircle size={20} /> WHATSAPP
                         </button>
@@ -474,7 +482,7 @@ export const ContasReceber = () => {
                     )}
                 </div>
 
-                {/* 🚀 MODAL DO WHATSAPP */}
+                {/* ? MODAL DO WHATSAPP */}
                 {modalZap && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
                         <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-8 relative">

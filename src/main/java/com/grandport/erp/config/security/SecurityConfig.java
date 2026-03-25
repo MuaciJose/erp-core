@@ -37,6 +37,7 @@ public class SecurityConfig {
 
                         // ================= ROTAS PÚBLICAS =================
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                        .requestMatchers("/error").permitAll()
                         // 🚀  ESTA LINHA AQUI PARA LIBERAR O TESTE PDF:
                         .requestMatchers("/api/teste-pdf").permitAll()
                         // 🚀 A NOVA CHAVE MESTRA PARA A IMPRESSÃO DA OS:
