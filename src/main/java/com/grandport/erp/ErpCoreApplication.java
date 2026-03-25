@@ -27,9 +27,8 @@ public class ErpCoreApplication {
     @Bean
     CommandLineRunner initDatabase(UsuarioRepository repository, PasswordEncoder passwordEncoder) {
         return args -> {
-            // LISTA ATUALIZADA: Agora inclui "relatorio-comissoes"
             List<String> todasPermissoes = Arrays.asList(
-                    "dash", "pdv", "vendas", "orcamentos", "fila-caixa", "caixa", "relatorio-comissoes", // <-- ADICIONADO AQUI
+                    "dash", "pdv", "vendas", "orcamentos", "fila-caixa", "caixa", "relatorio-comissoes",
                     "estoque", "marcas", "ajuste_estoque", "compras", "previsao", "faltas",
                     "contas-pagar", "contas-receber", "bancos", "conciliacao", "plano-contas", "dre",
                     "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes", "calculadora", "recibo-avulso","historico-recibos","ncm", "whatsapp",
@@ -45,12 +44,22 @@ public class ErpCoreApplication {
                 admin.setSenha(passwordEncoder.encode("admin123"));
                 admin.setNomeCompleto("Administrador do Sistema");
                 admin.setPermissoes(todasPermissoes);
+
+                // 🚀 O CARIMBO DA BASE: Define que esse Super Admin é dono da Empresa 1
+                admin.setEmpresaId(1L);
+
                 repository.save(admin);
                 System.out.println(">>> Usuário ADMIN criado com sucesso! Use: admin / admin123");
             } else {
                 admin.setPermissoes(todasPermissoes);
+
+                // 🚀 GARANTIA: Se o admin antigo estava "perdido" sem empresa, ele puxa para a 1
+                if (admin.getEmpresaId() == null) {
+                    admin.setEmpresaId(1L);
+                }
+
                 repository.save(admin);
-                System.out.println(">>> Permissões do usuário ADMIN atualizadas com sucesso!");
+                System.out.println(">>> Permissões do usuário ADMIN atualizadas e Empresa vinculada com sucesso!");
             }
         };
     }
