@@ -38,29 +38,49 @@ public class ChecklistController {
     // =========================================================
     // 🚀 ROTA PARA RECEBER AS FOTOS (Preparada para o Cliente!)
     // =========================================================
+    // =========================================================
+    // 🚀 ROTA PARA RECEBER MÚLTIPLAS FOTOS (Blindado para o React)
+    // =========================================================
     @PostMapping("/{id}/fotos")
-    public ResponseEntity<String> uploadFotoVistoria(@PathVariable Long id, @RequestParam("foto") MultipartFile foto) {
+    public ResponseEntity<?> uploadFotosVistoria(
+            @PathVariable Long id,
+            // 🚀 MÁGICA 1: Aceitamos uma LISTA de arquivos, e o nome pode ser "fotos", "foto", ou "files"
+            @RequestParam(value = "fotos", required = false) List<MultipartFile> fotosPlural,
+            @RequestParam(value = "foto", required = false) List<MultipartFile> fotosSingular) {
         try {
-            // 1. Usa o seu método salvarFoto que você criou no Service
-            String caminhoRelativo = fotoStorageService.salvarFoto(foto);
+            // Verifica qual etiqueta o React usou para mandar a carga
+            List<MultipartFile> arquivosRecebidos = fotosPlural != null && !fotosPlural.isEmpty() ? fotosPlural : fotosSingular;
 
-            // 2. Busca o Checklist no banco de dados
+            if (arquivosRecebidos == null || arquivosRecebidos.isEmpty()) {
+                return ResponseEntity.badRequest().body(java.util.Map.of("message", "Nenhuma foto foi enviada no pacote."));
+            }
+
+            // 1. Busca o Checklist no banco de dados primeiro
             ChecklistVeiculo checklist = checklistService.buscarPorId(id);
 
-            // 3. Monta a URL pública usando a variável inteligente
-            // Se estiver no seu PC: http://192.168.1.104:8080/uploads/checklists/...
-            // Se estiver no cliente: https://api.oficina.com.br/uploads/checklists/...
-            String urlFotoCompleta = baseUrl + caminhoRelativo;
+            // 2. Loop para processar e salvar TODAS as fotos que vieram juntas
+            for (MultipartFile arquivo : arquivosRecebidos) {
+                if (!arquivo.isEmpty()) {
+                    // Usa o seu método salvarFoto que você criou no Service
+                    String caminhoRelativo = fotoStorageService.salvarFoto(arquivo);
 
-            // 4. Adiciona a URL na lista de fotos do Checklist e salva
-            checklist.getFotos().add(urlFotoCompleta);
+                    // Monta a URL pública (ajustando barras duplicadas)
+                    String urlFotoCompleta = baseUrl.endsWith("/") ? baseUrl + caminhoRelativo : baseUrl + "/" + caminhoRelativo;
+                    urlFotoCompleta = urlFotoCompleta.replace("//uploads", "/uploads"); // Limpeza fina de rota
+
+                    // Adiciona a URL na lista
+                    checklist.getFotos().add(urlFotoCompleta);
+                }
+            }
+
+            // 3. Salva o Checklist com todas as fotos novas de uma vez
             checklistRepository.save(checklist);
 
-            return ResponseEntity.ok("Foto salva com sucesso!");
+            return ResponseEntity.ok(java.util.Map.of("message", "Fotos anexadas com sucesso ao Laudo!"));
 
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.badRequest().body("Erro ao salvar foto: " + e.getMessage());
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", "Erro interno ao salvar fotos: " + e.getMessage()));
         }
     }
 
