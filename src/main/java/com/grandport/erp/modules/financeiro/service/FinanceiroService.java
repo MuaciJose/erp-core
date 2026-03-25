@@ -223,29 +223,33 @@ public class FinanceiroService {
     }
 
     // =========================================================================
-    // 🚀 LÓGICA DE CARTÃO DE CRÉDITO (AGORA VINCULADA AO CLIENTE)
+    // 🚀 LÓGICA DE CARTÃO DE CRÉDITO (BLINDADA COM NOME NA DESCRIÇÃO)
     // =========================================================================
     @Transactional
     public void gerarContaReceberCartao(BigDecimal valor, Integer parcelas, Parceiro cliente, String referencia) {
         if (parcelas == null || parcelas < 1) parcelas = 1;
 
+        // 🚀 O RADAR: Captura o nome na hora que entra no método!
+        String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
+
         for (int i = 1; i <= parcelas; i++) {
             ContaReceber conta = new ContaReceber();
 
-            // 🚀 AGORA O NOME DO CLIENTE ENTRA AQUI!
+            // Vincula o Parceiro oficialmente no Banco de Dados
             if (cliente != null) {
                 conta.setParceiro(cliente);
             }
 
-            conta.setDescricao("Cartão " + i + "/" + parcelas + " - " + referencia);
+            // 🚀 INJEÇÃO DE VISIBILIDADE: Colocamos o nome do cliente direto no título da conta!
+            conta.setDescricao("Cartão " + i + "/" + parcelas + " - " + nomeCliente + " (" + referencia + ")");
+
             conta.setValorOriginal(valor.divide(BigDecimal.valueOf(parcelas), 2, RoundingMode.HALF_UP));
-            conta.setDataVencimento(LocalDateTime.now().plusDays(30L * i));
+            conta.setDataVencimento(java.time.LocalDateTime.now().plusDays(30L * i));
             conta.setStatus(StatusFinanceiro.PENDENTE);
 
             recebaRepo.save(conta);
         }
 
-        String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
         auditoriaService.registrar("FINANCEIRO", "GERACAO_RECEBER_CARTAO", "Gerou " + parcelas + " parcela(s) no Cartão (Ref: " + referencia + ") do cliente '" + nomeCliente + "' totalizando R$ " + valor);
     }
 
