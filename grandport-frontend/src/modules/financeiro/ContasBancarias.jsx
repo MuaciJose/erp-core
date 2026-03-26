@@ -10,13 +10,14 @@ export const ContasBancarias = () => {
     const [contas, setContas] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // 🚀 ESTADOS DE FLUXO
+    // ? ESTADOS DE FLUXO
     const [modoAtual, setModoAtual] = useState('LISTA'); // LISTA, NOVA_CONTA, TRANSFERENCIA
     const [processando, setProcessando] = useState(false);
 
-    // ESTADOS PARA NOVA CONTA
+    // 🚀 ESTADOS PARA NOVA CONTA (AGORA COM OS CAMPOS EDI BLINDADOS)
     const [formNovaConta, setFormNovaConta] = useState({
-        nome: '', tipo: 'BANCO', numeroBanco: '', agencia: '', numeroConta: ''
+        nome: '', tipo: 'BANCO', numeroBanco: '', agencia: '', numeroConta: '',
+        digitoConta: '', carteira: '', convenio: '', nossoNumeroAtual: '1', tipoCnab: '400'
     });
     const [saldoInicialInput, setSaldoInicialInput] = useState('0');
 
@@ -66,7 +67,7 @@ export const ContasBancarias = () => {
     };
 
     // =======================================================================
-    // 🚀 ATALHOS DE TECLADO (MODO NINJA COMPLETO)
+    // ? ATALHOS DE TECLADO (MODO NINJA COMPLETO)
     // =======================================================================
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -106,7 +107,11 @@ export const ContasBancarias = () => {
     // TRANSIÇÕES E AÇÕES
     // =======================================================================
     const abrirNovaConta = () => {
-        setFormNovaConta({ nome: '', tipo: 'BANCO', numeroBanco: '', agencia: '', numeroConta: '' });
+        // 🚀 Zera os campos EDI também
+        setFormNovaConta({
+            nome: '', tipo: 'BANCO', numeroBanco: '', agencia: '', numeroConta: '',
+            digitoConta: '', carteira: '', convenio: '', nossoNumeroAtual: '1', tipoCnab: '400'
+        });
         setSaldoInicialInput('0');
         setModoAtual('NOVA_CONTA');
     };
@@ -233,7 +238,7 @@ export const ContasBancarias = () => {
                                 <h3 className="font-black text-slate-800 text-lg leading-tight mb-1">{conta.nome}</h3>
                                 {conta.tipo === 'BANCO' ? (
                                     <p className="text-[10px] font-bold text-slate-400 font-mono">
-                                        B: {conta.numeroBanco || '---'} | Ag: {conta.agencia || '---'} | C: {conta.numeroConta || '---'}
+                                        B: {conta.numeroBanco || '---'} | Ag: {conta.agencia || '---'} | C: {conta.numeroConta || '---'}-{conta.digitoConta || 'X'}
                                     </p>
                                 ) : (
                                     <p className="text-[10px] font-bold text-slate-400">Moeda em espécie / PIX local</p>
@@ -293,19 +298,52 @@ export const ContasBancarias = () => {
                                 </select>
                             </div>
 
+                            {/* 🚀 O CAMPO DE BATALHA DO EDI! */}
                             {formNovaConta.tipo === 'BANCO' && (
-                                <div className="grid grid-cols-3 gap-3 p-5 bg-blue-50 rounded-2xl border-2 border-blue-100 animate-fade-in">
-                                    <div title="Código da Instituição Financeira">
-                                        <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Nº Banco</label>
-                                        <input type="text" value={formNovaConta.numeroBanco} onChange={e => setFormNovaConta({...formNovaConta, numeroBanco: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="341" />
+                                <div className="space-y-4 p-5 bg-blue-50 rounded-2xl border-2 border-blue-100 animate-fade-in">
+                                    <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest border-b border-blue-200 pb-2">Configurações de Remessa e Boleto</h3>
+
+                                    {/* Linha 1: Banco, Agência, Conta, Dígito */}
+                                    <div className="grid grid-cols-4 gap-3">
+                                        <div title="Código da Instituição (Ex: 001, 341)">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Nº Banco</label>
+                                            <input type="text" value={formNovaConta.numeroBanco} onChange={e => setFormNovaConta({...formNovaConta, numeroBanco: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="341" />
+                                        </div>
+                                        <div title="Agência">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Agência</label>
+                                            <input type="text" value={formNovaConta.agencia} onChange={e => setFormNovaConta({...formNovaConta, agencia: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="0001" />
+                                        </div>
+                                        <div title="Número da Conta">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Conta</label>
+                                            <input type="text" value={formNovaConta.numeroConta} onChange={e => setFormNovaConta({...formNovaConta, numeroConta: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="12345" />
+                                        </div>
+                                        <div title="Dígito da Conta">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Dígito</label>
+                                            <input type="text" value={formNovaConta.digitoConta} onChange={e => setFormNovaConta({...formNovaConta, digitoConta: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="6" />
+                                        </div>
                                     </div>
-                                    <div title="Número da Agência sem dígito">
-                                        <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Agência</label>
-                                        <input type="text" value={formNovaConta.agencia} onChange={e => setFormNovaConta({...formNovaConta, agencia: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="0001" />
-                                    </div>
-                                    <div title="Número da Conta com dígito">
-                                        <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Conta</label>
-                                        <input type="text" value={formNovaConta.numeroConta} onChange={e => setFormNovaConta({...formNovaConta, numeroConta: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="12345-6" />
+
+                                    {/* Linha 2: EDI / CNAB */}
+                                    <div className="grid grid-cols-4 gap-3 pt-2">
+                                        <div title="Carteira de Cobrança">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Carteira</label>
+                                            <input type="text" value={formNovaConta.carteira} onChange={e => setFormNovaConta({...formNovaConta, carteira: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="109" />
+                                        </div>
+                                        <div title="Convênio (BB/Caixa)">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Convênio</label>
+                                            <input type="text" value={formNovaConta.convenio} onChange={e => setFormNovaConta({...formNovaConta, convenio: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="Op" />
+                                        </div>
+                                        <div title="Padrão CNAB">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">CNAB</label>
+                                            <select value={formNovaConta.tipoCnab} onChange={e => setFormNovaConta({...formNovaConta, tipoCnab: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400 cursor-pointer">
+                                                <option value="400">400</option>
+                                                <option value="240">240</option>
+                                            </select>
+                                        </div>
+                                        <div title="Nosso Número Atual">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Nosso N.º</label>
+                                            <input type="number" value={formNovaConta.nossoNumeroAtual} onChange={e => setFormNovaConta({...formNovaConta, nossoNumeroAtual: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="1" />
+                                        </div>
                                     </div>
                                 </div>
                             )}

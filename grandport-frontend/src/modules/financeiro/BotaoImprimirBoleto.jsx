@@ -22,45 +22,36 @@ export const BotaoImprimirBoleto = ({ contaReceberId }) => {
     }, [modalAberto]);
 
     const handleGerarBoleto = async () => {
+        // 1. VALIDAÇÃO DE PRÉ-LANÇAMENTO
         if (!contaSelecionada) {
-            toast.error("Comandante, selecione a conta bancária emissora!");
-            return;
-        }
-
-        const idToast = toast.loading("A forjar o PDF do Boleto...");
-        setLoading(true);
-
-        // 🚀 TÁTICA FANTASMA: Abre a aba imediatamente no clique para furar o bloqueio!
-        const novaAba = window.open('', '_blank');
-        if (novaAba) {
-            novaAba.document.write('<h2 style="font-family: sans-serif; text-align: center; margin-top: 50px; color: #333;">A contactar o Banco... A gerar o seu Boleto.</h2>');
-        } else {
-            toast.error("O navegador bloqueou a aba! Permita os pop-ups lá em cima.", { id: idToast });
-            setLoading(false);
+            alert("⚠️ Selecione uma Conta Bancária antes de gerar o boleto.");
             return;
         }
 
         try {
-            // Faz o pedido ao Java
-            const response = await api.get(`/api/financeiro/boletos/${contaReceberId}/gerar-pdf/${contaSelecionada}`, {
+            setLoading(true); // Ativa o spinner do botão
+
+            // 2. A MIRA CORRIGIDA
+            // Usando a variável de estado real 'contaSelecionada'
+            const urlDoJava = `/api/financeiro/boletos/${contaReceberId}/gerar-pdf/${contaSelecionada}`;
+
+            const response = await api.get(urlDoJava, {
                 responseType: 'blob'
             });
 
-            // Cria o ficheiro na memória
-            const fileURL = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-
-            // 🚀 INJETA O PDF NA ABA QUE JÁ ESTAVA ABERTA
-            novaAba.location.href = fileURL;
-
-            toast.success("Boleto gerado com sucesso!", { id: idToast });
-            setModalAberto(false);
+            const arquivoPdf = new Blob([response.data], { type: 'application/pdf' });
+            const urlDoArquivo = window.URL.createObjectURL(arquivoPdf);
+            window.open(urlDoArquivo, '_blank');
 
         } catch (error) {
-            console.error(error);
-            novaAba.close(); // Se der erro, fecha a aba fantasma para não sujar a tela
-            toast.error("Falha ao gerar o boleto.", { id: idToast });
+            let mensagemAmigavel = "Ocorreu um erro de comunicação com o servidor.";
+            if (error.response && (error.response.status === 400 || error.response.status === 500)) {
+                mensagemAmigavel = "Falha na geração do PDF. O banco rejeitou os dados (Agência, Conta, ou IDs) por estarem fora do padrão matemático exigido.";
+            }
+            alert(`⚠️ ALERTA DO SISTEMA:\n\n${mensagemAmigavel}`);
+            console.error("Erro Técnico detalhado:", error);
         } finally {
-            setLoading(false);
+            setLoading(false); // Desativa o spinner independentemente de sucesso ou erro
         }
     };
 

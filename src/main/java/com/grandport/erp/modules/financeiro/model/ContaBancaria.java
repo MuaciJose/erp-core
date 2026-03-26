@@ -33,6 +33,7 @@ public class ContaBancaria extends BaseEntityMultiEmpresa {
     private String numeroConta;
     private String digitoConta;
 
+    private String convenio; // Essencial para Banco do Brasil e Caixa
     // =========================================================================
     // 📄 DADOS PARA EDI BANCÁRIO (BOLETOS / CNAB)
     // =========================================================================
@@ -50,4 +51,7 @@ public class ContaBancaria extends BaseEntityMultiEmpresa {
     // Cada vez que gerar um boleto, o Java faz: nossoNumeroAtual + 1
     @Column(nullable = false)
     private Long nossoNumeroAtual = 0L;
+
+    @Column(length = 3)
+    private String tipoCnab = "400"; // Padrão 400 ou 240
 }
