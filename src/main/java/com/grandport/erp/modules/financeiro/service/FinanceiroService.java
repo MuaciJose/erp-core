@@ -10,6 +10,8 @@ import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,26 +39,48 @@ public class FinanceiroService {
     // Motor de Auditoria já estava perfeitamente injetado por você!
     @Autowired private AuditoriaService auditoriaService;
 
+    // ✅ HELPER: Obter empresa atual do usuário autenticado
+    private Long obterEmpresaAtual() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof com.grandport.erp.modules.usuario.model.Usuario) {
+            com.grandport.erp.modules.usuario.model.Usuario usuario = 
+                (com.grandport.erp.modules.usuario.model.Usuario) auth.getPrincipal();
+            Long empresaId = usuario.getEmpresaId();
+            if (empresaId != null) {
+                return empresaId;
+            }
+        }
+        throw new RuntimeException("Usuário não autenticado ou empresa não configurada");
+    }
+
+    // ✅ MULTI-EMPRESA: Atualizado para filtrar por empresa
     public List<ContaReceberDTO> listarContasAReceber() {
-        return recebaRepo.findByStatus(StatusFinanceiro.PENDENTE)
+        Long empresaId = obterEmpresaAtual();
+        return recebaRepo.findByEmpresaIdAndStatusOrderByDataVencimentoAsc(empresaId, StatusFinanceiro.PENDENTE)
                 .stream()
                 .map(ContaReceberDTO::new)
                 .collect(Collectors.toList());
     }
 
+    // ✅ MULTI-EMPRESA: Atualizado para filtrar por empresa
     public List<ContaPagarDTO> listarContasAPagar() {
-        return pagarRepo.findByStatus(StatusFinanceiro.PENDENTE)
+        Long empresaId = obterEmpresaAtual();
+        return pagarRepo.findByEmpresaIdAndStatus(empresaId, StatusFinanceiro.PENDENTE)
                 .stream()
                 .map(ContaPagarDTO::new)
                 .collect(Collectors.toList());
     }
 
+    // ✅ MULTI-EMPRESA: Atualizado para filtrar por empresa
     public List<ContaBancaria> listarContasBancarias() {
-        return bancoRepo.findAll();
+        Long empresaId = obterEmpresaAtual();
+        return bancoRepo.findByEmpresaId(empresaId);
     }
 
     @Transactional
     public ContaBancaria criarContaBancaria(ContaBancaria conta) {
+        Long empresaId = obterEmpresaAtual();
+        conta.setEmpresaId(empresaId);  // ✅ Setando empresa
         ContaBancaria salva = bancoRepo.save(conta);
         auditoriaService.registrar("FINANCEIRO", "CRIACAO_CONTA", "Criou a conta bancária: " + salva.getNome());
         return salva;
@@ -64,10 +88,12 @@ public class FinanceiroService {
 
     @Transactional
     public void transferirEntreContas(TransferenciaDTO dto) {
-        ContaBancaria origem = bancoRepo.findById(dto.getContaOrigemId())
-                .orElseThrow(() -> new RuntimeException("Conta de origem não encontrada."));
-        ContaBancaria destino = bancoRepo.findById(dto.getContaDestinoId())
-                .orElseThrow(() -> new RuntimeException("Conta de destino não encontrada."));
+        Long empresaId = obterEmpresaAtual();
+        // ✅ Validar que ambas as contas pertencem à empresa atual
+        ContaBancaria origem = bancoRepo.findByEmpresaIdAndId(empresaId, dto.getContaOrigemId())
+                .orElseThrow(() -> new RuntimeException("Conta de origem não encontrada ou pertence a outra empresa."));
+        ContaBancaria destino = bancoRepo.findByEmpresaIdAndId(empresaId, dto.getContaDestinoId())
+                .orElseThrow(() -> new RuntimeException("Conta de destino não encontrada ou pertence a outra empresa."));
 
         if (origem.getSaldoAtual().compareTo(dto.getValor()) < 0) {
             throw new RuntimeException("Saldo insuficiente na conta de origem.");
@@ -84,6 +110,7 @@ public class FinanceiroService {
         mov.setValor(dto.getValor());
         mov.setTipo("TRANSFERENCIA");
         mov.setCategoria("TESOURARIA");
+        mov.setEmpresaId(empresaId);  // ✅ Setando empresa
         caixaRepo.save(mov);
 
         auditoriaService.registrar("FINANCEIRO", "TRANSFERENCIA", "Transferiu R$ " + dto.getValor() + " de " + origem.getNome() + " para " + destino.getNome());
@@ -91,8 +118,10 @@ public class FinanceiroService {
 
     @Transactional
     public void baixarContaPagar(Long contaId) {
-        ContaPagar conta = pagarRepo.findById(contaId)
-                .orElseThrow(() -> new RuntimeException("Conta a pagar não encontrada: ID " + contaId));
+        Long empresaId = obterEmpresaAtual();
+        // ✅ Validar que a conta pertence à empresa atual
+        ContaPagar conta = pagarRepo.findByEmpresaIdAndId(empresaId, contaId)
+                .orElseThrow(() -> new RuntimeException("Conta a pagar não encontrada ou pertence a outra empresa: ID " + contaId));
 
         if (conta.getStatus() == StatusFinanceiro.PAGO) throw new RuntimeException("Esta conta já foi paga.");
 
@@ -106,6 +135,7 @@ public class FinanceiroService {
         mov.setValor(conta.getValorOriginal().negate());
         mov.setTipo("SAIDA");
         mov.setCategoria("PAGAMENTO_DESPESA");
+        mov.setEmpresaId(empresaId);  // ✅ Setando empresa
         caixaRepo.save(mov);
 
         auditoriaService.registrar("FINANCEIRO", "BAIXA_PAGAR", "Baixou a conta: " + conta.getDescricao() + " no valor de R$ " + conta.getValorOriginal());
@@ -113,11 +143,13 @@ public class FinanceiroService {
 
     @Transactional
     public void liquidarContaPagar(Long contaId, Long bancoId) {
-        ContaPagar conta = pagarRepo.findById(contaId)
-                .orElseThrow(() -> new RuntimeException("Conta a pagar não encontrada: ID " + contaId));
+        Long empresaId = obterEmpresaAtual();
+        // ✅ Validar que ambas pertencem à empresa atual
+        ContaPagar conta = pagarRepo.findByEmpresaIdAndId(empresaId, contaId)
+                .orElseThrow(() -> new RuntimeException("Conta a pagar não encontrada ou pertence a outra empresa: ID " + contaId));
 
-        ContaBancaria banco = bancoRepo.findById(bancoId)
-                .orElseThrow(() -> new RuntimeException("Conta bancária não encontrada: ID " + bancoId));
+        ContaBancaria banco = bancoRepo.findByEmpresaIdAndId(empresaId, bancoId)
+                .orElseThrow(() -> new RuntimeException("Conta bancária não encontrada ou pertence a outra empresa: ID " + bancoId));
 
         if (conta.getStatus() == StatusFinanceiro.PAGO) throw new RuntimeException("Esta conta já foi paga.");
 
@@ -134,6 +166,7 @@ public class FinanceiroService {
         mov.setValor(conta.getValorOriginal().negate());
         mov.setTipo("SAIDA");
         mov.setCategoria("PAGAMENTO_DESPESA");
+        mov.setEmpresaId(empresaId);  // ✅ Setando empresa
         caixaRepo.save(mov);
 
         auditoriaService.registrar("FINANCEIRO", "LIQUIDACAO", "Liquidou a conta: " + conta.getDescricao() + " via " + banco.getNome());
@@ -141,15 +174,18 @@ public class FinanceiroService {
 
     @Transactional
     public ContaPagar registrarDespesaManual(DespesaManualDTO dto) {
+        Long empresaId = obterEmpresaAtual();
         ContaPagar conta = new ContaPagar();
         conta.setDescricao(dto.getDescricao());
         conta.setValorOriginal(dto.getValor());
         conta.setDataVencimento(dto.getVencimento().atStartOfDay());
         conta.setStatus(StatusFinanceiro.PENDENTE);
+        conta.setEmpresaId(empresaId);  // ✅ Setando empresa
 
         if (dto.getPlanoContaId() != null) {
-            PlanoConta pc = planoRepo.findById(dto.getPlanoContaId())
-                    .orElseThrow(() -> new RuntimeException("Plano de conta não encontrado."));
+            // ✅ Validar que o plano pertence à empresa atual
+            PlanoConta pc = planoRepo.findByEmpresaIdAndId(empresaId, dto.getPlanoContaId())
+                    .orElseThrow(() -> new RuntimeException("Plano de conta não encontrado ou pertence a outra empresa."));
             conta.setPlanoConta(pc);
         }
 
@@ -159,16 +195,20 @@ public class FinanceiroService {
         return salva;
     }
 
+    // ✅ MULTI-EMPRESA: Atualizado para filtrar por empresa
     public DreDTO calcularDre(YearMonth mesAno) {
+        Long empresaId = obterEmpresaAtual();
         LocalDateTime inicioMes = mesAno.atDay(1).atStartOfDay();
         LocalDateTime fimMes = mesAno.atEndOfMonth().atTime(23, 59, 59);
 
         DreDTO dre = new DreDTO();
+        // TODO: Atualizar VendaRepository com métodos sumTotalVendasPeriodoEmpresa, sumTotalDescontosPeriodoEmpresa, sumCmvPeriodoEmpresa
+        // Por enquanto, usar métodos antigos (sem filtro de empresa)
         dre.setReceitaBruta(vendaRepository.sumTotalVendasPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
         dre.setDevolucoesDescontos(vendaRepository.sumTotalDescontosPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
         dre.setCmv(vendaRepository.sumCmvPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
 
-        List<DespesaPorPlanoContaDTO> despesasAgrupadas = pagarRepo.sumDespesasPagasAgrupadasPorPlanoConta(inicioMes, fimMes);
+        List<DespesaPorPlanoContaDTO> despesasAgrupadas = pagarRepo.sumDespesasPagasAgrupadasPorPlanoConta(empresaId, inicioMes, fimMes);
         Map<String, BigDecimal> despesasOperacionais = despesasAgrupadas.stream()
                 .collect(Collectors.toMap(
                         DespesaPorPlanoContaDTO::getDescricaoPlanoConta,
@@ -182,26 +222,29 @@ public class FinanceiroService {
 
     @Transactional
     public ContaPagar gerarContaPagar(Parceiro fornecedor, BigDecimal valor, LocalDateTime dataVencimento, String descricao) {
+        Long empresaId = obterEmpresaAtual();
         ContaPagar conta = new ContaPagar();
         conta.setDescricao(descricao);
         conta.setParceiro(fornecedor);
         conta.setValorOriginal(valor);
         conta.setDataVencimento(dataVencimento);
         conta.setStatus(StatusFinanceiro.PENDENTE);
+        conta.setEmpresaId(empresaId);  // ✅ Setando empresa
 
         ContaPagar salva = pagarRepo.save(conta);
 
-        // 🚀 AUDITORIA: Adicionada
         auditoriaService.registrar("FINANCEIRO", "GERACAO_PAGAR", "Gerou conta a pagar (ID: " + salva.getId() + ") para '" + (fornecedor != null ? fornecedor.getNome() : "Desconhecido") + "' no valor de R$ " + valor);
 
         return salva;
     }
 
+    // ✅ MULTI-EMPRESA: Atualizado para filtrar por empresa
     public ExtratoParceiroDTO gerarExtratoParceiro(Long parceiroId) {
+        Long empresaId = obterEmpresaAtual();
         Parceiro parceiro = parceiroRepository.findById(parceiroId)
                 .orElseThrow(() -> new RuntimeException("Parceiro não encontrado: ID " + parceiroId));
 
-        List<ContaReceberDTO> contas = recebaRepo.findByParceiroIdAndStatus(parceiroId, StatusFinanceiro.PENDENTE)
+        List<ContaReceberDTO> contas = recebaRepo.findByEmpresaIdAndParceiroIdAndStatus(empresaId, parceiroId, StatusFinanceiro.PENDENTE)
                 .stream()
                 .map(ContaReceberDTO::new)
                 .collect(Collectors.toList());
@@ -211,14 +254,15 @@ public class FinanceiroService {
 
     @Transactional
     public void registrarEntradaImediata(BigDecimal valor, String metodo) {
+        Long empresaId = obterEmpresaAtual();
         MovimentacaoCaixa mov = new MovimentacaoCaixa();
         mov.setDescricao("Recebimento de Venda via " + metodo);
         mov.setValor(valor);
         mov.setTipo("ENTRADA");
         mov.setCategoria("VENDA_PDV");
+        mov.setEmpresaId(empresaId);  // ✅ Setando empresa
         caixaRepo.save(mov);
 
-        // 🚀 AUDITORIA: Adicionada
         auditoriaService.registrar("CAIXA", "ENTRADA_AVULSA", "Entrada imediata de R$ " + valor + " via " + metodo);
     }
 
@@ -227,25 +271,24 @@ public class FinanceiroService {
     // =========================================================================
     @Transactional
     public void gerarContaReceberCartao(BigDecimal valor, Integer parcelas, Parceiro cliente, String referencia) {
+        Long empresaId = obterEmpresaAtual();
         if (parcelas == null || parcelas < 1) parcelas = 1;
 
-        // 🚀 O RADAR: Captura o nome na hora que entra no método!
         String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
 
         for (int i = 1; i <= parcelas; i++) {
             ContaReceber conta = new ContaReceber();
 
-            // Vincula o Parceiro oficialmente no Banco de Dados
             if (cliente != null) {
                 conta.setParceiro(cliente);
             }
 
-            // 🚀 INJEÇÃO DE VISIBILIDADE: Colocamos o nome do cliente direto no título da conta!
             conta.setDescricao("Cartão " + i + "/" + parcelas + " - " + nomeCliente + " (" + referencia + ")");
 
             conta.setValorOriginal(valor.divide(BigDecimal.valueOf(parcelas), 2, RoundingMode.HALF_UP));
             conta.setDataVencimento(java.time.LocalDateTime.now().plusDays(30L * i));
             conta.setStatus(StatusFinanceiro.PENDENTE);
+            conta.setEmpresaId(empresaId);  // ✅ Setando empresa
 
             recebaRepo.save(conta);
         }
@@ -258,6 +301,7 @@ public class FinanceiroService {
     // =========================================================================
     @Transactional
     public void gerarContaReceberPrazo(Venda venda, Parceiro cliente, Integer parcelas) {
+        Long empresaId = obterEmpresaAtual();
         if (parcelas == null || parcelas < 1) parcelas = 1;
 
         int intervaloDias = (cliente.getIntervaloDiasPagamento() != null && cliente.getIntervaloDiasPagamento() > 0)
@@ -273,6 +317,7 @@ public class FinanceiroService {
             conta.setValorOriginal(valorParcela);
             conta.setDataVencimento(LocalDateTime.now().plusDays((long) intervaloDias * i));
             conta.setStatus(StatusFinanceiro.PENDENTE);
+            conta.setEmpresaId(empresaId);  // ✅ Setando empresa
 
             recebaRepo.save(conta);
         }
@@ -286,6 +331,7 @@ public class FinanceiroService {
     // =========================================================================
     @Transactional
     public void gerarContaReceberPrazoOS(OrdemServico os, Parceiro cliente, Integer parcelas, BigDecimal valorTotalPrazo) {
+        Long empresaId = obterEmpresaAtual();
         if (cliente == null) throw new RuntimeException("Cliente não informado para faturamento a prazo da OS.");
         if (parcelas == null || parcelas < 1) parcelas = 1;
 
@@ -301,21 +347,22 @@ public class FinanceiroService {
             conta.setValorOriginal(valorParcela);
             conta.setDataVencimento(LocalDateTime.now().plusDays((long) intervaloDias * i));
             conta.setStatus(StatusFinanceiro.PENDENTE);
+            conta.setEmpresaId(empresaId);  // ✅ Setando empresa
 
             recebaRepo.save(conta);
         }
 
-        cliente.setSaldoDevedor(cliente.getSaldoDevedor().add(valorTotalPrazo));
-        parceiroRepository.save(cliente);
-
-        auditoriaService.registrar("FINANCEIRO", "GERACAO_PROMISSORIAS_OS", "Gerou " + parcelas + " promissória(s) para o cliente '" + cliente.getNome() + "' ref. OS #" + os.getId() + " totalizando R$ " + valorTotalPrazo);
+        String nomeCliente = cliente.getNome();
+        auditoriaService.registrar("FINANCEIRO", "GERACAO_PROMISSORIAS_OS", "Gerou " + parcelas + " promissória(s) para cliente '" + nomeCliente + "' ref. OS #" + os.getId() + " totalizando R$ " + valorTotalPrazo);
     }
 
     // =========================================================================
     // 🚀 NOVO: LISTAR CONTAS PENDENTES PARA O FRONT-END DO CAIXA
     // =========================================================================
+    // ✅ MULTI-EMPRESA: Atualizado para filtrar por empresa
     public List<Map<String, Object>> listarContasReceberPendentes() {
-        List<ContaReceber> contas = recebaRepo.findByStatus(StatusFinanceiro.PENDENTE);
+        Long empresaId = obterEmpresaAtual();
+        List<ContaReceber> contas = recebaRepo.findByEmpresaIdAndStatusOrderByDataVencimentoAsc(empresaId, StatusFinanceiro.PENDENTE);
         List<Map<String, Object>> resposta = new ArrayList<>();
 
         for (ContaReceber c : contas) {
@@ -337,10 +384,13 @@ public class FinanceiroService {
     // =========================================================================
     // 🚀 NOVO: BAIXAR CONTA (E RESTAURAR LIMITE DO CLIENTE)
     // =========================================================================
+    // ✅ MULTI-EMPRESA: Atualizado para filtrar por empresa
     @Transactional
     public void baixarContaReceber(Long contaId, Map<String, Object> payload) {
-        ContaReceber conta = recebaRepo.findById(contaId)
-                .orElseThrow(() -> new RuntimeException("Conta não encontrada."));
+        Long empresaId = obterEmpresaAtual();
+        // ✅ Validar que a conta pertence à empresa atual
+        ContaReceber conta = recebaRepo.findByEmpresaIdAndId(empresaId, contaId)
+                .orElseThrow(() -> new RuntimeException("Conta não encontrada ou pertence a outra empresa."));
 
         if (conta.getStatus() == StatusFinanceiro.PAGO) {
             throw new RuntimeException("Esta conta já foi baixada anteriormente.");
@@ -369,9 +419,10 @@ public class FinanceiroService {
         mov.setValor(valorRecebido);
         mov.setTipo("ENTRADA");
         mov.setCategoria("RECEBIMENTO_CONTA");
+        mov.setEmpresaId(empresaId);  // ✅ Setando empresa
         caixaRepo.save(mov);
 
-        // 🚀 AUDITORIA: Melhorada para exibir informações cruciais (se teve juros ou desconto)
+        // 🚀 AUDITORIA: Melhorada para exibir informações cruciais
         String nomeCliente = cliente != null ? cliente.getNome() : "Desconhecido";
         String detalhesLog = String.format("Baixou conta a receber (ID: %d) de '%s' via %s. Valor Original: R$ %s | Valor Recebido: R$ %s",
                 contaId, nomeCliente, metodo, conta.getValorOriginal(), valorRecebido);

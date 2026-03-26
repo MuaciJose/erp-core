@@ -13,12 +13,34 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ContaPagarRepository extends JpaRepository<ContaPagar, Long> {
+    
+    // ✅ MULTI-EMPRESA: Métodos com filtro de empresa
+    List<ContaPagar> findByEmpresaIdAndStatus(Long empresaId, StatusFinanceiro status);
+    List<ContaPagar> findByEmpresaIdAndDataVencimentoBetweenOrderByDataVencimentoAsc(Long empresaId, LocalDateTime inicio, LocalDateTime fim);
+    List<ContaPagar> findByEmpresaIdAndDataPagamentoBetween(Long empresaId, LocalDateTime inicio, LocalDateTime fim);
+    Optional<ContaPagar> findByEmpresaIdAndId(Long empresaId, Long id);
+
+    @Query("SELECT SUM(c.valorPago) FROM ContaPagar c WHERE c.empresaId = :empresaId AND c.status = 'PAGO' AND c.dataPagamento BETWEEN :inicio AND :fim")
+    Optional<BigDecimal> sumDespesasPagasPeriodo(@Param("empresaId") Long empresaId, @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    @Query("SELECT new com.grandport.erp.modules.financeiro.dto.DespesaPorPlanoContaDTO(COALESCE(pc.descricao, cp.descricao, 'Despesa Não Identificada'), SUM(cp.valorPago)) " +
+           "FROM ContaPagar cp LEFT JOIN cp.planoConta pc " +
+           "WHERE cp.empresaId = :empresaId AND cp.status = 'PAGO' AND cp.dataPagamento BETWEEN :inicio AND :fim " +
+           "GROUP BY COALESCE(pc.descricao, cp.descricao, 'Despesa Não Identificada')")
+    List<DespesaPorPlanoContaDTO> sumDespesasPagasAgrupadasPorPlanoConta(
+            @Param("empresaId") Long empresaId,
+            @Param("inicio") LocalDateTime inicio, 
+            @Param("fim") LocalDateTime fim);
+
+    // ❌ DEPRECATED: Métodos antigos sem filtro
+    @Deprecated
     List<ContaPagar> findByStatus(StatusFinanceiro status);
 
+    @Deprecated
     @Query("SELECT SUM(c.valorPago) FROM ContaPagar c WHERE c.status = 'PAGO' AND c.dataPagamento BETWEEN :inicio AND :fim")
     Optional<BigDecimal> sumDespesasPagasPeriodo(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 
-    // Se não tiver plano de contas, usa a descrição da conta como categoria
+    @Deprecated
     @Query("SELECT new com.grandport.erp.modules.financeiro.dto.DespesaPorPlanoContaDTO(COALESCE(pc.descricao, cp.descricao, 'Despesa Não Identificada'), SUM(cp.valorPago)) " +
            "FROM ContaPagar cp LEFT JOIN cp.planoConta pc " +
            "WHERE cp.status = 'PAGO' AND cp.dataPagamento BETWEEN :inicio AND :fim " +
@@ -26,11 +48,4 @@ public interface ContaPagarRepository extends JpaRepository<ContaPagar, Long> {
     List<DespesaPorPlanoContaDTO> sumDespesasPagasAgrupadasPorPlanoConta(
             @Param("inicio") LocalDateTime inicio, 
             @Param("fim") LocalDateTime fim);
-
-    // Busca todas as contas a pagar de uma empresa num intervalo de datas
-    List<ContaPagar> findByEmpresaIdAndDataVencimentoBetweenOrderByDataVencimentoAsc(
-            Long empresaId,
-            java.time.LocalDateTime inicio,
-            java.time.LocalDateTime fim
-    );
 }

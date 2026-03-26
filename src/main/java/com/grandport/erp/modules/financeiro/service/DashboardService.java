@@ -50,7 +50,7 @@ public class DashboardService {
         resumo.setFaturamentoMes(vendaRepository.sumTotalVendasPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
 
         // 🚀 O CONSERTO DO ERRO DE COMPILAO AQUI!
-        resumo.setReceberAtrasado(contaReceberRepository.sumContasAtrasadasBlindado(empresaId).orElse(BigDecimal.ZERO));
+        resumo.setReceberAtrasado(contaReceberRepository.sumContasAtrasadas(empresaId).orElse(BigDecimal.ZERO));
 
         Long vendasHoje = vendaRepository.countVendasByData(LocalDate.now().atStartOfDay(), LocalDate.now().atTime(LocalTime.MAX));
         resumo.setVendasHoje(vendasHoje != null ? vendasHoje : 0L);

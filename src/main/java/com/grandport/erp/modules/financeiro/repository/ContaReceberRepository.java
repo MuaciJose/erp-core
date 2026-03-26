@@ -12,21 +12,27 @@ import java.util.Optional;
 
 public interface ContaReceberRepository extends JpaRepository<ContaReceber, Long> {
 
-    // 🚀 O NOVO MÉTODO BLINDADO PARA O EDI BANCÁRIO
-    List<ContaReceber> findByEmpresaIdAndStatus(Long empresaId, StatusFinanceiro status);
-
-    List<ContaReceber> findByStatus(StatusFinanceiro status);
-
-    List<ContaReceber> findByParceiroIdAndStatus(Long parceiroId, StatusFinanceiro status);
-
-    // 🛡️ ALERTA TÁTICO: Atualizei esta query para respeitar a Empresa e não vazar dados!
-    @Query("SELECT SUM(c.valorOriginal) FROM ContaReceber c WHERE c.empresaId = :empresaId AND c.status = 'PENDENTE' AND c.dataVencimento < CURRENT_DATE")
-    Optional<BigDecimal> sumContasAtrasadasBlindado(@Param("empresaId") Long empresaId);
-
-    // Busca todas as contas a receber de uma empresa num intervalo de datas
+    // ✅ MULTI-EMPRESA: Métodos com filtro de empresa
+    List<ContaReceber> findByEmpresaIdAndStatusOrderByDataVencimentoAsc(Long empresaId, StatusFinanceiro status);
+    List<ContaReceber> findByEmpresaIdAndParceiroIdAndStatus(Long empresaId, Long parceiroId, StatusFinanceiro status);
     List<ContaReceber> findByEmpresaIdAndDataVencimentoBetweenOrderByDataVencimentoAsc(
             Long empresaId,
             java.time.LocalDateTime inicio,
             java.time.LocalDateTime fim
     );
+    Optional<ContaReceber> findByEmpresaIdAndId(Long empresaId, Long id);
+
+    // ✅ MULTI-EMPRESA: Query com filtro de empresa
+    @Query("SELECT SUM(c.valorOriginal) FROM ContaReceber c WHERE c.empresaId = :empresaId AND c.status = 'PENDENTE' AND c.dataVencimento < CURRENT_DATE")
+    Optional<BigDecimal> sumContasAtrasadas(@Param("empresaId") Long empresaId);
+
+    @Query("SELECT SUM(c.valorOriginal) FROM ContaReceber c WHERE c.empresaId = :empresaId AND c.status = 'PENDENTE'")
+    Optional<BigDecimal> sumContasAReceberPendentes(@Param("empresaId") Long empresaId);
+
+    // ❌ DEPRECATED: Métodos antigos sem filtro
+    @Deprecated
+    List<ContaReceber> findByStatus(StatusFinanceiro status);
+
+    @Deprecated
+    List<ContaReceber> findByParceiroIdAndStatus(Long parceiroId, StatusFinanceiro status);
 }
