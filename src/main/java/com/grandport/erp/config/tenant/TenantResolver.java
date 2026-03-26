@@ -5,12 +5,17 @@ import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Component
 public class TenantResolver implements CurrentTenantIdentifierResolver<Long> {
 
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
+
     @Override
     public Long resolveCurrentTenantIdentifier() {
+        String timestamp = LocalDateTime.now().format(FORMATTER);
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
         if (auth != null && auth.getPrincipal() != null) {
@@ -21,20 +26,22 @@ public class TenantResolver implements CurrentTenantIdentifierResolver<Long> {
                 Usuario usuario = (Usuario) principal;
                 Long empresaId = usuario.getEmpresaId();
                 
-                System.out.println("╔════════════════════════════════════════════════════════════╗");
-                System.out.println("║ 🟢 RADAR SAAS: Liberando dados                             ║");
-                System.out.println("║ Empresa ID: [" + (empresaId != null ? empresaId : "NULL") + "]                                        ║");
-                System.out.println("║ Usuário: " + usuario.getUsername() + (usuario.getUsername().length() < 40 ? " ".repeat(40 - usuario.getUsername().length()) : "") + "║");
-                System.out.println("╚════════════════════════════════════════════════════════════╝");
-
-                return empresaId != null ? empresaId : 1L;
+                if (empresaId == null || empresaId <= 0) {
+                    System.out.println("[" + timestamp + "] 🟡 AVISO - TenantResolver: empresaId é NULL/INVÁLIDO para usuário [" + usuario.getUsername() + "]. Usando fallback 1L");
+                    return 1L;
+                }
+                
+                System.out.println("[" + timestamp + "] ✅ TenantResolver: Usuário [" + usuario.getUsername() + "] | Empresa ID: [" + empresaId + "]");
+                return empresaId;
             } else {
                 // Se cair aqui, é porque o Spring Security guardou só o Nome/String em vez do objeto Usuario!
-                System.out.println("🔴 ALERTA SAAS: O crachá está incompleto! Formato encontrado: " + principal.getClass().getName());
+                System.out.println("[" + timestamp + "] 🔴 ERRO - TenantResolver: Principal inválido! Tipo: " + principal.getClass().getName() + ". Valor: " + principal);
             }
+        } else {
+            System.out.println("[" + timestamp + "] 🔴 ERRO - TenantResolver: Nenhuma autenticação encontrada no SecurityContext!");
         }
 
-        System.out.println("🔴 ALERTA SAAS: Nenhuma autenticação encontrada. Usando empresa padrão (1L)");
+        System.out.println("[" + timestamp + "] ⚠️ FALLBACK: Usando empresaId padrão (1L)");
         return 1L; // Fallback de emergência
     }
 

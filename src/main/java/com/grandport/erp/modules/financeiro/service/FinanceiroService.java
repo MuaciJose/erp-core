@@ -87,6 +87,54 @@ public class FinanceiroService {
     }
 
     @Transactional
+    public ContaBancaria atualizarContaBancaria(Long contaId, ContaBancaria dadosAtualizados) {
+        Long empresaId = obterEmpresaAtual();
+        
+        // ✅ Validar que a conta pertence à empresa atual
+        ContaBancaria contaBanco = bancoRepo.findByEmpresaIdAndId(empresaId, contaId)
+                .orElseThrow(() -> new RuntimeException("Conta bancária não encontrada ou pertence a outra empresa."));
+        
+        // ✅ Proteger contra tentativa de alterar empresa
+        if (dadosAtualizados.getEmpresaId() != null && !dadosAtualizados.getEmpresaId().equals(empresaId)) {
+            throw new SecurityException("Tentativa de violação: não é permitido alterar a empresa da conta.");
+        }
+        
+        // ✅ Atualizar apenas os campos permitidos (não alterar saldo via edição)
+        contaBanco.setNome(dadosAtualizados.getNome());
+        contaBanco.setTipo(dadosAtualizados.getTipo());
+        contaBanco.setNumeroBanco(dadosAtualizados.getNumeroBanco());
+        contaBanco.setAgencia(dadosAtualizados.getAgencia());
+        contaBanco.setNumeroConta(dadosAtualizados.getNumeroConta());
+        contaBanco.setDigitoConta(dadosAtualizados.getDigitoConta());
+        contaBanco.setCarteira(dadosAtualizados.getCarteira());
+        contaBanco.setConvenio(dadosAtualizados.getConvenio());
+        contaBanco.setTipoCnab(dadosAtualizados.getTipoCnab());
+        contaBanco.setNossoNumeroAtual(dadosAtualizados.getNossoNumeroAtual());
+        
+        ContaBancaria atualizada = bancoRepo.save(contaBanco);
+        auditoriaService.registrar("FINANCEIRO", "ATUALIZACAO_CONTA", "Atualizou a conta bancária: " + atualizada.getNome());
+        return atualizada;
+    }
+
+    @Transactional
+    public void excluirContaBancaria(Long contaId) {
+        Long empresaId = obterEmpresaAtual();
+        
+        // ✅ Validar que a conta pertence à empresa atual
+        ContaBancaria conta = bancoRepo.findByEmpresaIdAndId(empresaId, contaId)
+                .orElseThrow(() -> new RuntimeException("Conta bancária não encontrada ou pertence a outra empresa."));
+        
+        // ✅ Não permitir excluir conta com saldo diferente de zero
+        if (conta.getSaldoAtual() != null && conta.getSaldoAtual().compareTo(java.math.BigDecimal.ZERO) != 0) {
+            throw new RuntimeException("Não é permitido excluir conta com saldo. Zere o saldo antes de excluir.");
+        }
+        
+        String nomeConta = conta.getNome();
+        bancoRepo.deleteById(contaId);
+        auditoriaService.registrar("FINANCEIRO", "EXCLUSAO_CONTA", "Excluiu a conta bancária: " + nomeConta);
+    }
+
+    @Transactional
     public void transferirEntreContas(TransferenciaDTO dto) {
         Long empresaId = obterEmpresaAtual();
         // ✅ Validar que ambas as contas pertencem à empresa atual

@@ -31,7 +31,19 @@ const CadastroEmpresa = ({ onVoltarLogin }) => {
             setSucesso(true);
             setLoading(false);
 
+            // 🔐 CRÍTICO: Limpar dados antigos de autenticação para forçar novo login
+            // Isso garante que o usuário terá novo token com a empresaId correta
+            localStorage.removeItem('token');
+            localStorage.removeItem('empresaId');
+            localStorage.removeItem('usuarioId');
+            localStorage.removeItem('user');
+            
+            // Remove do sessionStorage também (se existir)
+            sessionStorage.removeItem('token');
+            sessionStorage.removeItem('empresaId');
+
             // Redireciona para o login após 3 segundos usando a função do App.jsx
+            // O TenantResolver do backend lerá a nova empresaId do token JWT gerado
             setTimeout(() => {
                 onVoltarLogin();
             }, 3000);

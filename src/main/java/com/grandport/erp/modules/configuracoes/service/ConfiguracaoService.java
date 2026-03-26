@@ -129,6 +129,15 @@ public class ConfiguracaoService {
         // 🔐 Extrair empresaId do contexto de segurança
         Long empresaId = obterEmpresaIdDoUsuario();
 
+        // 🔐 VALIDAÇÃO CRÍTICA: Verificar se o usuário está tentando alterar empresa errada
+        if (dadosAtualizados.getEmpresaId() != null && 
+            !dadosAtualizados.getEmpresaId().equals(empresaId)) {
+            throw new SecurityException(
+                "🔴 TENTATIVA DE VIOLAÇÃO: Você está tentando alterar configuração de OUTRA EMPRESA! " +
+                "Esperado empresaId: " + empresaId + ", Recebido: " + dadosAtualizados.getEmpresaId()
+            );
+        }
+
         // 1. Buscar configuração ATUAL da empresa
         ConfiguracaoSistema configBanco = repository
             .findFirstByEmpresaIdOrderByIdDesc(empresaId)

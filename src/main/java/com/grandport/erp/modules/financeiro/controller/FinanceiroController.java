@@ -59,6 +59,19 @@ public class FinanceiroController {
         return ResponseEntity.ok(financeiroService.criarContaBancaria(conta));
     }
 
+    @PutMapping("/contas-bancarias/{id}")
+    public ResponseEntity<ContaBancaria> atualizarContaBancaria(
+            @PathVariable Long id,
+            @RequestBody ContaBancaria conta) {
+        return ResponseEntity.ok(financeiroService.atualizarContaBancaria(id, conta));
+    }
+
+    @DeleteMapping("/contas-bancarias/{id}")
+    public ResponseEntity<Void> excluirContaBancaria(@PathVariable Long id) {
+        financeiroService.excluirContaBancaria(id);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/contas-bancarias/transferir")
     public ResponseEntity<Void> transferir(@RequestBody TransferenciaDTO dto) {
         financeiroService.transferirEntreContas(dto);

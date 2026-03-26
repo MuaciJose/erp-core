@@ -11,7 +11,7 @@ export const ContasBancarias = () => {
     const [loading, setLoading] = useState(true);
 
     // ? ESTADOS DE FLUXO
-    const [modoAtual, setModoAtual] = useState('LISTA'); // LISTA, NOVA_CONTA, TRANSFERENCIA
+    const [modoAtual, setModoAtual] = useState('LISTA'); // LISTA, NOVA_CONTA, TRANSFERENCIA, EDITAR_CONTA
     const [processando, setProcessando] = useState(false);
 
     // 🚀 ESTADOS PARA NOVA CONTA (AGORA COM OS CAMPOS EDI BLINDADOS)
@@ -20,6 +20,13 @@ export const ContasBancarias = () => {
         digitoConta: '', carteira: '', convenio: '', nossoNumeroAtual: '1', tipoCnab: '400'
     });
     const [saldoInicialInput, setSaldoInicialInput] = useState('0');
+
+    // ESTADOS PARA EDIÇÃO DE CONTA
+    const [contaEmEdicao, setContaEmEdicao] = useState(null);
+    const [formEdicaoConta, setFormEdicaoConta] = useState({
+        nome: '', tipo: 'BANCO', numeroBanco: '', agencia: '', numeroConta: '',
+        digitoConta: '', carteira: '', convenio: '', nossoNumeroAtual: '1', tipoCnab: '400'
+    });
 
     // ESTADOS PARA TRANSFERÊNCIA
     const [formTransf, setFormTransf] = useState({ contaOrigemId: '', contaDestinoId: '' });
@@ -84,8 +91,8 @@ export const ContasBancarias = () => {
                 }
             }
 
-            // ATALHOS NAS TELAS DE FORMULÁRIO (NOVA_CONTA OU TRANSFERENCIA)
-            if (modoAtual === 'NOVA_CONTA' || modoAtual === 'TRANSFERENCIA') {
+            // ATALHOS NAS TELAS DE FORMULÁRIO (NOVA_CONTA, EDITAR_CONTA OU TRANSFERENCIA)
+            if (modoAtual === 'NOVA_CONTA' || modoAtual === 'EDITAR_CONTA' || modoAtual === 'TRANSFERENCIA') {
                 if (e.key === 'Escape') {
                     e.preventDefault();
                     voltarParaLista();
@@ -93,6 +100,7 @@ export const ContasBancarias = () => {
                     e.preventDefault();
                     if (!processando) {
                         if (modoAtual === 'NOVA_CONTA') submitNovaConta();
+                        if (modoAtual === 'EDITAR_CONTA') submitEdicaoConta();
                         if (modoAtual === 'TRANSFERENCIA') submitTransferencia();
                     }
                 }
@@ -114,6 +122,59 @@ export const ContasBancarias = () => {
         });
         setSaldoInicialInput('0');
         setModoAtual('NOVA_CONTA');
+    };
+
+    const abrirEdicaoConta = (conta) => {
+        setContaEmEdicao(conta);
+        setFormEdicaoConta({
+            nome: conta.nome,
+            tipo: conta.tipo,
+            numeroBanco: conta.numeroBanco || '',
+            agencia: conta.agencia || '',
+            numeroConta: conta.numeroConta || '',
+            digitoConta: conta.digitoConta || '',
+            carteira: conta.carteira || '',
+            convenio: conta.convenio || '',
+            nossoNumeroAtual: conta.nossoNumeroAtual || '1',
+            tipoCnab: conta.tipoCnab || '400'
+        });
+        setModoAtual('EDITAR_CONTA');
+    };
+
+    const submitEdicaoConta = async () => {
+        if (!formEdicaoConta.nome) return toast.error("Informe o nome da conta.");
+
+        setProcessando(true);
+        const toastId = toast.loading("Atualizando conta...");
+
+        try {
+            const payload = { ...formEdicaoConta };
+            await api.put(`/api/financeiro/contas-bancarias/${contaEmEdicao.id}`, payload);
+            toast.success("Conta atualizada com sucesso!", { id: toastId });
+            setModoAtual('LISTA');
+            setContaEmEdicao(null);
+        } catch (error) {
+            const msg = error.response?.data?.message || "Erro ao atualizar conta.";
+            toast.error(msg, { id: toastId });
+        } finally {
+            setProcessando(false);
+        }
+    };
+
+    const excluirConta = async (conta) => {
+        const confirmacao = window.confirm(`Tem certeza que deseja excluir a conta "${conta.nome}"?\n\n⚠️ Atenção: O saldo deve estar zerado para excluir.`);
+        if (!confirmacao) return;
+
+        const toastId = toast.loading("Excluindo conta...");
+
+        try {
+            await api.delete(`/api/financeiro/contas-bancarias/${conta.id}`);
+            toast.success("Conta excluída com sucesso!", { id: toastId });
+            carregarContas();
+        } catch (error) {
+            const msg = error.response?.data?.message || "Erro ao excluir conta.";
+            toast.error(msg, { id: toastId });
+        }
     };
 
     const abrirTransferencia = () => {
@@ -246,8 +307,24 @@ export const ContasBancarias = () => {
                             </div>
 
                             <div className="mt-6 pt-4 border-t border-slate-100">
-                                <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Saldo Disponível</p>
-                                <p className="text-3xl font-black text-slate-900 tracking-tight">R$ {formatarMoeda(conta.saldoAtual)}</p>
+                                <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Saldo Disponível</p>
+                                <p className="text-3xl font-black text-slate-900 tracking-tight mb-4">R$ {formatarMoeda(conta.saldoAtual)}</p>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => abrirEdicaoConta(conta)}
+                                        title="Editar conta"
+                                        className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold py-2 rounded-lg transition-colors"
+                                    >
+                                        ✏️ Editar
+                                    </button>
+                                    <button
+                                        onClick={() => excluirConta(conta)}
+                                        title="Excluir conta (saldo deve estar zerado)"
+                                        className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold py-2 rounded-lg transition-colors"
+                                    >
+                                        🗑️ Excluir
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ))}
@@ -375,6 +452,125 @@ export const ContasBancarias = () => {
                         >
                             {processando ? <Loader2 size={32} className="animate-spin"/> : <Save size={32}/>}
                             SALVAR NOVA CONTA (Ctrl+Enter)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (modoAtual === 'EDITAR_CONTA' && contaEmEdicao) {
+        return (
+            <div className="p-8 max-w-4xl mx-auto animate-fade-in">
+                <button onClick={voltarParaLista} title="Atalho: Esc" className="mb-6 flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold transition-colors">
+                    <ArrowLeft size={20} /> Voltar para Tesouraria (Esc)
+                </button>
+
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden border-t-8 border-blue-500">
+                    <div className="p-8 bg-slate-50 border-b border-slate-200">
+                        <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+                            <Landmark className="text-blue-600" size={32} /> Editar Conta
+                        </h2>
+                        <p className="text-sm font-bold text-slate-500 mt-2">Atualize os dados da conta: {contaEmEdicao.nome}</p>
+                    </div>
+
+                    <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-6">
+                            <div title="Como essa conta será chamada no sistema">
+                                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Nome da Conta / Identificação</label>
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    value={formEdicaoConta.nome}
+                                    onChange={e => setFormEdicaoConta({...formEdicaoConta, nome: e.target.value})}
+                                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold text-slate-700"
+                                    placeholder="Ex: Itaú Loja 01, Caixa Gaveta..."
+                                />
+                            </div>
+
+                            <div title="Categoria para ícones e organização">
+                                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Tipo de Conta</label>
+                                <select
+                                    value={formEdicaoConta.tipo}
+                                    onChange={e => setFormEdicaoConta({...formEdicaoConta, tipo: e.target.value})}
+                                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold text-slate-700 cursor-pointer"
+                                >
+                                    <option value="BANCO">Conta Bancária Oficial</option>
+                                    <option value="CAIXA_FISICO">Caixa Físico (Dinheiro na Gaveta)</option>
+                                    <option value="CARTEIRA_DIGITAL">Carteira Digital (MercadoPago, PagSeguro)</option>
+                                </select>
+                            </div>
+
+                            {/* 🚀 O CAMPO DE BATALHA DO EDI! */}
+                            {formEdicaoConta.tipo === 'BANCO' && (
+                                <div className="space-y-4 p-5 bg-blue-50 rounded-2xl border-2 border-blue-100 animate-fade-in">
+                                    <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest border-b border-blue-200 pb-2">Configurações de Remessa e Boleto</h3>
+
+                                    {/* Linha 1: Banco, Agência, Conta, Dígito */}
+                                    <div className="grid grid-cols-4 gap-3">
+                                        <div title="Código da Instituição (Ex: 001, 341)">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Nº Banco</label>
+                                            <input type="text" value={formEdicaoConta.numeroBanco} onChange={e => setFormEdicaoConta({...formEdicaoConta, numeroBanco: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="341" />
+                                        </div>
+                                        <div title="Agência">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Agência</label>
+                                            <input type="text" value={formEdicaoConta.agencia} onChange={e => setFormEdicaoConta({...formEdicaoConta, agencia: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="0001" />
+                                        </div>
+                                        <div title="Número da Conta">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Conta</label>
+                                            <input type="text" value={formEdicaoConta.numeroConta} onChange={e => setFormEdicaoConta({...formEdicaoConta, numeroConta: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="12345" />
+                                        </div>
+                                        <div title="Dígito da Conta">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Dígito</label>
+                                            <input type="text" value={formEdicaoConta.digitoConta} onChange={e => setFormEdicaoConta({...formEdicaoConta, digitoConta: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="6" />
+                                        </div>
+                                    </div>
+
+                                    {/* Linha 2: EDI / CNAB */}
+                                    <div className="grid grid-cols-4 gap-3 pt-2">
+                                        <div title="Carteira de Cobrança">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Carteira</label>
+                                            <input type="text" value={formEdicaoConta.carteira} onChange={e => setFormEdicaoConta({...formEdicaoConta, carteira: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="109" />
+                                        </div>
+                                        <div title="Convênio (BB/Caixa)">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Convênio</label>
+                                            <input type="text" value={formEdicaoConta.convenio} onChange={e => setFormEdicaoConta({...formEdicaoConta, convenio: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="Op" />
+                                        </div>
+                                        <div title="Padrão CNAB">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">CNAB</label>
+                                            <select value={formEdicaoConta.tipoCnab} onChange={e => setFormEdicaoConta({...formEdicaoConta, tipoCnab: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400 cursor-pointer">
+                                                <option value="400">400</option>
+                                                <option value="240">240</option>
+                                            </select>
+                                        </div>
+                                        <div title="Nosso Número Atual">
+                                            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Nosso N.º</label>
+                                            <input type="number" value={formEdicaoConta.nossoNumeroAtual} onChange={e => setFormEdicaoConta({...formEdicaoConta, nossoNumeroAtual: e.target.value})} className="w-full p-3 bg-white border-2 border-blue-100 rounded-xl font-bold outline-none focus:border-blue-400" placeholder="1" />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-emerald-50 p-8 rounded-3xl border-2 border-emerald-100">
+                            <p className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-4">ℹ️ Informações</p>
+                            <div className="space-y-3 text-sm font-bold text-slate-700">
+                                <p>💰 <strong>Saldo Atual:</strong> R$ {formatarMoeda(contaEmEdicao.saldoAtual)}</p>
+                                <p className="text-xs text-slate-500">⚠️ O saldo não pode ser alterado aqui. Use Transferências para ajustar.</p>
+                                <p className="text-xs text-slate-500 border-t border-emerald-200 pt-3 mt-3">✏️ Modifique os dados bancários e clique em SALVAR para confirmar as alterações.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-6 bg-slate-100 border-t border-slate-200 flex gap-4">
+                        <button
+                            onClick={submitEdicaoConta}
+                            disabled={processando || !formEdicaoConta.nome}
+                            title="Atalho: Ctrl + Enter"
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black text-xl py-6 rounded-2xl shadow-xl transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-3 disabled:opacity-50 disabled:transform-none"
+                        >
+                            {processando ? <Loader2 size={32} className="animate-spin"/> : <Save size={32}/>}
+                            SALVAR ALTERAÇÕES (Ctrl+Enter)
                         </button>
                     </div>
                 </div>
