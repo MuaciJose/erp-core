@@ -3,6 +3,7 @@ package com.grandport.erp.modules.compras.controller;
 import com.grandport.erp.modules.compras.dto.ConfirmacaoNotaDTO;
 import com.grandport.erp.modules.compras.dto.ImportacaoResumoDTO;
 import com.grandport.erp.modules.compras.dto.NfeProcDTO;
+import com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService;
 import com.grandport.erp.modules.compras.service.CompraService;
 import com.grandport.erp.modules.compras.service.XmlService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +31,7 @@ public class CompraController {
     private com.grandport.erp.modules.compras.repository.CompraXMLRepository compraXMLRepository;
 
     @Autowired
-    private com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository configuracaoRepository;
+    private ConfiguracaoAtualService configuracaoAtualService;
 
     @GetMapping("/historico")
     public ResponseEntity<List<ImportacaoResumoDTO>> listarHistorico() {
@@ -69,8 +70,7 @@ public class CompraController {
         var nota = compraXMLRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Nota Fiscal não encontrada."));
 
-        var empresa = configuracaoRepository.findById(1L)
-                .orElse(new com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema());
+        var empresa = configuracaoAtualService.obterAtual();
 
         Map<String, Object> variaveis = new HashMap<>();
         variaveis.put("empresa", empresa);

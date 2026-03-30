@@ -10,6 +10,7 @@ import java.util.Optional;
 
 public interface ParceiroRepository extends JpaRepository<Parceiro, Long> {
 
+    Optional<Parceiro> findByEmpresaIdAndId(Long empresaId, Long id);
     Optional<Parceiro> findByDocumento(String documento);
     Optional<Parceiro> findByNome(String nome);
 

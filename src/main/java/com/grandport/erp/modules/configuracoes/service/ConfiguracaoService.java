@@ -2,12 +2,11 @@ package com.grandport.erp.modules.configuracoes.service;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 // 🚀 1. IMPORTAÇÃO DA AUDITORIA
 import com.grandport.erp.modules.admin.service.AuditoriaService;
-import com.grandport.erp.modules.usuario.model.Usuario;
 import jakarta.annotation.PostConstruct;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
@@ -33,6 +32,7 @@ import java.util.stream.Stream;
 import java.util.List;
 
 @Service
+@Slf4j
 public class ConfiguracaoService {
 
     @Autowired
@@ -48,6 +48,9 @@ public class ConfiguracaoService {
     @Autowired
     private AuditoriaService auditoriaService;
 
+    @Autowired
+    private EmpresaContextService empresaContextService;
+
     private ScheduledFuture<?> tarefaAgendada;
 
     @org.springframework.beans.factory.annotation.Value("${spring.datasource.username}")
@@ -61,43 +64,19 @@ public class ConfiguracaoService {
 
     @PostConstruct
     public void init() {
-        reagendarBackup();
+        reagendarBackupInicial();
     }
 
     public ConfiguracaoSistema obterConfiguracao() {
         // 🔐 Extrair empresaId do usuário autenticado
-        Long empresaId = obterEmpresaIdDoUsuario();
-        
-        // 🔐 Buscar configuração DA EMPRESA ATUAL
-        ConfiguracaoSistema config = repository
-            .findFirstByEmpresaIdOrderByIdDesc(empresaId)
-            .orElseGet(() -> criarConfiguracaoPadraoParaEmpresa(empresaId));
-
-        // Aplicar defaults de campos nulos
-        if (config.getHorarioBackupAuto() == null) config.setHorarioBackupAuto("03:00");
-        if (config.getTipoCertificado() == null) config.setTipoCertificado("A1");
-        if (config.getSerieNfce() == null) config.setSerieNfce(1);
-        if (config.getNumeroProximaNfce() == null) config.setNumeroProximaNfce(1L);
-        if (config.getCscIdToken() == null) config.setCscIdToken("");
-        if (config.getCscCodigo() == null) config.setCscCodigo("");
-
-        return config;
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        return obterConfiguracaoPorEmpresa(empresaId);
     }
 
-    // 🔐 Helper para extrair empresaId do contexto de segurança
-    private Long obterEmpresaIdDoUsuario() {
-        try {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof Usuario) {
-                Usuario usuario = (Usuario) auth.getPrincipal();
-                if (usuario.getEmpresaId() != null && usuario.getEmpresaId() > 0) {
-                    return usuario.getEmpresaId();
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("⚠️ ConfiguracaoService: Erro ao extrair empresaId: " + e.getMessage());
-        }
-        return 1L; // Fallback para empresa padrão
+    public ConfiguracaoSistema obterConfiguracaoSistema() {
+        return repository.findFirstByOrderByIdDesc()
+                .map(this::aplicarDefaults)
+                .orElseThrow(() -> new IllegalStateException("Nenhuma configuracao do sistema encontrada para execucao automatica."));
     }
 
     // 🔐 Criar configuração padrão para nova empresa
@@ -118,16 +97,31 @@ public class ConfiguracaoService {
         config.setRazaoSocial("");
         config.setCnpj("");
         config.setTelefone("");
-        System.out.println("✅ ConfiguracaoService: Configuração padrão criada para empresa [" + empresaId + "]");
         ConfiguracaoSistema salva = repository.save(config);
-        System.out.println("✅ ConfiguracaoService: ID gerado: " + salva.getId());
         return salva;
+    }
+
+    private ConfiguracaoSistema obterConfiguracaoPorEmpresa(Long empresaId) {
+        ConfiguracaoSistema config = repository
+            .findFirstByEmpresaIdOrderByIdDesc(empresaId)
+            .orElseGet(() -> criarConfiguracaoPadraoParaEmpresa(empresaId));
+        return aplicarDefaults(config);
+    }
+
+    private ConfiguracaoSistema aplicarDefaults(ConfiguracaoSistema config) {
+        if (config.getHorarioBackupAuto() == null) config.setHorarioBackupAuto("03:00");
+        if (config.getTipoCertificado() == null) config.setTipoCertificado("A1");
+        if (config.getSerieNfce() == null) config.setSerieNfce(1);
+        if (config.getNumeroProximaNfce() == null) config.setNumeroProximaNfce(1L);
+        if (config.getCscIdToken() == null) config.setCscIdToken("");
+        if (config.getCscCodigo() == null) config.setCscCodigo("");
+        return config;
     }
 
     @Transactional
     public ConfiguracaoSistema atualizarConfiguracao(ConfiguracaoSistema dadosAtualizados) {
         // 🔐 Extrair empresaId do contexto de segurança
-        Long empresaId = obterEmpresaIdDoUsuario();
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
 
         // 🔐 VALIDAÇÃO CRÍTICA: Verificar se o usuário está tentando alterar empresa errada
         if (dadosAtualizados.getEmpresaId() != null && 
@@ -169,7 +163,7 @@ public class ConfiguracaoService {
         auditoriaService.registrar("SISTEMA", "ALTERACAO_CONFIGURACAO", 
             "Configurações do sistema foram atualizadas para a empresa [" + empresaId + "]");
 
-        System.out.println("✅ ConfiguracaoService: Configuração atualizada para empresa [" + empresaId + "]");
+        log.info("Configuracao atualizada para empresaId={}", empresaId);
 
         return salva;
     }
@@ -194,7 +188,7 @@ public class ConfiguracaoService {
         Path caminhoCompleto = Paths.get(diretorioDestino + File.separator + cnpjLimpo + ".pfx");
         Files.copy(arquivo.getInputStream(), caminhoCompleto, StandardCopyOption.REPLACE_EXISTING);
 
-        System.out.println("✅ Certificado salvo com sucesso: " + caminhoCompleto.getFileName());
+        log.info("Certificado salvo com sucesso: {}", caminhoCompleto.getFileName());
 
         // 🚀 4. AUDITORIA: Upload de Certificado (Crítico)
         auditoriaService.registrar("SISTEMA", "UPLOAD_CERTIFICADO", "Um novo Certificado Digital A1 foi carregado para o CNPJ: " + cnpjLimpo);
@@ -211,7 +205,7 @@ public class ConfiguracaoService {
             List<String> tabelasParaApagar = jdbcTemplate.queryForList(sqlBuscaTabelas, String.class);
 
             if (tabelasParaApagar.isEmpty()) {
-                System.out.println("Nenhuma tabela encontrada para resetar.");
+                log.info("Nenhuma tabela encontrada para resetar.");
                 return;
             }
 
@@ -220,7 +214,7 @@ public class ConfiguracaoService {
 
             jdbcTemplate.execute(sqlTruncate);
 
-            System.out.println("✅ Banco de dados resetado com sucesso! (Tabelas limpas: " + tabelasJuntas + ")");
+            log.warn("Banco de dados resetado com sucesso. Tabelas limpas={}", tabelasJuntas);
 
             // 🚀 5. AUDITORIA: Reset de Banco (Extremamente Crítico)
             auditoriaService.registrar("SISTEMA", "RESET_BANCO_DADOS", "ALERTA CRÍTICO: O banco de dados foi completamente resetado (TRUNCATE). As tabelas limpas foram: " + tabelasJuntas);
@@ -247,9 +241,30 @@ public class ConfiguracaoService {
             String cron = String.format("0 %s %s * * *", partes[1], partes[0]);
 
             tarefaAgendada = taskScheduler.schedule(this::rotinaManutencaoSistema, new CronTrigger(cron));
-            System.out.println("### [SISTEMA] Backup Automático agendado para às " + horario);
+            log.info("Backup automatico agendado para {}", horario);
         } catch (Exception e) {
-            System.err.println("### [ERRO] Falha ao processar horário de backup: " + horario);
+            log.error("Falha ao processar horario de backup: {}", horario, e);
+            tarefaAgendada = taskScheduler.schedule(this::rotinaManutencaoSistema, new CronTrigger("0 0 3 * * *"));
+        }
+    }
+
+    private void reagendarBackupInicial() {
+        if (tarefaAgendada != null) {
+            tarefaAgendada.cancel(false);
+        }
+
+        String horario = repository.findFirstByOrderByIdDesc()
+                .map(ConfiguracaoSistema::getHorarioBackupAuto)
+                .filter(valor -> valor != null && valor.contains(":"))
+                .orElse("03:00");
+
+        try {
+            String[] partes = horario.split(":");
+            String cron = String.format("0 %s %s * * *", partes[1], partes[0]);
+            tarefaAgendada = taskScheduler.schedule(this::rotinaManutencaoSistema, new CronTrigger(cron));
+            log.info("Backup automatico inicial agendado para {}", horario);
+        } catch (Exception e) {
+            log.error("Falha ao processar horario inicial de backup: {}", horario, e);
             tarefaAgendada = taskScheduler.schedule(this::rotinaManutencaoSistema, new CronTrigger("0 0 3 * * *"));
         }
     }
@@ -268,7 +283,7 @@ public class ConfiguracaoService {
             String dbPass = dbPassProp;
 
             jdbcTemplate.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;");
-            System.out.println("♻️ Esquema public recriado. Iniciando injeção do arquivo...");
+            log.warn("Esquema public recriado. Iniciando restauracao do backup.");
 
             boolean isWindows = System.getProperty("os.name").toLowerCase().startsWith("windows");
             String comandoPsql = isWindows ? "psql.exe" : "psql";
@@ -299,11 +314,11 @@ public class ConfiguracaoService {
             int exitCode = process.waitFor();
 
             if (exitCode != 0) {
-                System.err.println("❌ ERRO NO PSQL AO RESTAURAR:\n" + output.toString());
+                log.error("Erro no psql ao restaurar backup: {}", output);
                 throw new RuntimeException("O banco de dados rejeitou o arquivo de backup.");
             }
 
-            System.out.println("✅ Backup restaurado com sucesso absoluto!");
+            log.info("Backup restaurado com sucesso.");
 
             // 🚀 6. AUDITORIA: Restauração de Backup (Crítico)
             auditoriaService.registrar("SISTEMA", "RESTAURACAO_BACKUP", "ALERTA CRÍTICO: Um backup externo foi restaurado no banco de dados sobrescrevendo os dados atuais.");
@@ -348,7 +363,7 @@ public class ConfiguracaoService {
 
     public void rotinaManutencaoSistema() {
         try {
-            System.out.println("### [SISTEMA] Iniciando Backup Automático...");
+            log.info("Iniciando backup automatico.");
             String home = System.getProperty("user.home");
             String caminhoPasta = home + File.separator + "backups_grandport";
             File pasta = new File(caminhoPasta);
@@ -359,12 +374,12 @@ public class ConfiguracaoService {
             Files.copy(backupResource.getInputStream(), arquivoFinal.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
             limparBackupsAntigos(caminhoPasta, 30);
-            System.out.println("### [SISTEMA] Manutenção concluída.");
+            log.info("Manutencao automatica concluida.");
 
             // Nota: O Backup Automático não recebe log de auditoria de usuário, pois é o próprio servidor (TaskScheduler) que executa.
 
         } catch (Exception e) {
-            System.err.println("### [ERRO] Falha no agendamento: " + e.getMessage());
+            log.error("Falha na rotina de manutencao agendada", e);
         }
     }
 
@@ -378,17 +393,17 @@ public class ConfiguracaoService {
                             String dataString = path.getFileName().toString().substring(11, 21);
                             if (LocalDate.parse(dataString).isBefore(dataLimite)) {
                                 Files.delete(path);
-                                System.out.println("### [SISTEMA] Removido backup antigo: " + path.getFileName());
+                                log.info("Backup antigo removido: {}", path.getFileName());
                             }
                         } catch (Exception ignored) {}
                     });
         } catch (IOException e) {
-            System.err.println("### [ERRO] Limpeza falhou: " + e.getMessage());
+            log.error("Limpeza de backups falhou", e);
         }
     }
 
     public void limparLogsTecnicos() {
-        System.out.println("### SISTEMA: Logs limpos e Cache esvaziado.");
+        log.info("Logs tecnicos limpos e cache esvaziado.");
 
         // 🚀 8. AUDITORIA: Limpeza de Logs
         auditoriaService.registrar("SISTEMA", "LIMPEZA_LOGS", "Os logs técnicos internos (console/cache) foram limpos pelo administrador.");

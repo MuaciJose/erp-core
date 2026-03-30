@@ -2,17 +2,16 @@ package com.grandport.erp.modules.fiscal.service;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 import com.grandport.erp.modules.fiscal.repository.NotaFiscalRepository;
 import com.grandport.erp.modules.vendas.model.StatusVenda;
 import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
-import com.grandport.erp.modules.usuario.model.Usuario;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +35,7 @@ import java.util.Map;
  * - Números são atualizados de forma atômica
  */
 @Service
+@Slf4j
 public class SincronizacaoErpService {
 
     @Autowired
@@ -50,6 +50,9 @@ public class SincronizacaoErpService {
     @Autowired
     private AuditoriaService auditoriaService;
 
+    @Autowired
+    private EmpresaContextService empresaContextService;
+
     // =========================================================================
     // 🔐 MÉTODO AUXILIAR: Obter Empresa do Usuário Autenticado
     // =========================================================================
@@ -58,25 +61,9 @@ public class SincronizacaoErpService {
      * 🆕 Obtém o ID da empresa do usuário atualmente autenticado
      * Usado para isolamento de dados em sincronizações automáticas
      * 
-     * Fallback para empresaId = 1L se não conseguir extrair
      */
     private Long obterEmpresaIdDoUsuarioAutenticado() {
-        try {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof Usuario) {
-                Usuario usuario = (Usuario) auth.getPrincipal();
-                Long empresaId = usuario.getEmpresaId();
-                if (empresaId != null && empresaId > 0) {
-                    System.out.println("🏢 Empresa do usuário: " + empresaId);
-                    return empresaId;
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("⚠️ Erro ao extrair empresa do contexto: " + e.getMessage());
-        }
-        // Fallback seguro
-        System.out.println("🏢 Usando empresa padrão: 1L");
-        return 1L;
+        return empresaContextService.getRequiredEmpresaId();
     }
 
     // =========================================================================
@@ -114,7 +101,7 @@ public class SincronizacaoErpService {
         }
 
         // ✅ Obtém configuração atual
-        ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
+        ConfiguracaoSistema config = configuracaoService.obterConfiguracaoSistema();
 
         // ✅ Valida se o número retornado é o esperado
         if (!config.getSerieNfce().equals(serieSefaz)) {
@@ -134,7 +121,7 @@ public class SincronizacaoErpService {
                 "Possível vazio na série.",
                 numeroSefaz, config.getNumeroProximaNfce()
             );
-            System.out.println("⚠️  " + aviso);
+            log.warn(aviso);
         }
 
         // ✅ Atualiza a nota
@@ -156,10 +143,8 @@ public class SincronizacaoErpService {
             )
         );
 
-        System.out.println("✅ Série/Número sincronizado com sucesso!");
-        System.out.println("   Número: " + numeroSefaz);
-        System.out.println("   Série: " + serieSefaz);
-        System.out.println("   Próximo: " + (numeroSefaz + 1));
+        log.info("Serie/numero sincronizado com sucesso. numero={} serie={} proximo={}",
+                numeroSefaz, serieSefaz, numeroSefaz + 1);
     }
 
     // =========================================================================
@@ -246,7 +231,7 @@ public class SincronizacaoErpService {
     @Transactional
     public void roboSincronizacaoAutomatica() {
         try {
-            System.out.println("🤖 ROBÔ: Iniciando sincronização automática...");
+            log.info("Iniciando robo de sincronizacao automatica.");
 
             // ✅ Sincroniza status de todas as notas com vendas
             List<NotaFiscal> notasComVenda = notaFiscalRepository.findAll().stream()
@@ -259,18 +244,17 @@ public class SincronizacaoErpService {
                     this.sincronizarStatus(nota);
                     sincronizadas++;
                 } catch (Exception e) {
-                    System.err.println("❌ Erro ao sincronizar nota " + nota.getId() + ": " + e.getMessage());
+                    log.error("Erro ao sincronizar nota id={}", nota.getId(), e);
                 }
             }
 
             // ✅ Valida série/número
             validarIntegridade();
 
-            System.out.println("✅ ROBÔ: Sincronização concluída!");
-            System.out.println("   Notas sincronizadas: " + sincronizadas);
+            log.info("Robo de sincronizacao concluido. notasSincronizadas={}", sincronizadas);
 
         } catch (Exception e) {
-            System.err.println("❌ Erro no robô de sincronização: " + e.getMessage());
+            log.error("Erro no robo de sincronizacao", e);
             auditoriaService.registrar("SISTEMA", "ERRO_ROBO_SINCRONIZACAO",
                 "Erro na execução automática de sincronização: " + e.getMessage());
         }
@@ -287,7 +271,7 @@ public class SincronizacaoErpService {
      */
     @Transactional
     public Map<String, Object> validarIntegridade() {
-        ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
+        ConfiguracaoSistema config = configuracaoService.obterConfiguracaoSistema();
         
         List<NotaFiscal> notas = notaFiscalRepository.findAll().stream()
             .filter(n -> "AUTORIZADA".equals(n.getStatus()) || 
@@ -324,7 +308,7 @@ public class SincronizacaoErpService {
                          "ENVIADA".equals(n.getStatus())))
             .toList();
 
-        System.out.println("🧹 Limpando " + notasOrfas.size() + " notas órfãs...");
+        log.info("Limpando notas orfas. quantidade={}", notasOrfas.size());
 
         for (NotaFiscal nota : notasOrfas) {
             // Pode deletar ou mover para status especial
@@ -335,4 +319,3 @@ public class SincronizacaoErpService {
         }
     }
 }
-

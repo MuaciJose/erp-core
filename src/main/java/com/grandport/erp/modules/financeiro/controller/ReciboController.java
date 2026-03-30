@@ -2,7 +2,7 @@ package com.grandport.erp.modules.financeiro.controller;
 
 import com.grandport.erp.modules.financeiro.model.Recibo;
 import com.grandport.erp.modules.financeiro.repository.ReciboRepository;
-import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
+import com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService;
 import com.grandport.erp.modules.pdf.service.PdfService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -22,10 +22,10 @@ public class ReciboController {
     private ReciboRepository repository;
 
     @Autowired
-    private ConfiguracaoRepository configuracaoRepository;
+    private PdfService pdfService;
 
     @Autowired
-    private PdfService pdfService;
+    private ConfiguracaoAtualService configuracaoAtualService;
 
     // 🚀 SALVAR NOVO RECIBO NO BANCO
     @PostMapping
@@ -52,8 +52,7 @@ public class ReciboController {
     public ResponseEntity<byte[]> gerarPdfReciboAvulso(@RequestBody Map<String, Object> dados) {
 
         // 1. Pega as configurações da empresa (Logo, Endereço, etc)
-        var empresa = configuracaoRepository.findById(1L)
-                .orElse(new com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema());
+        var empresa = obterConfiguracaoAtual();
 
         // 2. Formata a data por extenso (Ex: 19 de Março de 2026)
         String dataFormatada = "";
@@ -125,5 +124,9 @@ public class ReciboController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=Recibo.pdf")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(arquivoPdf);
+    }
+
+    private com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema obterConfiguracaoAtual() {
+        return configuracaoAtualService.obterAtual();
     }
 }

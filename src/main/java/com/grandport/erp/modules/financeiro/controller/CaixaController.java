@@ -1,6 +1,7 @@
 package com.grandport.erp.modules.financeiro.controller;
 
 import com.grandport.erp.modules.financeiro.dto.CaixaDiarioDTO;
+import com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService;
 import com.grandport.erp.modules.financeiro.service.CaixaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -23,7 +24,7 @@ public class CaixaController {
     private com.grandport.erp.modules.pdf.service.PdfService pdfService;
 
     @Autowired
-    private com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository configuracaoRepository;
+    private ConfiguracaoAtualService configuracaoAtualService;
 
     @Autowired
     private com.grandport.erp.modules.financeiro.repository.CaixaDiarioRepository caixaRepository;
@@ -87,7 +88,7 @@ public class CaixaController {
 
         if (caixaSelecionado == null) return ResponseEntity.badRequest().build();
 
-        var empresa = configuracaoRepository.findById(1L).orElse(new com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema());
+        var empresa = obterConfiguracaoAtual();
 
         // 2. Cálculos usando os nomes EXATOS da sua classe CaixaDiario.java
         double totalDinheiro = caixaSelecionado.getTotalDinheiro() != null ? caixaSelecionado.getTotalDinheiro().doubleValue() : 0;
@@ -137,5 +138,9 @@ public class CaixaController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=Caixa_" + caixaSelecionado.getId() + ".pdf")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(arquivoPdf);
+    }
+
+    private com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema obterConfiguracaoAtual() {
+        return configuracaoAtualService.obterAtual();
     }
 }

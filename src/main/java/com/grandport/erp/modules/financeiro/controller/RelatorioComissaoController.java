@@ -1,7 +1,7 @@
 package com.grandport.erp.modules.financeiro.controller;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
-import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
+import com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService;
 import com.grandport.erp.modules.financeiro.service.RelatorioComissaoService;
 import com.grandport.erp.modules.pdf.service.PdfService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +28,7 @@ public class RelatorioComissaoController {
     private PdfService pdfService;
 
     @Autowired
-    private ConfiguracaoRepository configuracaoRepository;
+    private ConfiguracaoAtualService configuracaoAtualService;
 
     @GetMapping("/comissoes")
     public ResponseEntity<?> gerarRelatorioComissao(
@@ -38,7 +38,7 @@ public class RelatorioComissaoController {
 
         LocalDateTime dataIni = LocalDate.parse(inicio).atStartOfDay();
         LocalDateTime dataFim = LocalDate.parse(fim).atTime(23, 59, 59);
-        ConfiguracaoSistema empresa = configuracaoRepository.findById(1L).orElse(new ConfiguracaoSistema());
+        ConfiguracaoSistema empresa = obterConfiguracaoAtual();
 
         // 🚀 Passa as configurações pro Service calcular tudo direitinho
         return ResponseEntity.ok(relatorioService.calcularComissoes(dataIni, dataFim, vendedorId, empresa));
@@ -52,7 +52,7 @@ public class RelatorioComissaoController {
 
         LocalDateTime dataIni = LocalDate.parse(inicio).atStartOfDay();
         LocalDateTime dataFim = LocalDate.parse(fim).atTime(23, 59, 59);
-        ConfiguracaoSistema empresa = configuracaoRepository.findById(1L).orElse(new ConfiguracaoSistema());
+        ConfiguracaoSistema empresa = obterConfiguracaoAtual();
 
         // 🚀 Passa as configurações pro Service
         List<RelatorioComissaoService.ComissaoMembroDTO> dados = relatorioService.calcularComissoes(dataIni, dataFim, vendedorId, empresa);
@@ -88,5 +88,9 @@ public class RelatorioComissaoController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=Fechamento-Comissoes.pdf")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(arquivoPdf);
+    }
+
+    private com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema obterConfiguracaoAtual() {
+        return configuracaoAtualService.obterAtual();
     }
 }

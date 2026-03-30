@@ -5,6 +5,7 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTCreationException;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.grandport.erp.modules.usuario.model.Usuario;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -16,8 +17,15 @@ import java.time.ZoneOffset;
 public class TokenService {
     
     // Em produção, use uma variável de ambiente para essa secret
-    @Value("${api.security.token.secret}")
+    @Value("${api.security.token.secret:}")
     private String secret;
+
+    @PostConstruct
+    void validateConfiguration() {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("JWT secret não configurado. Defina a variável JWT_SECRET ou a propriedade api.security.token.secret.");
+        }
+    }
 
     public String gerarToken(Usuario usuario) {
         try {

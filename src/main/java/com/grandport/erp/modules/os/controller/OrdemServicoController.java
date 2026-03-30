@@ -1,6 +1,7 @@
 package com.grandport.erp.modules.os.controller;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
+import com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService;
 import com.grandport.erp.modules.os.dto.OsRequestDTO;
 import com.grandport.erp.modules.os.model.OrdemServico;
 import com.grandport.erp.modules.os.repository.OrdemServicoRepository;
@@ -25,7 +26,7 @@ public class OrdemServicoController {
     @Autowired private OsFiscalService osFiscalService;
 
     @Autowired private com.grandport.erp.modules.pdf.service.PdfService pdfService;
-    @Autowired private com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository configuracaoRepository;
+    @Autowired private ConfiguracaoAtualService configuracaoAtualService;
 
     // PARA: 🚀 (AQUI ESTÁ A BLINDAGEM)
     @GetMapping
@@ -111,8 +112,7 @@ public class OrdemServicoController {
         OrdemServico os = osRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("OS não encontrada"));
 
-        var empresa = configuracaoRepository.findById(1L)
-                .orElse(new com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema());
+        var empresa = obterConfiguracaoAtual();
 
         // 🔥 Número formatado
         String numeroOsFormatado = String.format("OS-%06d", os.getId());
@@ -201,8 +201,10 @@ public class OrdemServicoController {
             // 1. PUXAR A OS E A CONFIGURAÇÃO DO BANCO
             OrdemServico os = osRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("OS não encontrada"));
-            var config = configuracaoRepository.findById(1L)
-                    .orElseThrow(() -> new RuntimeException("Configuração do sistema não encontrada"));
+            var config = obterConfiguracaoAtual();
+            if (config.getId() == null) {
+                throw new RuntimeException("Configuração do sistema não encontrada");
+            }
 
             String token = config.getWhatsappToken();
             String apiUrl = config.getWhatsappApiUrl();
@@ -285,6 +287,10 @@ public class OrdemServicoController {
         } catch (Exception e) {
             return org.springframework.http.ResponseEntity.badRequest().body("Erro ao gerar HTML: " + e.getMessage());
         }
+    }
+
+    private ConfiguracaoSistema obterConfiguracaoAtual() {
+        return configuracaoAtualService.obterAtual();
     }
 
 }

@@ -43,15 +43,6 @@ public class SecurityConfig {
                         // 🚀 A NOVA CHAVE MESTRA PARA A IMPRESSÃO DA OS:
                         .requestMatchers("/api/os/*/imprimir-pdf").permitAll()
                         .requestMatchers("/api/vendas/*/imprimir-pdf").permitAll()
-                        .requestMatchers("/api/relatorios/comissoes/pdf").permitAll()
-                        .requestMatchers("/api/caixa/pdf").permitAll()
-                        .requestMatchers("/api/compras/*/pdf").permitAll()
-                        .requestMatchers("/api/financeiro/dre/pdf").permitAll()
-                        .requestMatchers("/api/financeiro/recibos/gerar-pdf").permitAll()
-                        .requestMatchers("/api/financeiro/contas-a-pagar/*/recibo-pdf").permitAll()
-                        .requestMatchers("/api/financeiro/contas-a-pagar/relatorio-pdf").permitAll()
-                        .requestMatchers("/api/financeiro/contas-a-receber/*/recibo-pdf").permitAll()
-                        .requestMatchers("/api/financeiro/contas-a-receber/relatorio-pdf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/assinaturas/nova-empresa").permitAll()
 
 
@@ -64,8 +55,6 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/parceiros/consulta-cnpj/**").permitAll()
                         .requestMatchers("/api/parceiros/consulta-cep/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/configuracoes/backup").permitAll()
-
                         // ================= ROTAS PRIVADAS (Requerem Token) =================
                         // 🚀 COMPRAS: Voltei para autenticado. Se o GET/POST funciona, o PUT tem que funcionar.
                         .requestMatchers("/api/compras/**").authenticated()

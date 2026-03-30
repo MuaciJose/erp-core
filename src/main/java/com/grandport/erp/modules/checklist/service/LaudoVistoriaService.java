@@ -2,8 +2,7 @@ package com.grandport.erp.modules.checklist.service;
 
 import com.grandport.erp.modules.checklist.model.ChecklistVeiculo;
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
-// 🚀 IMPORT CORRIGIDO COM O NOME EXATO DO SEU ARQUIVO
-import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
+import com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService;
 
 import net.sf.jasperreports.engine.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,9 +19,8 @@ public class LaudoVistoriaService {
     @Autowired
     private ChecklistService checklistService;
 
-    // 🚀 INJETANDO O SEU REPOSITÓRIO EXATO AQUI
     @Autowired
-    private ConfiguracaoRepository configuracaoRepository;
+    private ConfiguracaoAtualService configuracaoAtualService;
 
     public byte[] gerarLaudoPdf(Long checklistId) {
         try {
@@ -30,8 +28,7 @@ public class LaudoVistoriaService {
             ChecklistVeiculo vistoria = checklistService.buscarPorId(checklistId);
 
             // 🚀 2. BUSCA OS DADOS DA EMPRESA NO BANCO DE DADOS (ID 1)
-            ConfiguracaoSistema config = configuracaoRepository.findById(1L)
-                    .orElse(new ConfiguracaoSistema());
+            ConfiguracaoSistema config = configuracaoAtualService.obterAtual();
 
             // 3. Prepara as variáveis (Parâmetros)
             Map<String, Object> parametros = new HashMap<>();

@@ -2,8 +2,10 @@ package com.grandport.erp.modules.admin.service;
 
 import com.grandport.erp.modules.admin.model.LogAuditoria;
 import com.grandport.erp.modules.admin.repository.LogAuditoriaRepository;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,40 +21,30 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.time.LocalDateTime;
 
 @Service
+@Slf4j
 public class AuditoriaService {
 
     @Autowired
     private LogAuditoriaRepository repository;
 
+    @Autowired(required = false)
+    private EmpresaContextService empresaContextService;
+
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void registrar(String modulo, String acao, String detalhes) {
-        LogAuditoria log = new LogAuditoria();
-        log.setDataHora(LocalDateTime.now());
-        log.setModulo(modulo);
-        log.setAcao(acao);
-        log.setDetalhes(detalhes);
+        LogAuditoria registro = new LogAuditoria();
+        registro.setDataHora(LocalDateTime.now());
+        registro.setModulo(modulo);
+        registro.setAcao(acao);
+        registro.setDetalhes(detalhes);
 
-        // 🚀 NOVO: Preencher empresaId com a empresa do usuário autenticado
         try {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof Usuario) {
-                Usuario usuario = (Usuario) auth.getPrincipal();
-                Long empresaId = usuario.getEmpresaId();
-                if (empresaId != null && empresaId > 0) {
-                    log.setEmpresaId(empresaId);
-                    System.out.println("🔐 AuditoriaService: Log criado para empresa [" + empresaId + "]");
-                } else {
-                    log.setEmpresaId(1L); // Fallback
-                    System.out.println("⚠️ AuditoriaService: Usuario sem empresaId, usando 1L");
-                }
-            } else {
-                log.setEmpresaId(1L); // Fallback para sistema interno
-                System.out.println("⚠️ AuditoriaService: Autenticação não encontrada, usando empresa 1L");
+            if (empresaContextService != null) {
+                registro.setEmpresaId(empresaContextService.getRequiredEmpresaId());
             }
         } catch (Exception e) {
-            log.setEmpresaId(1L);
-            System.out.println("❌ AuditoriaService: Erro ao extrair empresaId: " + e.getMessage());
+            log.debug("Auditoria sem empresa no contexto: {}", e.getMessage());
         }
 
         // 🛡️ Captura o IP limpando proxys
@@ -68,12 +60,12 @@ public class AuditoriaService {
                     ip = ip.split(",")[0].trim();
                 }
                 if ("0:0:0:0:0:0:0:1".equals(ip)) ip = "127.0.0.1";
-                log.setIpOrigem(ip);
+                registro.setIpOrigem(ip);
             } else {
-                log.setIpOrigem("SISTEMA_INTERNO");
+                registro.setIpOrigem("SISTEMA_INTERNO");
             }
         } catch (Exception e) {
-            log.setIpOrigem("IP_DESCONHECIDO");
+            registro.setIpOrigem("IP_DESCONHECIDO");
         }
 
         // 🛡️ Captura o usuário
@@ -81,18 +73,18 @@ public class AuditoriaService {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.isAuthenticated() && !auth.getPrincipal().equals("anonymousUser")) {
                 if (auth.getPrincipal() instanceof Usuario) {
-                    log.setUsuarioNome(((Usuario) auth.getPrincipal()).getNomeCompleto());
+                    registro.setUsuarioNome(((Usuario) auth.getPrincipal()).getNomeCompleto());
                 } else {
-                    log.setUsuarioNome(auth.getName()); // Salva o login (email) se não for o objeto Usuario
+                    registro.setUsuarioNome(auth.getName()); // Salva o login (email) se não for o objeto Usuario
                 }
             } else {
-                log.setUsuarioNome("SISTEMA");
+                registro.setUsuarioNome("SISTEMA");
             }
         } catch (Exception e) {
-            log.setUsuarioNome("SISTEMA_FALHA_AUTH");
+            registro.setUsuarioNome("SISTEMA_FALHA_AUTH");
         }
 
-        repository.save(log);
+        repository.save(registro);
     }
 
     public Page<LogAuditoria> listarTodos(Pageable pageable) {

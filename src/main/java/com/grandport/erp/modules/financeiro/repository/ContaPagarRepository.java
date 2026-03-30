@@ -15,6 +15,9 @@ import java.util.Optional;
 public interface ContaPagarRepository extends JpaRepository<ContaPagar, Long> {
     
     // ✅ MULTI-EMPRESA: Métodos com filtro de empresa
+    List<ContaPagar> findByEmpresaIdOrderByDataVencimentoAsc(Long empresaId);
+    List<ContaPagar> findByEmpresaIdOrderByDataVencimentoDesc(Long empresaId);
+    List<ContaPagar> findByEmpresaIdAndParceiroIdOrderByDataVencimentoAsc(Long empresaId, Long parceiroId);
     List<ContaPagar> findByEmpresaIdAndStatus(Long empresaId, StatusFinanceiro status);
     List<ContaPagar> findByEmpresaIdAndDataVencimentoBetweenOrderByDataVencimentoAsc(Long empresaId, LocalDateTime inicio, LocalDateTime fim);
     List<ContaPagar> findByEmpresaIdAndDataPagamentoBetween(Long empresaId, LocalDateTime inicio, LocalDateTime fim);

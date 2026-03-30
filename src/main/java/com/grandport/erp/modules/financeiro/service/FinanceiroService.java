@@ -71,6 +71,40 @@ public class FinanceiroService {
                 .collect(Collectors.toList());
     }
 
+    public List<Map<String, Object>> listarTodasAsContasPagar() {
+        Long empresaId = obterEmpresaAtual();
+        return pagarRepo.findByEmpresaIdOrderByDataVencimentoDesc(empresaId)
+                .stream()
+                .map(conta -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", conta.getId());
+                    map.put("fornecedorNome", conta.getParceiro() != null && conta.getParceiro().getNome() != null
+                            ? conta.getParceiro().getNome()
+                            : "Diversos");
+                    map.put("descricao", conta.getDescricao() != null ? conta.getDescricao() : "");
+                    map.put("valor", conta.getValorOriginal() != null ? conta.getValorOriginal().doubleValue() : 0.0);
+                    map.put("dataVencimento", conta.getDataVencimento());
+                    map.put("dataPagamento", conta.getDataPagamento());
+
+                    String status = conta.getStatus() != null ? conta.getStatus().toString() : "PENDENTE";
+                    map.put("status", status);
+                    map.put("atrasado", conta.getDataVencimento() != null
+                            && !status.contains("PAG")
+                            && !status.contains("LIQUID")
+                            && conta.getDataVencimento().isBefore(LocalDateTime.now()));
+                    return map;
+                })
+                .collect(Collectors.toList());
+    }
+
+    public List<ContaReceberDTO> listarTodasAsContasReceber() {
+        Long empresaId = obterEmpresaAtual();
+        return recebaRepo.findByEmpresaIdOrderByDataVencimentoDesc(empresaId)
+                .stream()
+                .map(ContaReceberDTO::new)
+                .collect(Collectors.toList());
+    }
+
     // ✅ MULTI-EMPRESA: Atualizado para filtrar por empresa E contas ativas
     public List<ContaBancaria> listarContasBancarias() {
         Long empresaId = obterEmpresaAtual();

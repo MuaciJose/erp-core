@@ -6,6 +6,8 @@ import java.util.Optional;
 
 public interface ConfiguracaoRepository extends JpaRepository<ConfiguracaoSistema, Long> {
     
+    Optional<ConfiguracaoSistema> findFirstByOrderByIdDesc();
+
     // 🔐 Query que respeita o contexto de tenant
     Optional<ConfiguracaoSistema> findFirstByEmpresaId(Long empresaId);
     

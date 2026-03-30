@@ -13,6 +13,9 @@ import java.util.Optional;
 public interface ContaReceberRepository extends JpaRepository<ContaReceber, Long> {
 
     // ✅ MULTI-EMPRESA: Métodos com filtro de empresa
+    List<ContaReceber> findByEmpresaIdOrderByDataVencimentoAsc(Long empresaId);
+    List<ContaReceber> findByEmpresaIdOrderByDataVencimentoDesc(Long empresaId);
+    List<ContaReceber> findByEmpresaIdAndParceiroIdOrderByDataVencimentoAsc(Long empresaId, Long parceiroId);
     List<ContaReceber> findByEmpresaIdAndStatusOrderByDataVencimentoAsc(Long empresaId, StatusFinanceiro status);
     List<ContaReceber> findByEmpresaIdAndParceiroIdAndStatus(Long empresaId, Long parceiroId, StatusFinanceiro status);
     List<ContaReceber> findByEmpresaIdAndDataVencimentoBetweenOrderByDataVencimentoAsc(

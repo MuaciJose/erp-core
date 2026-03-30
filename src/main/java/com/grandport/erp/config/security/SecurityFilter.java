@@ -34,29 +34,28 @@ public class SecurityFilter extends OncePerRequestFilter {
 
         if (token != null) {
             try {
-                // Tenta validar o token. Se expirar, cai no catch silenciosamente.
                 var login = tokenService.validateToken(token);
 
                 if (login != null && !login.isEmpty()) {
                     UserDetails user = usuarioRepository.findByUsername(login);
 
-                    // ✅ LOG ESTRUTURADO: Substituir System.out por logger
                     if (user instanceof com.grandport.erp.modules.usuario.model.Usuario) {
                         com.grandport.erp.modules.usuario.model.Usuario u = 
                             (com.grandport.erp.modules.usuario.model.Usuario) user;
-                        log.debug("🔍 DEBUG SecurityFilter - Usuario: {} | empresaId carregado: {}", 
-                            u.getUsername(), u.getEmpresaId());
+                        log.debug("JWT validado para usuario={} empresaId={}", u.getUsername(), u.getEmpresaId());
                     }
 
-                    // Adiciona a verificação para garantir que o usuário existe no banco
                     if (user != null) {
                         var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
                         SecurityContextHolder.getContext().setAuthentication(authentication);
+                    } else {
+                        SecurityContextHolder.clearContext();
+                        log.warn("JWT válido para usuário inexistente no banco: {}", login);
                     }
                 }
             } catch (Exception e) {
-                // Ignora o erro do token expirado silenciosamente.
-                System.out.println("Token ignorado (provavelmente expirado ou inválido).");
+                SecurityContextHolder.clearContext();
+                log.warn("Falha ao processar JWT: {}", e.getMessage());
             }
         }
 
@@ -65,7 +64,9 @@ public class SecurityFilter extends OncePerRequestFilter {
 
     private String recoverToken(HttpServletRequest request) {
         var authHeader = request.getHeader("Authorization");
-        if (authHeader == null) return null;
-        return authHeader.replace("Bearer ", "");
+        if (authHeader == null || authHeader.isBlank() || !authHeader.startsWith("Bearer ")) {
+            return null;
+        }
+        return authHeader.substring(7);
     }
 }

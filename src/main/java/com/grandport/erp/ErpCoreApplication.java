@@ -2,6 +2,7 @@ package com.grandport.erp;
 
 import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -9,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.data.web.config.EnableSpringDataWebSupport;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.Arrays;
 import java.util.List;
@@ -18,6 +20,7 @@ import static org.springframework.data.web.config.EnableSpringDataWebSupport.Pag
 @SpringBootApplication
 @EnableScheduling
 @EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)
+@Slf4j
 public class ErpCoreApplication {
 
     public static void main(String[] args) {
@@ -25,8 +28,23 @@ public class ErpCoreApplication {
     }
 
     @Bean
-    CommandLineRunner initDatabase(UsuarioRepository repository, PasswordEncoder passwordEncoder) {
+    CommandLineRunner initDatabase(
+            UsuarioRepository repository,
+            PasswordEncoder passwordEncoder,
+            @Value("${app.bootstrap-admin.enabled:false}") boolean bootstrapAdminEnabled,
+            @Value("${app.bootstrap-admin.username:}") String bootstrapUsername,
+            @Value("${app.bootstrap-admin.password:}") String bootstrapPassword) {
         return args -> {
+            if (!bootstrapAdminEnabled) {
+                log.info("Bootstrap de administrador desabilitado.");
+                return;
+            }
+
+            if (bootstrapUsername.isBlank() || bootstrapPassword.isBlank()) {
+                log.warn("Bootstrap de administrador habilitado sem credenciais completas. Seed ignorado.");
+                return;
+            }
+
             List<String> todasPermissoes = Arrays.asList(
                     "dash", "pdv", "vendas", "orcamentos", "fila-caixa", "caixa", "relatorio-comissoes",
                     "estoque", "marcas", "ajuste_estoque", "compras", "previsao", "faltas",
@@ -36,30 +54,26 @@ public class ErpCoreApplication {
                     "os","servicos","listagem-os","checklist","curva-abc","fluxo-caixa-projecao"
             );
 
-            Usuario admin = (Usuario) repository.findByUsername("admin");
+            Usuario admin = repository.findByUsername(bootstrapUsername);
 
             if (admin == null) {
                 admin = new Usuario();
-                admin.setUsername("admin");
-                admin.setSenha(passwordEncoder.encode("admin123"));
+                admin.setUsername(bootstrapUsername);
+                admin.setSenha(passwordEncoder.encode(bootstrapPassword));
                 admin.setNomeCompleto("Administrador do Sistema");
                 admin.setPermissoes(todasPermissoes);
-
-                // 🚀 O CARIMBO DA BASE: Define que esse Super Admin é dono da Empresa 1
                 admin.setEmpresaId(1L);
 
                 repository.save(admin);
-                System.out.println(">>> Usuário ADMIN criado com sucesso! Use: admin / admin123");
+                log.warn("Usuário bootstrap [{}] criado. Desabilite BOOTSTRAP_ADMIN_ENABLED após o provisionamento.", bootstrapUsername);
             } else {
                 admin.setPermissoes(todasPermissoes);
-
-                // 🚀 GARANTIA: Se o admin antigo estava "perdido" sem empresa, ele puxa para a 1
                 if (admin.getEmpresaId() == null) {
                     admin.setEmpresaId(1L);
                 }
 
                 repository.save(admin);
-                System.out.println(">>> Permissões do usuário ADMIN atualizadas e Empresa vinculada com sucesso!");
+                log.info("Permissões do usuário bootstrap [{}] atualizadas.", bootstrapUsername);
             }
         };
     }

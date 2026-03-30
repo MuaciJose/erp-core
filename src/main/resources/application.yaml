@@ -3,20 +3,20 @@ spring:
     name: erp-core
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/grandport_erp
-    username: postgres # Geralmente 'postgres'
-    password: admin # Geralmente 'admin'
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/grandport_erp}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:admin}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update # MUDADO PARA CREATE PARA RECRIAR O BANCO COM A COLUNA TEXT
+      ddl-auto: validate
     show-sql: false # Mostra os comandos SQL no console para debug
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        tenant_identifier_resolver: com.grandport.erp.config.tenant.TenantResolver # 🚀 MOTOR DO MULTI-EMPRESA (SAAS) ATIVADO AQUI:
+        tenant_identifier_resolver: com.grandport.erp.config.tenant.TenantResolver
     open-in-view: false
 
   flyway:
@@ -29,16 +29,16 @@ spring:
       max-request-size: 50MB
 
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: raraavidae@gmail.com
-    password: fuql gnnj uuat dwyh
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
-          auth: true
+          auth: ${MAIL_SMTP_AUTH:true}
           starttls:
-            enable: true
+            enable: ${MAIL_SMTP_STARTTLS:true}
 
   redis:
     host: localhost
@@ -78,17 +78,18 @@ logging:
 api:
   security:
     token:
-      secret: ${JWT_SECRET:minha-chave-secreta-do-erp-123}
+      secret: ${JWT_SECRET:}
 
-
-# ==========================================
-# 🌐 CONFIGURAÇÕES GERAIS DO SISTEMA
-# ==========================================
 app:
+  bootstrap-admin:
+    enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
+    username: ${BOOTSTRAP_ADMIN_USERNAME:}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+
   api:
     # No seu PC fica o IP da sua rede. No cliente, você vai trocar isso
     # para https://api.site-do-cliente.com.br
-    base-url: "http://192.168.1.104:8080"
+    base-url: ${APP_API_BASE_URL:http://192.168.1.104:8080}
 
 # ✅ ACTUATOR PARA MONITORAMENTO E HEALTH CHECK
 management:

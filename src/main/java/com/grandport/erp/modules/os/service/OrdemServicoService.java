@@ -12,7 +12,7 @@ import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
 import com.grandport.erp.modules.veiculo.repository.VeiculoRepository;
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
-import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
+import com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService;
 // 🚀 INJEÇÃO DO FINANCEIRO AQUI:
 import com.grandport.erp.modules.financeiro.service.FinanceiroService;
 
@@ -34,7 +34,7 @@ public class OrdemServicoService {
     @Autowired private ServicoRepository servicoRepository;
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private AuditoriaService auditoriaService;
-    @Autowired private ConfiguracaoRepository configuracaoRepository;
+    @Autowired private ConfiguracaoAtualService configuracaoAtualService;
 
     // 🚀 DECLARAÇÃO DO FINANCEIRO AQUI:
     @Autowired private FinanceiroService financeiroService;
@@ -143,7 +143,7 @@ public class OrdemServicoService {
             throw new RuntimeException("Esta OS já foi faturada e fechada!");
         }
 
-        var config = configuracaoRepository.findById(1L).orElse(null);
+        ConfiguracaoSistema config = configuracaoAtualService.obterAtual();
         boolean globalLiberado = config != null && Boolean.TRUE.equals(config.getPermitirEstoqueNegativoGlobal());
 
         for (OsItemPeca item : os.getItensPecas()) {
