@@ -5,11 +5,16 @@ import com.grandport.erp.modules.financeiro.model.ContaBancaria;
 import com.grandport.erp.modules.financeiro.model.ContaPagar;
 import com.grandport.erp.modules.financeiro.model.ContaReceber;
 import com.grandport.erp.modules.financeiro.service.FinanceiroService;
+import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -21,6 +26,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/financeiro")
+@Tag(name = "Financeiro", description = "Gestão de contas, transferências, extratos e DRE")
 public class FinanceiroController {
 
     // =======================================================
@@ -50,45 +56,61 @@ public class FinanceiroController {
     // =======================================================
 
     @GetMapping("/contas-bancarias")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FINANCEIRO', 'GERENTE')")
+    @Operation(summary = "Listar contas bancárias", description = "Retorna todas as contas bancárias ativas da empresa", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<List<ContaBancaria>> getContasBancarias() {
         return ResponseEntity.ok(financeiroService.listarContasBancarias());
     }
 
     @PostMapping("/contas-bancarias")
-    public ResponseEntity<ContaBancaria> criarContaBancaria(@RequestBody ContaBancaria conta) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'FINANCEIRO')")
+    @Operation(summary = "Criar conta bancária", description = "Cria uma nova conta bancária com validações", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<ContaBancaria> criarContaBancaria(@Valid @RequestBody ContaBancaria conta) {
         return ResponseEntity.ok(financeiroService.criarContaBancaria(conta));
     }
 
     @PutMapping("/contas-bancarias/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FINANCEIRO')")
+    @Operation(summary = "Atualizar conta bancária", description = "Atualiza dados de uma conta bancária existente", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<ContaBancaria> atualizarContaBancaria(
             @PathVariable Long id,
-            @RequestBody ContaBancaria conta) {
+            @Valid @RequestBody ContaBancaria conta) {
         return ResponseEntity.ok(financeiroService.atualizarContaBancaria(id, conta));
     }
 
     @DeleteMapping("/contas-bancarias/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Deletar conta bancária (soft delete)", description = "Marca a conta como deletada (soft delete) mantendo auditoria", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<Void> excluirContaBancaria(@PathVariable Long id) {
         financeiroService.excluirContaBancaria(id);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/contas-bancarias/transferir")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FINANCEIRO')")
+    @Operation(summary = "Transferir entre contas", description = "Realiza transferência de valores entre contas bancárias", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<Void> transferir(@RequestBody TransferenciaDTO dto) {
         financeiroService.transferirEntreContas(dto);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/extrato/{parceiroId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FINANCEIRO', 'GERENTE')")
+    @Operation(summary = "Gerar extrato", description = "Gera extrato consolidado para um parceiro", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<ExtratoParceiroDTO> getExtrato(@PathVariable Long parceiroId) {
         return ResponseEntity.ok(financeiroService.gerarExtratoParceiro(parceiroId));
     }
 
     @GetMapping("/dre")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FINANCEIRO', 'GERENTE')")
+    @Operation(summary = "Calcular DRE", description = "Calcula Demonstração de Resultado do Exercício para um período", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<DreDTO> getDre(@RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth mesAno) {
         return ResponseEntity.ok(financeiroService.calcularDre(mesAno));
     }
 
     @GetMapping("/dre/pdf")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FINANCEIRO', 'GERENTE')")
+    @Operation(summary = "Gerar DRE em PDF", description = "Gera relatório DRE em formato PDF", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<byte[]> imprimirDrePdf(@RequestParam String mesAno) {
         var dados = financeiroService.calcularDre(java.time.YearMonth.parse(mesAno));
         var empresa = configuracaoRepository.findById(1L).orElse(new com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema());

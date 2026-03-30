@@ -28,9 +28,6 @@ spring:
       max-file-size: 50MB
       max-request-size: 50MB
 
-  # ==========================================
-  # 🚀 CONFIGURAÇÕES DE EMAIL (Envio de XMLs)
-  # ==========================================
   mail:
     host: smtp.gmail.com
     port: 587
@@ -43,11 +40,40 @@ spring:
           starttls:
             enable: true
 
+  redis:
+    host: localhost
+    port: 6379
+    timeout: 2000ms
+    jedis:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000 # 10 minutos
+
+# ✅ LOGGING ESTRUTURADO COM SLF4J
 logging:
   level:
-    com.grandport: DEBUG  # Mude de INFO para DEBUG para ver tudo o que acontece
+    root: INFO
+    com.grandport: INFO
+    com.grandport.erp.config.security: DEBUG
+    org.springframework.security: DEBUG
     br.com.swconsultoria.nfe: DEBUG # Isso mostra os detalhes da biblioteca fiscal
 
+
+    org.hibernate.SQL: DEBUG
+    org.flywaydb: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/erp-core.log
+    max-size: 10MB
+    max-history: 10
 
 api:
   security:
@@ -63,3 +89,22 @@ app:
     # No seu PC fica o IP da sua rede. No cliente, você vai trocar isso
     # para https://api.site-do-cliente.com.br
     base-url: "http://192.168.1.104:8080"
+
+# ✅ ACTUATOR PARA MONITORAMENTO E HEALTH CHECK
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,caches,threaddump
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true

@@ -71,10 +71,11 @@ public class FinanceiroService {
                 .collect(Collectors.toList());
     }
 
-    // ✅ MULTI-EMPRESA: Atualizado para filtrar por empresa
+    // ✅ MULTI-EMPRESA: Atualizado para filtrar por empresa E contas ativas
     public List<ContaBancaria> listarContasBancarias() {
         Long empresaId = obterEmpresaAtual();
-        return bancoRepo.findByEmpresaId(empresaId);
+        // Filtrar: empresa_id = atual AND ativo = true (soft delete)
+        return bancoRepo.findByEmpresaIdAndAtivoTrue(empresaId);
     }
 
     @Transactional
@@ -130,8 +131,20 @@ public class FinanceiroService {
         }
         
         String nomeConta = conta.getNome();
-        bancoRepo.deleteById(contaId);
-        auditoriaService.registrar("FINANCEIRO", "EXCLUSAO_CONTA", "Excluiu a conta bancária: " + nomeConta);
+        
+        // ✅ SOFT DELETE: Ao invés de deletar, marca como inativo
+        conta.setAtivo(false);
+        conta.setDataDelecao(java.time.LocalDateTime.now());
+        
+        // Obter usuário atual autenticado
+        org.springframework.security.core.Authentication auth = 
+            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String usuarioDelecao = auth != null ? auth.getName() : "SISTEMA";
+        conta.setUsuarioDelecao(usuarioDelecao);
+        
+        bancoRepo.save(conta);
+        auditoriaService.registrar("FINANCEIRO", "EXCLUSAO_CONTA", 
+            "Deletou (soft delete) a conta bancária: " + nomeConta + " | Usuário: " + usuarioDelecao);
     }
 
     @Transactional

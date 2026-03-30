@@ -9,4 +9,10 @@ public interface ContaBancariaRepository extends JpaRepository<ContaBancaria, Lo
     // ✅ MULTI-EMPRESA: Métodos com filtro de empresa
     List<ContaBancaria> findByEmpresaId(Long empresaId);
     Optional<ContaBancaria> findByEmpresaIdAndId(Long empresaId, Long id);
+    
+    // ✅ SOFT DELETE: Buscar apenas contas ativas
+    List<ContaBancaria> findByEmpresaIdAndAtivoTrue(Long empresaId);
+    Optional<ContaBancaria> findByEmpresaIdAndIdAndAtivoTrue(Long empresaId, Long id);
 }
+
+

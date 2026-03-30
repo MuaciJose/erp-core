@@ -92,13 +92,22 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-
-        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+        // ✅ SEGURANÇA: Definir domínios específicos (não wildcard)
+        configuration.setAllowedOrigins(Arrays.asList(
+            "http://localhost:3000",              // Dev frontend React
+            "http://localhost:5173",              // Dev Vite
+            "http://127.0.0.1:3000",              // Dev local
+            "http://127.0.0.1:5173",              // Dev local Vite
+            "https://www.seudominio.com",         // Produção
+            "https://app.seudominio.com",         // Produção app
+            "https://admin.seudominio.com"        // Admin produção
+        ));
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
-        configuration.setAllowCredentials(true);
+        configuration.setAllowedHeaders(Arrays.asList("Content-Type", "Authorization", "Accept", "X-Requested-With"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Total-Count"));
+        configuration.setAllowCredentials(false); // true apenas se necessário em produção
+        configuration.setMaxAge(3600L); // Cache preflight por 1 hora
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
