@@ -29,10 +29,21 @@
 
     <!-- Logger Configuration -->
     <logger name="com.grandport" level="INFO"/>
-    <logger name="com.grandport.erp.config.security" level="DEBUG"/>
-    <logger name="org.springframework.security" level="DEBUG"/>
-    <logger name="org.hibernate.SQL" level="DEBUG"/>
-    <logger name="org.flywaydb" level="DEBUG"/>
+    <springProfile name="!local">
+        <logger name="com.grandport.erp.config.security" level="INFO"/>
+        <logger name="org.springframework.security" level="INFO"/>
+        <logger name="org.hibernate.SQL" level="INFO"/>
+        <logger name="org.flywaydb" level="INFO"/>
+        <logger name="br.com.swconsultoria.nfe" level="INFO"/>
+    </springProfile>
+
+    <springProfile name="local">
+        <logger name="com.grandport.erp.config.security" level="DEBUG"/>
+        <logger name="org.springframework.security" level="DEBUG"/>
+        <logger name="org.hibernate.SQL" level="DEBUG"/>
+        <logger name="org.flywaydb" level="DEBUG"/>
+        <logger name="br.com.swconsultoria.nfe" level="DEBUG"/>
+    </springProfile>
 
     <!-- Root Logger -->
     <root level="INFO">
@@ -40,4 +51,3 @@
         <appender-ref ref="FILE"/>
     </root>
 </configuration>
-

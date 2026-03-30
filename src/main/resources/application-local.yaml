@@ -1,0 +1,11 @@
+logging:
+  level:
+    com.grandport.erp.config.security: DEBUG
+    org.springframework.security: DEBUG
+    br.com.swconsultoria.nfe: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.flywaydb: DEBUG
+
+spring:
+  jpa:
+    show-sql: false

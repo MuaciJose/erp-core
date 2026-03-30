@@ -60,13 +60,11 @@ logging:
   level:
     root: INFO
     com.grandport: INFO
-    com.grandport.erp.config.security: DEBUG
-    org.springframework.security: DEBUG
-    br.com.swconsultoria.nfe: DEBUG # Isso mostra os detalhes da biblioteca fiscal
-
-
-    org.hibernate.SQL: DEBUG
-    org.flywaydb: DEBUG
+    com.grandport.erp.config.security: INFO
+    org.springframework.security: INFO
+    br.com.swconsultoria.nfe: INFO
+    org.hibernate.SQL: INFO
+    org.flywaydb: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

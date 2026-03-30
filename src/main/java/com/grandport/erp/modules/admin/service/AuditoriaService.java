@@ -5,8 +5,8 @@ import com.grandport.erp.modules.admin.repository.LogAuditoriaRepository;
 import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
@@ -22,13 +22,11 @@ import java.time.LocalDateTime;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class AuditoriaService {
 
-    @Autowired
-    private LogAuditoriaRepository repository;
-
-    @Autowired(required = false)
-    private EmpresaContextService empresaContextService;
+    private final LogAuditoriaRepository repository;
+    private final EmpresaContextService empresaContextService;
 
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
