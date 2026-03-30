@@ -11,6 +11,7 @@ import com.grandport.erp.modules.vendas.repository.VendaRepository;
 // 🚀 1. IMPORTAÇÃO DA AUDITORIA
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,9 @@ import static java.util.Map.entry;
 
 @Service
 public class NfeService {
+
+    @Value("${app.jobs.fiscal.contingencia.enabled:true}")
+    private boolean contingenciaJobEnabled;
 
     @Autowired
     private com.grandport.erp.modules.estoque.repository.ProdutoRepository produtoRepository;
@@ -55,8 +59,12 @@ public class NfeService {
     // =========================================================================
     // 🤖 ROBÔ DE CONTINGÊNCIA (MANTIDO INTACTO)
     // =========================================================================
-    @Scheduled(fixedDelay = 300000)
+    @Scheduled(fixedDelayString = "${app.jobs.fiscal.contingencia.fixed-delay:300000}")
     public void roboReenviarNotasContingencia() {
+        if (!contingenciaJobEnabled) {
+            return;
+        }
+
         /*
         List<NotaFiscal> notasPresas = notaFiscalRepository.findByStatus("CONTINGENCIA");
         if (!notasPresas.isEmpty()) {

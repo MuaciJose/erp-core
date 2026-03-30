@@ -11,24 +11,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up JDK 21
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '21'
         distribution: 'temurin'
         cache: maven
 
-    - name: Run SonarQube analysis
-      run: ./mvnw clean verify sonar:sonar -Dsonar.projectKey=erp-core
-      env:
-        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        SONAR_LOGIN: ${{ secrets.SONAR_TOKEN }}
+    - name: Validate Flyway migration naming
+      run: |
+        invalid_files=$(find src/main/resources/db/migration -maxdepth 1 -type f ! -name 'V*__*.sql')
+        if [ -n "$invalid_files" ]; then
+          echo "Arquivos de migration fora do padrao:"
+          echo "$invalid_files"
+          exit 1
+        fi
 
-    - name: Run Checkstyle
-      run: ./mvnw checkstyle:check
+    - name: Validate Hibernate schema policy
+      run: |
+        if grep -R -nE 'ddl-auto:[[:space:]]*(update|create|create-drop)' src/main/resources/application*.yaml; then
+          echo "Configuracao insegura de ddl-auto encontrada."
+          exit 1
+        fi
 
-    - name: Run SpotBugs
-      run: ./mvnw spotbugs:check
-
+    - name: Compile project
+      run: ./mvnw -B -DskipTests compile

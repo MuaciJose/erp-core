@@ -11,6 +11,7 @@ import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,9 @@ import java.util.Map;
 @Service
 @Slf4j
 public class SincronizacaoErpService {
+
+    @Value("${app.jobs.fiscal.sincronizacao.enabled:true}")
+    private boolean sincronizacaoJobEnabled;
 
     @Autowired
     private NotaFiscalRepository notaFiscalRepository;
@@ -227,9 +231,13 @@ public class SincronizacaoErpService {
      * 
      * Execução: A cada 5 minutos (300.000 milisegundos)
      */
-    @Scheduled(fixedDelay = 300000)
+    @Scheduled(fixedDelayString = "${app.jobs.fiscal.sincronizacao.fixed-delay:300000}")
     @Transactional
     public void roboSincronizacaoAutomatica() {
+        if (!sincronizacaoJobEnabled) {
+            return;
+        }
+
         try {
             log.info("Iniciando robo de sincronizacao automatica.");
 

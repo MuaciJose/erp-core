@@ -22,6 +22,8 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    validate-migration-naming: true
+    clean-disabled: true
 
   servlet:
     multipart:
@@ -83,6 +85,15 @@ app:
     enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
     username: ${BOOTSTRAP_ADMIN_USERNAME:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+
+  jobs:
+    fiscal:
+      contingencia:
+        enabled: ${APP_JOBS_FISCAL_CONTINGENCIA_ENABLED:true}
+        fixed-delay: ${APP_JOBS_FISCAL_CONTINGENCIA_FIXED_DELAY:300000}
+      sincronizacao:
+        enabled: ${APP_JOBS_FISCAL_SINCRONIZACAO_ENABLED:true}
+        fixed-delay: ${APP_JOBS_FISCAL_SINCRONIZACAO_FIXED_DELAY:300000}
 
   api:
     # No seu PC fica o IP da sua rede. No cliente, você vai trocar isso

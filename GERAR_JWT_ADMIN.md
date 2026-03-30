@@ -150,6 +150,62 @@ Importante:
 - o profile padrao usa logs mais enxutos
 - o profile `local` ativa logs mais detalhados para seguranca, SQL, Flyway e fiscal
 
+## Profiles Disponiveis
+
+O projeto agora tem separacao basica por ambiente:
+
+- `default`: configuracao padrao
+- `local`: logs mais verbosos para desenvolvimento
+- `test`: jobs desabilitados e cache simples
+- `hml`: homologacao com banco e logs separados
+
+### Subir com profile `local`
+
+```bash
+JWT_SECRET='seu-segredo' mvn spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+### Subir com profile `hml`
+
+```bash
+JWT_SECRET='seu-segredo' mvn spring-boot:run -Dspring-boot.run.profiles=hml
+```
+
+### Rodar com profile `test`
+
+```bash
+mvn test -Dspring.profiles.active=test
+```
+
+## Jobs Fiscais
+
+Os jobs agendados do fiscal agora podem ser controlados por configuracao.
+
+No profile padrao:
+
+- `APP_JOBS_FISCAL_CONTINGENCIA_ENABLED`
+- `APP_JOBS_FISCAL_CONTINGENCIA_FIXED_DELAY`
+- `APP_JOBS_FISCAL_SINCRONIZACAO_ENABLED`
+- `APP_JOBS_FISCAL_SINCRONIZACAO_FIXED_DELAY`
+
+Exemplo no Linux, desabilitando os jobs:
+
+```bash
+APP_JOBS_FISCAL_CONTINGENCIA_ENABLED=false \
+APP_JOBS_FISCAL_SINCRONIZACAO_ENABLED=false \
+JWT_SECRET='seu-segredo' \
+mvn spring-boot:run
+```
+
+Exemplo em homologacao:
+
+```bash
+HML_APP_JOBS_FISCAL_CONTINGENCIA_ENABLED=false \
+HML_APP_JOBS_FISCAL_SINCRONIZACAO_ENABLED=true \
+JWT_SECRET='seu-segredo' \
+mvn spring-boot:run -Dspring-boot.run.profiles=hml
+```
+
 ## Verificar o Usuario Admin no PostgreSQL
 
 ### 1. Entrar no banco

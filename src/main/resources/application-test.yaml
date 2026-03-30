@@ -1,0 +1,50 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    url: ${TEST_DB_URL:jdbc:postgresql://localhost:5432/grandport_erp_test}
+    username: ${TEST_DB_USERNAME:postgres}
+    password: ${TEST_DB_PASSWORD:admin}
+
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: false
+
+  cache:
+    type: simple
+
+  task:
+    scheduling:
+      enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.grandport: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+    org.flywaydb: WARN
+
+app:
+  bootstrap-admin:
+    enabled: false
+  jobs:
+    fiscal:
+      contingencia:
+        enabled: false
+        fixed-delay: 300000
+      sincronizacao:
+        enabled: false
+        fixed-delay: 300000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

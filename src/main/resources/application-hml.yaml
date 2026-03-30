@@ -1,0 +1,62 @@
+spring:
+  config:
+    activate:
+      on-profile: hml
+
+  datasource:
+    url: ${HML_DB_URL:jdbc:postgresql://localhost:5432/grandport_erp_hml}
+    username: ${HML_DB_USERNAME:postgres}
+    password: ${HML_DB_PASSWORD:admin}
+
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+  mail:
+    host: ${HML_MAIL_HOST:${MAIL_HOST:smtp.gmail.com}}
+    port: ${HML_MAIL_PORT:${MAIL_PORT:587}}
+    username: ${HML_MAIL_USERNAME:${MAIL_USERNAME:}}
+    password: ${HML_MAIL_PASSWORD:${MAIL_PASSWORD:}}
+
+  redis:
+    host: ${HML_REDIS_HOST:${REDIS_HOST:localhost}}
+    port: ${HML_REDIS_PORT:${REDIS_PORT:6379}}
+
+logging:
+  level:
+    root: INFO
+    com.grandport: INFO
+    com.grandport.erp.config.security: INFO
+    org.springframework.security: INFO
+    br.com.swconsultoria.nfe: INFO
+    org.hibernate.SQL: INFO
+    org.flywaydb: INFO
+  file:
+    name: logs/erp-core-hml.log
+
+app:
+  bootstrap-admin:
+    enabled: ${HML_BOOTSTRAP_ADMIN_ENABLED:false}
+    username: ${HML_BOOTSTRAP_ADMIN_USERNAME:}
+    password: ${HML_BOOTSTRAP_ADMIN_PASSWORD:}
+  jobs:
+    fiscal:
+      contingencia:
+        enabled: ${HML_APP_JOBS_FISCAL_CONTINGENCIA_ENABLED:true}
+        fixed-delay: ${HML_APP_JOBS_FISCAL_CONTINGENCIA_FIXED_DELAY:300000}
+      sincronizacao:
+        enabled: ${HML_APP_JOBS_FISCAL_SINCRONIZACAO_ENABLED:true}
+        fixed-delay: ${HML_APP_JOBS_FISCAL_SINCRONIZACAO_FIXED_DELAY:300000}
+  api:
+    base-url: ${HML_APP_API_BASE_URL:${APP_API_BASE_URL:http://localhost:8080}}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus

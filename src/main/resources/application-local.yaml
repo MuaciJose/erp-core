@@ -9,3 +9,13 @@ logging:
 spring:
   jpa:
     show-sql: false
+
+app:
+  jobs:
+    fiscal:
+      contingencia:
+        enabled: true
+        fixed-delay: 300000
+      sincronizacao:
+        enabled: true
+        fixed-delay: 300000
