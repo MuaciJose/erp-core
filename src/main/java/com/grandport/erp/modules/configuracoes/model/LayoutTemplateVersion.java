@@ -8,7 +8,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.Data;
@@ -42,7 +41,6 @@ public class LayoutTemplateVersion extends BaseEntityMultiEmpresa {
     @Column(nullable = false, length = 20)
     private Status status;
 
-    @Lob
     @Column(name = "html_content", columnDefinition = "TEXT")
     private String htmlContent;
 

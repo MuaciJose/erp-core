@@ -1,7 +1,11 @@
 package com.grandport.erp.modules.financeiro.controller;
 
 import com.grandport.erp.modules.financeiro.model.ContaBancaria;
+import com.grandport.erp.modules.financeiro.dto.DreDTO;
+import com.grandport.erp.modules.financeiro.service.FinanceiroDocumentoService;
+import com.grandport.erp.modules.financeiro.service.FinanceiroRelatorioService;
 import com.grandport.erp.modules.financeiro.service.FinanceiroService;
+import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,11 +19,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
+import java.time.YearMonth;
+import java.util.Map;
 import java.util.List;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -29,6 +36,20 @@ class FinanceiroControllerWebTest {
 
     @Mock
     private FinanceiroService financeiroService;
+    @Mock
+    private com.grandport.erp.modules.pdf.service.PdfService pdfService;
+    @Mock
+    private com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService configuracaoAtualService;
+    @Mock
+    private com.grandport.erp.modules.financeiro.repository.ContaReceberRepository contaReceberRepository;
+    @Mock
+    private com.grandport.erp.modules.financeiro.repository.ContaPagarRepository contaPagarRepository;
+    @Mock
+    private com.grandport.erp.modules.vendas.service.WhatsAppService whatsappService;
+    @Mock
+    private FinanceiroRelatorioService financeiroRelatorioService;
+    @Mock
+    private FinanceiroDocumentoService financeiroDocumentoService;
 
     @InjectMocks
     private FinanceiroController financeiroController;
@@ -90,5 +111,104 @@ class FinanceiroControllerWebTest {
                 .andExpect(jsonPath("$.nome").value("Caixa"))
                 .andExpect(jsonPath("$.numeroBanco").value("104"))
                 .andExpect(jsonPath("$.ativo").value(true));
+    }
+
+    @Test
+    @DisplayName("GET /api/financeiro/contas-a-receber/{id}/recibo-pdf deve retornar PDF")
+    void deveRetornarReciboRecebimentoPdf() throws Exception {
+        when(financeiroDocumentoService.gerarReciboRecebimento(8L)).thenReturn("pdf-recibo".getBytes());
+
+        mockMvc.perform(get("/api/financeiro/contas-a-receber/8/recibo-pdf"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", "inline; filename=Recibo_Recebimento_8.pdf"))
+                .andExpect(content().bytes("pdf-recibo".getBytes()));
+    }
+
+    @Test
+    @DisplayName("GET /api/financeiro/contas-a-receber/relatorio-pdf deve retornar PDF")
+    void deveRetornarRelatorioReceberPdf() throws Exception {
+        when(financeiroRelatorioService.gerarPdfRelatorioReceber("", "", "", "TODAS", "VENCIMENTO"))
+                .thenReturn("pdf-relatorio".getBytes());
+
+        mockMvc.perform(get("/api/financeiro/contas-a-receber/relatorio-pdf"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", "inline; filename=Relatorio_Contas_Receber.pdf"))
+                .andExpect(content().bytes("pdf-relatorio".getBytes()));
+    }
+
+    @Test
+    @DisplayName("GET /api/financeiro/extrato-cliente/{id}/pdf deve retornar PDF")
+    void deveRetornarExtratoClientePdf() throws Exception {
+        when(financeiroDocumentoService.gerarExtratoCliente(5L, "", "")).thenReturn("pdf-extrato".getBytes());
+
+        mockMvc.perform(get("/api/financeiro/extrato-cliente/5/pdf"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", "inline; filename=Extrato_Cliente_5.pdf"))
+                .andExpect(content().bytes("pdf-extrato".getBytes()));
+    }
+
+    @Test
+    @DisplayName("GET /api/financeiro/contas-a-pagar/{id}/recibo-pdf deve retornar PDF")
+    void deveRetornarReciboPagamentoPdf() throws Exception {
+        when(financeiroDocumentoService.gerarReciboPagamento(6L)).thenReturn("pdf-pagamento".getBytes());
+
+        mockMvc.perform(get("/api/financeiro/contas-a-pagar/6/recibo-pdf"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", "inline; filename=Recibo_6.pdf"))
+                .andExpect(content().bytes("pdf-pagamento".getBytes()));
+    }
+
+    @Test
+    @DisplayName("GET /api/financeiro/contas-a-pagar/relatorio-pdf deve retornar PDF")
+    void deveRetornarRelatorioPagarPdf() throws Exception {
+        when(financeiroRelatorioService.gerarPdfRelatorioPagar("", "", "", "TODAS", "VENCIMENTO"))
+                .thenReturn("pdf-pagar".getBytes());
+
+        mockMvc.perform(get("/api/financeiro/contas-a-pagar/relatorio-pdf"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", "inline; filename=Relatorio_Contas_Pagar.pdf"))
+                .andExpect(content().bytes("pdf-pagar".getBytes()));
+    }
+
+    @Test
+    @DisplayName("GET /api/financeiro/extrato-fornecedor/{id}/pdf deve retornar PDF")
+    void deveRetornarExtratoFornecedorPdf() throws Exception {
+        when(financeiroDocumentoService.gerarExtratoFornecedor(9L, "", "")).thenReturn("pdf-extrato-fornecedor".getBytes());
+
+        mockMvc.perform(get("/api/financeiro/extrato-fornecedor/9/pdf"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", "inline; filename=Extrato_Fornecedor_9.pdf"))
+                .andExpect(content().bytes("pdf-extrato-fornecedor".getBytes()));
+    }
+
+    @Test
+    @DisplayName("GET /api/financeiro/dre/pdf deve retornar PDF")
+    void deveRetornarDrePdf() throws Exception {
+        DreDTO dre = new DreDTO();
+        dre.setReceitaBruta(BigDecimal.valueOf(10000));
+        dre.setDevolucoesDescontos(BigDecimal.valueOf(500));
+        dre.setCmv(BigDecimal.valueOf(3000));
+        dre.setDespesasOperacionais(Map.of("administrativas", BigDecimal.valueOf(1200)));
+
+        ConfiguracaoSistema config = new ConfiguracaoSistema();
+        config.setNomeFantasia("GrandPort");
+        config.setLayoutHtmlDre("<html><body>DRE</body></html>");
+
+        when(financeiroService.calcularDre(YearMonth.of(2026, 3))).thenReturn(dre);
+        when(configuracaoAtualService.obterAtual()).thenReturn(config);
+        when(pdfService.gerarPdfDeStringHtml(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap()))
+                .thenReturn("pdf-dre".getBytes());
+
+        mockMvc.perform(get("/api/financeiro/dre/pdf").param("mesAno", "2026-03"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", "inline; filename=DRE-2026-03.pdf"))
+                .andExpect(content().bytes("pdf-dre".getBytes()));
     }
 }
