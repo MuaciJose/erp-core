@@ -243,6 +243,7 @@ export const VeiculosCliente = ({ clienteAtual, clientesLista }) => {
             {carroParaHistorico && (
                 <HistoricoVeiculoModal
                     veiculo={carroParaHistorico}
+                    cliente={clienteAtual}
                     onClose={() => setCarroParaHistorico(null)}
                 />
             )}

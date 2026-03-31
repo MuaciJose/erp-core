@@ -9,6 +9,7 @@ import SeparacaoPedidos from '../screens/SeparacaoPedidos';
 import GestaoVendas from '../screens/GestaoVendas';
 import Parceiros from '../screens/Parceiros';
 import ChecklistMobile from '../screens/ChecklistMobile';
+import AgendaMobile from '../screens/AgendaMobile';
 
 export const APP_ROUTES = {
     dashboard: {
@@ -52,6 +53,11 @@ export const APP_ROUTES = {
         showTabBar: true,
         tabLabel: 'Clientes',
         tabIcon: 'users'
+    },
+    agenda: {
+        key: 'agenda',
+        component: AgendaMobile,
+        showTabBar: false
     },
     cadastro: {
         key: 'cadastro',

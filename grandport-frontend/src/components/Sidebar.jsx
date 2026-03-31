@@ -12,7 +12,7 @@ import {
     Menu,
     ChevronLeft,
     HelpCircle,
-    MessageCircle // 🚀 ADICIONADO PARA O MENU DE CRM
+    MessageCircle
 } from 'lucide-react';
 import apiSidebar from '../api/axios';
 
@@ -20,6 +20,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
     const [menuExpandido, setMenuExpandido] = useState('vendas');
     const [isRetratil, setIsRetratil] = useState(false);
     const [nomeEmpresa, setNomeEmpresa] = useState('GRANDPORT ERP');
+    const [resumoAgenda, setResumoAgenda] = useState(null);
 
     useEffect(() => {
         apiSidebar.get('/api/configuracoes')
@@ -30,6 +31,22 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 }
             })
             .catch(err => console.log("Não foi possível carregar o nome da empresa na sidebar.", err));
+    }, []);
+
+    useEffect(() => {
+        const carregarResumoAgenda = async () => {
+            try {
+                const hoje = new Date().toISOString().slice(0, 10);
+                const res = await apiSidebar.get('/api/agenda/resumo', { params: { data: hoje } });
+                setResumoAgenda(res.data || null);
+            } catch (err) {
+                console.log("Não foi possível carregar o resumo da agenda na sidebar.", err);
+            }
+        };
+
+        carregarResumoAgenda();
+        const intervalo = window.setInterval(carregarResumoAgenda, 120000);
+        return () => window.clearInterval(intervalo);
     }, []);
 
     const toggleMenu = (menuId) => {
@@ -67,6 +84,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             submenus: [
                 { titulo: 'Painel de CRM', acao: 'crm' },
                 { titulo: 'Gestão de Revisões', acao: 'revisoes' }, // 🚀 MOVIDO PARA CÁ
+                { titulo: 'Agenda Corporativa', acao: 'agenda' },
                 { titulo: 'Integração WhatsApp', acao: 'whatsapp' }
             ]
         },
@@ -115,7 +133,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         { id: 'manual', titulo: 'Manual do Usuário', icone: <HelpCircle size={20} />, acao: 'manual' }
     ];
 
-    const rotasLivres = ['manual'];
+    const rotasLivres = ['manual', 'agenda'];
 
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {
@@ -134,6 +152,8 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         }
         return null;
     }).filter(menu => menu !== null);
+
+    const contadorAgenda = resumoAgenda ? ((resumoAgenda.atrasados || 0) > 0 ? resumoAgenda.atrasados : (resumoAgenda.hoje || 0)) : 0;
 
     return (
         <aside
@@ -212,6 +232,13 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                                             >
                                                 {paginaAtiva === sub.acao && <div className="w-1.5 h-1.5 rounded-full bg-white"></div>}
                                                 <span className={`${paginaAtiva === sub.acao ? 'ml-1' : 'ml-3'} truncate`}>{sub.titulo}</span>
+                                                {sub.acao === 'agenda' && contadorAgenda > 0 && (
+                                                    <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                                        (resumoAgenda?.atrasados || 0) > 0 ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'
+                                                    }`}>
+                                                        {contadorAgenda}
+                                                    </span>
+                                                )}
                                             </button>
                                         ))}
                                     </div>

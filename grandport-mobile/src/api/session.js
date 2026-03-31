@@ -4,7 +4,8 @@ export const STORAGE_KEYS = {
     token: 'grandport_token',
     user: 'grandport_user',
     userName: 'grandport_user_nome',
-    permissions: 'grandport_user_permissoes'
+    permissions: 'grandport_user_permissoes',
+    agendaDraft: 'grandport_agenda_draft'
 };
 
 export const getApiBaseUrl = () =>

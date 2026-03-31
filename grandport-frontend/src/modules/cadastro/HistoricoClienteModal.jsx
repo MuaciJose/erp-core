@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
-import { User, FileText, ShoppingBag, AlertTriangle, CheckCircle, Calendar, Printer, X, Loader2 } from 'lucide-react';
+import { User, FileText, ShoppingBag, AlertTriangle, CheckCircle, Calendar, Printer, X, Loader2, CalendarPlus } from 'lucide-react';
 import { CupomReciboModal } from '../vendas/CupomReciboModal';
 import toast from 'react-hot-toast'; // 🚀 Adicionado para os avisos de carregamento
 
@@ -11,6 +11,12 @@ export const HistoricoClienteModal = ({ cliente, onClose }) => {
     const [erro, setErro] = useState(null);
 
     const [pedidoParaReimprimir, setPedidoParaReimprimir] = useState(null);
+
+    const abrirAgenda = (payload) => {
+        localStorage.setItem('agenda_quick_create', JSON.stringify(payload));
+        window.dispatchEvent(new CustomEvent('grandport:navigate', { detail: { page: 'agenda' } }));
+        onClose?.();
+    };
 
     useEffect(() => {
         const carregarHistorico = async () => {
@@ -192,14 +198,31 @@ export const HistoricoClienteModal = ({ cliente, onClose }) => {
                                                         </span>
                                                 </td>
                                                 <td className="py-4 text-center">
-                                                    {/* 🚀 CHAMA A NOVA FUNÇÃO DE BUSCA AQUI */}
-                                                    <button
-                                                        onClick={() => handleImprimirDetalhado(compra)}
-                                                        className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors"
-                                                        title="Reimprimir Recibo"
-                                                    >
-                                                        <Printer size={18} />
-                                                    </button>
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button
+                                                            onClick={() => abrirAgenda({
+                                                                titulo: `Retorno comercial de ${cliente.nome}`,
+                                                                descricao: `Contato sobre o pedido #${compra.id} • Aplicação: ${compra.veiculoDescricao}`,
+                                                                setor: 'COMERCIAL',
+                                                                prioridade: 'NORMAL',
+                                                                status: 'AGENDADO',
+                                                                parceiroId: cliente.id,
+                                                                dataInicio: `${new Date().toISOString().slice(0, 10)}T09:00`,
+                                                                dataFim: `${new Date().toISOString().slice(0, 10)}T09:30`
+                                                            })}
+                                                            className="text-slate-400 hover:text-amber-600 hover:bg-amber-50 p-2 rounded-lg transition-colors"
+                                                            title="Agendar retorno"
+                                                        >
+                                                            <CalendarPlus size={18} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleImprimirDetalhado(compra)}
+                                                            className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors"
+                                                            title="Reimprimir Recibo"
+                                                        >
+                                                            <Printer size={18} />
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}

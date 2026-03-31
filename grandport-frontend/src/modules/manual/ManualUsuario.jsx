@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
     ArrowLeft,
     BookOpen,
+    Calendar,
     FileText,
     HelpCircle,
     Keyboard,
@@ -19,12 +20,13 @@ export const ManualUsuario = ({ onVoltar }) => {
     const menu = [
         { id: 'introducao', icone: <BookOpen size={18} />, titulo: 'Introdução' },
         { id: 'dashboard', icone: <LayoutDashboard size={18} />, titulo: '1. Dashboard' },
-        { id: 'vendas', icone: <ShoppingCart size={18} />, titulo: '2. Vendas e Caixa' },
-        { id: 'estoque', icone: <Package size={18} />, titulo: '3. Estoque e Catálogo' },
-        { id: 'oficina', icone: <Wrench size={18} />, titulo: '4. Oficina e Recepção' },
-        { id: 'impressao', icone: <Printer size={18} />, titulo: '5. Impressão e Layouts' },
-        { id: 'mobile', icone: <Smartphone size={18} />, titulo: '6. Aplicativo Mobile' },
-        { id: 'atalhos', icone: <Keyboard size={18} />, titulo: '7. Atalhos do Balcão' }
+        { id: 'agenda', icone: <Calendar size={18} />, titulo: '2. Agenda Corporativa' },
+        { id: 'vendas', icone: <ShoppingCart size={18} />, titulo: '3. Vendas e Caixa' },
+        { id: 'estoque', icone: <Package size={18} />, titulo: '4. Estoque e Catálogo' },
+        { id: 'oficina', icone: <Wrench size={18} />, titulo: '5. Oficina e Recepção' },
+        { id: 'impressao', icone: <Printer size={18} />, titulo: '6. Impressão e Layouts' },
+        { id: 'mobile', icone: <Smartphone size={18} />, titulo: '7. Aplicativo Mobile' },
+        { id: 'atalhos', icone: <Keyboard size={18} />, titulo: '8. Atalhos do Balcão' }
     ];
 
     const Tecla = ({ children }) => (
@@ -127,8 +129,41 @@ export const ManualUsuario = ({ onVoltar }) => {
                                 <Card title="KPIs e alertas">
                                     Use os cards para acompanhar receita, contas em atraso, pedidos do dia, itens críticos e gargalos. Quando houver indicador de risco, trate como fila de ação, não como painel decorativo.
                                 </Card>
+                                <Card title="Agenda do Dia">
+                                    O dashboard agora mostra compromissos de hoje. Você pode abrir a agenda já filtrada, ver atrasados ou iniciar um novo compromisso sem sair do painel principal.
+                                </Card>
+                                <Card title="Aviso no topo do ERP">
+                                    Quando existirem compromissos atrasados, o sistema exibe um aviso operacional no topo da aplicação com atalho direto para a fila de atrasos.
+                                </Card>
                                 <Card title="Relatórios">
                                     A aba de relatórios permite imprimir resumos gerenciais e apoiar reuniões, fechamento de mês e prestação de contas.
+                                </Card>
+                            </div>
+                        </div>
+                    )}
+
+                    {secaoAtiva === 'agenda' && (
+                        <div className="animate-fade-in max-w-4xl space-y-6 text-slate-600 leading-relaxed">
+                            <h3 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+                                <Calendar className="text-blue-600" /> Agenda Corporativa
+                            </h3>
+                            <p>A agenda corporativa centraliza compromissos comerciais, de recepção, oficina e financeiro. Ela também recebe ações automáticas vindas de revisão, venda e ordem de serviço.</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Card title="Criação rápida">
+                                    Você pode abrir um novo compromisso pelo dashboard ou gerar automaticamente a partir de Revisões, Central de Vendas e OS.
+                                </Card>
+                                <Card title="Filtros prontos">
+                                    Use os atalhos <strong>Hoje</strong>, <strong>Atrasados</strong> e <strong>Próximos 7 dias</strong> para tratar a agenda como fila operacional.
+                                </Card>
+                                <Card title="Edição e exclusão">
+                                    Cada compromisso pode ser <strong>editado</strong>, <strong>confirmado</strong>, <strong>concluído</strong> ou <strong>excluído</strong> direto na listagem.
+                                </Card>
+                                <Card title="WhatsApp e responsável">
+                                    Quando houver telefone no cadastro do cliente, o compromisso pode disparar confirmação via WhatsApp, inclusive no app mobile.
+                                </Card>
+                                <Card title="Origem por cliente">
+                                    Na tela de parceiros, use o botão <strong>Agendar</strong> para abrir a agenda já com o cliente preenchido e um compromisso-base pronto para edição.
                                 </Card>
                             </div>
                         </div>

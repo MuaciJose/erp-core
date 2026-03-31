@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
     Wrench, Car, User, Search, Plus, Trash2, CheckCircle, Save,
     Image as ImageIcon, Info, FileText, AlertTriangle, MessageCircle,
-    Printer, Gauge, Fuel, ChevronDown, Package, Calendar, DollarSign, Send, X
+    Printer, Gauge, Fuel, ChevronDown, Package, Calendar, DollarSign, Send, X, CalendarPlus
 } from 'lucide-react';
 
 export const OrdemServico = ({ osParaEditar, onVoltar }) => {
@@ -433,6 +433,18 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         }
     };
 
+    const criarCompromissoAgenda = async () => {
+        if (!osId) return notificar('erro', 'Salve a OS primeiro antes de criar um compromisso.');
+
+        const toastId = toast.loading('Criando compromisso na agenda corporativa...');
+        try {
+            await api.post(`/api/agenda/origens/os/${osId}`);
+            toast.success('Compromisso criado na agenda corporativa!', { id: toastId });
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Erro ao criar compromisso na agenda.', { id: toastId });
+        }
+    };
+
     // =========================================================================
     // 🖨️ 2. BOTÃO DE IMPRIMIR (PUXA O HTML DA CENTRAL DE LAYOUTS 'os')
     // =========================================================================
@@ -514,6 +526,15 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
                             className="p-2.5 bg-white text-green-600 hover:bg-green-50 border border-green-200 rounded-lg transition-colors shadow-sm disabled:opacity-50"
                         >
                             <MessageCircle size={18}/>
+                        </button>
+
+                        <button
+                            onClick={criarCompromissoAgenda}
+                            disabled={!osId}
+                            title="Criar compromisso na agenda corporativa"
+                            className="p-2.5 bg-white text-amber-600 hover:bg-amber-50 border border-amber-200 rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                        >
+                            <CalendarPlus size={18}/>
                         </button>
 
                         {/* 🖨️ NOVO: BOTÃO DE IMPRESSÃO (CARREGA A CENTRAL DE LAYOUTS) */}

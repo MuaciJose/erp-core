@@ -18,7 +18,55 @@ O GrandPort ERP foi estruturado para operação automotiva completa:
 
 ---
 
-## 2. Vendas e Caixa
+## 2. Agenda Corporativa
+
+### 2.1. Para que serve
+
+A agenda corporativa centraliza compromissos de:
+
+- comercial
+- recepção
+- oficina
+- financeiro
+
+Ela também pode nascer automaticamente de:
+
+- revisão
+- venda
+- ordem de serviço
+
+### 2.2. O que é possível fazer
+
+- criar compromisso manual
+- editar compromisso
+- confirmar
+- concluir
+- excluir
+- abrir WhatsApp quando houver telefone do cliente
+- abrir a agenda já preenchida a partir do cadastro de parceiros
+
+### 2.3. Filtros rápidos
+
+Use os atalhos:
+
+- `Hoje`
+- `Atrasados`
+- `Próximos 7 dias`
+
+### 2.4. Dashboard
+
+No dashboard existe o bloco `Agenda do Dia`, que permite:
+
+- ver os compromissos de hoje
+- abrir a agenda já filtrada
+- abrir apenas os atrasados
+- iniciar um novo compromisso rapidamente
+
+Quando houver atraso, o ERP também mostra um aviso no topo da aplicação com atalho direto para a fila de compromissos vencidos.
+
+---
+
+## 3. Vendas e Caixa
 
 ### 2.1. Central de Vendas
 
@@ -55,7 +103,7 @@ Pedidos enviados para recebimento aparecem na fila de caixa, onde o operador:
 
 ---
 
-## 3. Estoque e Catálogo
+## 4. Estoque e Catálogo
 
 ### 3.1. Gestão de Peças
 
@@ -92,7 +140,7 @@ No app mobile, o recebimento funciona por conferência cega:
 
 ---
 
-## 4. Oficina e Recepção
+## 5. Oficina e Recepção
 
 ### 4.1. Checklist / Recepção
 
@@ -127,7 +175,7 @@ Use o painel como fila de produção da oficina para acompanhar:
 
 ---
 
-## 5. Impressão e Layouts
+## 6. Impressão e Layouts
 
 O ERP possui governança de impressão para:
 
@@ -162,7 +210,7 @@ As centrais suportam:
 
 ---
 
-## 6. Financeiro
+## 7. Financeiro
 
 ### 6.1. Controle de Caixa
 
@@ -180,7 +228,7 @@ O módulo financeiro possui geração de:
 
 ---
 
-## 7. Aplicativo Mobile
+## 8. Aplicativo Mobile
 
 O projeto possui um aplicativo mobile próprio em React Native / Expo.
 
@@ -198,7 +246,7 @@ O mobile não substitui o ERP web inteiro. Ele cobre a operação de campo, balc
 
 ---
 
-## 8. Atalhos do Balcão
+## 9. Atalhos do Balcão
 
 Atalhos mais importantes:
 
@@ -214,7 +262,7 @@ Atalhos mais importantes:
 
 ---
 
-## 9. Observação Operacional
+## 10. Observação Operacional
 
 Em impressão, salvar não coloca em produção. Para o documento usar o novo modelo, é necessário publicar.
 

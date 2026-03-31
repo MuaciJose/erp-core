@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
-import { Users, Plus, Search, Phone, MapPin, Building2, Edit, FileText, History, Mail, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Plus, Search, Phone, MapPin, Building2, Edit, FileText, History, Mail, ChevronLeft, ChevronRight, CalendarPlus } from 'lucide-react';
 import { CriarParceiro } from './CriarParceiro';
 import { ExtratoParceiro } from '../financeiro/ExtratoParceiro';
 import { HistoricoClienteModal } from './HistoricoClienteModal';
 
-export const Parceiros = () => {
+export const Parceiros = ({ setPaginaAtiva }) => {
     const [parceiros, setParceiros] = useState([]);
     const [busca, setBusca] = useState("");
     const [loading, setLoading] = useState(true);
@@ -30,6 +30,24 @@ export const Parceiros = () => {
     };
 
     useEffect(() => { carregarParceiros(); }, []);
+
+    const agendarParaParceiro = (parceiro) => {
+        const dataBase = new Date().toISOString().slice(0, 10);
+        localStorage.setItem('agenda_quick_create', JSON.stringify({
+            titulo: `Contato com ${parceiro.nome}`,
+            descricao: parceiro.telefone ? `Contato comercial com ${parceiro.nome} • Tel: ${parceiro.telefone}` : `Contato comercial com ${parceiro.nome}`,
+            setor: 'COMERCIAL',
+            prioridade: 'NORMAL',
+            status: 'AGENDADO',
+            parceiroId: parceiro.id,
+            dataInicio: `${dataBase}T09:00`,
+            dataFim: `${dataBase}T09:30`
+        }));
+
+        if (setPaginaAtiva) {
+            setPaginaAtiva('agenda');
+        }
+    };
 
     // 🚀 Voltar para a página 1 ao buscar ou trocar de aba
     useEffect(() => {
@@ -195,6 +213,11 @@ export const Parceiros = () => {
                                                     {p.tipo !== 'FORNECEDOR' && (
                                                         <button onClick={() => setClienteParaHistorico(p)} className="p-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors shadow-sm" title="Histórico de Compras">
                                                             <History size={16} />
+                                                        </button>
+                                                    )}
+                                                    {p.tipo !== 'FORNECEDOR' && (
+                                                        <button onClick={() => agendarParaParceiro(p)} className="p-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200 transition-colors shadow-sm" title="Criar compromisso na agenda">
+                                                            <CalendarPlus size={16} />
                                                         </button>
                                                     )}
                                                     <button onClick={() => setExtratoAberto(p.id)} className="p-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 transition-colors shadow-sm" title="Extrato Financeiro">

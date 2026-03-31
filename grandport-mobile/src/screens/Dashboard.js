@@ -10,6 +10,7 @@ import { STORAGE_KEYS } from '../api/session';
 const SALES_MODULES = [
     { titulo: 'PDV Mobile', subtitulo: 'Orcamento e venda', icone: 'shopping-cart', corFundo: '#fef3c7', corIcone: '#b45309', rota: 'orcamento', permissao: 'pdv' },
     { titulo: 'Documentos', subtitulo: 'Orcamentos e pedidos', icone: 'file-text', corFundo: '#dbeafe', corIcone: '#2563eb', rota: 'vendas', permissao: 'vendas' },
+    { titulo: 'Agenda', subtitulo: 'Compromissos do dia', icone: 'calendar', corFundo: '#e0e7ff', corIcone: '#4338ca', rota: 'agenda', permissao: 'agenda' },
     { titulo: 'Clientes', subtitulo: 'Consulta e cadastro', icone: 'users', corFundo: '#f3e8ff', corIcone: '#9333ea', rota: 'parceiros', permissao: 'parceiros' },
     { titulo: 'Vistoria', subtitulo: 'Fotos e assinatura', icone: 'check-circle', corFundo: '#dcfce7', corIcone: '#16a34a', rota: 'checklist', permissao: 'checklist' }
 ];
@@ -94,6 +95,16 @@ export default function Dashboard({ onNavigate, onLogout }) {
         });
     };
 
+    const tratarRevisoesAtrasadas = async () => {
+        try {
+            await api.post('/api/agenda/sincronizar/revisoes');
+        } catch (error) {
+            console.log('Falha ao sincronizar revisoes atrasadas no mobile', error);
+        } finally {
+            onNavigate('agenda');
+        }
+    };
+
     const stats = useMemo(() => ([
         {
             titulo: 'Faturamento',
@@ -130,7 +141,7 @@ export default function Dashboard({ onNavigate, onLogout }) {
     ]), [resumo]);
 
     const quickActions = useMemo(() => {
-        const prioridade = ['checklist', 'inventario', 'orcamento', 'vendas'];
+        const prioridade = ['agenda', 'checklist', 'inventario', 'orcamento', 'vendas'];
         const origem = [...SALES_MODULES, ...STOCK_MODULES];
         return prioridade
             .map(id => origem.find(item => item.rota === id))
@@ -247,6 +258,9 @@ export default function Dashboard({ onNavigate, onLogout }) {
                                 Existem {resumo.crmAtrasados} revisoes em atraso para contato.
                             </Text>
                         </View>
+                        <TouchableOpacity style={styles.alertButton} onPress={tratarRevisoesAtrasadas}>
+                            <Text style={styles.alertButtonText}>Abrir agenda</Text>
+                        </TouchableOpacity>
                     </View>
                 )}
 
@@ -424,6 +438,14 @@ const styles = StyleSheet.create({
     alertContent: { flex: 1, marginLeft: 10 },
     alertTitle: { color: '#dc2626', fontSize: 14, fontWeight: '900' },
     alertSubtitle: { color: '#ef4444', fontSize: 12, fontWeight: '700', marginTop: 3, lineHeight: 18 },
+    alertButton: {
+        backgroundColor: '#dc2626',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 12,
+        marginLeft: 10
+    },
+    alertButtonText: { color: '#fff', fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
     moduleGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
     moduleCard: {
         width: '48.2%',

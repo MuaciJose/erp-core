@@ -17,6 +17,7 @@ import { InstallPWABanner } from '../../components/InstallPWABanner';
 
 export const Dashboard = ({ setPaginaAtiva }) => {
     const [resumo, setResumo] = useState(null);
+    const [agendaHoje, setAgendaHoje] = useState([]);
     const [loading, setLoading] = useState(true);
     const [abaAtiva, setAbaAtiva] = useState('geral');
 
@@ -24,6 +25,25 @@ export const Dashboard = ({ setPaginaAtiva }) => {
     const [nomeUsuario, setNomeUsuario] = useState('Admin');
 
     const CORES = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6'];
+
+    const abrirAgendaComFiltro = (filtro) => {
+        localStorage.setItem('agenda_quick_filter', filtro);
+        setPaginaAtiva('agenda');
+    };
+
+    const abrirCriacaoRapidaAgenda = () => {
+        const hoje = new Date();
+        const dataBase = hoje.toISOString().slice(0, 10);
+        localStorage.setItem('agenda_quick_create', JSON.stringify({
+            titulo: 'Novo compromisso do dashboard',
+            setor: 'COMERCIAL',
+            prioridade: 'NORMAL',
+            status: 'AGENDADO',
+            dataInicio: `${dataBase}T09:00`,
+            dataFim: `${dataBase}T09:30`
+        }));
+        setPaginaAtiva('agenda');
+    };
 
     useEffect(() => {
         const userStr = localStorage.getItem('grandport_user') || localStorage.getItem('usuario') || localStorage.getItem('user');
@@ -39,8 +59,13 @@ export const Dashboard = ({ setPaginaAtiva }) => {
 
         const carregarDashboard = async () => {
             try {
-                const res = await api.get('/api/dashboard/resumo');
-                setResumo(res.data);
+                const hoje = new Date().toISOString().slice(0, 10);
+                const [resumoRes, agendaRes] = await Promise.all([
+                    api.get('/api/dashboard/resumo'),
+                    api.get('/api/agenda', { params: { dataInicio: hoje, dataFim: hoje } })
+                ]);
+                setResumo(resumoRes.data);
+                setAgendaHoje((agendaRes.data || []).slice(0, 5));
             } catch (error) {
                 console.error("Erro ao carregar dashboard", error);
             } finally {
@@ -293,6 +318,60 @@ export const Dashboard = ({ setPaginaAtiva }) => {
                                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.15em]">Agendadas para Hoje</span>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <div className="mb-10 animate-fade-in">
+                        <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 text-left">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                                <div>
+                                    <h3 className="font-black text-slate-800 text-xl flex items-center gap-3">
+                                        <CalendarClock className="text-blue-600" size={24} /> Agenda do Dia
+                                    </h3>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Compromissos operacionais e comerciais previstos para hoje</p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <button onClick={abrirCriacaoRapidaAgenda} className="text-xs font-black text-emerald-700 hover:text-white flex items-center gap-2 bg-emerald-50 hover:bg-emerald-600 px-4 py-2.5 rounded-xl transition-all shadow-sm">
+                                        NOVO COMPROMISSO
+                                    </button>
+                                    <button onClick={() => abrirAgendaComFiltro('atrasados')} className="text-xs font-black text-rose-700 hover:text-white flex items-center gap-2 bg-rose-50 hover:bg-rose-600 px-4 py-2.5 rounded-xl transition-all shadow-sm">
+                                        VER ATRASADOS
+                                    </button>
+                                    <button onClick={() => abrirAgendaComFiltro('hoje')} className="text-xs font-black text-blue-700 hover:text-white flex items-center gap-2 bg-blue-50 hover:bg-blue-600 px-4 py-2.5 rounded-xl transition-all shadow-sm">
+                                        ABRIR AGENDA <ArrowRight size={16}/>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {agendaHoje.length === 0 ? (
+                                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm font-bold text-slate-400">
+                                    Nenhum compromisso agendado para hoje.
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {agendaHoje.map((item) => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => setPaginaAtiva('agenda')}
+                                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-5 py-4 text-left transition-colors"
+                                        >
+                                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                                                <div>
+                                                    <div className="text-base font-black text-slate-800">{item.titulo}</div>
+                                                    <div className="mt-1 text-sm font-medium text-slate-500">
+                                                        {new Date(item.dataInicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                        {item.usuarioResponsavelNome ? ` • ${item.usuarioResponsavelNome}` : ''}
+                                                        {item.parceiroNome ? ` • ${item.parceiroNome}` : ''}
+                                                    </div>
+                                                </div>
+                                                <div className="text-xs font-black uppercase tracking-wider text-blue-700">
+                                                    {item.status}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 

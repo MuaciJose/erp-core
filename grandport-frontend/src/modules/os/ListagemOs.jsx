@@ -3,7 +3,7 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import {
     Search, LayoutList, Printer, Eye, Clock, User, Car, DollarSign,
-    CheckCircle, AlertTriangle, FileText, ChevronRight
+    CheckCircle, AlertTriangle, FileText, ChevronRight, CalendarPlus
 } from 'lucide-react';
 import { OrdemServico } from './OrdemServico';
 
@@ -79,6 +79,17 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
         } catch (error) {
             console.error("Erro no PDF:", error);
             toast.error("Erro ao gerar o PDF da OS. Verifique se o layout não tem erros.", { id: toastId });
+        }
+    };
+
+    const criarAgendaDaOs = async (os) => {
+        const toastId = toast.loading(`Criando compromisso da OS #${os.id}...`);
+        try {
+            await api.post(`/api/agenda/origens/os/${os.id}`);
+            toast.success("Compromisso criado na agenda corporativa!", { id: toastId });
+        } catch (error) {
+            console.error(error);
+            toast.error("Erro ao criar compromisso da OS.", { id: toastId });
         }
     };
 
@@ -187,6 +198,9 @@ export const ListagemOs = ({ setPaginaAtiva }) => {
                                         <div className="flex justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
                                             <button onClick={() => imprimirOs(os)} className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg transition-colors shadow-sm" title="Imprimir OS">
                                                 <Printer size={18}/>
+                                            </button>
+                                            <button onClick={() => criarAgendaDaOs(os)} className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg transition-colors shadow-sm" title="Criar compromisso na agenda">
+                                                <CalendarPlus size={18}/>
                                             </button>
                                             <button onClick={() => setOsEmVisualizacao(os)} className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors shadow-sm" title="Ver Detalhes da OS">
                                                 <Eye size={18}/>

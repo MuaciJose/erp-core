@@ -2,12 +2,28 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
 import {
     Car, X, Calendar, PenTool, User, Gauge, CheckCircle,
-    ClipboardCheck, Droplet, AlertTriangle, FileText, Camera, Printer
+    ClipboardCheck, Droplet, AlertTriangle, FileText, Camera, Printer, CalendarPlus
 } from 'lucide-react'; // 🚀 IMPORTAMOS O ÍCONE DA IMPRESSORA AQUI!
 import toast from 'react-hot-toast';
-export const HistoricoVeiculoModal = ({ veiculo, onClose }) => {
+export const HistoricoVeiculoModal = ({ veiculo, cliente, onClose }) => {
     const [historico, setHistorico] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    const abrirAgenda = () => {
+        localStorage.setItem('agenda_quick_create', JSON.stringify({
+            titulo: `Retorno do veículo ${veiculo.placa}`,
+            descricao: `Contato sobre ${veiculo.marca} ${veiculo.modelo} • Placa ${veiculo.placa}`,
+            setor: 'RECEPCAO',
+            prioridade: 'NORMAL',
+            status: 'AGENDADO',
+            parceiroId: cliente?.id || null,
+            veiculoId: veiculo.id,
+            dataInicio: `${new Date().toISOString().slice(0, 10)}T09:00`,
+            dataFim: `${new Date().toISOString().slice(0, 10)}T09:30`
+        }));
+        window.dispatchEvent(new CustomEvent('grandport:navigate', { detail: { page: 'agenda' } }));
+        onClose?.();
+    };
 
     useEffect(() => {
         const carregarHistorico = async () => {
@@ -65,9 +81,14 @@ export const HistoricoVeiculoModal = ({ veiculo, onClose }) => {
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
-                        <X size={24} className="text-slate-400 hover:text-white" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button onClick={abrirAgenda} className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black text-xs uppercase flex items-center gap-2 transition-colors">
+                            <CalendarPlus size={14} /> Agendar
+                        </button>
+                        <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
+                            <X size={24} className="text-slate-400 hover:text-white" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* CORPO DA LINHA DO TEMPO */}

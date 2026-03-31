@@ -41,6 +41,7 @@ export const GestaoUsuarios = () => {
             telas: [
                 { acao: 'crm', nome: 'Painel de CRM / Pós-Venda' },
                 { acao: 'revisoes', nome: 'Gestão de Revisões (Agendamentos)' },
+                { acao: 'agenda', nome: 'Agenda Corporativa Inteligente' },
                 { acao: 'whatsapp', nome: 'Integração WhatsApp' }
             ]
         },

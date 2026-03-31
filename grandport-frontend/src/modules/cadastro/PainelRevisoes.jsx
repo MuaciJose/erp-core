@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, CheckCircle, MessageCircle, AlertTriangle, User, Car } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, MessageCircle, AlertTriangle, User, Car, PlusSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios'; // 🚀 AQUI IMPORTAMOS O SEU MOTOR DE CONEXÃO COM O JAVA
 
@@ -71,6 +71,17 @@ export const PainelRevisoes = () => {
         atualizarStatusNoJava(rev.id, 'CONTATADO');
     };
 
+    const enviarParaAgenda = async (rev) => {
+        const toastId = toast.loading("Criando compromisso na agenda...");
+        try {
+            await api.post(`/api/agenda/origens/revisao/${rev.id}`);
+            toast.success("Compromisso enviado para a agenda corporativa.", { id: toastId });
+        } catch (error) {
+            console.error(error);
+            toast.error("Falha ao criar compromisso na agenda.", { id: toastId });
+        }
+    };
+
     const formatarData = (dataString) => {
         if (!dataString) return '--/--/----';
         const [ano, mes, dia] = dataString.split('-');
@@ -129,6 +140,13 @@ export const PainelRevisoes = () => {
                     className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-colors"
                 >
                     <MessageCircle size={16} /> WHATSAPP
+                </button>
+                <button
+                    onClick={() => enviarParaAgenda(rev)}
+                    title="Criar compromisso na agenda corporativa"
+                    className="p-2 bg-blue-100 hover:bg-blue-500 hover:text-white text-blue-600 rounded-xl transition-colors shrink-0"
+                >
+                    <PlusSquare size={18} />
                 </button>
                 <button
                     onClick={() => atualizarStatusNoJava(rev.id, 'CONCLUIDO')}

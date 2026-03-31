@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/axios';
+import { STORAGE_KEYS } from '../api/session';
 import MobileHeroCard from '../components/MobileHeroCard';
 import MobileStatRow from '../components/MobileStatRow';
 
-export default function Parceiros({ onVoltar, onSelecionarCliente }) {
+export default function Parceiros({ onVoltar, onSelecionarCliente, onNavigate }) {
     const [parceiros, setParceiros] = useState([]);
     const [busca, setBusca] = useState('');
     const [carregando, setCarregando] = useState(true);
@@ -30,6 +32,23 @@ export default function Parceiros({ onVoltar, onSelecionarCliente }) {
     };
 
     useEffect(() => { carregarParceiros(); }, []);
+
+    const agendarParaParceiro = async (parceiro) => {
+        try {
+            const hoje = new Date().toISOString().slice(0, 10);
+            await AsyncStorage.setItem(STORAGE_KEYS.agendaDraft, JSON.stringify({
+                titulo: `Contato com ${parceiro.nome}`,
+                descricao: parceiro.telefone ? `Contato comercial com ${parceiro.nome} • Tel: ${parceiro.telefone}` : `Contato comercial com ${parceiro.nome}`,
+                parceiroId: parceiro.id,
+                lembreteWhatsApp: !!parceiro.telefone,
+                dataInicio: `${hoje}T09:00`,
+                dataFim: `${hoje}T09:30`
+            }));
+            onNavigate?.('agenda');
+        } catch (error) {
+            Toast.show({ type: 'error', text1: 'Não foi possível abrir a agenda' });
+        }
+    };
 
     const parceirosFiltrados = parceiros.filter(p => {
         const termo = busca.toLowerCase();
@@ -162,11 +181,16 @@ export default function Parceiros({ onVoltar, onSelecionarCliente }) {
                                 <Text style={styles.txtNome} numberOfLines={1}>{item.nome}</Text>
                                 <Text style={styles.txtDoc}>{item.documento || 'S/ Doc'}</Text>
                             </View>
-                            {item.telefone && (
-                                <TouchableOpacity onPress={() => Linking.openURL(`whatsapp://send?phone=55${item.telefone.replace(/\D/g,'')}`)} style={styles.btnZap}>
-                                    <Feather name="message-circle" size={16} color="#fff" />
+                            <View style={styles.cardActions}>
+                                {item.telefone && (
+                                    <TouchableOpacity onPress={() => Linking.openURL(`whatsapp://send?phone=55${item.telefone.replace(/\D/g,'')}`)} style={styles.btnZap}>
+                                        <Feather name="message-circle" size={16} color="#fff" />
+                                    </TouchableOpacity>
+                                )}
+                                <TouchableOpacity onPress={() => agendarParaParceiro(item)} style={styles.btnAgenda}>
+                                    <Feather name="calendar" size={16} color="#b45309" />
                                 </TouchableOpacity>
-                            )}
+                            </View>
                         </TouchableOpacity>
                     )}
                 />
@@ -193,7 +217,9 @@ const styles = StyleSheet.create({
     cardIcone: { backgroundColor: '#eff6ff', padding: 12, borderRadius: 12 },
     txtNome: { fontSize: 16, fontWeight: 'bold', color: '#1e293b' },
     txtDoc: { fontSize: 12, color: '#64748b', fontWeight: '900', marginTop: 2 },
+    cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     btnZap: { backgroundColor: '#22c55e', padding: 10, borderRadius: 10 },
+    btnAgenda: { backgroundColor: '#fef3c7', padding: 10, borderRadius: 10 },
     centerBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
     // Formulario Novo

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Search, Plus, FileText, CheckCircle, Clock,
-    Printer, ArrowLeft, Eye, X, User, Trash2, Edit, Lock, Wallet, Package, Receipt
+    Printer, ArrowLeft, Eye, X, User, Trash2, Edit, Lock, Wallet, Package, Receipt, CalendarPlus
 } from 'lucide-react';
 import api from '../../api/axios';
 import { OrcamentoPedido } from './OrcamentoPedido';
@@ -100,6 +100,17 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
     const handleReabrir = (venda) => {
         setVendaParaEditar(venda);
         setTelaAtual('NOVO');
+    };
+
+    const criarAgendaDaVenda = async (vendaId) => {
+        const toastId = toast.loading('Criando follow-up na agenda...');
+        try {
+            await api.post(`/api/agenda/origens/venda/${vendaId}`);
+            toast.success('Compromisso criado na agenda corporativa.', { id: toastId });
+        } catch (error) {
+            console.error(error);
+            toast.error('Não foi possível criar o compromisso da venda.', { id: toastId });
+        }
     };
 
     // 🚀 IMPRESSÃO A4 (VIA JAVA / BANCO DE DADOS)
@@ -325,6 +336,14 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
                                                     <FileText size={16} />
                                                 </button>
 
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); criarAgendaDaVenda(venda.id); }}
+                                                    className="p-2 bg-slate-100 text-slate-600 hover:bg-amber-500 hover:text-white rounded-lg transition-colors"
+                                                    title="Criar follow-up na agenda"
+                                                >
+                                                    <CalendarPlus size={16} />
+                                                </button>
+
                                                 {venda.status !== 'CONCLUIDA' && venda.status !== 'AGUARDANDO_PAGAMENTO' ? (
                                                     <>
                                                         <button
@@ -380,6 +399,13 @@ export const GestaoVendas = ({ setPaginaAtiva }) => {
                                     className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-black shadow-lg flex items-center gap-2 transition-transform hover:-translate-y-1"
                                 >
                                     <FileText size={20} /> FOLHA A4
+                                </button>
+
+                                <button
+                                    onClick={() => criarAgendaDaVenda(espelhoAberto.id)}
+                                    className="bg-amber-500 hover:bg-amber-400 text-white px-5 py-3 rounded-xl font-black shadow-lg flex items-center gap-2 transition-transform hover:-translate-y-1"
+                                >
+                                    <CalendarPlus size={20} /> AGENDA
                                 </button>
 
                                 <button onClick={() => setEspelhoAberto(null)} title="Pressione Esc para fechar" className="bg-slate-800 p-3 rounded-xl text-slate-400 hover:text-white hover:bg-red-500 transition-colors">
