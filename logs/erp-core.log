@@ -21114,3 +21114,42 @@ Caused by: org.postgresql.util.PSQLException: Objetos Grandes não podem ser usa
 2026-03-31 12:07:40.828 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
 2026-03-31 12:07:56.288 [http-nio-8080-exec-4] INFO  c.g.e.m.c.s.ConfiguracaoService - Backup automatico agendado para 03:00
 2026-03-31 12:07:56.300 [http-nio-8080-exec-4] INFO  c.g.e.m.c.s.ConfiguracaoService - Configuracao atualizada para empresaId=1
+2026-03-31 12:12:40.833 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 12:12:40.848 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 12:12:40.853 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
+2026-03-31 12:17:40.858 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 12:17:40.875 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 12:17:40.887 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
+2026-03-31 12:22:40.903 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 12:22:40.940 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 12:22:40.959 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
+2026-03-31 12:27:40.964 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 12:27:40.970 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 12:27:40.981 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
+2026-03-31 12:32:40.987 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 12:32:41.004 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 12:32:41.016 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
+2026-03-31 12:37:41.022 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 12:37:41.036 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 12:37:41.044 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
+2026-03-31 12:42:41.049 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 12:42:41.079 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 12:42:41.084 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
+2026-03-31 12:47:41.091 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 12:47:41.098 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 12:47:41.105 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
+2026-03-31 12:52:41.108 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 12:52:41.118 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 12:52:41.123 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
+2026-03-31 12:57:41.128 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 12:57:41.136 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 12:57:41.141 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
+2026-03-31 13:02:41.144 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 13:02:41.202 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 13:02:41.207 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
+2026-03-31 13:07:41.226 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 13:07:41.252 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 13:07:41.263 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0
+2026-03-31 13:12:41.276 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Iniciando robo de sincronizacao automatica.
+2026-03-31 13:12:41.288 [scheduling-1] WARN  c.g.e.m.c.s.ConfiguracaoService - Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.
+2026-03-31 13:12:41.294 [scheduling-1] INFO  c.g.e.m.f.s.SincronizacaoErpService - Robo de sincronizacao concluido. notasSincronizadas=0

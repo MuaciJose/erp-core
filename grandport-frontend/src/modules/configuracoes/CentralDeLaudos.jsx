@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
-import { FileCode2, Save, RotateCcw, Eye, Rocket, History } from 'lucide-react';
+import { FileCode2, Save, RotateCcw, Eye, Rocket, History, Library, Code2, ScanSearch } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const TODAS_FAMILIAS = 'todas';
+const ABAS_CENTRAL = [
+  { id: 'editor', label: 'Editor', icon: Code2 },
+  { id: 'biblioteca', label: 'Biblioteca', icon: Library },
+  { id: 'diff', label: 'Diff', icon: ScanSearch },
+];
 
 const getFamiliaVisual = (styleId = '') => {
   const [, familia = styleId] = styleId.split('-', 2);
@@ -18,6 +23,7 @@ const getLabelFamilia = (familia = '') => {
 };
 
 export const CentralDeLaudos = () => {
+  const [abaAtiva, setAbaAtiva] = useState('editor');
   const [jrxml, setJrxml] = useState('');
   const [templateOficial, setTemplateOficial] = useState(null);
   const [bibliotecaTemplates, setBibliotecaTemplates] = useState([]);
@@ -260,19 +266,19 @@ export const CentralDeLaudos = () => {
 
     const carregarMiniaturas = async () => {
       const entries = await Promise.all(
-          bibliotecaTemplates.map(async (template) => {
-            try {
-              const response = await api.get(`/api/configuracoes/laudo-vistoria/template/library/${template.styleId}/preview`, {
-                params: selectedChecklistId ? { checklistId: selectedChecklistId } : undefined,
-                responseType: 'blob',
-              });
-              const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-              generatedUrls.push(url);
-              return [template.styleId, url];
-            } catch (error) {
-              return [template.styleId, ''];
-            }
-          })
+        bibliotecaTemplates.map(async (template) => {
+          try {
+            const response = await api.get(`/api/configuracoes/laudo-vistoria/template/library/${template.styleId}/preview`, {
+              params: selectedChecklistId ? { checklistId: selectedChecklistId } : undefined,
+              responseType: 'blob',
+            });
+            const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            generatedUrls.push(url);
+            return [template.styleId, url];
+          } catch (error) {
+            return [template.styleId, ''];
+          }
+        })
       );
 
       if (cancelled) {
@@ -324,356 +330,152 @@ export const CentralDeLaudos = () => {
     : bibliotecaTemplates.filter((template) => getFamiliaVisual(template.styleId) === filtroBiblioteca);
 
   return (
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-              <FileCode2 className="text-orange-500" />
-              Laudo de Vistoria
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              Editor dedicado de JRXML para o laudo. Esse fluxo é separado da central HTML porque usa JasperReports.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2 justify-end text-xs">
-            {estadoTemplate.officialStyleId && (
-                <span className="bg-slate-100 text-slate-900 px-3 py-1 rounded-full font-bold">
-                  Oficial {estadoTemplate.officialStyleId}
-                </span>
-            )}
-            <span className={`px-3 py-1 rounded-full font-bold ${
-              customizado ? 'bg-orange-100 text-orange-900' : 'bg-slate-100 text-slate-700'
-            }`}>
-              {customizado ? 'Template customizado' : 'Template padrão'}
-            </span>
-            {estadoTemplate.isPublishedUsingOfficial ? (
-                <span className="bg-sky-100 text-sky-900 px-3 py-1 rounded-full font-bold">
-                  Publicado segue oficial
-                </span>
-            ) : (
-                <span className="bg-rose-100 text-rose-900 px-3 py-1 rounded-full font-bold">
-                  Publicado customizado
-                </span>
-            )}
-            {estadoTemplate.isEditorUsingOfficial ? (
-                <span className="bg-cyan-100 text-cyan-900 px-3 py-1 rounded-full font-bold">
-                  Editor com oficial
-                </span>
-            ) : (
-                <span className="bg-amber-100 text-amber-900 px-3 py-1 rounded-full font-bold">
-                  Editor alterado
-                </span>
-            )}
-            {estadoTemplate.hasDraft && (
-                <span className="bg-amber-100 text-amber-900 px-3 py-1 rounded-full font-bold">
-                  Draft v{estadoTemplate.draftVersion}
-                </span>
-            )}
-            {estadoTemplate.publishedVersion && (
-                <span className="bg-emerald-100 text-emerald-900 px-3 py-1 rounded-full font-bold">
-                  Publicado v{estadoTemplate.publishedVersion}
-                </span>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 text-sm text-orange-900 mb-4">
-          O backend compila o JRXML ao salvar e o preview usa checklist informado, checklist recente da empresa ou dados mockados.
-        </div>
-
-        {templateOficial && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4 flex items-start justify-between gap-4">
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-6 rounded-3xl border border-slate-200 bg-slate-50 px-6 py-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-700">
+              JasperReports
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="mt-1 rounded-2xl bg-orange-500 p-3 text-white">
+                <FileCode2 size={20} />
+              </div>
               <div>
-                <h3 className="font-bold text-slate-900">Template Oficial do Laudo</h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  {templateOficial.label} {templateOficial.styleId ? `| estilo ${templateOficial.styleId}` : ''}
-                </p>
-                <p className="text-sm text-slate-600 mt-2">
-                  Importe o oficial no editor para iniciar um novo draft a partir do padrao premium do sistema.
+                <h2 className="text-2xl font-semibold text-slate-950">Laudo de Vistoria</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Editor dedicado do JRXML do laudo. O preview pode usar checklist real ou dados mockados.
                 </p>
               </div>
-              <button
-                  onClick={importarTemplateOficial}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition font-bold text-sm"
-              >
-                <Rocket size={16} />
-                Importar Oficial
-              </button>
             </div>
-        )}
+            <div className="mt-4 flex flex-wrap gap-2 text-xs">
+              {estadoTemplate.officialStyleId && <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">Oficial {estadoTemplate.officialStyleId}</span>}
+              <span className={`rounded-full px-3 py-1 font-semibold ${customizado ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-700'}`}>{customizado ? 'Template customizado' : 'Template padrão'}</span>
+              <span className={`rounded-full px-3 py-1 font-semibold ${estadoTemplate.isPublishedUsingOfficial ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{estadoTemplate.isPublishedUsingOfficial ? 'Publicado no oficial' : 'Publicado customizado'}</span>
+              <span className={`rounded-full px-3 py-1 font-semibold ${estadoTemplate.isEditorUsingOfficial ? 'bg-sky-100 text-sky-800' : 'bg-violet-100 text-violet-800'}`}>{estadoTemplate.isEditorUsingOfficial ? 'Editor no oficial' : 'Editor alterado'}</span>
+              {estadoTemplate.hasDraft && <span className="rounded-full bg-orange-100 px-3 py-1 font-semibold text-orange-800">Draft v{estadoTemplate.draftVersion}</span>}
+              {estadoTemplate.publishedVersion && <span className="rounded-full bg-slate-900 px-3 py-1 font-semibold text-white">Publicado v{estadoTemplate.publishedVersion}</span>}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 xl:min-w-[360px]">
+            <button onClick={salvarTemplate} disabled={salvando || loading || !jrxml.trim()} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"><Save size={16} />{salvando ? 'Salvando...' : 'Salvar draft'}</button>
+            <button onClick={publicarTemplate} disabled={publicando || loading || !estadoTemplate.hasDraft} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"><Rocket size={16} />{publicando ? 'Publicando...' : 'Publicar'}</button>
+            <button onClick={alternarPreview} disabled={loading || gerandoPreview} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"><Eye size={16} />{gerandoPreview ? 'Gerando...' : previewAberto ? 'Fechar preview' : 'Preview PDF'}</button>
+            <button onClick={resetarTemplate} disabled={salvando || publicando || loading} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-100 disabled:opacity-50"><RotateCcw size={16} />Resetar</button>
+          </div>
+        </div>
+      </div>
 
-        {bibliotecaTemplates.length > 0 && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4">
-              <div className="mb-4">
-                <h3 className="font-bold text-slate-900">Biblioteca Premium do Laudo</h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  Importe um estilo pronto de JRXML para iniciar o draft com uma base visual diferente.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mb-6 flex flex-wrap gap-2">
+        {ABAS_CENTRAL.map((aba) => {
+          const AbaIcon = aba.icon;
+          return (
+            <button key={aba.id} onClick={() => setAbaAtiva(aba.id)} className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${abaAtiva === aba.id ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100'}`}>
+              <AbaIcon size={15} />
+              {aba.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        <div className="xl:col-span-9">
+          {abaAtiva === 'editor' && (
+            <>
+              {templateOficial && (
+                <div className="mb-4 rounded-3xl border border-slate-200 bg-white p-5">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Template oficial</h3>
+                      <p className="mt-2 text-base font-semibold text-slate-900">{templateOficial.label} {templateOficial.styleId ? `| ${templateOficial.styleId}` : ''}</p>
+                    </div>
+                    <button onClick={importarTemplateOficial} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"><Rocket size={16} />Importar oficial</button>
+                  </div>
+                </div>
+              )}
+
+              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 px-5 py-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Editor JRXML</h3>
+                </div>
+                <textarea value={jrxml} onChange={(e) => setJrxml(e.target.value)} disabled={loading} className="min-h-[460px] w-full border-0 p-5 font-mono text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Cole aqui o JRXML do laudo de vistoria..." />
+                <div className="border-t border-slate-200 px-5 py-4">
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Motivo editorial da alteração</label>
+                  <textarea value={changeReason} onChange={(e) => setChangeReason(e.target.value)} className="w-full rounded-2xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" rows={3} placeholder="Ex.: ajuste do cabeçalho, correção de posicionamento das fotos, mudança da assinatura..." />
+                </div>
+                <div className="border-t border-slate-200 px-5 py-4">
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Checklist usado no preview</label>
+                  <select value={selectedChecklistId} onChange={(e) => setSelectedChecklistId(e.target.value)} className="w-full rounded-2xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+                    <option value="">Automático: mais recente ou dados mockados</option>
+                    {previewContexts.map((context) => <option key={context.id} value={context.id}>#{context.id} | {context.placa} | {context.modelo} | {context.cliente}</option>)}
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
+
+          {abaAtiva === 'biblioteca' && bibliotecaTemplates.length > 0 && (
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-5 py-4">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Biblioteca premium</h3>
+                <div className="mt-4 flex flex-wrap gap-2">
                   {familiasDisponiveis.map((familia) => (
-                      <button
-                          key={familia}
-                          onClick={() => setFiltroBiblioteca(familia)}
-                          className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
-                            filtroBiblioteca === familia
-                              ? 'bg-slate-900 text-white'
-                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }`}
-                      >
-                        {familia === TODAS_FAMILIAS ? 'Todas as linhas' : getLabelFamilia(familia)}
-                      </button>
+                    <button key={familia} onClick={() => setFiltroBiblioteca(familia)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${filtroBiblioteca === familia ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>{familia === TODAS_FAMILIAS ? 'Todas as linhas' : getLabelFamilia(familia)}</button>
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
                 {templatesFiltrados.map((template) => (
-                    <div key={template.styleId} className="border border-slate-200 rounded-2xl p-4 flex items-start justify-between gap-3">
-                      <div>
-                        <div className="mb-3 h-28 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-                          {thumbnailBibliotecaUrls[template.styleId] ? (
-                              <iframe
-                                  title={`Thumb ${template.styleId}`}
-                                  src={thumbnailBibliotecaUrls[template.styleId]}
-                                  className="h-[520px] w-[320px] origin-top-left scale-[0.25] border-0 bg-white"
-                              />
-                          ) : (
-                              <div className="flex h-full items-center justify-center text-xs font-semibold text-slate-500">
-                                Gerando miniatura...
-                              </div>
-                          )}
-                        </div>
-                        <div className="font-semibold text-slate-900">{template.label}</div>
-                        <div className="text-xs text-slate-500 mt-1">{template.styleId}</div>
-                        <div className="text-xs text-slate-600 mt-2">
-                          Linha visual {getLabelFamilia(getFamiliaVisual(template.styleId))}
-                        </div>
-                        {template.official && (
-                            <span className="inline-flex mt-2 bg-sky-100 text-sky-900 px-2 py-1 rounded-full text-[11px] font-semibold">
-                              Oficial do sistema
-                            </span>
-                        )}
-                      </div>
-                      <div className="shrink-0 flex flex-col gap-2">
-                        <button
-                            onClick={() => visualizarTemplateDaBiblioteca(template.styleId)}
-                            className="px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 transition text-sm font-bold"
-                        >
-                          Preview
-                        </button>
-                        <button
-                            onClick={() => importarTemplateDaBiblioteca(template.styleId)}
-                            className="px-3 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition text-sm font-bold"
-                        >
-                          Importar
-                        </button>
-                      </div>
+                  <div key={template.styleId} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-3 h-28 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                      {thumbnailBibliotecaUrls[template.styleId] ? <iframe title={`Thumb ${template.styleId}`} src={thumbnailBibliotecaUrls[template.styleId]} className="h-[520px] w-[320px] origin-top-left scale-[0.25] border-0 bg-white" /> : <div className="flex h-full items-center justify-center text-xs font-semibold text-slate-500">Gerando miniatura...</div>}
                     </div>
-                ))}
-              </div>
-              {previewTemplateBiblioteca && (
-                  <div className="mt-4 border-t border-slate-200 pt-4">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <div>
-                        <h4 className="font-bold text-slate-900">Preview do JRXML</h4>
-                        <p className="text-sm text-slate-500">
-                          {previewTemplateBiblioteca.label} | {previewTemplateBiblioteca.styleId}
-                        </p>
-                      </div>
-                      <button
-                          onClick={() => {
-                            if (previewBibliotecaUrl) {
-                              URL.revokeObjectURL(previewBibliotecaUrl);
-                            }
-                            setPreviewBibliotecaUrl('');
-                            setPreviewTemplateBiblioteca(null);
-                          }}
-                          className="px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
-                      >
-                        Fechar
-                      </button>
+                    <div className="text-base font-semibold text-slate-900">{template.label}</div>
+                    <div className="mt-1 text-xs text-slate-500">{template.styleId}</div>
+                    <div className="mt-4 flex gap-2">
+                      <button onClick={() => visualizarTemplateDaBiblioteca(template.styleId)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><Eye size={15} />Preview</button>
+                      <button onClick={() => importarTemplateDaBiblioteca(template.styleId)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"><Rocket size={15} />Importar</button>
                     </div>
-                    <iframe
-                        title={`Preview ${previewTemplateBiblioteca.styleId}`}
-                        src={previewBibliotecaUrl}
-                        className="w-full h-[640px] border border-slate-200 rounded-2xl bg-white"
-                    />
                   </div>
-              )}
-            </div>
-        )}
-
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-          <div className="xl:col-span-3">
-            <textarea
-                value={jrxml}
-                onChange={(e) => setJrxml(e.target.value)}
-                disabled={loading}
-                className="w-full min-h-[420px] p-4 font-mono text-sm border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                placeholder="Cole aqui o JRXML do laudo de vistoria..."
-            />
-
-            <div className="mt-4">
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Motivo da alteração
-              </label>
-              <textarea
-                  value={changeReason}
-                  onChange={(e) => setChangeReason(e.target.value)}
-                  className="w-full border border-slate-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  rows={3}
-                  placeholder="Ex.: ajuste do cabeçalho, correção de posicionamento das fotos, mudança da assinatura..."
-              />
-            </div>
-
-            <div className="mt-4">
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Checklist usado no preview
-              </label>
-              <select
-                  value={selectedChecklistId}
-                  onChange={(e) => setSelectedChecklistId(e.target.value)}
-                  className="w-full border border-slate-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-              >
-                <option value="">Automático: mais recente ou dados mockados</option>
-                {previewContexts.map((context) => (
-                    <option key={context.id} value={context.id}>
-                      #{context.id} | {context.placa} | {context.modelo} | {context.cliente}
-                    </option>
                 ))}
-              </select>
-              <p className="text-xs text-slate-500 mt-2">
-                Selecione um checklist real para validar o JRXML com dados concretos da empresa.
-              </p>
+              </div>
+              {previewTemplateBiblioteca && <div className="border-t border-slate-200 bg-slate-50 p-5"><iframe title={`Preview ${previewTemplateBiblioteca.styleId}`} src={previewBibliotecaUrl} className="h-[640px] w-full rounded-2xl border border-slate-200 bg-white" /></div>}
             </div>
+          )}
 
-            <div className="flex gap-3 mt-4 flex-wrap">
-              <button
-                  onClick={salvarTemplate}
-                  disabled={salvando || loading || !jrxml.trim()}
-                  className="flex items-center gap-2 px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 disabled:opacity-50 font-bold transition"
-              >
-                <Save size={18} />
-                {salvando ? 'Salvando...' : 'Salvar Draft'}
-              </button>
-
-              <button
-                  onClick={publicarTemplate}
-                  disabled={publicando || loading || !estadoTemplate.hasDraft}
-                  className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50 font-bold transition"
-              >
-                <Rocket size={18} />
-                {publicando ? 'Publicando...' : 'Publicar Draft'}
-              </button>
-
-              <button
-                  onClick={alternarPreview}
-                  disabled={loading || gerandoPreview}
-                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-bold transition"
-              >
-                <Eye size={18} />
-                {gerandoPreview ? 'Gerando...' : previewAberto ? 'Fechar Preview' : 'Preview PDF'}
-              </button>
-
-              <button
-                  onClick={resetarTemplate}
-                  disabled={salvando || publicando || loading}
-                  className="flex items-center gap-2 px-6 py-3 bg-slate-600 text-white rounded-xl hover:bg-slate-700 disabled:opacity-50 font-bold transition"
-              >
-                <RotateCcw size={18} />
-                Resetar para padrão
-              </button>
+          {abaAtiva === 'diff' && (
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              {diffAtual?.hasChanges ? <div className="max-h-[520px] overflow-auto rounded-2xl bg-slate-950 p-4 font-mono text-xs text-slate-100">{diffAtual.lines?.map((line, index) => <div key={`${line.type}-${index}`} className={line.type === 'added' ? 'text-emerald-300' : line.type === 'removed' ? 'text-rose-300' : 'text-amber-200'}>{line.type === 'added' ? '+ ' : line.type === 'removed' ? '- ' : '! '}{line.content}</div>)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">Nenhuma divergência relevante entre draft e publicado no momento.</div>}
             </div>
+          )}
 
-            {previewAberto && (
-                <div className="mt-6">
-                  <iframe
-                      src={previewUrl}
-                      title="Preview do Laudo de Vistoria"
-                      className="w-full h-[760px] border border-slate-200 rounded-2xl"
-                  />
-                </div>
-            )}
+          {previewAberto && <div className="mt-6"><iframe src={previewUrl} title="Preview do Laudo de Vistoria" className="h-[760px] w-full rounded-2xl border border-slate-200" /></div>}
+        </div>
 
-            {diffAtual?.hasChanges && (
-                <div className="mt-6 bg-slate-950 text-slate-100 rounded-2xl p-4">
-                  <h3 className="font-bold text-white mb-2">Diff Draft vs Publicado</h3>
-                  <p className="text-xs text-slate-400 mb-4">
-                    Draft: {diffAtual.draftLineCount} linhas | Publicado: {diffAtual.publishedLineCount} linhas
-                  </p>
-                  <div className="max-h-[420px] overflow-auto font-mono text-xs space-y-1">
-                    {diffAtual.lines?.map((line, index) => (
-                        <div
-                            key={`${line.type}-${index}`}
-                            className={
-                              line.type === 'added'
-                                ? 'text-emerald-300'
-                                : line.type === 'removed'
-                                  ? 'text-rose-300'
-                                  : 'text-amber-200'
-                            }
-                        >
-                          {line.type === 'added' ? '+ ' : line.type === 'removed' ? '- ' : '! '}
-                          {line.content}
-                        </div>
-                    ))}
+        <div className="xl:col-span-3">
+          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-4">
+              <History size={16} className="text-slate-600" />
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Histórico</h3>
+            </div>
+            <div className="max-h-[720px] divide-y divide-slate-100 overflow-y-auto">
+              {historico.length === 0 && <div className="p-4 text-sm text-slate-500">Nenhuma versão do laudo registrada ainda.</div>}
+              {historico.map((versao) => (
+                <div key={versao.id} className="space-y-3 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-slate-900">v{versao.versionNumber}</span>
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${versao.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-900' : versao.status === 'DRAFT' ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-700'}`}>{versao.status}</span>
                   </div>
+                  {versao.changeReason && <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">{versao.changeReason}</div>}
+                  <div className="text-xs text-slate-500">{versao.createdAt ? new Date(versao.createdAt).toLocaleString() : 'Sem data'}</div>
+                  {versao.status !== 'DRAFT' && <button onClick={() => rollbackTemplate(versao.id)} disabled={publicando} className="text-xs font-semibold text-slate-900 transition hover:text-slate-600">Publicar esta versão</button>}
                 </div>
-            )}
-          </div>
-
-          <div className="xl:col-span-1">
-            <div className="border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="p-4 border-b bg-slate-50 flex items-center gap-2">
-                <History size={16} className="text-slate-600" />
-                <h3 className="font-bold text-slate-800">Histórico</h3>
-              </div>
-              <div className="max-h-[780px] overflow-y-auto divide-y">
-                {historico.length === 0 && (
-                    <div className="p-4 text-sm text-slate-500">
-                      Nenhuma versão do laudo registrada ainda.
-                    </div>
-                )}
-                {historico.map((versao) => (
-                    <div key={versao.id} className="p-4 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-sm text-slate-900">v{versao.versionNumber}</span>
-                        <span className={`text-[10px] px-2 py-1 rounded-full ${
-                          versao.status === 'PUBLISHED'
-                            ? 'bg-emerald-100 text-emerald-900'
-                            : versao.status === 'DRAFT'
-                              ? 'bg-amber-100 text-amber-900'
-                              : 'bg-slate-100 text-slate-700'
-                        }`}>
-                          {versao.status}
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        Criado por {versao.createdBy || 'sistema'}
-                      </div>
-                      {versao.changeReason && (
-                          <div className="text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded p-2">
-                            {versao.changeReason}
-                          </div>
-                      )}
-                      <div className="text-xs text-slate-500">
-                        {versao.createdAt ? new Date(versao.createdAt).toLocaleString() : 'Sem data'}
-                      </div>
-                      {versao.status !== 'DRAFT' && (
-                          <button
-                              onClick={() => rollbackTemplate(versao.id)}
-                              disabled={publicando}
-                              className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
-                          >
-                            Publicar esta versão
-                          </button>
-                      )}
-                    </div>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
+    </div>
   );
 };
 

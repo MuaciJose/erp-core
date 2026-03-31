@@ -588,41 +588,113 @@ export const Configuracoes = () => {
         }
     };
 
+    const gruposNavegacao = [
+        {
+            id: 'negocio',
+            label: 'Negócio',
+            items: [
+                { id: 'EMPRESA', label: 'Dados da Empresa', icon: Building2, activeClass: 'bg-blue-600 text-white shadow-md' },
+                { id: 'VENDEDORES', label: 'Vendedores', icon: Users, activeClass: 'bg-blue-600 text-white shadow-md' },
+                { id: 'REGRAS', label: 'Regras', icon: Sliders, activeClass: 'bg-blue-600 text-white shadow-md' },
+            ],
+        },
+        {
+            id: 'fiscal',
+            label: 'Fiscal e Impressão',
+            items: [
+                { id: 'FISCAL', label: 'Fiscal / NF-e (Peças)', icon: Receipt, activeClass: 'bg-blue-600 text-white shadow-md' },
+                { id: 'PREFEITURA', label: 'Prefeitura (Serviços)', icon: Landmark, activeClass: 'bg-orange-500 text-white shadow-md' },
+                { id: 'IMPRESSAO', label: 'Impressão', icon: Printer, activeClass: 'bg-blue-600 text-white shadow-md' },
+                { id: 'LAYOUTS', label: 'Layouts', icon: Palette, activeClass: 'bg-purple-600 text-white shadow-md' },
+            ],
+        },
+        {
+            id: 'plataforma',
+            label: 'Plataforma',
+            items: [
+                { id: 'INTEGRACOES', label: 'Integrações', icon: Plug, activeClass: 'bg-blue-600 text-white shadow-md' },
+                { id: 'SISTEMA', label: 'Sistema', icon: Database, activeClass: 'bg-slate-900 text-white shadow-md' },
+            ],
+        },
+    ];
+
     if (loading) return <div className="p-8 text-center font-bold text-slate-400 animate-pulse">CARREGANDO CONFIGURAÇÕES...</div>;
 
     return (
-        <div className="p-8 max-w-6xl mx-auto animate-fade-in relative flex flex-col h-full">
+        <div className="mx-auto flex h-full max-w-7xl flex-col animate-fade-in p-8">
 
-            <div className="mb-8 flex justify-between items-end">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-800 flex items-center gap-3"><Settings className="text-slate-600 bg-slate-200 p-1.5 rounded-xl" size={40} /> CONFIGURAÇÕES</h1>
-                    <p className="text-slate-500 mt-1">Gerencie a identidade, regras e motor fiscal do ERP.</p>
+            <div className="mb-8 rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+                    <div className="min-w-0">
+                        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                            Centro administrativo
+                        </div>
+                        <h1 className="flex items-center gap-3 text-3xl font-black text-slate-800">
+                            <Settings className="rounded-2xl bg-slate-200 p-1.5 text-slate-600" size={40} />
+                            Configurações
+                        </h1>
+                        <p className="mt-2 max-w-2xl text-slate-500">
+                            Gerencie identidade da empresa, parâmetros fiscais, impressão, integrações e rotinas críticas do ERP.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            Aba atual: <span className="font-black text-slate-900">{abaAtiva}</span>
+                        </div>
+                        <button
+                            onClick={salvarConfiguracoes}
+                            disabled={salvando}
+                            title="Aplicar e salvar permanentemente todas as alterações realizadas em todas as abas"
+                            className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-8 py-3 font-black text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            <Save size={20} /> {salvando ? 'PROCESSANDO...' : 'SALVAR TUDO'}
+                        </button>
+                    </div>
                 </div>
-                <button
-                    onClick={salvarConfiguracoes}
-                    disabled={salvando}
-                    title="Aplicar e salvar permanentemente todas as alterações realizadas em todas as abas"
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-black shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-all disabled:opacity-50"
-                >
-                    <Save size={20} /> {salvando ? 'PROCESSANDO...' : 'SALVAR TUDO'}
-                </button>
             </div>
 
-            <div className="flex flex-col lg:flex-row gap-8 flex-1">
-                {/* MENU LATERAL */}
-                <div className="w-full lg:w-64 flex flex-col gap-2">
-                    <button onClick={() => setAbaAtiva('EMPRESA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'EMPRESA' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Building2 size={20} /> Dados da Empresa</button>
-                    <button onClick={() => setAbaAtiva('FISCAL')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'FISCAL' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Receipt size={20} /> Fiscal / NF-e (Peças)</button>
-                    <button onClick={() => setAbaAtiva('PREFEITURA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'PREFEITURA' ? 'bg-orange-500 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Landmark size={20} /> Prefeitura (Serviços)</button>
-                    <button onClick={() => setAbaAtiva('VENDEDORES')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'VENDEDORES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Users size={20} /> Vendedores</button>
-                    <button onClick={() => setAbaAtiva('IMPRESSAO')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'IMPRESSAO' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Printer size={20} /> Impressão</button>
-                    <button onClick={() => setAbaAtiva('LAYOUTS')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'LAYOUTS' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Palette size={20} /> 🎨 Layouts</button>
-                    <button onClick={() => setAbaAtiva('REGRAS')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'REGRAS' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Sliders size={20} /> Regras</button>
-                    <button onClick={() => setAbaAtiva('INTEGRACOES')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'INTEGRACOES' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Plug size={20} /> Integrações</button>
-                    <button onClick={() => setAbaAtiva('SISTEMA')} className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${abaAtiva === 'SISTEMA' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}><Database size={20} /> Sistema</button>
+            <div className="grid flex-1 grid-cols-1 gap-8 xl:grid-cols-12">
+                <div className="xl:col-span-3">
+                    <div className="sticky top-6 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+                        <div className="border-b border-slate-200 px-5 py-4">
+                            <h2 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Seções</h2>
+                        </div>
+                        <div className="max-h-[820px] overflow-y-auto px-4 py-4">
+                            <div className="space-y-5">
+                                {gruposNavegacao.map((grupo) => (
+                                    <div key={grupo.id}>
+                                        <div className="px-2 pb-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                            {grupo.label}
+                                        </div>
+                                        <div className="space-y-2">
+                                            {grupo.items.map((item) => {
+                                                const Icone = item.icon;
+                                                const ativo = abaAtiva === item.id;
+                                                return (
+                                                    <button
+                                                        key={item.id}
+                                                        onClick={() => setAbaAtiva(item.id)}
+                                                        className={`flex w-full items-center gap-3 rounded-2xl p-4 font-bold transition-all ${
+                                                            ativo
+                                                                ? item.activeClass
+                                                                : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
+                                                        }`}
+                                                    >
+                                                        <Icone size={19} />
+                                                        <span className="text-left">{item.label}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="flex-1 bg-white p-8 rounded-3xl shadow-sm border border-slate-200 min-h-[500px] overflow-y-auto">
+                <div className="xl:col-span-9">
+                    <div className="min-h-[500px] overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
 
                     {abaAtiva === 'EMPRESA' && (
                         <div className="space-y-6 animate-fade-in">
@@ -1273,6 +1345,7 @@ export const Configuracoes = () => {
 
                 </div>
             </div>
+        </div>
         </div>
     );
 };

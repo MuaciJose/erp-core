@@ -6,25 +6,50 @@
 
 import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
-import { Save, RotateCcw, Eye, Copy, AlertCircle, Rocket, History } from 'lucide-react';
+import {
+  Save,
+  RotateCcw,
+  Eye,
+  Copy,
+  AlertCircle,
+  Rocket,
+  History,
+  FileText,
+  Receipt,
+  ShoppingCart,
+  Wallet,
+  ClipboardList,
+  BarChart3,
+  Banknote,
+  BadgeDollarSign,
+  FileSpreadsheet,
+  Library,
+  Code2,
+  ScanSearch,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const TIPOS_LAYOUT = [
-  { id: 'extratoCliente', nome: '📋 Extrato de Cliente', descricao: 'Extrato de contas a receber' },
-  { id: 'extratoFornecedor', nome: '📦 Extrato de Fornecedor', descricao: 'Extrato de contas a pagar' },
-  { id: 'os', nome: '🔧 Ordem de Serviço', descricao: 'Ordem de serviço (OS)' },
-  { id: 'venda', nome: '🛒 Pedido de Venda', descricao: 'Pedido de venda / cotação' },
-  { id: 'recibo', nome: '📄 Recibo', descricao: 'Recibo de recebimento' },
-  { id: 'reciboPagamento', nome: '💳 Recibo de Pagamento', descricao: 'Recibo de pagamento de conta' },
-  { id: 'fechamentoCaixa', nome: '💰 Fechamento de Caixa', descricao: 'Fechamento diário de caixa' },
-  { id: 'espelhoNota', nome: '📋 Espelho de Nota', descricao: 'Espelho da Nota Fiscal' },
-  { id: 'dre', nome: '📊 DRE', descricao: 'Demonstração de Resultado (DRE)' },
-  { id: 'relatorioComissao', nome: '💼 Relatório de Comissão', descricao: 'Relatório de comissões' },
-  { id: 'relatorioContasPagar', nome: '📋 Contas a Pagar', descricao: 'Relatório de contas a pagar' },
-  { id: 'relatorioContasReceber', nome: '📋 Contas a Receber', descricao: 'Relatório de contas a receber' },
+  { id: 'extratoCliente', nome: 'Extrato de Cliente', descricao: 'Extrato de contas a receber', icon: FileText },
+  { id: 'extratoFornecedor', nome: 'Extrato de Fornecedor', descricao: 'Extrato de contas a pagar', icon: ClipboardList },
+  { id: 'os', nome: 'Ordem de Serviço', descricao: 'Documento operacional da oficina', icon: FileSpreadsheet },
+  { id: 'venda', nome: 'Pedido de Venda', descricao: 'Pedido de venda e orçamento', icon: ShoppingCart },
+  { id: 'recibo', nome: 'Recibo', descricao: 'Recibo de recebimento', icon: Receipt },
+  { id: 'reciboPagamento', nome: 'Recibo de Pagamento', descricao: 'Pagamento de contas e fornecedores', icon: Wallet },
+  { id: 'fechamentoCaixa', nome: 'Fechamento de Caixa', descricao: 'Resumo diário do caixa', icon: Banknote },
+  { id: 'espelhoNota', nome: 'Espelho de Nota', descricao: 'Conferência da nota fiscal', icon: ClipboardList },
+  { id: 'dre', nome: 'DRE', descricao: 'Demonstração de resultado', icon: BarChart3 },
+  { id: 'relatorioComissao', nome: 'Relatório de Comissão', descricao: 'Comissões da equipe', icon: BadgeDollarSign },
+  { id: 'relatorioContasPagar', nome: 'Contas a Pagar', descricao: 'Relatório financeiro de saídas', icon: FileText },
+  { id: 'relatorioContasReceber', nome: 'Contas a Receber', descricao: 'Relatório financeiro de entradas', icon: FileText },
 ];
 
 const TODAS_FAMILIAS = 'todas';
+const ABAS_CENTRAL = [
+  { id: 'editor', label: 'Editor', icon: Code2 },
+  { id: 'biblioteca', label: 'Biblioteca', icon: Library },
+  { id: 'diff', label: 'Diff', icon: ScanSearch },
+];
 
 const getFamiliaVisual = (styleId = '') => {
   const [, familia = styleId] = styleId.split('-', 2);
@@ -40,6 +65,8 @@ const getLabelFamilia = (familia = '') => {
 
 export const CentralDeLayouts = () => {
   const [tipoSelecionado, setTipoSelecionado] = useState('extratoCliente');
+  const [abaAtiva, setAbaAtiva] = useState('editor');
+  const [buscaTipo, setBuscaTipo] = useState('');
   const [html, setHtml] = useState('');
   const [metadata, setMetadata] = useState(null);
   const [templateOficial, setTemplateOficial] = useState(null);
@@ -368,394 +395,499 @@ export const CentralDeLayouts = () => {
     }
   };
 
+  const gruposDocumentos = [
+    {
+      id: 'operacional',
+      label: 'Operacional',
+      items: ['os', 'venda', 'recibo', 'reciboPagamento', 'fechamentoCaixa', 'espelhoNota'],
+    },
+    {
+      id: 'financeiro',
+      label: 'Financeiro',
+      items: ['extratoCliente', 'extratoFornecedor', 'dre', 'relatorioComissao', 'relatorioContasPagar', 'relatorioContasReceber'],
+    },
+  ];
+  const tiposFiltrados = TIPOS_LAYOUT.filter((tipo) => {
+    const termo = buscaTipo.trim().toLowerCase();
+    if (!termo) return true;
+    return `${tipo.nome} ${tipo.descricao}`.toLowerCase().includes(termo);
+  });
   const layoutInfo = TIPOS_LAYOUT.find((tipo) => tipo.id === tipoSelecionado);
+  const LayoutIcon = layoutInfo?.icon || FileText;
   const familiasDisponiveis = [TODAS_FAMILIAS, ...new Set(bibliotecaTemplates.map((template) => getFamiliaVisual(template.styleId)))];
   const templatesFiltrados = filtroBiblioteca === TODAS_FAMILIAS
     ? bibliotecaTemplates
     : bibliotecaTemplates.filter((template) => getFamiliaVisual(template.styleId) === filtroBiblioteca);
 
   return (
-      <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              🎨 Central de Layouts
-            </h1>
-            <p className="text-gray-600 mt-2">Gerencie os templates HTML de todos os documentos e extratos do sistema</p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow sticky top-6">
-                <div className="p-4 border-b">
-                  <h2 className="font-bold text-gray-900">Layouts Disponíveis</h2>
+          <div className="mb-6 rounded-3xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="min-w-0">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+                  Central editorial
                 </div>
-                <div className="divide-y max-h-[600px] overflow-y-auto">
-                  {TIPOS_LAYOUT.map((tipo) => (
-                      <button
-                          key={tipo.id}
-                          onClick={() => setTipoSelecionado(tipo.id)}
-                          className={`w-full text-left p-3 hover:bg-gray-50 transition ${
-                              tipoSelecionado === tipo.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
-                          }`}
-                      >
-                        <div className="font-semibold text-sm text-gray-900">{tipo.nome}</div>
-                        <div className="text-xs text-gray-500 mt-1">{tipo.descricao}</div>
-                      </button>
-                  ))}
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 rounded-2xl bg-slate-900 p-3 text-white">
+                    <LayoutIcon size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="text-2xl font-semibold text-slate-950">{layoutInfo?.nome || 'Central de Layouts'}</h1>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {layoutInfo?.descricao || 'Gerencie templates HTML publicados, rascunhos e padrões oficiais.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                  {estadoLayout.officialStyleId && (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+                      Oficial {estadoLayout.officialStyleId}
+                    </span>
+                  )}
+                  <span className={`rounded-full px-3 py-1 font-semibold ${estadoLayout.isPublishedUsingOfficial ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                    {estadoLayout.isPublishedUsingOfficial ? 'Publicado no oficial' : 'Publicado customizado'}
+                  </span>
+                  <span className={`rounded-full px-3 py-1 font-semibold ${estadoLayout.isEditorUsingOfficial ? 'bg-sky-100 text-sky-800' : 'bg-violet-100 text-violet-800'}`}>
+                    {estadoLayout.isEditorUsingOfficial ? 'Editor no oficial' : 'Editor alterado'}
+                  </span>
+                  {estadoLayout.hasDraft && (
+                    <span className="rounded-full bg-orange-100 px-3 py-1 font-semibold text-orange-800">
+                      Draft v{estadoLayout.draftVersion}
+                    </span>
+                  )}
+                  {estadoLayout.publishedVersion && (
+                    <span className="rounded-full bg-slate-900 px-3 py-1 font-semibold text-white">
+                      Publicado v{estadoLayout.publishedVersion}
+                    </span>
+                  )}
                 </div>
               </div>
-            </div>
 
-            <div className="lg:col-span-3">
+              <div className="grid grid-cols-2 gap-3 xl:min-w-[360px]">
+                <button
+                  onClick={salvarLayout}
+                  disabled={salvando || loading || !html.trim()}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Save size={16} />
+                  {salvando ? 'Salvando...' : 'Salvar draft'}
+                </button>
+                <button
+                  onClick={publicarLayout}
+                  disabled={publicando || loading || !estadoLayout.hasDraft}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Rocket size={16} />
+                  {publicando ? 'Publicando...' : 'Publicar'}
+                </button>
+                <button
+                  onClick={alternarPreview}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  <Eye size={16} />
+                  {gerandoPreview ? 'Gerando...' : previewAberta ? 'Fechar preview' : 'Preview PDF'}
+                </button>
+                <button
+                  onClick={resetarLayout}
+                  disabled={salvando || publicando || loading}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RotateCcw size={16} />
+                  Resetar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+            <div className="xl:col-span-9">
+              <div className="mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 px-5 py-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Documento ativo</h2>
+                      <p className="mt-1 text-sm text-slate-600">Escolha qual layout HTML você quer editar sem sair da central.</p>
+                    </div>
+                    <div className="w-full lg:w-[280px]">
+                      <input
+                        value={buscaTipo}
+                        onChange={(e) => setBuscaTipo(e.target.value)}
+                        placeholder="Buscar documento..."
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4 px-5 py-5">
+                  {gruposDocumentos.map((grupo) => {
+                    const itensGrupo = tiposFiltrados.filter((tipo) => grupo.items.includes(tipo.id));
+                    if (!itensGrupo.length) {
+                      return null;
+                    }
+                    return (
+                      <div key={grupo.id}>
+                        <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                          {grupo.label}
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                          {itensGrupo.map((tipo) => {
+                            const ItemIcon = tipo.icon || FileText;
+                            return (
+                              <button
+                                key={tipo.id}
+                                onClick={() => setTipoSelecionado(tipo.id)}
+                                className={`rounded-2xl px-4 py-4 text-left transition ${
+                                  tipoSelecionado === tipo.id
+                                    ? 'bg-slate-900 text-white shadow-sm'
+                                    : 'border border-slate-200 bg-slate-50 hover:bg-white'
+                                }`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className={`rounded-2xl p-2.5 ${tipoSelecionado === tipo.id ? 'bg-white/10 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-200'}`}>
+                                    <ItemIcon size={16} />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className={`text-sm font-semibold leading-5 ${tipoSelecionado === tipo.id ? 'text-white' : 'text-slate-900'}`}>
+                                      {tipo.nome}
+                                    </div>
+                                    <div className={`mt-1 text-xs leading-5 ${tipoSelecionado === tipo.id ? 'text-slate-200' : 'text-slate-500'}`}>
+                                      {tipo.descricao}
+                                    </div>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {!tiposFiltrados.length && (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                      Nenhum documento encontrado para essa busca.
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {layoutInfo && (
-                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded mb-6">
+                  <div className="mb-6 rounded-3xl border border-sky-200 bg-sky-50 p-5">
                     <div className="flex items-start gap-3">
-                      <AlertCircle className="text-blue-500 mt-1" size={20} />
+                      <AlertCircle className="mt-1 text-sky-600" size={20} />
                       <div>
-                        <h3 className="font-bold text-blue-900">{layoutInfo.nome}</h3>
-                        <p className="text-sm text-blue-800 mt-1">
-                          Use variáveis Thymeleaf como <code className="bg-blue-200 px-2 py-1 rounded">${'${variavel}'}</code> para inserir dados dinâmicos
+                        <h3 className="font-semibold text-sky-950">{layoutInfo.nome}</h3>
+                        <p className="mt-1 text-sm text-sky-900">
+                          Use variáveis Thymeleaf como <code className="rounded bg-sky-100 px-2 py-1">${'${variavel}'}</code> para inserir dados dinâmicos.
                         </p>
                         {metadata?.notes?.length > 0 && (
-                            <div className="mt-3 space-y-1">
+                            <div className="mt-3 space-y-1.5">
                               {metadata.notes.map((note) => (
-                                  <div key={note} className="text-xs text-blue-900">
-                                    - {note}
+                                  <div key={note} className="text-xs text-sky-900">
+                                    {note}
                                   </div>
                               ))}
                             </div>
                         )}
-                        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                          {estadoLayout.officialStyleId && (
-                              <span className="bg-slate-100 text-slate-900 px-2 py-1 rounded-full">
-                                Oficial {estadoLayout.officialStyleId}
-                              </span>
-                          )}
-                          {estadoLayout.isPublishedUsingOfficial ? (
-                              <span className="bg-sky-100 text-sky-900 px-2 py-1 rounded-full">
-                                Publicado segue oficial
-                              </span>
-                          ) : (
-                              <span className="bg-rose-100 text-rose-900 px-2 py-1 rounded-full">
-                                Publicado customizado
-                              </span>
-                          )}
-                          {estadoLayout.isEditorUsingOfficial ? (
-                              <span className="bg-cyan-100 text-cyan-900 px-2 py-1 rounded-full">
-                                Editor com oficial
-                              </span>
-                          ) : (
-                              <span className="bg-amber-100 text-amber-900 px-2 py-1 rounded-full">
-                                Editor alterado
-                              </span>
-                          )}
-                          {estadoLayout.hasDraft && (
-                              <span className="bg-amber-100 text-amber-900 px-2 py-1 rounded-full">
-                                Draft v{estadoLayout.draftVersion}
-                              </span>
-                          )}
-                          {estadoLayout.publishedVersion && (
-                              <span className="bg-emerald-100 text-emerald-900 px-2 py-1 rounded-full">
-                                Publicado v{estadoLayout.publishedVersion}
-                              </span>
-                          )}
+                      </div>
+                    </div>
+                  </div>
+              )}
+
+              <div className="mb-6 flex flex-wrap gap-2">
+                {ABAS_CENTRAL.map((aba) => {
+                  const AbaIcon = aba.icon;
+                  return (
+                    <button
+                      key={aba.id}
+                      onClick={() => setAbaAtiva(aba.id)}
+                      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                        abaAtiva === aba.id
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <AbaIcon size={15} />
+                      {aba.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {abaAtiva === 'editor' && (
+                <>
+                  {metadata?.availableVariables?.length > 0 && (
+                    <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Variáveis liberadas</h2>
+                          <p className="mt-1 text-sm text-slate-600">Use somente os campos homologados para esse documento.</p>
                         </div>
                       </div>
-                    </div>
-                  </div>
-              )}
-
-              {metadata?.availableVariables?.length > 0 && (
-                  <div className="bg-white rounded-lg shadow mb-6">
-                    <div className="p-4 border-b">
-                      <h2 className="font-bold text-gray-900">Variáveis Disponíveis</h2>
-                    </div>
-                    <div className="p-4 flex flex-wrap gap-2">
-                      {metadata.availableVariables.map((variable) => (
-                          <code key={variable} className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs">
+                      <div className="flex flex-wrap gap-2">
+                        {metadata.availableVariables.map((variable) => (
+                          <code key={variable} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
                             {'${' + variable + '}'}
                           </code>
-                      ))}
-                    </div>
-                  </div>
-              )}
-
-              {templateOficial && (
-                  <div className="bg-white rounded-lg shadow mb-6">
-                    <div className="p-4 border-b flex items-center justify-between gap-3">
-                      <div>
-                        <h2 className="font-bold text-gray-900">Template Oficial</h2>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {templateOficial.label} {templateOficial.styleId ? `| estilo ${templateOficial.styleId}` : ''}
-                        </p>
-                      </div>
-                      <button
-                          onClick={importarTemplateOficial}
-                          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition text-sm font-semibold"
-                      >
-                        <Rocket size={16} />
-                        Importar Oficial
-                      </button>
-                    </div>
-                    <div className="p-4 text-sm text-gray-600">
-                      Use esta ação para começar um draft a partir do padrão oficial premium do sistema, sem resetar a versão publicada.
-                    </div>
-                  </div>
-              )}
-
-              {bibliotecaTemplates.length > 0 && (
-                  <div className="bg-white rounded-lg shadow mb-6">
-                    <div className="p-4 border-b">
-                      <h2 className="font-bold text-gray-900">Biblioteca Premium</h2>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Escolha um estilo pronto e carregue no editor sem mexer no publicado atual.
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {familiasDisponiveis.map((familia) => (
-                            <button
-                                key={familia}
-                                onClick={() => setFiltroBiblioteca(familia)}
-                                className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
-                                  filtroBiblioteca === familia
-                                    ? 'bg-slate-900 text-white'
-                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                                }`}
-                            >
-                              {familia === TODAS_FAMILIAS ? 'Todas as linhas' : getLabelFamilia(familia)}
-                            </button>
                         ))}
                       </div>
                     </div>
-                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {templatesFiltrados.map((template) => (
-                          <div key={template.styleId} className="border border-gray-200 rounded-lg p-4 flex items-start justify-between gap-3">
-                            <div>
-                              <div className="mb-3 h-28 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-                                {thumbnailBibliotecaUrls[template.styleId] ? (
-                                    <iframe
-                                        title={`Thumb ${template.styleId}`}
-                                        src={thumbnailBibliotecaUrls[template.styleId]}
-                                        className="h-[440px] w-[320px] origin-top-left scale-[0.25] border-0 bg-white"
-                                    />
-                                ) : (
-                                    <div className="flex h-full items-center justify-center text-xs font-semibold text-slate-500">
-                                      Gerando miniatura...
-                                    </div>
-                                )}
-                              </div>
-                              <div className="font-semibold text-gray-900">{template.label}</div>
-                              <div className="text-xs text-gray-500 mt-1">{template.styleId}</div>
-                              <div className="text-xs text-slate-600 mt-2">
-                                Linha visual {getLabelFamilia(getFamiliaVisual(template.styleId))}
-                              </div>
-                              {template.official && (
-                                  <span className="inline-flex mt-2 bg-sky-100 text-sky-900 px-2 py-1 rounded-full text-[11px] font-semibold">
-                                    Oficial do sistema
-                                  </span>
-                              )}
-                            </div>
-                            <div className="shrink-0 flex flex-col gap-2">
-                              <button
-                                  onClick={() => visualizarTemplateDaBiblioteca(template.styleId)}
-                                  className="px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition text-sm font-semibold"
-                              >
-                                Preview
-                              </button>
-                              <button
-                                  onClick={() => importarTemplateDaBiblioteca(template.styleId)}
-                                  className="px-3 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition text-sm font-semibold"
-                              >
-                                Importar
-                              </button>
-                            </div>
-                          </div>
+                  )}
+
+                  {templateOficial && (
+                    <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Template oficial</h2>
+                          <p className="mt-2 text-base font-semibold text-slate-900">
+                            {templateOficial.label} {templateOficial.styleId ? `| ${templateOficial.styleId}` : ''}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-600">
+                            Importe o padrão oficial para começar um novo draft sem alterar o publicado atual.
+                          </p>
+                        </div>
+                        <button
+                          onClick={importarTemplateOficial}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                        >
+                          <Rocket size={16} />
+                          Importar oficial
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                    <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                      <div>
+                        <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Editor HTML</h2>
+                        <p className="mt-1 text-sm text-slate-600">Edite o template do documento mantendo a sintaxe Thymeleaf válida.</p>
+                      </div>
+                      <button
+                        onClick={copiarParaClipboard}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        title="Copiar HTML para clipboard"
+                      >
+                        <Copy size={16} />
+                        Copiar
+                      </button>
+                    </div>
+
+                    <textarea
+                      value={html}
+                      onChange={(e) => setHtml(e.target.value)}
+                      disabled={loading}
+                      className="w-full border-0 p-5 font-mono text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      style={{ height: '460px', fontFamily: 'Monaco, Courier New, monospace' }}
+                      placeholder="Cole ou edite aqui o HTML do documento. Use as variáveis homologadas acima."
+                    />
+                    <div className="border-t border-slate-200 px-5 py-4">
+                      <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        Motivo editorial da alteração
+                      </label>
+                      <textarea
+                        value={changeReason}
+                        onChange={(e) => setChangeReason(e.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        rows={3}
+                        placeholder="Ex.: ajuste de cabeçalho, correção de variável, padronização visual ou revisão de rodapé."
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {abaAtiva === 'biblioteca' && bibliotecaTemplates.length > 0 && (
+                <div className="mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                  <div className="border-b border-slate-200 px-5 py-4">
+                    <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Biblioteca premium</h2>
+                    <p className="mt-1 text-sm text-slate-600">Escolha uma linha visual pronta e carregue no editor sem mexer no publicado.</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {familiasDisponiveis.map((familia) => (
+                        <button
+                          key={familia}
+                          onClick={() => setFiltroBiblioteca(familia)}
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                            filtroBiblioteca === familia
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          {familia === TODAS_FAMILIAS ? 'Todas as linhas' : getLabelFamilia(familia)}
+                        </button>
                       ))}
                     </div>
-                    {previewTemplateBiblioteca && (
-                        <div className="border-t p-4 bg-slate-50">
-                          <div className="flex items-center justify-between gap-3 mb-3">
-                            <div>
-                              <h3 className="font-bold text-slate-900">Preview do Template</h3>
-                              <p className="text-sm text-slate-500">
-                                {previewTemplateBiblioteca.label} | {previewTemplateBiblioteca.styleId}
-                              </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
+                    {templatesFiltrados.map((template) => (
+                      <div key={template.styleId} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="mb-3 h-28 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                          {thumbnailBibliotecaUrls[template.styleId] ? (
+                            <iframe
+                              title={`Thumb ${template.styleId}`}
+                              src={thumbnailBibliotecaUrls[template.styleId]}
+                              className="h-[440px] w-[320px] origin-top-left scale-[0.25] border-0 bg-white"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-xs font-semibold text-slate-500">
+                              Gerando miniatura...
                             </div>
-                            <button
-                                onClick={() => {
-                                  if (previewBibliotecaUrl) {
-                                    URL.revokeObjectURL(previewBibliotecaUrl);
-                                  }
-                                  setPreviewBibliotecaUrl('');
-                                  setPreviewTemplateBiblioteca(null);
-                                }}
-                                className="px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-lg transition"
-                            >
-                              Fechar
-                            </button>
-                          </div>
-                          <iframe
-                              title={`Preview ${previewTemplateBiblioteca.styleId}`}
-                              src={previewBibliotecaUrl}
-                              className="w-full h-[520px] border border-slate-200 rounded-lg bg-white"
-                          />
+                          )}
                         </div>
-                    )}
+                        <div className="text-base font-semibold text-slate-900">{template.label}</div>
+                        <div className="mt-1 text-xs text-slate-500">{template.styleId}</div>
+                        <div className="mt-2 text-xs text-slate-600">
+                          Linha visual {getLabelFamilia(getFamiliaVisual(template.styleId))}
+                        </div>
+                        {template.official && (
+                          <span className="mt-3 inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-900">
+                            Oficial do sistema
+                          </span>
+                        )}
+                        <div className="mt-4 flex gap-2">
+                          <button
+                            onClick={() => visualizarTemplateDaBiblioteca(template.styleId)}
+                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                          >
+                            <Eye size={15} />
+                            Preview
+                          </button>
+                          <button
+                            onClick={() => importarTemplateDaBiblioteca(template.styleId)}
+                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+                          >
+                            <Rocket size={15} />
+                            Importar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                  {previewTemplateBiblioteca && (
+                    <div className="border-t border-slate-200 bg-slate-50 p-5">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="font-semibold text-slate-900">Preview do template</h3>
+                          <p className="text-sm text-slate-500">
+                            {previewTemplateBiblioteca.label} | {previewTemplateBiblioteca.styleId}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (previewBibliotecaUrl) {
+                              URL.revokeObjectURL(previewBibliotecaUrl);
+                            }
+                            setPreviewBibliotecaUrl('');
+                            setPreviewTemplateBiblioteca(null);
+                          }}
+                          className="rounded-2xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+                        >
+                          Fechar
+                        </button>
+                      </div>
+                      <iframe
+                        title={`Preview ${previewTemplateBiblioteca.styleId}`}
+                        src={previewBibliotecaUrl}
+                        className="h-[520px] w-full rounded-2xl border border-slate-200 bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
               )}
 
-              <div className="bg-white rounded-lg shadow mb-6">
-                <div className="p-4 border-b flex justify-between items-center">
-                  <h2 className="font-bold text-gray-900">Editar HTML</h2>
-                  <button
-                      onClick={copiarParaClipboard}
-                      className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded transition"
-                      title="Copiar HTML para clipboard"
-                  >
-                    <Copy size={18} />
-                    <span className="text-sm">Copiar</span>
-                  </button>
-                </div>
-
-                <textarea
-                    value={html}
-                    onChange={(e) => setHtml(e.target.value)}
-                    disabled={loading}
-                    className="w-full p-4 font-mono text-sm border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-b-lg"
-                    style={{ height: '400px', fontFamily: 'Monaco, Courier New, monospace' }}
-                    placeholder="Paste seu HTML aqui... Você pode usar variáveis Thymeleaf"
-                />
-                <div className="border-t p-4">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Motivo da alteração
-                  </label>
-                  <textarea
-                      value={changeReason}
-                      onChange={(e) => setChangeReason(e.target.value)}
-                      className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      rows={3}
-                      placeholder="Ex.: ajuste de identidade visual, correção de campos, padronização do cabeçalho..."
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 flex-wrap">
-                <button
-                    onClick={salvarLayout}
-                    disabled={salvando || loading || !html.trim()}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition font-semibold"
-                >
-                  <Save size={20} />
-                  {salvando ? 'Salvando...' : 'Salvar Draft'}
-                </button>
-
-                <button
-                    onClick={publicarLayout}
-                    disabled={publicando || loading || !estadoLayout.hasDraft}
-                    className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition font-semibold"
-                >
-                  <Rocket size={20} />
-                  {publicando ? 'Publicando...' : 'Publicar Draft'}
-                </button>
-
-                <button
-                    onClick={alternarPreview}
-                    className="flex items-center gap-2 px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition font-semibold"
-                >
-                  <Eye size={20} />
-                  {gerandoPreview ? 'Gerando...' : (previewAberta ? 'Fechar Preview' : 'Preview PDF')}
-                </button>
-
-                <button
-                    onClick={resetarLayout}
-                    disabled={salvando || publicando || loading}
-                    className="flex items-center gap-2 px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 transition font-semibold"
-                >
-                  <RotateCcw size={20} />
-                  Resetar
-                </button>
-              </div>
-
-              {previewAberta && (
-                  <div className="mt-6 bg-white rounded-lg shadow p-6">
-                    <h3 className="font-bold text-gray-900 mb-4">Preview real do PDF</h3>
-                    <iframe
-                        src={previewUrl}
-                        title="Preview PDF"
-                        className="w-full h-[700px] border border-gray-200 rounded"
-                    />
-                  </div>
-              )}
-
-              {diffAtual?.hasChanges && (
-                  <div className="mt-6 bg-white rounded-lg shadow p-6">
-                    <h3 className="font-bold text-gray-900 mb-2">Diff Draft vs Publicado</h3>
-                    <p className="text-sm text-gray-500 mb-4">
-                      Draft: {diffAtual.draftLineCount} linhas | Publicado: {diffAtual.publishedLineCount} linhas
+              {abaAtiva === 'diff' && (
+                <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="mb-4">
+                    <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Diff editorial</h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Compare o conteúdo do draft com a versão publicada antes de promover mudanças.
                     </p>
-                    <div className="bg-gray-950 text-gray-100 rounded-lg p-4 max-h-[420px] overflow-auto font-mono text-xs space-y-1">
-                      {diffAtual.lines?.map((line, index) => (
+                  </div>
+                  {diffAtual?.hasChanges ? (
+                    <>
+                      <p className="mb-4 text-sm text-slate-500">
+                        Draft: {diffAtual.draftLineCount} linhas | Publicado: {diffAtual.publishedLineCount} linhas
+                      </p>
+                      <div className="max-h-[520px] space-y-1 overflow-auto rounded-2xl bg-slate-950 p-4 font-mono text-xs text-slate-100">
+                        {diffAtual.lines?.map((line, index) => (
                           <div
-                              key={`${line.type}-${index}`}
-                              className={
-                                line.type === 'added'
-                                  ? 'text-emerald-300'
-                                  : line.type === 'removed'
-                                    ? 'text-rose-300'
-                                    : 'text-amber-200'
-                              }
+                            key={`${line.type}-${index}`}
+                            className={
+                              line.type === 'added'
+                                ? 'text-emerald-300'
+                                : line.type === 'removed'
+                                  ? 'text-rose-300'
+                                  : 'text-amber-200'
+                            }
                           >
                             {line.type === 'added' ? '+ ' : line.type === 'removed' ? '- ' : '! '}
                             {line.content}
                           </div>
-                      ))}
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+                      Nenhuma divergência relevante entre draft e publicado no momento.
                     </div>
+                  )}
+                </div>
+              )}
+
+              {previewAberta && (
+                  <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 className="mb-4 font-semibold text-slate-900">Preview real do PDF</h3>
+                    <iframe
+                        src={previewUrl}
+                        title="Preview PDF"
+                        className="h-[700px] w-full rounded-2xl border border-slate-200"
+                    />
                   </div>
               )}
             </div>
 
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow sticky top-6">
-                <div className="p-4 border-b flex items-center gap-2">
-                  <History size={18} className="text-gray-600" />
-                  <h2 className="font-bold text-gray-900">Histórico</h2>
+            <div className="xl:col-span-3">
+              <div className="sticky top-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-4">
+                  <History size={18} className="text-slate-600" />
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Histórico</h2>
                 </div>
-                <div className="max-h-[700px] overflow-y-auto divide-y">
+                <div className="max-h-[720px] divide-y divide-slate-100 overflow-y-auto">
                   {historico.length === 0 && (
-                      <div className="p-4 text-sm text-gray-500">
+                      <div className="p-4 text-sm text-slate-500">
                         Nenhuma versão registrada ainda.
                       </div>
                   )}
                   {historico.map((versao) => (
-                      <div key={versao.id} className="p-4 space-y-2">
+                      <div key={versao.id} className="space-y-3 p-4">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold text-sm text-gray-900">v{versao.versionNumber}</span>
-                          <span className={`text-[10px] px-2 py-1 rounded-full ${
+                          <span className="text-sm font-semibold text-slate-900">v{versao.versionNumber}</span>
+                          <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
                               versao.status === 'PUBLISHED'
                                   ? 'bg-emerald-100 text-emerald-900'
                                   : versao.status === 'DRAFT'
                                       ? 'bg-amber-100 text-amber-900'
-                                      : 'bg-gray-100 text-gray-700'
+                                      : 'bg-slate-100 text-slate-700'
                           }`}>
                             {versao.status}
                           </span>
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-slate-500">
                           Criado por {versao.createdBy || 'sistema'}
                         </div>
                         {versao.changeReason && (
-                            <div className="text-xs text-gray-700 bg-gray-50 border border-gray-200 rounded p-2">
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
                               {versao.changeReason}
                             </div>
                         )}
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-slate-500">
                           {versao.createdAt ? new Date(versao.createdAt).toLocaleString() : 'Sem data'}
                         </div>
                         {versao.status !== 'DRAFT' && (
                             <button
                                 onClick={() => rollbackVersao(versao.id)}
                                 disabled={publicando}
-                                className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+                                className="text-xs font-semibold text-slate-900 transition hover:text-slate-600"
                             >
                               Publicar esta versão
                             </button>
