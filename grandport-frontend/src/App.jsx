@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import api from './api/axios';
+import { clearSession, syncAuthHeader, updateStoredUser } from './utils/authStorage';
 
 // --- IMPORTAÇÃO DO TOAST ---
 import { Toaster } from 'react-hot-toast';
@@ -103,6 +104,11 @@ function App() {
     const [carregandoApp, setCarregandoApp] = useState(true);
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [resumoAgendaTopo, setResumoAgendaTopo] = useState(null);
+    const [senhaAtualObrigatoria, setSenhaAtualObrigatoria] = useState('');
+    const [novaSenhaObrigatoria, setNovaSenhaObrigatoria] = useState('');
+    const [confirmacaoSenhaObrigatoria, setConfirmacaoSenhaObrigatoria] = useState('');
+    const [salvandoTrocaSenha, setSalvandoTrocaSenha] = useState(false);
+    const [erroTrocaSenha, setErroTrocaSenha] = useState('');
 
     // 🚀 NOVO ESTADO: Controla as telas antes do usuário logar
     const [telaPublica, setTelaPublica] = useState('login');
@@ -118,16 +124,30 @@ function App() {
     };
 
     useEffect(() => {
-        const token = localStorage.getItem('grandport_token');
-        const userSaved = localStorage.getItem('grandport_user');
+        const validarSessao = async () => {
+            const token = syncAuthHeader(api);
 
-        if (token && userSaved) {
-            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-            const usuario = JSON.parse(userSaved);
-            setUsuarioLogado(usuario);
-            setPaginaAtiva(definirTelaInicial(usuario));
-        }
-        setCarregandoApp(false);
+            if (!token) {
+                setCarregandoApp(false);
+                return;
+            }
+
+            try {
+                const res = await api.get('/auth/me');
+                const usuario = res.data;
+                setUsuarioLogado(usuario);
+                setPaginaAtiva(definirTelaInicial(usuario));
+            } catch (error) {
+                clearSession();
+                delete api.defaults.headers.common.Authorization;
+                setUsuarioLogado(null);
+                setPaginaAtiva('');
+            } finally {
+                setCarregandoApp(false);
+            }
+        };
+
+        validarSessao();
 
         const handleFSChange = () => setIsFullScreen(!!document.fullscreenElement);
         document.addEventListener('fullscreenchange', handleFSChange);
@@ -135,10 +155,17 @@ function App() {
             const destino = event?.detail?.page;
             if (destino) setPaginaAtiva(destino);
         };
+        const handleSessionExpired = () => {
+            setUsuarioLogado(null);
+            setPaginaAtiva('');
+            setTelaPublica('login');
+        };
         window.addEventListener('grandport:navigate', handleCustomNavigate);
+        window.addEventListener('grandport:session-expired', handleSessionExpired);
         return () => {
             document.removeEventListener('fullscreenchange', handleFSChange);
             window.removeEventListener('grandport:navigate', handleCustomNavigate);
+            window.removeEventListener('grandport:session-expired', handleSessionExpired);
         };
     }, []);
 
@@ -171,12 +198,11 @@ function App() {
         } catch (e) {
             console.error("Erro ao registrar logout", e);
         } finally {
-            localStorage.removeItem('grandport_token');
-            localStorage.removeItem('grandport_user');
-            api.defaults.headers.common['Authorization'] = '';
+            clearSession();
+            delete api.defaults.headers.common.Authorization;
             setUsuarioLogado(null);
             setPaginaAtiva('');
-            window.location.reload();
+            setTelaPublica('login');
         }
     };
 
@@ -193,11 +219,41 @@ function App() {
     const permissoesExtra = ['revisoes', 'agenda', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual', 'checklist', 'inventario', 'estoque'];
     const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva) || permissoesExtra.includes(paginaAtiva);
     const agendaTemAtrasos = (resumoAgendaTopo?.atrasados || 0) > 0;
-    const podeVerAgenda = true;
+    const podeVerAgenda = usuarioLogado?.permissoes?.includes('agenda');
+    const exigeTrocaSenha = !!usuarioLogado?.forcePasswordChange;
 
     const abrirAgendaAtrasados = () => {
         localStorage.setItem('agenda_quick_filter', 'atrasados');
         setPaginaAtiva('agenda');
+    };
+
+    const handleTrocarSenhaObrigatoria = async () => {
+        setErroTrocaSenha('');
+        if (!senhaAtualObrigatoria || !novaSenhaObrigatoria || !confirmacaoSenhaObrigatoria) {
+            setErroTrocaSenha('Preencha a senha atual e a nova senha completa.');
+            return;
+        }
+        if (novaSenhaObrigatoria !== confirmacaoSenhaObrigatoria) {
+            setErroTrocaSenha('A confirmação da nova senha não confere.');
+            return;
+        }
+
+        setSalvandoTrocaSenha(true);
+        try {
+            const res = await api.post('/auth/trocar-senha', {
+                senhaAtual: senhaAtualObrigatoria,
+                novaSenha: novaSenhaObrigatoria
+            });
+            setUsuarioLogado(res.data);
+            updateStoredUser(res.data);
+            setSenhaAtualObrigatoria('');
+            setNovaSenhaObrigatoria('');
+            setConfirmacaoSenhaObrigatoria('');
+        } catch (error) {
+            setErroTrocaSenha(error?.response?.data?.error || 'Não foi possível trocar a senha.');
+        } finally {
+            setSalvandoTrocaSenha(false);
+        }
     };
 
     return (
@@ -333,6 +389,37 @@ function App() {
                     )}
                 </div>
             </main>
+
+            {exigeTrocaSenha && (
+                <div className="fixed inset-0 z-[120] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+                        <div className="px-6 py-5 border-b border-slate-100">
+                            <div className="text-xs font-black uppercase tracking-[0.22em] text-amber-600">Segurança obrigatória</div>
+                            <h2 className="mt-2 text-2xl font-black text-slate-900">Troque sua senha antes de continuar</h2>
+                            <p className="mt-2 text-sm text-slate-500">Usuários novos ou com senha resetada precisam definir uma senha forte antes de acessar o ERP.</p>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Senha atual</label>
+                                <input type="password" value={senhaAtualObrigatoria} onChange={(e) => setSenhaAtualObrigatoria(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-600 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nova senha</label>
+                                <input type="password" value={novaSenhaObrigatoria} onChange={(e) => setNovaSenhaObrigatoria(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-600 outline-none" />
+                                <p className="mt-1 text-[11px] text-slate-500">Use no mínimo 10 caracteres, com maiúscula, minúscula, número e símbolo.</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Confirmar nova senha</label>
+                                <input type="password" value={confirmacaoSenhaObrigatoria} onChange={(e) => setConfirmacaoSenhaObrigatoria(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-600 outline-none" />
+                            </div>
+                            {erroTrocaSenha && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{erroTrocaSenha}</div>}
+                            <button onClick={handleTrocarSenhaObrigatoria} disabled={salvandoTrocaSenha} className="w-full rounded-xl bg-slate-900 text-white py-4 font-black hover:bg-blue-600 transition-colors disabled:opacity-70">
+                                {salvandoTrocaSenha ? 'SALVANDO...' : 'ATUALIZAR SENHA'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <WidgetCalculadora />
         </div>

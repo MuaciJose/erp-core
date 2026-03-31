@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearSession, getStoredToken } from '../utils/authStorage';
 
 const api = axios.create({
   // 🚀 A MÁGICA DO .ENV ENTRA AQUI!
@@ -8,12 +9,23 @@ const api = axios.create({
 
 // Interceptor para anexar o Token JWT em cada requisição (MANTIDO INTACTO - TÁ PERFEITO!)
 api.interceptors.request.use((config) => {
-  // Sincronizado com a chave usada no Login.jsx e App.jsx
-  const token = localStorage.getItem('grandport_token');
+  const token = getStoredToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401 && !error?.config?.url?.includes('/auth/login')) {
+      clearSession();
+      delete api.defaults.headers.common.Authorization;
+      window.dispatchEvent(new CustomEvent('grandport:session-expired'));
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default api;

@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Toast from 'react-native-toast-message';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import Login from './src/screens/Login';
 import AppShell from './src/components/AppShell';
 import { APP_ROUTES } from './src/navigation/routes';
-import { clearSession, STORAGE_KEYS } from './src/api/session';
+import { clearSession, getCleanToken } from './src/api/session';
+import api from './src/api/axios';
 
 export default function App() {
     const [carregando, setCarregando] = useState(true);
@@ -20,12 +20,13 @@ export default function App() {
     useEffect(() => {
         const verificarAcesso = async () => {
             try {
-                const token = await AsyncStorage.getItem(STORAGE_KEYS.token);
+                const token = await getCleanToken();
                 if (token) {
+                    await api.get('/auth/me');
                     setStack([{ key: 'dashboard' }]);
                 }
             } catch (error) {
-                console.error(error);
+                await clearSession();
             } finally {
                 setCarregando(false);
             }

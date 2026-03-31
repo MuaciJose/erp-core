@@ -1,13 +1,16 @@
 package com.grandport.erp.modules.usuario.controller;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+import com.grandport.erp.modules.admin.service.SecurityEventService;
 import com.grandport.erp.modules.usuario.dto.UsuarioDTO;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
+import com.grandport.erp.modules.usuario.service.PasswordPolicyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder; // 🚀 INJEÇÃO DE SEGURANÇA
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,10 +19,14 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/usuarios")
+@PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
 public class UsuarioController {
 
     @Autowired private UsuarioRepository repository;
     @Autowired private AuditoriaService auditoriaService;
+    @Autowired private SecurityEventService securityEventService;
+    @Autowired private PasswordPolicyService passwordPolicyService;
+    @Autowired private PasswordEncoder passwordEncoder;
 
     // =======================================================================
     // 🚀 1. LISTAGEM BLINDADA (Só enxerga a própria base)
@@ -43,12 +50,16 @@ public class UsuarioController {
     public ResponseEntity<UsuarioDTO> criar(@RequestBody UsuarioDTO dto) {
         Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
+        passwordPolicyService.validateOrThrow(dto.getSenha());
+
         Usuario novo = new Usuario();
         novo.setNomeCompleto(dto.getNome());
         novo.setUsername(dto.getEmail());
-        novo.setSenha(new BCryptPasswordEncoder().encode(dto.getSenha()));
+        novo.setSenha(passwordEncoder.encode(dto.getSenha()));
         novo.setPermissoes(dto.getPermissoes());
         novo.setAtivo(true);
+        novo.setMfaEnabled(dto.isMfaEnabled());
+        novo.setForcePasswordChange(dto.isForcePasswordChange());
 
         // 🔐 A CHAVE DE SEGURANÇA: Força o novo usuário a ter o mesmo ID de empresa do criador!
         novo.setEmpresaId(usuarioLogado.getEmpresaId());
@@ -72,9 +83,13 @@ public class UsuarioController {
         usuario.setNomeCompleto(dto.getNome());
         usuario.setUsername(dto.getEmail());
         usuario.setPermissoes(dto.getPermissoes());
+        usuario.setMfaEnabled(dto.isMfaEnabled());
+        usuario.setForcePasswordChange(dto.isForcePasswordChange());
 
         if (dto.getSenha() != null && !dto.getSenha().isEmpty()) {
-            usuario.setSenha(new BCryptPasswordEncoder().encode(dto.getSenha()));
+            passwordPolicyService.validateOrThrow(dto.getSenha());
+            usuario.setSenha(passwordEncoder.encode(dto.getSenha()));
+            usuario.setForcePasswordChange(true);
         }
 
         Usuario salvo = repository.save(usuario);
@@ -94,6 +109,35 @@ public class UsuarioController {
         repository.save(usuario);
 
         auditoriaService.registrar("SISTEMA", "STATUS_USUARIO", (novoStatus ? "Desbloqueou" : "Bloqueou") + " o acesso de: " + usuario.getNomeCompleto());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/revogar-mfa")
+    public ResponseEntity<Void> revogarMfa(@PathVariable Long id) {
+        Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Usuario usuario = repository.findByIdAndEmpresaId(id, usuarioLogado.getEmpresaId())
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado nesta empresa!"));
+
+        usuario.setMfaEnabled(false);
+        usuario.setMfaSecret(null);
+        repository.save(usuario);
+
+        auditoriaService.registrar("SEGURANCA", "REVOGAR_MFA", "Revogou o MFA do usuário: " + usuario.getNomeCompleto());
+        securityEventService.registrar(usuarioLogado.getEmpresaId(), "REVOGAR_MFA", "WARN", usuario.getUsername(), null, "MFA revogado por administrador.");
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/forcar-reset-senha")
+    public ResponseEntity<Void> forcarResetSenha(@PathVariable Long id) {
+        Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Usuario usuario = repository.findByIdAndEmpresaId(id, usuarioLogado.getEmpresaId())
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado nesta empresa!"));
+
+        usuario.setForcePasswordChange(true);
+        repository.save(usuario);
+
+        auditoriaService.registrar("SEGURANCA", "FORCAR_RESET_SENHA", "Forçou nova senha para o usuário: " + usuario.getNomeCompleto());
+        securityEventService.registrar(usuarioLogado.getEmpresaId(), "FORCAR_RESET_SENHA", "WARN", usuario.getUsername(), null, "Reset de senha marcado para o próximo login.");
         return ResponseEntity.ok().build();
     }
 }

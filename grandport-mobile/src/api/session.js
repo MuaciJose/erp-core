@@ -32,6 +32,14 @@ export const saveSession = async (token, usuario = {}) => {
     ]);
 };
 
+export const updateStoredUser = async (usuario = {}) => {
+    await AsyncStorage.multiSet([
+        [STORAGE_KEYS.user, JSON.stringify(usuario || {})],
+        [STORAGE_KEYS.userName, usuario?.nome || 'Usuário'],
+        [STORAGE_KEYS.permissions, JSON.stringify(usuario?.permissoes || [])]
+    ]);
+};
+
 export const clearSession = async () => {
     await AsyncStorage.multiRemove([
         STORAGE_KEYS.token,

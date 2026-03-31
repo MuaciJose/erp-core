@@ -6,5 +6,6 @@ public record NovaEmpresaDTO(
         String telefone,
         String nomeAdmin,
         String emailAdmin,
-        String senhaAdmin
+        String senhaAdmin,
+        String inviteToken
 ) {}

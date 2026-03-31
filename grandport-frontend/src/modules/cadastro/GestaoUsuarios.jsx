@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
-import { Users, UserPlus, Edit, ShieldCheck, Ban, CheckCircle, X, AlertTriangle, Info, Wrench } from 'lucide-react';
+import { Users, UserPlus, Edit, ShieldCheck, Ban, CheckCircle, X, AlertTriangle, Info, Wrench, KeyRound, Smartphone, ShieldOff, RotateCcw } from 'lucide-react';
 
 export const GestaoUsuarios = () => {
     const [usuarios, setUsuarios] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalAberto, setModalAberto] = useState(false);
+    const [eventosSeguranca, setEventosSeguranca] = useState([]);
 
     const [notificacao, setNotificacao] = useState(null);
 
@@ -15,6 +16,8 @@ export const GestaoUsuarios = () => {
         email: '',
         senha: '',
         ativo: true,
+        mfaEnabled: false,
+        forcePasswordChange: true,
         isMecanico: false,
         comissaoServico: '',
         permissoes: []
@@ -113,7 +116,19 @@ export const GestaoUsuarios = () => {
         }
     };
 
-    useEffect(() => { carregarUsuarios(); }, []);
+    const carregarEventosSeguranca = async () => {
+        try {
+            const res = await api.get('/api/security-events', { params: { limit: 8 } });
+            setEventosSeguranca(res.data || []);
+        } catch (error) {
+            console.error("Erro ao carregar eventos de segurança", error);
+        }
+    };
+
+    useEffect(() => {
+        carregarUsuarios();
+        carregarEventosSeguranca();
+    }, []);
 
     const handleTogglePermissao = (acaoTela) => {
         setUsuarioForm(prev => {
@@ -140,7 +155,7 @@ export const GestaoUsuarios = () => {
 
     const abrirModalNovo = () => {
         setUsuarioForm({
-            id: null, nome: '', email: '', senha: '', ativo: true,
+            id: null, nome: '', email: '', senha: '', ativo: true, mfaEnabled: false, forcePasswordChange: true,
             isMecanico: false, comissaoServico: '', permissoes: todasAsPermissoes
         });
         setModalAberto(true);
@@ -174,6 +189,7 @@ export const GestaoUsuarios = () => {
             }
             setModalAberto(false);
             carregarUsuarios();
+            carregarEventosSeguranca();
         } catch (err) {
             const msgErro = err.response?.data?.message || "Ocorreu um problema ao salvar as informações.";
             showToast('erro', 'Erro ao Salvar', msgErro);
@@ -186,9 +202,34 @@ export const GestaoUsuarios = () => {
                 await api.put(`/api/usuarios/${id}/status`, { ativo: !statusAtual });
                 showToast('sucesso', 'Status Alterado', `O acesso do usuário foi ${statusAtual ? 'bloqueado' : 'liberado'} com sucesso.`);
                 carregarUsuarios();
+                carregarEventosSeguranca();
             } catch(err) {
                 showToast('erro', 'Erro na Operação', 'Não foi possível alterar o status do usuário.');
             }
+        }
+    };
+
+    const revogarMfa = async (user) => {
+        if (!window.confirm(`Deseja revogar o MFA de ${user.nome}?`)) return;
+        try {
+            await api.post(`/api/usuarios/${user.id}/revogar-mfa`);
+            showToast('sucesso', 'MFA Revogado', `O MFA de ${user.nome} foi revogado.`);
+            carregarUsuarios();
+            carregarEventosSeguranca();
+        } catch (err) {
+            showToast('erro', 'Erro na Operação', 'Não foi possível revogar o MFA deste usuário.');
+        }
+    };
+
+    const forcarResetSenha = async (user) => {
+        if (!window.confirm(`Deseja forçar troca de senha para ${user.nome} no próximo login?`)) return;
+        try {
+            await api.post(`/api/usuarios/${user.id}/forcar-reset-senha`);
+            showToast('sucesso', 'Reset de Senha Marcado', `${user.nome} terá que definir nova senha no próximo login.`);
+            carregarUsuarios();
+            carregarEventosSeguranca();
+        } catch (err) {
+            showToast('erro', 'Erro na Operação', 'Não foi possível marcar o reset de senha.');
         }
     };
 
@@ -269,15 +310,56 @@ export const GestaoUsuarios = () => {
                                     ? <span className="text-green-600 font-bold text-xs flex items-center justify-center gap-1"><CheckCircle size={14}/> ATIVO</span>
                                     : <span className="text-red-500 font-bold text-xs flex items-center justify-center gap-1"><Ban size={14}/> BLOQUEADO</span>
                                 }
+                                <div className="mt-2 flex justify-center gap-1 flex-wrap">
+                                    {user.mfaEnabled && <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black">MFA</span>}
+                                    {user.forcePasswordChange && <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black">TROCA SENHA</span>}
+                                </div>
                             </td>
                             <td className="p-4 pr-6 flex justify-center gap-3">
                                 <button onClick={() => abrirModalEditar(user)} className="text-blue-500 hover:text-blue-700 bg-blue-50 p-2 rounded-lg" title="Editar dados e permissões de acesso"><Edit size={18} /></button>
+                                <button onClick={() => revogarMfa(user)} className="text-indigo-500 hover:text-indigo-700 bg-indigo-50 p-2 rounded-lg" title="Revogar MFA deste usuário"><ShieldOff size={18} /></button>
+                                <button onClick={() => forcarResetSenha(user)} className="text-amber-600 hover:text-amber-800 bg-amber-50 p-2 rounded-lg" title="Forçar nova senha no próximo login"><RotateCcw size={18} /></button>
                                 <button onClick={() => alternarStatus(user.id, user.ativo)} className={`${user.ativo ? 'text-red-500 hover:text-red-700 bg-red-50' : 'text-green-600 hover:text-green-800 bg-green-50'} p-2 rounded-lg`} title={user.ativo ? "Bloquear acesso deste usuário ao sistema" : "Liberar acesso deste usuário ao sistema"}>{user.ativo ? <Ban size={18} /> : <CheckCircle size={18} />}</button>
                             </td>
                         </tr>
                     ))}
                     </tbody>
                 </table>
+            </div>
+
+            <div className="mt-8 bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg font-black text-slate-800">Eventos Recentes de Segurança</h2>
+                        <p className="text-sm text-slate-500">Login, MFA, bloqueios e ações administrativas recentes.</p>
+                    </div>
+                    <button onClick={carregarEventosSeguranca} className="text-xs font-black uppercase tracking-widest text-blue-600 hover:text-blue-800">Atualizar</button>
+                </div>
+                <div className="divide-y divide-slate-100">
+                    {eventosSeguranca.length === 0 ? (
+                        <div className="px-6 py-8 text-sm text-slate-500">Nenhum evento recente.</div>
+                    ) : eventosSeguranca.map(evento => (
+                        <div key={evento.id} className="px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                            <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`text-[10px] px-2 py-1 rounded-full font-black uppercase ${
+                                        evento.severidade === 'CRITICAL' ? 'bg-red-100 text-red-700' :
+                                        evento.severidade === 'WARN' ? 'bg-amber-100 text-amber-700' :
+                                        'bg-blue-100 text-blue-700'
+                                    }`}>
+                                        {evento.severidade}
+                                    </span>
+                                    <span className="text-xs font-black text-slate-700">{evento.tipo}</span>
+                                    {evento.username && <span className="text-xs text-slate-500 font-mono">{evento.username}</span>}
+                                </div>
+                                <div className="mt-1 text-sm text-slate-600">{evento.detalhes}</div>
+                            </div>
+                            <div className="text-xs text-slate-400 whitespace-nowrap">
+                                {new Date(evento.dataHora).toLocaleString('pt-BR')}
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
 
             {modalAberto && (
@@ -307,6 +389,31 @@ export const GestaoUsuarios = () => {
                                     {usuarioForm.id && <span className="text-orange-500 text-[10px]">Preencha apenas se for alterar</span>}
                                 </label>
                                 <input type="password" value={usuarioForm.senha} onChange={e => setUsuarioForm({...usuarioForm, senha: e.target.value})} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-600 outline-none text-slate-700" placeholder="******" />
+                                <p className="mt-1 text-[11px] text-slate-500">Mínimo 10 caracteres com maiúscula, minúscula, número e símbolo.</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 cursor-pointer">
+                                    <div className={`w-6 h-6 rounded flex items-center justify-center border-2 ${usuarioForm.mfaEnabled ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300'}`}>
+                                        {usuarioForm.mfaEnabled && <CheckCircle size={16} />}
+                                    </div>
+                                    <input type="checkbox" className="hidden" checked={usuarioForm.mfaEnabled} onChange={(e) => setUsuarioForm({ ...usuarioForm, mfaEnabled: e.target.checked })} />
+                                    <div>
+                                        <div className="font-black text-slate-800 flex items-center gap-2"><Smartphone size={16} /> MFA</div>
+                                        <div className="text-[11px] text-slate-500">Exige código do autenticador no login.</div>
+                                    </div>
+                                </label>
+
+                                <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 cursor-pointer">
+                                    <div className={`w-6 h-6 rounded flex items-center justify-center border-2 ${usuarioForm.forcePasswordChange ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-slate-300'}`}>
+                                        {usuarioForm.forcePasswordChange && <CheckCircle size={16} />}
+                                    </div>
+                                    <input type="checkbox" className="hidden" checked={usuarioForm.forcePasswordChange} onChange={(e) => setUsuarioForm({ ...usuarioForm, forcePasswordChange: e.target.checked })} />
+                                    <div>
+                                        <div className="font-black text-slate-800 flex items-center gap-2"><KeyRound size={16} /> Troca obrigatória</div>
+                                        <div className="text-[11px] text-slate-500">Força nova senha no próximo login.</div>
+                                    </div>
+                                </label>
                             </div>
 
                             <div className="bg-orange-50 p-5 rounded-2xl border border-orange-200 mt-2 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shadow-inner">

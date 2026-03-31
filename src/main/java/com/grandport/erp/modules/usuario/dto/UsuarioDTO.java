@@ -13,6 +13,8 @@ public class UsuarioDTO {
     private String email;
     private String senha;
     private boolean ativo;
+    private boolean mfaEnabled;
+    private boolean forcePasswordChange;
     private List<String> permissoes;
 
     public UsuarioDTO(Usuario u) {
@@ -20,6 +22,8 @@ public class UsuarioDTO {
         this.nome = u.getNomeCompleto();
         this.email = u.getUsername();
         this.ativo = u.isAtivo();
+        this.mfaEnabled = u.isMfaEnabled();
+        this.forcePasswordChange = u.isForcePasswordChange();
         this.permissoes = u.getPermissoes();
     }
 }

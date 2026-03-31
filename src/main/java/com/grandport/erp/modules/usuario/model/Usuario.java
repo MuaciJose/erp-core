@@ -35,6 +35,15 @@ public class Usuario implements UserDetails {
 
     private boolean ativo = true;
 
+    @Column(name = "mfa_enabled", nullable = false)
+    private boolean mfaEnabled = false;
+
+    @Column(name = "mfa_secret")
+    private String mfaSecret;
+
+    @Column(name = "force_password_change", nullable = false)
+    private boolean forcePasswordChange = false;
+
     @Column(name = "is_mecanico")
     private Boolean isMecanico = false;
 

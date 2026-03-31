@@ -5,6 +5,7 @@ import com.grandport.erp.modules.empresa.model.Empresa;
 import com.grandport.erp.modules.empresa.repository.EmpresaRepository;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
+import com.grandport.erp.modules.usuario.service.PasswordPolicyService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,11 +18,13 @@ public class AssinaturaService {
     private final EmpresaRepository empresaRepository;
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordPolicyService passwordPolicyService;
 
-    public AssinaturaService(EmpresaRepository empresaRepository, UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
+    public AssinaturaService(EmpresaRepository empresaRepository, UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, PasswordPolicyService passwordPolicyService) {
         this.empresaRepository = empresaRepository;
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.passwordPolicyService = passwordPolicyService;
     }
 
     @Transactional
@@ -35,6 +38,7 @@ public class AssinaturaService {
         if (usuarioRepository.findByUsername(dto.emailAdmin()) != null) {
             throw new RuntimeException("Operação Negada: Este login/e-mail já está em uso por outro usuário.");
         }
+        passwordPolicyService.validateOrThrow(dto.senhaAdmin());
 
         // 2. Cria o Quartel-General (A Empresa)
         Empresa empresa = new Empresa();
@@ -51,6 +55,7 @@ public class AssinaturaService {
         admin.setNomeCompleto(dto.nomeAdmin());
         admin.setUsername(dto.emailAdmin()); // Onde vai ficar salvo o e-mail de login
         admin.setSenha(passwordEncoder.encode(dto.senhaAdmin()));
+        admin.setForcePasswordChange(false);
 
         // O motor do SaaS ativado
         admin.setEmpresaId(empresaSalva.getId());
