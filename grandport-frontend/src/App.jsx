@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import api from './api/axios';
 
 // --- IMPORTAÇÃO DO TOAST ---
@@ -6,31 +6,23 @@ import { Toaster } from 'react-hot-toast';
 
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './modules/financeiro/Dashboard';
-import { Pdv } from './modules/vendas/Pdv';
-import { Produtos } from './modules/estoque/Produtos';
 import { Marcas } from './modules/estoque/Marcas';
 import { AjusteEstoque } from './modules/estoque/AjusteEstoque';
 import { PrevisaoCompras } from './modules/estoque/PrevisaoCompras';
 import { Parceiros } from './modules/cadastro/Parceiros';
-import { ImportarXml } from './modules/compras/ImportarXml';
 import { Login } from './modules/auth/Login';
 import CadastroEmpresa from './modules/auth/CadastroEmpresa'; // 🚀 IMPORTAÇÃO DA NOVA TELA AQUI
 import { CargaNcm } from './modules/admin/CargaNcm';
 import { RelatorioFaltas } from './modules/admin/RelatorioFaltas';
-import { ContasReceber } from './modules/financeiro/ContasReceber';
 import { ContasPagar } from './modules/financeiro/ContasPagar';
 import { ControleCaixa } from './modules/financeiro/ControleCaixa';
 import { FluxoCaixaDre } from './modules/financeiro/FluxoCaixaDre';
 import { FluxoCaixaProjecao } from './modules/financeiro/FluxoCaixaProjecao'; // 🚀 A NOVA TELA DO FUTURO AQUI!
-import { ContasBancarias } from './modules/financeiro/ContasBancarias';
 import { PlanoContas } from './modules/financeiro/PlanoContas';
 import { ConciliacaoBancaria } from './modules/financeiro/ConciliacaoBancaria';
 import { GestaoUsuarios } from './modules/cadastro/GestaoUsuarios';
 import { Auditoria } from './modules/cadastro/Auditoria';
-import { Configuracoes } from './modules/configuracoes/Configuracoes';
 import { WidgetCalculadora } from './components/WidgetCalculadora';
-import { GestaoVendas } from './modules/vendas/GestaoVendas';
-import { FilaPedidosCaixa } from './modules/vendas/FilaPedidosCaixa';
 import { RelatorioComissoes } from './modules/vendas/RelatorioComissoes';
 import { ManualUsuario } from './modules/manual/ManualUsuario';
 
@@ -40,8 +32,6 @@ import { HistoricoRecibos } from './modules/financeiro/HistoricoRecibos';
 
 // 🚀 MÓDULO FISCAL
 import { RegrasFiscais } from './modules/fiscal/RegrasFiscais';
-import { GerenciadorFiscal } from './modules/fiscal/GerenciadorFiscal';
-import EmitirNfeAvulsa from './modules/fiscal/EmitirNfeAvulsa';
 
 // 🚀 MÓDULO Categoria
 import { Categorias } from './modules/estoque/Categorias';
@@ -53,18 +43,58 @@ import { PainelRevisoes } from './modules/cadastro/PainelRevisoes';
 import { GeradorEtiquetas } from './modules/estoque/GeradorEtiquetas';
 
 // 🚀 MÓDULOS DE ORDEM DE SERVIÇO
-import { PainelOs } from './modules/os/PainelOs';
 import { ListagemOs } from './modules/os/ListagemOs';
 
 // 🚀 MÓDULO CHECKLIST DE VEÍCULOS (NOVO)
-import { ChecklistTablet } from './modules/checklist/ChecklistTablet';
-
 import { CurvaABC } from './modules/estoque/curvaABC';
 
 // 🚀 MÓDULO SERVIÇOS / MÃO DE OBRA
 import { GestaoServicos } from './modules/servicos/GestaoServicos';
 
 import { InventarioPWA } from './modules/estoque/InventarioPWA';
+
+const Configuracoes = lazy(() =>
+    import('./modules/configuracoes/Configuracoes').then(module => ({ default: module.Configuracoes }))
+);
+const Pdv = lazy(() =>
+    import('./modules/vendas/Pdv').then(module => ({ default: module.Pdv }))
+);
+const Produtos = lazy(() =>
+    import('./modules/estoque/Produtos').then(module => ({ default: module.Produtos }))
+);
+const ImportarXml = lazy(() =>
+    import('./modules/compras/ImportarXml').then(module => ({ default: module.ImportarXml }))
+);
+const ContasReceber = lazy(() =>
+    import('./modules/financeiro/ContasReceber').then(module => ({ default: module.ContasReceber }))
+);
+const ContasBancarias = lazy(() =>
+    import('./modules/financeiro/ContasBancarias').then(module => ({ default: module.ContasBancarias }))
+);
+const GestaoVendas = lazy(() =>
+    import('./modules/vendas/GestaoVendas').then(module => ({ default: module.GestaoVendas }))
+);
+const FilaPedidosCaixa = lazy(() =>
+    import('./modules/vendas/FilaPedidosCaixa').then(module => ({ default: module.FilaPedidosCaixa }))
+);
+const GerenciadorFiscal = lazy(() =>
+    import('./modules/fiscal/GerenciadorFiscal').then(module => ({ default: module.GerenciadorFiscal }))
+);
+const EmitirNfeAvulsa = lazy(() =>
+    import('./modules/fiscal/EmitirNfeAvulsa')
+);
+const PainelOs = lazy(() =>
+    import('./modules/os/PainelOs').then(module => ({ default: module.PainelOs }))
+);
+const ChecklistTablet = lazy(() =>
+    import('./modules/checklist/ChecklistTablet').then(module => ({ default: module.ChecklistTablet }))
+);
+
+const lazyFallback = (
+    <div className="min-h-[40vh] flex items-center justify-center text-slate-500 font-semibold">
+        Carregando modulo...
+    </div>
+);
 
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
@@ -168,9 +198,9 @@ function App() {
                     ) : (
                         <>
                             {paginaAtiva === 'dash' && <Dashboard setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'pdv' && <Pdv setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'vendas' && <GestaoVendas setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'fila-caixa' && <FilaPedidosCaixa setPaginaAtiva={setPaginaAtiva} />}
+                            {paginaAtiva === 'pdv' && <Suspense fallback={lazyFallback}><Pdv setPaginaAtiva={setPaginaAtiva} /></Suspense>}
+                            {paginaAtiva === 'vendas' && <Suspense fallback={lazyFallback}><GestaoVendas setPaginaAtiva={setPaginaAtiva} /></Suspense>}
+                            {paginaAtiva === 'fila-caixa' && <Suspense fallback={lazyFallback}><FilaPedidosCaixa setPaginaAtiva={setPaginaAtiva} /></Suspense>}
                             {paginaAtiva === 'caixa' && <ControleCaixa />}
                             {paginaAtiva === 'relatorio-comissoes' && <RelatorioComissoes />}
 
@@ -179,29 +209,38 @@ function App() {
                             {paginaAtiva === 'etiquetas' && <GeradorEtiquetas />}
 
                             {/* 🚀 TELAS DA OFICINA */}
-                            {paginaAtiva === 'checklist' && <ChecklistTablet setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'os' && <PainelOs />}
+                            {paginaAtiva === 'checklist' && <Suspense fallback={lazyFallback}><ChecklistTablet setPaginaAtiva={setPaginaAtiva} /></Suspense>}
+                            {paginaAtiva === 'os' && <Suspense fallback={lazyFallback}><PainelOs /></Suspense>}
                             {paginaAtiva === 'listagem-os' && <ListagemOs setPaginaAtiva={setPaginaAtiva} />}
 
                             {paginaAtiva === 'servicos' && <GestaoServicos />}
 
-                            {paginaAtiva === 'estoque' && <Produtos setPaginaAtiva={setPaginaAtiva} />}
+                            {paginaAtiva === 'estoque' && <Suspense fallback={lazyFallback}><Produtos setPaginaAtiva={setPaginaAtiva} /></Suspense>}
                             {paginaAtiva === 'marcas' && <Marcas />}
                             {paginaAtiva === 'ajuste_estoque' && <AjusteEstoque />}
                             {paginaAtiva === 'parceiros' && <Parceiros />}
                             {paginaAtiva === 'previsao' && <PrevisaoCompras />}
-                            {paginaAtiva === 'compras' && <ImportarXml />}
+                            {paginaAtiva === 'compras' && <Suspense fallback={lazyFallback}><ImportarXml /></Suspense>}
                             {paginaAtiva === 'fiscal' && <CargaNcm />}
                             {paginaAtiva === 'faltas' && <RelatorioFaltas />}
-                            {paginaAtiva === 'contas-receber' && <ContasReceber />}
+                            {paginaAtiva === 'contas-receber' && <Suspense fallback={lazyFallback}><ContasReceber /></Suspense>}
                             {paginaAtiva === 'contas-pagar' && <ContasPagar />}
                             {paginaAtiva === 'dre' && <FluxoCaixaDre />}
-                            {paginaAtiva === 'fluxo-caixa-projecao' && <FluxoCaixaProjecao setPaginaAtiva={setPaginaAtiva}/>}                            {paginaAtiva === 'bancos' && <ContasBancarias />}
+                            {paginaAtiva === 'fluxo-caixa-projecao' && <FluxoCaixaProjecao setPaginaAtiva={setPaginaAtiva}/>}
+                            {paginaAtiva === 'bancos' && <Suspense fallback={lazyFallback}><ContasBancarias /></Suspense>}
                             {paginaAtiva === 'plano-contas' && <PlanoContas />}
                             {paginaAtiva === 'conciliacao' && <ConciliacaoBancaria />}
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
                             {paginaAtiva === 'auditoria' && <Auditoria />}
-                            {paginaAtiva === 'configuracoes' && <Configuracoes />}
+                            {paginaAtiva === 'configuracoes' && (
+                                <Suspense fallback={
+                                    <div className="min-h-[40vh] flex items-center justify-center text-slate-500 font-semibold">
+                                        Carregando central de configuracoes...
+                                    </div>
+                                }>
+                                    <Configuracoes />
+                                </Suspense>
+                            )}
                             {paginaAtiva === 'manual' && <ManualUsuario onVoltar={() => setPaginaAtiva('dash')} />}
 
                             {paginaAtiva === 'recibo-avulso' && <ReciboAvulso setPaginaAtiva={setPaginaAtiva} />}
@@ -209,8 +248,8 @@ function App() {
 
                             {paginaAtiva === 'regras-fiscais' && <RegrasFiscais setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'categorias' && <Categorias />}
-                            {paginaAtiva === 'gerenciador-nfe' && <GerenciadorFiscal setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'emitir-nfe-avulsa' && <EmitirNfeAvulsa setPaginaAtiva={setPaginaAtiva} />}
+                            {paginaAtiva === 'gerenciador-nfe' && <Suspense fallback={lazyFallback}><GerenciadorFiscal setPaginaAtiva={setPaginaAtiva} /></Suspense>}
+                            {paginaAtiva === 'emitir-nfe-avulsa' && <Suspense fallback={lazyFallback}><EmitirNfeAvulsa setPaginaAtiva={setPaginaAtiva} /></Suspense>}
                             {paginaAtiva === 'inventario' && <InventarioPWA  setPaginaAtiva={setPaginaAtiva} />}
                             {paginaAtiva === 'curva-abc' && <CurvaABC />}
                         </>

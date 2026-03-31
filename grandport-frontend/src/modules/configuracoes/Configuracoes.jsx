@@ -8,6 +8,9 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CentralDeLayouts } from './CentralDeLayouts';
+import { CentralDeLaudos } from './CentralDeLaudos';
+import { LayoutGovernanceDashboard } from './LayoutGovernanceDashboard';
+import { CentralDanfe } from './CentralDanfe';
 
 // 🚀 LISTA OFICIAL PARA GARANTIR QUE O DADO ENVIADO AO JAVA SEJA SEMPRE VÁLIDO
 const ESTADOS_BRASIL = [
@@ -1260,8 +1263,11 @@ export const Configuracoes = () => {
                     )}
 
                     {abaAtiva === 'LAYOUTS' && (
-                        <div className="animate-fade-in">
+                        <div className="animate-fade-in space-y-8">
+                            <LayoutGovernanceDashboard />
                             <CentralDeLayouts />
+                            <CentralDeLaudos />
+                            <CentralDanfe />
                         </div>
                     )}
 

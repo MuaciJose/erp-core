@@ -8,6 +8,8 @@ import org.thymeleaf.templateresolver.StringTemplateResolver;
 import org.xhtmlrenderer.pdf.ITextRenderer;
 
 import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -20,6 +22,9 @@ public class PdfService {
     private static final Pattern STSONG_PATTERN = Pattern.compile("(?i)'?STSong-Light'?(\\s*,\\s*BoldItalic)?");
     private static final Pattern UNIGB_PATTERN = Pattern.compile("(?i)'?UniGB-UCS2-H'?");
     private static final Pattern FONT_FACE_BLOCK_PATTERN = Pattern.compile("(?is)@font-face\\s*\\{.*?(STSong-Light|UniGB-UCS2-H).*?\\}");
+    private static final Pattern TH_TEXT_PATTERN = Pattern.compile("th:text=\"([^\"]+)\"");
+    private static final Pattern THYMELEAF_EXPRESSION_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
+    private static final Pattern CONCAT_TOKEN_PATTERN = Pattern.compile("(\\$\\{[^}]+}|'[^']*')");
 
     // Criamos um motor especial só para ler Texto (String) do Banco de Dados
     private final TemplateEngine stringTemplateEngine;
@@ -31,12 +36,7 @@ public class PdfService {
 
     // 🚀 NOVO MÉTODO: Recebe o TEXTO HTML direto do banco, não o nome do arquivo!
     public byte[] gerarPdfDeStringHtml(String htmlTemplate, Map<String, Object> variaveis) {
-        // 1. Entrega os dados (variáveis) para o Thymeleaf
-        Context context = new Context();
-        context.setVariables(variaveis);
-
-        // 2. Pega o HTML CRU do banco e injeta os dados da OS dentro dele
-        String htmlProcessado = stringTemplateEngine.process(htmlTemplate, context);
+        String htmlProcessado = processTemplate(htmlTemplate, variaveis);
 
         // 3. Pega esse HTML final e transforma num arquivo PDF blindado
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -57,6 +57,14 @@ public class PdfService {
 
             throw new RuntimeException("Falha ao gerar o PDF da OS: " + e.getMessage(), e);
         }
+    }
+
+    String processTemplate(String htmlTemplate, Map<String, Object> variaveis) {
+        Context context = new Context();
+        context.setVariables(variaveis);
+
+        String htmlNormalizado = normalizarExpressoesThymeleaf(htmlTemplate);
+        return stringTemplateEngine.process(htmlNormalizado, context);
     }
 
     private void renderPdf(String htmlProcessado, ByteArrayOutputStream outputStream) throws Exception {
@@ -88,6 +96,95 @@ public class PdfService {
 
         matcher.appendTail(normalizedHtml);
         return normalizedHtml.toString();
+    }
+
+    private String normalizarExpressoesThymeleaf(String htmlTemplate) {
+        Matcher matcher = TH_TEXT_PATTERN.matcher(htmlTemplate);
+        StringBuffer normalizedHtml = new StringBuffer();
+
+        while (matcher.find()) {
+            String originalValue = matcher.group(1);
+            String normalizedValue = normalizeThTextValue(originalValue);
+            matcher.appendReplacement(normalizedHtml, Matcher.quoteReplacement("th:text=\"" + normalizedValue + "\""));
+        }
+
+        matcher.appendTail(normalizedHtml);
+        return normalizedHtml.toString();
+    }
+
+    private String normalizeThTextValue(String originalValue) {
+        if (originalValue == null || originalValue.isBlank()) {
+            return originalValue;
+        }
+
+        String trimmedValue = originalValue.trim();
+
+        if (trimmedValue.startsWith("|") && trimmedValue.endsWith("|")) {
+            return convertLiteralSubstitution(trimmedValue.substring(1, trimmedValue.length() - 1));
+        }
+
+        if (shouldNormalizeBrokenConcatenation(trimmedValue)) {
+            return convertBrokenConcatenation(trimmedValue);
+        }
+
+        return originalValue;
+    }
+
+    private boolean shouldNormalizeBrokenConcatenation(String value) {
+        int expressionCount = countOccurrences(value, "${");
+        return expressionCount > 1 || (expressionCount > 0 && value.startsWith("'"));
+    }
+
+    private int countOccurrences(String value, String token) {
+        int count = 0;
+        int index = 0;
+        while ((index = value.indexOf(token, index)) >= 0) {
+            count++;
+            index += token.length();
+        }
+        return count;
+    }
+
+    private String convertLiteralSubstitution(String innerValue) {
+        Matcher matcher = THYMELEAF_EXPRESSION_PATTERN.matcher(innerValue);
+        List<String> tokens = new ArrayList<>();
+        int lastIndex = 0;
+
+        while (matcher.find()) {
+            addLiteralToken(tokens, innerValue.substring(lastIndex, matcher.start()));
+            tokens.add(matcher.group(1).trim());
+            lastIndex = matcher.end();
+        }
+
+        addLiteralToken(tokens, innerValue.substring(lastIndex));
+        return wrapAsThymeleafExpression(tokens);
+    }
+
+    private String convertBrokenConcatenation(String value) {
+        Matcher matcher = CONCAT_TOKEN_PATTERN.matcher(value);
+        List<String> tokens = new ArrayList<>();
+
+        while (matcher.find()) {
+            String token = matcher.group(1);
+            if (token.startsWith("${")) {
+                tokens.add(token.substring(2, token.length() - 1).trim());
+            } else {
+                tokens.add(token);
+            }
+        }
+
+        return wrapAsThymeleafExpression(tokens);
+    }
+
+    private void addLiteralToken(List<String> tokens, String literal) {
+        if (literal == null || literal.isEmpty()) {
+            return;
+        }
+        tokens.add("'" + literal.replace("'", "\\'") + "'");
+    }
+
+    private String wrapAsThymeleafExpression(List<String> tokens) {
+        return "${" + String.join(" + ", tokens) + "}";
     }
 
     private String resolveSafeFontStack(String originalFontValue) {

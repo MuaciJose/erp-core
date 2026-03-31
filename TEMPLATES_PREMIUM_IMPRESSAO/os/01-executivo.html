@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <style>@page {
+        size: A4;
+        margin: 16mm
+    }
+
+    body {
+        font-family: Helvetica, Arial, sans-serif;
+        color: #172033;
+        font-size: 11px
+    }
+
+    h1, h2, p {
+        margin: 0
+    }
+
+    .top {
+        border-bottom: 3px solid #0f172a;
+        padding-bottom: 12px;
+        display: flex;
+        justify-content: space-between
+    }
+
+    .brand small, .muted {
+        color: #64748b
+    }
+
+    .hero {
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        padding: 12px;
+        margin: 16px 0;
+        background: #f8fafc
+    }
+
+    .grid {
+        width: 100%;
+        border-collapse: collapse
+    }
+
+    .grid td, .table td, .table th {
+        border: 1px solid #dbe4ee;
+        padding: 8px
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px
+    }
+
+    .table th {
+        background: #0f172a;
+        color: #fff;
+        text-transform: uppercase;
+        font-size: 9px
+    }
+
+    .total {
+        margin-top: 14px;
+        width: 280px;
+        margin-left: auto
+    }
+
+    .total td {
+        padding: 8px;
+        border-bottom: 1px solid #dbe4ee
+    }
+
+    .final {
+        background: #0f172a;
+        color: #fff;
+        font-weight: bold
+    }
+
+    .sign {
+        margin-top: 48px;
+        width: 100%;
+        text-align: center
+    }
+
+    .sign td {
+        padding: 0 20px
+    }</style>
+</head>
+<body>
+<div class="top">
+    <div class="brand"><h1 th:text="${empresa.nomeFantasia}">Empresa</h1><small
+            th:text="'CNPJ ' + ${empresa.cnpj} + ' | ' + ${empresa.telefone}">CNPJ</small></div>
+    <div style="text-align:right">
+        <div class="muted">ORDEM DE SERVICO</div>
+        <h2 th:text="${numeroOs}">OS-000001</h2><small th:text="${nomeConsultor}">Consultor</small></div>
+</div>
+<div class="hero">
+    <table class="grid">
+        <tr>
+            <td><strong>Cliente</strong><br/><span th:text="${nomeCliente}">Cliente</span></td>
+            <td><strong>Telefone</strong><br/><span th:text="${telefoneCliente}">Telefone</span></td>
+            <td><strong>Veiculo</strong><br/><span th:text="${veiculoNome}">Veiculo</span></td>
+            <td><strong>Placa</strong><br/><span th:text="${placaVeiculo}">ABC1D23</span></td>
+            <td><strong>KM</strong><br/><span th:text="${kmEntradaDisplay != null ? kmEntradaDisplay : (os.kmEntrada != null ? os.kmEntrada + ' km' : '--')}">0 km</span></td>
+        </tr>
+    </table>
+</div>
+<div th:if="${os.observacoes != null and !os.observacoes.isEmpty()}"><strong>Parecer tecnico</strong>
+    <p th:text="${os.observacoes}" style="margin-top:6px;white-space:pre-wrap"></p></div>
+<table class="table" th:if="${os.itensServicos != null and !os.itensServicos.isEmpty()}">
+    <thead>
+    <tr>
+        <th>Servico</th>
+        <th>Qtd</th>
+        <th>Unit.</th>
+        <th>Total</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="item : ${os.itensServicos}">
+        <td th:text="${item.servico != null ? item.servico.nome : 'Servico'}">Servico</td>
+        <td th:text="${item.quantidade != null ? item.quantidade : 1}">1</td>
+        <td th:text="${item.precoUnitario != null ? #numbers.formatDecimal(item.precoUnitario,1,'POINT',2,'COMMA') : '0,00'}">
+            0,00
+        </td>
+        <td th:text="${item.valorTotal != null ? #numbers.formatDecimal(item.valorTotal,1,'POINT',2,'COMMA') : '0,00'}">
+            0,00
+        </td>
+    </tr>
+    </tbody>
+</table>
+<table class="total">
+    <tr>
+        <td>Total servicos</td>
+        <td th:text="${os.totalServicos != null ? #numbers.formatDecimal(os.totalServicos,1,'POINT',2,'COMMA') : '0,00'}">
+            0,00
+        </td>
+    </tr>
+    <tr>
+        <td>Total pecas</td>
+        <td th:text="${os.totalPecas != null ? #numbers.formatDecimal(os.totalPecas,1,'POINT',2,'COMMA') : '0,00'}">
+            0,00
+        </td>
+    </tr>
+    <tr class="final">
+        <td>Total da OS</td>
+        <td th:text="${os.valorTotal != null ? #numbers.formatDecimal(os.valorTotal,1,'POINT',2,'COMMA') : '0,00'}">
+            0,00
+        </td>
+    </tr>
+</table>
+<table class="sign">
+    <tr>
+        <td>____________________________<br/>Oficina</td>
+        <td>____________________________<br/>Cliente</td>
+    </tr>
+</table>
+</body>
+</html>

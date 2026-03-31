@@ -8,6 +8,7 @@ import com.grandport.erp.modules.admin.service.AuditoriaService;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,6 +22,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -34,6 +37,19 @@ import java.util.List;
 @Service
 @Slf4j
 public class ConfiguracaoService {
+
+    private static final String DEFAULT_OS_TEMPLATE_PATH = "default-templates/os.html";
+    private static final String DEFAULT_VENDA_TEMPLATE_PATH = "default-templates/venda.html";
+    private static final String DEFAULT_RECIBO_TEMPLATE_PATH = "default-templates/recibo.html";
+    private static final String DEFAULT_RECIBO_PAGAMENTO_TEMPLATE_PATH = "default-templates/recibo-pagamento.html";
+    private static final String DEFAULT_FECHAMENTO_CAIXA_TEMPLATE_PATH = "default-templates/fechamento-caixa.html";
+    private static final String DEFAULT_DRE_TEMPLATE_PATH = "default-templates/dre.html";
+    private static final String DEFAULT_ESPELHO_NOTA_TEMPLATE_PATH = "default-templates/espelho-nota.html";
+    private static final String DEFAULT_EXTRATO_CLIENTE_TEMPLATE_PATH = "default-templates/extrato-cliente.html";
+    private static final String DEFAULT_EXTRATO_FORNECEDOR_TEMPLATE_PATH = "default-templates/extrato-fornecedor.html";
+    private static final String DEFAULT_RELATORIO_COMISSAO_TEMPLATE_PATH = "default-templates/relatorio-comissao.html";
+    private static final String DEFAULT_RELATORIO_CONTAS_PAGAR_TEMPLATE_PATH = "default-templates/relatorio-contas-pagar.html";
+    private static final String DEFAULT_RELATORIO_CONTAS_RECEBER_TEMPLATE_PATH = "default-templates/relatorio-contas-receber.html";
 
     @Autowired
     private ConfiguracaoRepository repository;
@@ -76,14 +92,23 @@ public class ConfiguracaoService {
     public ConfiguracaoSistema obterConfiguracaoSistema() {
         return repository.findFirstByOrderByIdDesc()
                 .map(this::aplicarDefaults)
-                .orElseThrow(() -> new IllegalStateException("Nenhuma configuracao do sistema encontrada para execucao automatica."));
+                .orElseGet(() -> {
+                    log.warn("Nenhuma configuracao persistida encontrada para execucao automatica. Usando defaults em memoria.");
+                    return criarConfiguracaoPadraoTransient();
+                });
     }
 
     // 🔐 Criar configuração padrão para nova empresa
     private ConfiguracaoSistema criarConfiguracaoPadraoParaEmpresa(Long empresaId) {
-        ConfiguracaoSistema config = new ConfiguracaoSistema();
-        config.setId(null);  // 🔐 ESSENCIAL: Deixar nulo para Hibernate auto-gerar
+        ConfiguracaoSistema config = criarConfiguracaoPadraoTransient();
         config.setEmpresaId(empresaId);  // 🔐 ESSENCIAL: Atribuir empresaId explicitamente
+        ConfiguracaoSistema salva = repository.save(config);
+        return salva;
+    }
+
+    private ConfiguracaoSistema criarConfiguracaoPadraoTransient() {
+        ConfiguracaoSistema config = new ConfiguracaoSistema();
+        config.setId(null);
         config.setHorarioBackupAuto("03:00");
         config.setSerieNfe(1);
         config.setNumeroProximaNfe(1L);
@@ -93,12 +118,23 @@ public class ConfiguracaoService {
         config.setAmbienteSefaz(2);
         config.setAmbienteNfse(2);
         config.setTipoCertificado("A1");
-        config.setNomeFantasia("Minha Autopeças");  // Valores padrão
+        config.setNomeFantasia("Minha Autopeças");
         config.setRazaoSocial("");
         config.setCnpj("");
         config.setTelefone("");
-        ConfiguracaoSistema salva = repository.save(config);
-        return salva;
+        config.setLayoutHtmlOs(loadDefaultTemplate(DEFAULT_OS_TEMPLATE_PATH, config.getLayoutHtmlOs()));
+        config.setLayoutHtmlVenda(loadDefaultTemplate(DEFAULT_VENDA_TEMPLATE_PATH, config.getLayoutHtmlVenda()));
+        config.setLayoutHtmlRecibo(loadDefaultTemplate(DEFAULT_RECIBO_TEMPLATE_PATH, config.getLayoutHtmlRecibo()));
+        config.setLayoutHtmlReciboPagamento(loadDefaultTemplate(DEFAULT_RECIBO_PAGAMENTO_TEMPLATE_PATH, config.getLayoutHtmlReciboPagamento()));
+        config.setLayoutHtmlFechamentoCaixa(loadDefaultTemplate(DEFAULT_FECHAMENTO_CAIXA_TEMPLATE_PATH, config.getLayoutHtmlFechamentoCaixa()));
+        config.setLayoutHtmlDre(loadDefaultTemplate(DEFAULT_DRE_TEMPLATE_PATH, config.getLayoutHtmlDre()));
+        config.setLayoutHtmlEspelhoNota(loadDefaultTemplate(DEFAULT_ESPELHO_NOTA_TEMPLATE_PATH, config.getLayoutHtmlEspelhoNota()));
+        config.setLayoutHtmlExtratoCliente(loadDefaultTemplate(DEFAULT_EXTRATO_CLIENTE_TEMPLATE_PATH, config.getLayoutHtmlExtratoCliente()));
+        config.setLayoutHtmlExtratoFornecedor(loadDefaultTemplate(DEFAULT_EXTRATO_FORNECEDOR_TEMPLATE_PATH, config.getLayoutHtmlExtratoFornecedor()));
+        config.setLayoutHtmlRelatorioComissao(loadDefaultTemplate(DEFAULT_RELATORIO_COMISSAO_TEMPLATE_PATH, config.getLayoutHtmlRelatorioComissao()));
+        config.setLayoutHtmlRelatorioContasPagar(loadDefaultTemplate(DEFAULT_RELATORIO_CONTAS_PAGAR_TEMPLATE_PATH, config.getLayoutHtmlRelatorioContasPagar()));
+        config.setLayoutHtmlRelatorioContasReceber(loadDefaultTemplate(DEFAULT_RELATORIO_CONTAS_RECEBER_TEMPLATE_PATH, config.getLayoutHtmlRelatorioContasReceber()));
+        return config;
     }
 
     private ConfiguracaoSistema obterConfiguracaoPorEmpresa(Long empresaId) {
@@ -115,7 +151,52 @@ public class ConfiguracaoService {
         if (config.getNumeroProximaNfce() == null) config.setNumeroProximaNfce(1L);
         if (config.getCscIdToken() == null) config.setCscIdToken("");
         if (config.getCscCodigo() == null) config.setCscCodigo("");
+        if (config.getLayoutHtmlOs() == null || config.getLayoutHtmlOs().isBlank()) {
+            config.setLayoutHtmlOs(loadDefaultTemplate(DEFAULT_OS_TEMPLATE_PATH, config.getLayoutHtmlOs()));
+        }
+        if (config.getLayoutHtmlVenda() == null || config.getLayoutHtmlVenda().isBlank()) {
+            config.setLayoutHtmlVenda(loadDefaultTemplate(DEFAULT_VENDA_TEMPLATE_PATH, config.getLayoutHtmlVenda()));
+        }
+        if (config.getLayoutHtmlRecibo() == null || config.getLayoutHtmlRecibo().isBlank()) {
+            config.setLayoutHtmlRecibo(loadDefaultTemplate(DEFAULT_RECIBO_TEMPLATE_PATH, config.getLayoutHtmlRecibo()));
+        }
+        if (config.getLayoutHtmlReciboPagamento() == null || config.getLayoutHtmlReciboPagamento().isBlank()) {
+            config.setLayoutHtmlReciboPagamento(loadDefaultTemplate(DEFAULT_RECIBO_PAGAMENTO_TEMPLATE_PATH, config.getLayoutHtmlReciboPagamento()));
+        }
+        if (config.getLayoutHtmlFechamentoCaixa() == null || config.getLayoutHtmlFechamentoCaixa().isBlank()) {
+            config.setLayoutHtmlFechamentoCaixa(loadDefaultTemplate(DEFAULT_FECHAMENTO_CAIXA_TEMPLATE_PATH, config.getLayoutHtmlFechamentoCaixa()));
+        }
+        if (config.getLayoutHtmlDre() == null || config.getLayoutHtmlDre().isBlank()) {
+            config.setLayoutHtmlDre(loadDefaultTemplate(DEFAULT_DRE_TEMPLATE_PATH, config.getLayoutHtmlDre()));
+        }
+        if (config.getLayoutHtmlEspelhoNota() == null || config.getLayoutHtmlEspelhoNota().isBlank()) {
+            config.setLayoutHtmlEspelhoNota(loadDefaultTemplate(DEFAULT_ESPELHO_NOTA_TEMPLATE_PATH, config.getLayoutHtmlEspelhoNota()));
+        }
+        if (config.getLayoutHtmlExtratoCliente() == null || config.getLayoutHtmlExtratoCliente().isBlank()) {
+            config.setLayoutHtmlExtratoCliente(loadDefaultTemplate(DEFAULT_EXTRATO_CLIENTE_TEMPLATE_PATH, config.getLayoutHtmlExtratoCliente()));
+        }
+        if (config.getLayoutHtmlExtratoFornecedor() == null || config.getLayoutHtmlExtratoFornecedor().isBlank()) {
+            config.setLayoutHtmlExtratoFornecedor(loadDefaultTemplate(DEFAULT_EXTRATO_FORNECEDOR_TEMPLATE_PATH, config.getLayoutHtmlExtratoFornecedor()));
+        }
+        if (config.getLayoutHtmlRelatorioComissao() == null || config.getLayoutHtmlRelatorioComissao().isBlank()) {
+            config.setLayoutHtmlRelatorioComissao(loadDefaultTemplate(DEFAULT_RELATORIO_COMISSAO_TEMPLATE_PATH, config.getLayoutHtmlRelatorioComissao()));
+        }
+        if (config.getLayoutHtmlRelatorioContasPagar() == null || config.getLayoutHtmlRelatorioContasPagar().isBlank()) {
+            config.setLayoutHtmlRelatorioContasPagar(loadDefaultTemplate(DEFAULT_RELATORIO_CONTAS_PAGAR_TEMPLATE_PATH, config.getLayoutHtmlRelatorioContasPagar()));
+        }
+        if (config.getLayoutHtmlRelatorioContasReceber() == null || config.getLayoutHtmlRelatorioContasReceber().isBlank()) {
+            config.setLayoutHtmlRelatorioContasReceber(loadDefaultTemplate(DEFAULT_RELATORIO_CONTAS_RECEBER_TEMPLATE_PATH, config.getLayoutHtmlRelatorioContasReceber()));
+        }
         return config;
+    }
+
+    private String loadDefaultTemplate(String classpathLocation, String fallback) {
+        try (InputStream in = new ClassPathResource(classpathLocation).getInputStream()) {
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            log.warn("Falha ao carregar template default em {}. Usando fallback embutido.", classpathLocation);
+            return fallback;
+        }
     }
 
     @Transactional

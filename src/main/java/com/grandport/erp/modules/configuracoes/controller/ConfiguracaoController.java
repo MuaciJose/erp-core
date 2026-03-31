@@ -1,7 +1,15 @@
 package com.grandport.erp.modules.configuracoes.controller;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
+import com.grandport.erp.modules.checklist.service.LaudoVistoriaTemplateService;
+import com.grandport.erp.modules.checklist.service.LaudoVistoriaService;
+import com.grandport.erp.modules.checklist.service.LaudoVistoriaTemplateVersioningService;
+import com.grandport.erp.modules.checklist.service.ChecklistService;
+import com.grandport.erp.modules.fiscal.service.DanfeService;
+import com.grandport.erp.modules.fiscal.service.DanfeTemplateService;
+import com.grandport.erp.modules.fiscal.service.DanfeTemplateVersioningService;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
+import com.grandport.erp.modules.configuracoes.service.LayoutTemplateVersioningService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -21,7 +29,49 @@ public class ConfiguracaoController {
     private ConfiguracaoService service;
 
     @Autowired
+    private com.grandport.erp.modules.configuracoes.service.LayoutTemplateGovernanceService layoutTemplateGovernanceService;
+
+    @Autowired
+    private com.grandport.erp.modules.configuracoes.service.LayoutPreviewDataService layoutPreviewDataService;
+
+    @Autowired
+    private com.grandport.erp.modules.configuracoes.service.OfficialLayoutTemplateService officialLayoutTemplateService;
+
+    @Autowired
+    private com.grandport.erp.modules.configuracoes.service.PremiumTemplateLibraryService premiumTemplateLibraryService;
+
+    @Autowired
+    private com.grandport.erp.modules.pdf.service.PdfService pdfService;
+
+    @Autowired
+    private LayoutTemplateVersioningService layoutTemplateVersioningService;
+
+    @Autowired
     private com.grandport.erp.modules.configuracoes.service.ManutencaoService manutencaoService;
+
+    @Autowired
+    private com.grandport.erp.modules.configuracoes.service.PrintingGovernanceOverviewService printingGovernanceOverviewService;
+
+    @Autowired
+    private LaudoVistoriaTemplateService laudoVistoriaTemplateService;
+
+    @Autowired
+    private LaudoVistoriaService laudoVistoriaService;
+
+    @Autowired
+    private LaudoVistoriaTemplateVersioningService laudoVistoriaTemplateVersioningService;
+
+    @Autowired
+    private ChecklistService checklistService;
+
+    @Autowired
+    private DanfeTemplateService danfeTemplateService;
+
+    @Autowired
+    private DanfeTemplateVersioningService danfeTemplateVersioningService;
+
+    @Autowired
+    private DanfeService danfeService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
@@ -142,61 +192,451 @@ public class ConfiguracaoController {
         layouts.put("relatorioComissao", config.getLayoutHtmlRelatorioComissao());
         layouts.put("relatorioContasPagar", config.getLayoutHtmlRelatorioContasPagar());
         layouts.put("relatorioContasReceber", config.getLayoutHtmlRelatorioContasReceber());
+        layouts.put("laudoVistoriaJrxml", config.getLayoutJrxmlLaudoVistoria());
         
         return ResponseEntity.ok(layouts);
     }
 
-    @GetMapping("/layouts/{tipoLayout}")
-    public ResponseEntity<Map<String, String>> obterLayout(@PathVariable String tipoLayout) {
-        ConfiguracaoSistema config = service.obterConfiguracao();
-        String html = null;
-        
-        switch (tipoLayout.toLowerCase()) {
-            case "extratocliente":
-                html = config.getLayoutHtmlExtratoCliente();
-                break;
-            case "extratofornecedor":
-                html = config.getLayoutHtmlExtratoFornecedor();
-                break;
-            case "os":
-                html = config.getLayoutHtmlOs();
-                break;
-            case "venda":
-                html = config.getLayoutHtmlVenda();
-                break;
-            case "recibo":
-                html = config.getLayoutHtmlRecibo();
-                break;
-            case "recibopagamento":
-                html = config.getLayoutHtmlReciboPagamento();
-                break;
-            case "fechamentocaixa":
-                html = config.getLayoutHtmlFechamentoCaixa();
-                break;
-            case "espelhonota":
-                html = config.getLayoutHtmlEspelhoNota();
-                break;
-            case "dre":
-                html = config.getLayoutHtmlDre();
-                break;
-            case "relatoriocomissao":
-                html = config.getLayoutHtmlRelatorioComissao();
-                break;
-            case "relatoriocontaspagar":
-                html = config.getLayoutHtmlRelatorioContasPagar();
-                break;
-            case "relatoriocontasreceber":
-                html = config.getLayoutHtmlRelatorioContasReceber();
-                break;
-            default:
-                return ResponseEntity.badRequest().body(Map.of("error", "Tipo de layout não encontrado: " + tipoLayout));
+    @GetMapping("/layouts/overview")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterResumoGovernancaImpressao() {
+        return ResponseEntity.ok(printingGovernanceOverviewService.getOverview());
+    }
+
+    @GetMapping("/laudo-vistoria/template")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterTemplateLaudoVistoria() {
+        var state = laudoVistoriaTemplateVersioningService.getEditorState();
+        var official = laudoVistoriaTemplateService.getOfficialTemplate();
+        return ResponseEntity.ok(Map.ofEntries(
+                Map.entry("jrxml", state.jrxml()),
+                Map.entry("publishedJrxml", state.publishedJrxml()),
+                Map.entry("customizado", state.customizado()),
+                Map.entry("source", state.customizado() ? "database" : "classpath"),
+                Map.entry("templateType", "jrxml"),
+                Map.entry("hasDraft", state.hasDraft()),
+                Map.entry("draftVersion", state.draftVersion() != null ? state.draftVersion() : ""),
+                Map.entry("publishedVersion", state.publishedVersion() != null ? state.publishedVersion() : ""),
+                Map.entry("officialStyleId", official.styleId()),
+                Map.entry("officialLabel", official.label()),
+                Map.entry("isEditorUsingOfficial", state.jrxml() != null && state.jrxml().equals(official.jrxml())),
+                Map.entry("isPublishedUsingOfficial", state.publishedJrxml() != null && state.publishedJrxml().equals(official.jrxml()))
+        ));
+    }
+
+    @GetMapping("/laudo-vistoria/template/official")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterTemplateOficialLaudoVistoria() {
+        return ResponseEntity.ok(laudoVistoriaTemplateService.getOfficialTemplate());
+    }
+
+    @GetMapping("/danfe/template")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterTemplateDanfe() {
+        var state = danfeTemplateVersioningService.getEditorState();
+        var official = danfeTemplateService.getOfficialTemplate();
+        return ResponseEntity.ok(Map.ofEntries(
+                Map.entry("jrxml", state.jrxml()),
+                Map.entry("publishedJrxml", state.publishedJrxml()),
+                Map.entry("customizado", state.customizado()),
+                Map.entry("source", state.customizado() ? "database" : "classpath"),
+                Map.entry("templateType", "jrxml"),
+                Map.entry("hasDraft", state.hasDraft()),
+                Map.entry("draftVersion", state.draftVersion() != null ? state.draftVersion() : ""),
+                Map.entry("publishedVersion", state.publishedVersion() != null ? state.publishedVersion() : ""),
+                Map.entry("officialStyleId", official.styleId()),
+                Map.entry("officialLabel", official.label()),
+                Map.entry("isEditorUsingOfficial", state.jrxml() != null && state.jrxml().equals(official.jrxml())),
+                Map.entry("isPublishedUsingOfficial", state.publishedJrxml() != null && state.publishedJrxml().equals(official.jrxml()))
+        ));
+    }
+
+    @GetMapping("/danfe/template/official")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterTemplateOficialDanfe() {
+        return ResponseEntity.ok(danfeTemplateService.getOfficialTemplate());
+    }
+
+    @GetMapping("/danfe/template/library")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> listarBibliotecaDanfe() {
+        return ResponseEntity.ok(premiumTemplateLibraryService.listDanfeTemplates());
+    }
+
+    @GetMapping("/danfe/template/library/{styleId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterTemplateBibliotecaDanfe(@PathVariable String styleId) {
+        try {
+            return ResponseEntity.ok(premiumTemplateLibraryService.getDanfeTemplate(styleId));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
-        
-        return ResponseEntity.ok(Map.of("tipoLayout", tipoLayout, "html", html != null ? html : ""));
+    }
+
+    @GetMapping("/danfe/template/library/{styleId}/preview")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> previewTemplateBibliotecaDanfe(@PathVariable String styleId) {
+        try {
+            var template = premiumTemplateLibraryService.getDanfeTemplate(styleId);
+            byte[] pdf = danfeService.gerarPreviewDanfePdf(template.content());
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=preview-library-danfe-" + styleId + ".pdf")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdf);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Falha ao gerar preview do template premium do DANFE: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/danfe/template")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    public ResponseEntity<?> salvarTemplateDanfe(@RequestBody Map<String, String> payload) {
+        try {
+            var draft = danfeTemplateVersioningService.saveDraft(payload.get("jrxml"), payload.get("changeReason"));
+            return ResponseEntity.ok(Map.of(
+                    "mensagem", "Draft do DANFE salvo com sucesso!",
+                    "draftVersion", draft.versionNumber(),
+                    "changeReason", draft.changeReason()
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/danfe/template/historico")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterHistoricoTemplateDanfe() {
+        return ResponseEntity.ok(danfeTemplateVersioningService.getHistory());
+    }
+
+    @PostMapping("/danfe/template/publish")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    public ResponseEntity<?> publicarTemplateDanfe(@RequestBody(required = false) Map<String, String> payload) {
+        try {
+            var published = danfeTemplateVersioningService.publishDraft(payload != null ? payload.get("changeReason") : null);
+            return ResponseEntity.ok(Map.of(
+                    "mensagem", "Template do DANFE publicado com sucesso!",
+                    "publishedVersion", published.versionNumber()
+            ));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/danfe/template/rollback/{versionId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    public ResponseEntity<?> rollbackTemplateDanfe(
+            @PathVariable Long versionId,
+            @RequestBody(required = false) Map<String, String> payload) {
+        try {
+            var published = danfeTemplateVersioningService.rollbackToVersion(
+                    versionId,
+                    payload != null ? payload.get("changeReason") : null
+            );
+            return ResponseEntity.ok(Map.of(
+                    "mensagem", "Rollback do DANFE publicado com sucesso!",
+                    "publishedVersion", published.versionNumber()
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/danfe/template/diff")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterDiffTemplateDanfe() {
+        return ResponseEntity.ok(danfeTemplateVersioningService.diffDraftAgainstPublished());
+    }
+
+    @PostMapping("/danfe/template/reset")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    public ResponseEntity<?> resetarTemplateDanfe() {
+        danfeTemplateVersioningService.resetPublished();
+        return ResponseEntity.ok(Map.of("mensagem", "Template do DANFE resetado para o padrão."));
+    }
+
+    @PostMapping("/danfe/template/preview")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> previewTemplateDanfe(@RequestBody(required = false) Map<String, String> payload) {
+        try {
+            String jrxml = payload != null ? payload.get("jrxml") : null;
+            byte[] pdf = danfeService.gerarPreviewDanfePdf((jrxml == null || jrxml.isBlank()) ? danfeTemplateVersioningService.getEditorState().jrxml() : jrxml);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=preview-danfe.pdf")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdf);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Falha ao gerar preview do DANFE: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/laudo-vistoria/template/library")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> listarBibliotecaLaudoVistoria() {
+        return ResponseEntity.ok(premiumTemplateLibraryService.listLaudoTemplates());
+    }
+
+    @GetMapping("/laudo-vistoria/template/library/{styleId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterTemplateBibliotecaLaudoVistoria(@PathVariable String styleId) {
+        try {
+            return ResponseEntity.ok(premiumTemplateLibraryService.getLaudoTemplate(styleId));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/laudo-vistoria/template/library/{styleId}/preview")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> previewTemplateBibliotecaLaudoVistoria(
+            @PathVariable String styleId,
+            @RequestParam(required = false) Long checklistId) {
+        try {
+            var template = premiumTemplateLibraryService.getLaudoTemplate(styleId);
+            byte[] pdf = laudoVistoriaService.gerarPreviewPdfComTemplate(template.content(), checklistId);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=preview-library-laudo-" + styleId + ".pdf")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdf);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Falha ao gerar preview do template premium: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/laudo-vistoria/template")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    public ResponseEntity<?> salvarTemplateLaudoVistoria(@RequestBody Map<String, String> payload) {
+        try {
+            var draft = laudoVistoriaTemplateVersioningService.saveDraft(payload.get("jrxml"), payload.get("changeReason"));
+            return ResponseEntity.ok(Map.of(
+                    "mensagem", "Draft do laudo salvo com sucesso!",
+                    "draftVersion", draft.versionNumber(),
+                    "changeReason", draft.changeReason()
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/laudo-vistoria/template/historico")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterHistoricoTemplateLaudoVistoria() {
+        return ResponseEntity.ok(laudoVistoriaTemplateVersioningService.getHistory());
+    }
+
+    @PostMapping("/laudo-vistoria/template/publish")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    public ResponseEntity<?> publicarTemplateLaudoVistoria(@RequestBody(required = false) Map<String, String> payload) {
+        try {
+            var published = laudoVistoriaTemplateVersioningService.publishDraft(payload != null ? payload.get("changeReason") : null);
+            return ResponseEntity.ok(Map.of(
+                    "mensagem", "Template do laudo publicado com sucesso!",
+                    "publishedVersion", published.versionNumber()
+            ));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/laudo-vistoria/template/rollback/{versionId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    public ResponseEntity<?> rollbackTemplateLaudoVistoria(
+            @PathVariable Long versionId,
+            @RequestBody(required = false) Map<String, String> payload) {
+        try {
+            var published = laudoVistoriaTemplateVersioningService.rollbackToVersion(
+                    versionId,
+                    payload != null ? payload.get("changeReason") : null
+            );
+            return ResponseEntity.ok(Map.of(
+                    "mensagem", "Rollback do laudo publicado com sucesso!",
+                    "publishedVersion", published.versionNumber()
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/laudo-vistoria/template/diff")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterDiffTemplateLaudoVistoria() {
+        return ResponseEntity.ok(laudoVistoriaTemplateVersioningService.diffDraftAgainstPublished());
+    }
+
+    @PostMapping("/laudo-vistoria/template/reset")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    public ResponseEntity<?> resetarTemplateLaudoVistoria() {
+        laudoVistoriaTemplateVersioningService.resetPublished();
+        return ResponseEntity.ok(Map.of("mensagem", "Template do laudo resetado para o padrão."));
+    }
+
+    @GetMapping("/laudo-vistoria/template/preview")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> previewTemplateLaudoVistoria(@RequestParam(required = false) Long checklistId) {
+        try {
+            byte[] pdf = laudoVistoriaService.gerarPreviewPdf(checklistId);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=preview-laudo-vistoria.pdf")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdf);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/laudo-vistoria/template/preview-contexts")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> listarContextosPreviewLaudoVistoria() {
+        return ResponseEntity.ok(
+                checklistService.listarRecentesDaEmpresa().stream()
+                        .map(checklist -> Map.of(
+                                "id", checklist.getId(),
+                                "placa", checklist.getVeiculo() != null && checklist.getVeiculo().getPlaca() != null
+                                        ? checklist.getVeiculo().getPlaca()
+                                        : "Sem placa",
+                                "modelo", checklist.getVeiculo() != null && checklist.getVeiculo().getModelo() != null
+                                        ? checklist.getVeiculo().getModelo()
+                                        : "Sem modelo",
+                                "cliente", checklist.getCliente() != null && checklist.getCliente().getNome() != null
+                                        ? checklist.getCliente().getNome()
+                                        : "Sem cliente",
+                                "dataRegistro", checklist.getDataRegistro() != null ? checklist.getDataRegistro().toString() : ""
+                        ))
+                        .toList()
+        );
+    }
+
+    @GetMapping("/layouts/{tipoLayout}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterLayout(@PathVariable String tipoLayout) {
+        try {
+            LayoutTemplateVersioningService.LayoutEditorState state = layoutTemplateVersioningService.getEditorState(tipoLayout);
+            var official = officialLayoutTemplateService.getOfficialTemplate(tipoLayout);
+            return ResponseEntity.ok(Map.of(
+                    "tipoLayout", state.tipoLayout(),
+                    "html", state.html(),
+                    "publishedHtml", state.publishedHtml(),
+                    "hasDraft", state.hasDraft(),
+                    "draftVersion", state.draftVersion() != null ? state.draftVersion() : "",
+                    "publishedVersion", state.publishedVersion() != null ? state.publishedVersion() : "",
+                    "officialStyleId", official.styleId(),
+                    "officialLabel", official.label(),
+                    "isEditorUsingOfficial", state.html() != null && state.html().equals(official.html()),
+                    "isPublishedUsingOfficial", state.publishedHtml() != null && state.publishedHtml().equals(official.html())
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/layouts/{tipoLayout}/official")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterTemplateOficialLayout(@PathVariable String tipoLayout) {
+        try {
+            return ResponseEntity.ok(officialLayoutTemplateService.getOfficialTemplate(tipoLayout));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/layouts/{tipoLayout}/library")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> listarBibliotecaLayout(@PathVariable String tipoLayout) {
+        try {
+            return ResponseEntity.ok(premiumTemplateLibraryService.listHtmlTemplates(tipoLayout));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/layouts/{tipoLayout}/library/{styleId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterTemplateBibliotecaLayout(
+            @PathVariable String tipoLayout,
+            @PathVariable String styleId) {
+        try {
+            return ResponseEntity.ok(premiumTemplateLibraryService.getHtmlTemplate(tipoLayout, styleId));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/layouts/{tipoLayout}/library/{styleId}/preview-pdf")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> previewTemplateBibliotecaLayout(
+            @PathVariable String tipoLayout,
+            @PathVariable String styleId) {
+        try {
+            var template = premiumTemplateLibraryService.getHtmlTemplate(tipoLayout, styleId);
+            byte[] pdf = pdfService.gerarPdfDeStringHtml(
+                    template.content(),
+                    layoutPreviewDataService.buildPreviewVariables(tipoLayout)
+            );
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=preview-library-" + tipoLayout + "-" + styleId + ".pdf")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdf);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Falha ao gerar preview do template premium: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/layouts/{tipoLayout}/metadata")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterMetadataLayout(@PathVariable String tipoLayout) {
+        try {
+            return ResponseEntity.ok(layoutTemplateGovernanceService.getMetadata(tipoLayout));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/layouts/{tipoLayout}/preview-pdf")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> gerarPreviewLayout(@PathVariable String tipoLayout, @RequestBody Map<String, String> payload) {
+        String html = payload.get("html");
+        if (html == null || html.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "HTML não pode estar vazio"));
+        }
+
+        var validation = layoutTemplateGovernanceService.validate(tipoLayout, html);
+        if (!validation.valid()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Layout rejeitado pela validação.",
+                    "errors", validation.errors(),
+                    "warnings", validation.warnings()
+            ));
+        }
+
+        try {
+            byte[] pdf = pdfService.gerarPdfDeStringHtml(
+                    html,
+                    layoutPreviewDataService.buildPreviewVariables(tipoLayout)
+            );
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=preview-" + tipoLayout + ".pdf")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdf);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Falha ao gerar preview do layout: " + e.getMessage()));
+        }
     }
 
     @PutMapping("/layouts/{tipoLayout}")
-    public ResponseEntity<Map<String, String>> atualizarLayout(
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> atualizarLayout(
             @PathVariable String tipoLayout,
             @RequestBody Map<String, String> payload) {
         
@@ -205,102 +645,137 @@ public class ConfiguracaoController {
             return ResponseEntity.badRequest().body(Map.of("error", "HTML não pode estar vazio"));
         }
         
-        ConfiguracaoSistema config = service.obterConfiguracao();
-        
-        switch (tipoLayout.toLowerCase()) {
-            case "extratocliente":
-                config.setLayoutHtmlExtratoCliente(html);
-                break;
-            case "extratofornecedor":
-                config.setLayoutHtmlExtratoFornecedor(html);
-                break;
-            case "os":
-                config.setLayoutHtmlOs(html);
-                break;
-            case "venda":
-                config.setLayoutHtmlVenda(html);
-                break;
-            case "recibo":
-                config.setLayoutHtmlRecibo(html);
-                break;
-            case "recibopagamento":
-                config.setLayoutHtmlReciboPagamento(html);
-                break;
-            case "fechamentocaixa":
-                config.setLayoutHtmlFechamentoCaixa(html);
-                break;
-            case "espelhonota":
-                config.setLayoutHtmlEspelhoNota(html);
-                break;
-            case "dre":
-                config.setLayoutHtmlDre(html);
-                break;
-            case "relatoriocomissao":
-                config.setLayoutHtmlRelatorioComissao(html);
-                break;
-            case "relatoriocontaspagar":
-                config.setLayoutHtmlRelatorioContasPagar(html);
-                break;
-            case "relatoriocontasreceber":
-                config.setLayoutHtmlRelatorioContasReceber(html);
-                break;
-            default:
-                return ResponseEntity.badRequest().body(Map.of("error", "Tipo de layout não encontrado: " + tipoLayout));
+        var validation = layoutTemplateGovernanceService.validate(tipoLayout, html);
+        if (!validation.valid()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Layout rejeitado pela validação.",
+                    "errors", validation.errors(),
+                    "warnings", validation.warnings(),
+                    "availableVariables", validation.availableVariables(),
+                    "notes", validation.notes()
+            ));
         }
+
+        LayoutTemplateVersioningService.LayoutVersionSummary draft = layoutTemplateVersioningService.saveDraft(
+                tipoLayout,
+                html,
+                payload.get("changeReason")
+        );
         
-        service.atualizarConfiguracao(config);
-        
-        return ResponseEntity.ok(Map.of("mensagem", "Layout atualizado com sucesso!", "tipoLayout", tipoLayout));
+        return ResponseEntity.ok(Map.of(
+                "mensagem", "Draft salvo com sucesso!",
+                "tipoLayout", tipoLayout,
+                "draftVersion", draft.versionNumber(),
+                "changeReason", draft.changeReason(),
+                "warnings", validation.warnings(),
+                "availableVariables", validation.availableVariables(),
+                "notes", validation.notes()
+        ));
+    }
+
+    @GetMapping("/layouts/{tipoLayout}/historico")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterHistoricoLayout(@PathVariable String tipoLayout) {
+        try {
+            return ResponseEntity.ok(layoutTemplateVersioningService.getHistory(tipoLayout));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/layouts/{tipoLayout}/publish")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    public ResponseEntity<?> publicarDraft(@PathVariable String tipoLayout) {
+        try {
+            LayoutTemplateVersioningService.LayoutVersionSummary published = layoutTemplateVersioningService.publishDraft(
+                    tipoLayout,
+                    null
+            );
+            return ResponseEntity.ok(Map.of(
+                    "mensagem", "Layout publicado com sucesso!",
+                    "tipoLayout", tipoLayout,
+                    "publishedVersion", published.versionNumber()
+            ));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/layouts/{tipoLayout}/publish-with-reason")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    public ResponseEntity<?> publicarDraftComMotivo(@PathVariable String tipoLayout, @RequestBody(required = false) Map<String, String> payload) {
+        try {
+            LayoutTemplateVersioningService.LayoutVersionSummary published = layoutTemplateVersioningService.publishDraft(
+                    tipoLayout,
+                    payload != null ? payload.get("changeReason") : null
+            );
+            return ResponseEntity.ok(Map.of(
+                    "mensagem", "Layout publicado com sucesso!",
+                    "tipoLayout", tipoLayout,
+                    "publishedVersion", published.versionNumber()
+            ));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/layouts/{tipoLayout}/rollback/{versionId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    public ResponseEntity<?> rollbackLayout(@PathVariable String tipoLayout, @PathVariable Long versionId) {
+        try {
+            LayoutTemplateVersioningService.LayoutVersionSummary published =
+                    layoutTemplateVersioningService.rollbackToVersion(tipoLayout, versionId, null);
+            return ResponseEntity.ok(Map.of(
+                    "mensagem", "Rollback publicado com sucesso!",
+                    "tipoLayout", tipoLayout,
+                    "publishedVersion", published.versionNumber()
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/layouts/{tipoLayout}/rollback/{versionId}/with-reason")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    public ResponseEntity<?> rollbackLayoutComMotivo(
+            @PathVariable String tipoLayout,
+            @PathVariable Long versionId,
+            @RequestBody(required = false) Map<String, String> payload) {
+        try {
+            LayoutTemplateVersioningService.LayoutVersionSummary published =
+                    layoutTemplateVersioningService.rollbackToVersion(
+                            tipoLayout,
+                            versionId,
+                            payload != null ? payload.get("changeReason") : null
+                    );
+            return ResponseEntity.ok(Map.of(
+                    "mensagem", "Rollback publicado com sucesso!",
+                    "tipoLayout", tipoLayout,
+                    "publishedVersion", published.versionNumber()
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/layouts/{tipoLayout}/diff")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    public ResponseEntity<?> obterDiffLayout(@PathVariable String tipoLayout) {
+        try {
+            return ResponseEntity.ok(layoutTemplateVersioningService.diffDraftAgainstPublished(tipoLayout));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @PostMapping("/layouts/reset/{tipoLayout}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
     public ResponseEntity<Map<String, String>> resetarLayout(@PathVariable String tipoLayout) {
-        ConfiguracaoSistema config = service.obterConfiguracao();
-        
-        // Define templates padrão vazios (será usado o template padrão do código)
-        switch (tipoLayout.toLowerCase()) {
-            case "extratocliente":
-                config.setLayoutHtmlExtratoCliente(null);
-                break;
-            case "extratofornecedor":
-                config.setLayoutHtmlExtratoFornecedor(null);
-                break;
-            case "os":
-                config.setLayoutHtmlOs(null);
-                break;
-            case "venda":
-                config.setLayoutHtmlVenda(null);
-                break;
-            case "recibo":
-                config.setLayoutHtmlRecibo(null);
-                break;
-            case "recibopagamento":
-                config.setLayoutHtmlReciboPagamento(null);
-                break;
-            case "fechamentocaixa":
-                config.setLayoutHtmlFechamentoCaixa(null);
-                break;
-            case "espelhonota":
-                config.setLayoutHtmlEspelhoNota(null);
-                break;
-            case "dre":
-                config.setLayoutHtmlDre(null);
-                break;
-            case "relatoriocomissao":
-                config.setLayoutHtmlRelatorioComissao(null);
-                break;
-            case "relatoriocontaspagar":
-                config.setLayoutHtmlRelatorioContasPagar(null);
-                break;
-            case "relatoriocontasreceber":
-                config.setLayoutHtmlRelatorioContasReceber(null);
-                break;
-            default:
-                return ResponseEntity.badRequest().body(Map.of("error", "Tipo de layout não encontrado: " + tipoLayout));
+        try {
+            layoutTemplateVersioningService.resetPublishedLayout(tipoLayout);
+            return ResponseEntity.ok(Map.of("mensagem", "Layout resetado para padrão!", "tipoLayout", tipoLayout));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
-        
-        service.atualizarConfiguracao(config);
-        
-        return ResponseEntity.ok(Map.of("mensagem", "Layout resetado para padrão!", "tipoLayout", tipoLayout));
     }
 }

@@ -206,6 +206,52 @@ JWT_SECRET='seu-segredo' \
 mvn spring-boot:run -Dspring-boot.run.profiles=hml
 ```
 
+## Alinhamento de Banco
+
+Se o projeto falhar com `Schema validation` por causa das migrations novas, alinhe o banco antes do boot.
+
+### V6: tabela `layout_template_versions`
+
+```sql
+CREATE TABLE IF NOT EXISTS layout_template_versions (
+    id BIGSERIAL PRIMARY KEY,
+    empresa_id BIGINT NOT NULL,
+    tipo_layout VARCHAR(100) NOT NULL,
+    version_number BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    html_content TEXT NULL,
+    change_reason TEXT NULL,
+    created_by VARCHAR(255) NULL,
+    published_by VARCHAR(255) NULL,
+    source_version_id BIGINT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    published_at TIMESTAMP NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_layout_template_versions_empresa_tipo
+    ON layout_template_versions (empresa_id, tipo_layout, version_number DESC);
+
+CREATE INDEX IF NOT EXISTS idx_layout_template_versions_empresa_tipo_status
+    ON layout_template_versions (empresa_id, tipo_layout, status);
+```
+
+### V7: coluna `layout_jrxml_laudo_vistoria`
+
+```sql
+ALTER TABLE configuracoes_sistema
+    ADD COLUMN IF NOT EXISTS layout_jrxml_laudo_vistoria TEXT;
+```
+
+### Conferir Flyway
+
+```sql
+SELECT installed_rank, version, description, success
+FROM flyway_schema_history
+ORDER BY installed_rank;
+```
+
+Se `V6` e `V7` nao aparecerem, esse ambiente esta defasado em relacao ao codigo atual.
+
 ## Verificar o Usuario Admin no PostgreSQL
 
 ### 1. Entrar no banco

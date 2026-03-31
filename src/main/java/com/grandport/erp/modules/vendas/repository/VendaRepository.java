@@ -55,6 +55,8 @@ public interface VendaRepository extends JpaRepository<Venda, Long> {
     @Query("SELECT v FROM Venda v WHERE v.empresaId = :empresaId ORDER BY v.dataHora DESC")
     List<Venda> findAllByEmpresa(@Param("empresaId") Long empresaId);
 
+    Optional<Venda> findByEmpresaIdAndId(Long empresaId, Long id);
+
     /**
      * 🚀 Novo: Buscar vendas por status e empresa
      */

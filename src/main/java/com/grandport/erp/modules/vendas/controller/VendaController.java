@@ -1,6 +1,7 @@
 package com.grandport.erp.modules.vendas.controller;
 
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.vendas.dto.PagamentoVendaDTO;
 import com.grandport.erp.modules.vendas.dto.VendaRequestDTO;
 import com.grandport.erp.modules.vendas.model.StatusVenda;
@@ -30,6 +31,7 @@ public class VendaController {
     @Autowired private NfeService nfeService;
     @Autowired private com.grandport.erp.modules.pdf.service.PdfService pdfService;
     @Autowired private ConfiguracaoAtualService configuracaoAtualService;
+    @Autowired private EmpresaContextService empresaContextService;
 
     // =========================================================================
     // 🛡️ ROTAS LISTAGEM AGORA PROTEGIDAS PELO SERVICE
@@ -154,7 +156,8 @@ public class VendaController {
             @PathVariable Long id,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "true") boolean imprimirObs
     ) {
-        Venda venda = repository.findById(id).orElseThrow(() -> new RuntimeException("Venda não encontrada"));
+        Venda venda = repository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id)
+                .orElseThrow(() -> new RuntimeException("Venda não encontrada"));
         var empresa = configuracaoAtualService.obterAtual();
 
         boolean isOrcamento = venda.getStatus() != null && venda.getStatus().name().equals("ORCAMENTO");
@@ -172,6 +175,8 @@ public class VendaController {
         variaveis.put("nomeCliente", nomeCliente);
         variaveis.put("nomeVendedor", nomeVendedor);
         variaveis.put("imprimirObs", imprimirObs);
+        variaveis.put("kmVeiculo", venda.getKmVeiculo());
+        variaveis.put("kmVeiculoDisplay", venda.getKmVeiculo() != null ? venda.getKmVeiculo() + " km" : "--");
 
         String htmlDoBanco = empresa.getLayoutHtmlVenda();
         if (htmlDoBanco == null || htmlDoBanco.trim().isEmpty()) {

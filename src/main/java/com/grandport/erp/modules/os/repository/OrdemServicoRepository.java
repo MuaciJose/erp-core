@@ -8,12 +8,14 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long> {
 
     List<OrdemServico> findByClienteId(Long clienteId);
     List<OrdemServico> findByVeiculoId(Long veiculoId);
+    Optional<OrdemServico> findByEmpresaIdAndId(Long empresaId, Long id);
 
     // 🛡️ NOVAS BUSCAS BLINDADAS
     List<OrdemServico> findByConsultorId(Long consultorId, Sort sort);

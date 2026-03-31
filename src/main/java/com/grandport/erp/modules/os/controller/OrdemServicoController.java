@@ -2,6 +2,7 @@ package com.grandport.erp.modules.os.controller;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.os.dto.OsRequestDTO;
 import com.grandport.erp.modules.os.model.OrdemServico;
 import com.grandport.erp.modules.os.repository.OrdemServicoRepository;
@@ -27,6 +28,7 @@ public class OrdemServicoController {
 
     @Autowired private com.grandport.erp.modules.pdf.service.PdfService pdfService;
     @Autowired private ConfiguracaoAtualService configuracaoAtualService;
+    @Autowired private EmpresaContextService empresaContextService;
 
     // PARA: 🚀 (AQUI ESTÁ A BLINDAGEM)
     @GetMapping
@@ -109,7 +111,7 @@ public class OrdemServicoController {
     ) {
 
         // 1. Puxa a OS e a Empresa do Banco
-        OrdemServico os = osRepository.findById(id)
+        OrdemServico os = osRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id)
                 .orElseThrow(() -> new RuntimeException("OS não encontrada"));
 
         var empresa = obterConfiguracaoAtual();
@@ -168,6 +170,8 @@ public class OrdemServicoController {
         variaveis.put("nomeConsultor", nomeConsultor);
         variaveis.put("veiculoNome", veiculoNome.trim());
         variaveis.put("placaVeiculo", placaVeiculo);
+        variaveis.put("kmEntrada", os.getKmEntrada());
+        variaveis.put("kmEntradaDisplay", os.getKmEntrada() != null ? os.getKmEntrada() + " km" : "--");
 
         // 🚀 INJETA A DECISÃO DO LAUDO PARA O HTML
         variaveis.put("imprimirLaudo", imprimirLaudo);

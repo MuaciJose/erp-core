@@ -167,6 +167,12 @@ public class ConfiguracaoSistema extends BaseEntityMultiEmpresa {
     @Column(columnDefinition = "TEXT")
     private String layoutHtmlExtratoFornecedor;
 
+    @Column(columnDefinition = "TEXT")
+    private String layoutJrxmlLaudoVistoria;
+
+    @Column(columnDefinition = "TEXT")
+    private String layoutJrxmlDanfe;
+
     @Column
     private String whatsappInstancia;
 
@@ -183,4 +189,3 @@ public class ConfiguracaoSistema extends BaseEntityMultiEmpresa {
 
 
 }
-

@@ -2,7 +2,67 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+function getPackageName(id) {
+  const normalized = id.split('node_modules/')[1]
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized.startsWith('@')) {
+    const [scope, name] = normalized.split('/')
+    return scope && name ? `${scope}/${name}` : normalized
+  }
+
+  return normalized.split('/')[0]
+}
+
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return undefined
+          }
+
+          const pkg = getPackageName(id)
+          if (!pkg) {
+            return 'vendor-misc'
+          }
+
+          if (
+            pkg === 'react' ||
+            pkg === 'react-dom' ||
+            pkg === 'react-router' ||
+            pkg === 'react-router-dom' ||
+            pkg === 'react-is' ||
+            pkg === 'scheduler' ||
+            pkg === 'use-sync-external-store' ||
+            pkg.startsWith('@remix-run/')
+          ) {
+            return 'vendor-framework'
+          }
+
+          if (
+            pkg === 'lucide-react' ||
+            pkg === 'react-hot-toast' ||
+            pkg === 'react-hotkeys-hook' ||
+            pkg === 'react-signature-canvas' ||
+            pkg === 'react-barcode' ||
+            pkg === 'html5-qrcode'
+          ) {
+            return 'vendor-ui'
+          }
+
+          if (pkg === 'axios' || pkg === 'date-fns' || pkg === 'browser-image-compression') {
+            return 'vendor-utils'
+          }
+
+          return 'vendor-misc'
+        }
+      }
+    }
+  },
   plugins: [
     react(),
     VitePWA({

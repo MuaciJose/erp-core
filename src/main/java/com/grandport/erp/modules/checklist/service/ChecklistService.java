@@ -4,6 +4,7 @@ import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.checklist.dto.ChecklistRequestDTO;
 import com.grandport.erp.modules.checklist.model.ChecklistVeiculo;
 import com.grandport.erp.modules.checklist.repository.ChecklistRepository;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 import com.grandport.erp.modules.usuario.model.Usuario;
@@ -23,14 +24,27 @@ public class ChecklistService {
     @Autowired private VeiculoRepository veiculoRepository;
     @Autowired private ParceiroRepository parceiroRepository;
     @Autowired private AuditoriaService auditoriaService;
+    @Autowired private EmpresaContextService empresaContextService;
 
     public List<ChecklistVeiculo> listarPorVeiculo(Long veiculoId) {
-        return checklistRepository.findByVeiculoIdOrderByDataRegistroDesc(veiculoId);
+        return checklistRepository.findByEmpresaIdAndVeiculoIdOrderByDataRegistroDesc(
+                empresaContextService.getRequiredEmpresaId(),
+                veiculoId
+        );
     }
 
     public ChecklistVeiculo buscarPorId(Long id) {
-        return checklistRepository.findById(id)
+        return checklistRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id)
                 .orElseThrow(() -> new RuntimeException("Checklist não encontrado."));
+    }
+
+    public ChecklistVeiculo buscarMaisRecenteDaEmpresa() {
+        return checklistRepository.findFirstByEmpresaIdOrderByDataRegistroDesc(empresaContextService.getRequiredEmpresaId())
+                .orElse(null);
+    }
+
+    public List<ChecklistVeiculo> listarRecentesDaEmpresa() {
+        return checklistRepository.findTop10ByEmpresaIdOrderByDataRegistroDesc(empresaContextService.getRequiredEmpresaId());
     }
 
     @Transactional

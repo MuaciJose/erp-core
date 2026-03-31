@@ -2,10 +2,14 @@ package com.grandport.erp.modules.fiscal.service;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
+import com.grandport.erp.modules.estoque.model.Produto;
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
+import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.vendas.model.ItemVenda;
+import com.grandport.erp.modules.vendas.model.Venda;
 // 🚀 1. IMPORTAÇÃO DA AUDITORIA
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+import lombok.extern.slf4j.Slf4j;
 import net.sf.jasperreports.engine.*;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
 import net.sf.jasperreports.engine.data.JRMapCollectionDataSource;
@@ -24,8 +28,11 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Service
+@Slf4j
 public class DanfeService {
 
     @Autowired
@@ -35,6 +42,11 @@ public class DanfeService {
     @Autowired
     private AuditoriaService auditoriaService;
 
+    @Autowired
+    private DanfeTemplateService danfeTemplateService;
+
+    private final ConcurrentMap<String, JasperReport> reportCache = new ConcurrentHashMap<>();
+
     public byte[] gerarDanfePdf(NotaFiscal nota) throws Exception {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
 
@@ -43,13 +55,6 @@ public class DanfeService {
                 (nota.getChaveAcesso() != null && nota.getChaveAcesso().contains("65"));
 
         String nomeArquivoReport = isCupomFiscal ? "reports/cupom_pdv_nfce.jrxml" : "reports/danfe.jrxml";
-        ClassPathResource resource = new ClassPathResource(nomeArquivoReport);
-
-        if (!resource.exists()) {
-            throw new Exception("Relatório não encontrado: " + nomeArquivoReport);
-        }
-
-        InputStream reportStream = resource.getInputStream();
         Map<String, Object> parametros = new HashMap<>();
         JRDataSource dataSource;
 
@@ -118,7 +123,9 @@ public class DanfeService {
             dataSource = new JRBeanCollectionDataSource(nota.getVenda() != null ? nota.getVenda().getItens() : List.of());
         }
 
-        JasperReport jr = JasperCompileManager.compileReport(reportStream);
+        JasperReport jr = isCupomFiscal
+                ? resolveClasspathReport(nomeArquivoReport)
+                : resolveDanfeReport();
         byte[] relatorioFinal = JasperExportManager.exportReportToPdf(JasperFillManager.fillReport(jr, parametros, dataSource));
 
         // 🚀 3. AUDITORIA: Registro da impressão/geração do documento
@@ -157,12 +164,101 @@ public class DanfeService {
             itList.add(m);
         }
 
-        JasperReport jr = JasperCompileManager.compileReport(new ClassPathResource("reports/danfe.jrxml").getInputStream());
+        JasperReport jr = resolveDanfeReport();
         byte[] relatorioFinal = JasperExportManager.exportReportToPdf(JasperFillManager.fillReport(jr, p, new JRMapCollectionDataSource(itList)));
 
         // 🚀 4. AUDITORIA: Registro da impressão avulsa via XML
         auditoriaService.registrar("FISCAL", "IMPRESSAO_DANFE_AVULSA", "Gerou PDF da DANFE avulsa lendo diretamente do XML. Nota: " + nota.getNumero() + " | Chave: " + nota.getChaveAcesso());
 
         return relatorioFinal;
+    }
+
+    public byte[] gerarPreviewDanfePdf(String jrxml) throws Exception {
+        ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
+        Map<String, Object> parametros = new HashMap<>();
+        parametros.put("EMITENTE_RAZAO", config.getRazaoSocial());
+        parametros.put("EMITENTE_CNPJ", config.getCnpj());
+        parametros.put("EMITENTE_IE", config.getInscricaoEstadual());
+        parametros.put("EMITENTE_ENDERECO", config.getLogradouro() + ", " + config.getNumero() + " - " + config.getCidade() + "/" + config.getUf());
+        parametros.put("CHAVE_ACESSO", "12345678901234567890123456789012345678901234");
+        parametros.put("NUMERO_NOTA", "9001");
+        parametros.put("CLIENTE_NOME", "Cliente Preview DANFE");
+        parametros.put("CLIENTE_DOC", "123.456.789-00");
+        parametros.put("VALOR_TOTAL", new BigDecimal("1580.00"));
+        parametros.put("DATA_EMISSAO", new SimpleDateFormat("dd/MM/yyyy HH:mm").format(new Date()));
+        parametros.put("INF_COMPLEMENTARES", "Preview interno do template DANFE.");
+
+        List<ItemVenda> itens = buildPreviewItems();
+        JasperReport report = compileTransientReport(jrxml);
+        return JasperExportManager.exportReportToPdf(
+                JasperFillManager.fillReport(report, parametros, new JRBeanCollectionDataSource(itens))
+        );
+    }
+
+    private JasperReport resolveDanfeReport() throws JRException {
+        String jrxml = danfeTemplateService.obterTemplateCompilavel();
+        String cacheKey = "custom-danfe:" + Integer.toHexString(jrxml.hashCode());
+        JasperReport cached = reportCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+        JasperReport compiled = compileTransientReport(jrxml);
+        reportCache.putIfAbsent(cacheKey, compiled);
+        return reportCache.get(cacheKey);
+    }
+
+    private JasperReport resolveClasspathReport(String reportPath) throws Exception {
+        ClassPathResource resource = new ClassPathResource(reportPath);
+        if (!resource.exists()) {
+            throw new Exception("Relatório não encontrado: " + reportPath);
+        }
+        return resolveReport(reportPath, resource.getInputStream());
+    }
+
+    private JasperReport compileTransientReport(String jrxml) throws JRException {
+        return JasperCompileManager.compileReport(new java.io.ByteArrayInputStream(jrxml.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
+    private JasperReport resolveReport(String reportPath, InputStream reportStream) throws JRException {
+        JasperReport cached = reportCache.get(reportPath);
+        if (cached != null) {
+            return cached;
+        }
+        JasperReport compiled = JasperCompileManager.compileReport(reportStream);
+        reportCache.putIfAbsent(reportPath, compiled);
+        return reportCache.get(reportPath);
+    }
+
+    private List<ItemVenda> buildPreviewItems() {
+        Venda venda = new Venda();
+
+        Produto filtro = new Produto();
+        filtro.setSku("FILTRO-001");
+        filtro.setNome("Filtro de óleo premium");
+        filtro.setCfopPadrao("5102");
+
+        Produto pastilha = new Produto();
+        pastilha.setSku("PAST-204");
+        pastilha.setNome("Pastilha de freio dianteira");
+        pastilha.setCfopPadrao("5102");
+
+        ItemVenda item1 = new ItemVenda();
+        item1.setVenda(venda);
+        item1.setProduto(filtro);
+        item1.setQuantidade(2);
+        item1.setPrecoUnitario(new BigDecimal("45.00"));
+
+        ItemVenda item2 = new ItemVenda();
+        item2.setVenda(venda);
+        item2.setProduto(pastilha);
+        item2.setQuantidade(1);
+        item2.setPrecoUnitario(new BigDecimal("1490.00"));
+
+        Parceiro cliente = new Parceiro();
+        cliente.setNome("Cliente Preview DANFE");
+        cliente.setDocumento("123.456.789-00");
+        venda.setCliente(cliente);
+
+        return List.of(item1, item2);
     }
 }
