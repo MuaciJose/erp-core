@@ -1,21 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import api from '../api/axios';
+import { STORAGE_KEYS } from '../api/session';
+
+const SALES_MODULES = [
+    { titulo: 'PDV Mobile', subtitulo: 'Orcamento e venda', icone: 'shopping-cart', corFundo: '#fef3c7', corIcone: '#b45309', rota: 'orcamento', permissao: 'pdv' },
+    { titulo: 'Documentos', subtitulo: 'Orcamentos e pedidos', icone: 'file-text', corFundo: '#dbeafe', corIcone: '#2563eb', rota: 'vendas', permissao: 'vendas' },
+    { titulo: 'Clientes', subtitulo: 'Consulta e cadastro', icone: 'users', corFundo: '#f3e8ff', corIcone: '#9333ea', rota: 'parceiros', permissao: 'parceiros' },
+    { titulo: 'Vistoria', subtitulo: 'Fotos e assinatura', icone: 'check-circle', corFundo: '#dcfce7', corIcone: '#16a34a', rota: 'checklist', permissao: 'checklist' }
+];
+
+const STOCK_MODULES = [
+    { titulo: 'Receber carga', subtitulo: 'Conferencia cega', icone: 'box', corFundo: '#dcfce7', corIcone: '#16a34a', rota: 'recebimento', permissao: 'estoque' },
+    { titulo: 'Separacao', subtitulo: 'Modo picking', icone: 'layers', corFundo: '#fae8ff', corIcone: '#c026d3', rota: 'separacao', permissao: 'vendas' },
+    { titulo: 'Pecas', subtitulo: 'Gestao de produtos', icone: 'package', corFundo: '#e2e8f0', corIcone: '#475569', rota: 'produtos', permissao: 'estoque' },
+    { titulo: 'Inventario', subtitulo: 'Bipagem e ajuste', icone: 'maximize', corFundo: '#e0f2fe', corIcone: '#0284c7', rota: 'inventario', permissao: 'ajuste_estoque' }
+];
 
 export default function Dashboard({ onNavigate, onLogout }) {
-    const [nomeUsuario, setNomeUsuario] = useState('Usuário');
+    const [nomeUsuario, setNomeUsuario] = useState('Usuario');
     const [nomeEmpresa, setNomeEmpresa] = useState('A carregar...');
     const [saudacao, setSaudacao] = useState('Bem-vindo');
     const [carregandoHeader, setCarregandoHeader] = useState(true);
-
     const [resumo, setResumo] = useState(null);
     const [carregandoResumo, setCarregandoResumo] = useState(true);
-
-    // 🚀 ESTADO QUE GUARDA AS CHAVES (PERMISSÕES) DO USUÁRIO
     const [permissoes, setPermissoes] = useState([]);
 
     useEffect(() => {
@@ -31,84 +43,120 @@ export default function Dashboard({ onNavigate, onLogout }) {
         else setSaudacao('Boa noite');
     };
 
-    // ============================================================================
-    // 👤 BUSCA DADOS E PERMISSÕES NO COFRE DO CELULAR
-    // ============================================================================
     const carregarIdentificacao = async () => {
         setCarregandoHeader(true);
         try {
-            const nomeSalvo = await AsyncStorage.getItem('grandport_user_nome');
+            const nomeSalvo = await AsyncStorage.getItem(STORAGE_KEYS.userName);
             if (nomeSalvo) setNomeUsuario(nomeSalvo.split(' ')[0]);
 
-            // 🚀 LÊ AS PERMISSÕES SALVAS NO LOGIN
-            const permissoesSalvas = await AsyncStorage.getItem('grandport_user_permissoes');
-            if (permissoesSalvas) {
-                setPermissoes(JSON.parse(permissoesSalvas));
-            }
-
-            let tokenRaw = await AsyncStorage.getItem('grandport_token');
-            let tokenLimpo = tokenRaw ? tokenRaw.replace(/['"]+/g, '') : '';
+            const permissoesSalvas = await AsyncStorage.getItem(STORAGE_KEYS.permissions);
+            if (permissoesSalvas) setPermissoes(JSON.parse(permissoesSalvas));
 
             try {
-                const res = await api.get('/api/configuracoes/empresa', {
-                    headers: { 'Authorization': `Bearer ${tokenLimpo}` }
-                });
-                if (res.data && res.data.nomeFantasia) setNomeEmpresa(res.data.nomeFantasia);
-                else if (res.data && res.data.razaoSocial) setNomeEmpresa(res.data.razaoSocial);
+                const res = await api.get('/api/configuracoes/empresa');
+                if (res.data?.nomeFantasia) setNomeEmpresa(res.data.nomeFantasia);
+                else if (res.data?.razaoSocial) setNomeEmpresa(res.data.razaoSocial);
                 else setNomeEmpresa('Minha Empresa');
-            } catch (err) { setNomeEmpresa('Sistema Mobile'); }
-        } catch (error) { console.log("Erro ao carregar identificação:", error); }
-        finally { setCarregandoHeader(false); }
+            } catch (err) {
+                setNomeEmpresa('Sistema Mobile');
+            }
+        } catch (error) {
+            console.log('Erro ao carregar identificação:', error);
+        } finally {
+            setCarregandoHeader(false);
+        }
     };
 
     const carregarResumo = async () => {
         setCarregandoResumo(true);
         try {
-            let tokenRaw = await AsyncStorage.getItem('grandport_token');
-            let tokenLimpo = tokenRaw ? tokenRaw.replace(/['"]+/g, '') : '';
-
-            const res = await api.get('/api/dashboard/resumo', {
-                headers: { 'Authorization': `Bearer ${tokenLimpo}` }
-            });
+            const res = await api.get('/api/dashboard/resumo');
             setResumo(res.data);
-        } catch (error) { console.log("Erro ao carregar resumo:", error); }
-        finally { setCarregandoResumo(false); }
+        } catch (error) {
+            console.log('Erro ao carregar resumo:', error);
+        } finally {
+            setCarregandoResumo(false);
+        }
     };
 
-    // ============================================================================
-    // 🛡️ MOTOR DE VERIFICAÇÃO DE ACESSO
-    // ============================================================================
-    const temAcesso = (chave) => {
-        return permissoes.includes(chave);
-    };
+    const temAcesso = (chave) => permissoes.includes(chave);
 
     const tentarAcessar = (rota, chavePermissao) => {
         if (temAcesso(chavePermissao)) {
             onNavigate(rota);
-        } else {
-            Toast.show({
-                type: 'error',
-                text1: 'Acesso Negado 🛑',
-                text2: 'Você não tem permissão para acessar este módulo.'
-            });
+            return;
         }
+
+        Toast.show({
+            type: 'error',
+            text1: 'Acesso negado',
+            text2: 'Seu perfil nao pode acessar este modulo.'
+        });
     };
 
-    const BotaoModulo = ({ titulo, subtitulo, icone, corFundo, corIcone, rota, chavePermissao }) => {
-        const liberado = temAcesso(chavePermissao);
+    const stats = useMemo(() => ([
+        {
+            titulo: 'Faturamento',
+            valor: `R$ ${(resumo?.faturamentoMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+            legenda: 'Mes atual',
+            icone: 'trending-up',
+            cor: '#16a34a',
+            fundo: '#dcfce7'
+        },
+        {
+            titulo: 'Atrasos',
+            valor: `R$ ${(resumo?.receberAtrasado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+            legenda: 'Contas vencidas',
+            icone: 'alert-circle',
+            cor: '#dc2626',
+            fundo: '#fee2e2'
+        },
+        {
+            titulo: 'Pedidos hoje',
+            valor: `${resumo?.vendasHoje || 0}`,
+            legenda: 'Fluxo do dia',
+            icone: 'shopping-bag',
+            cor: '#2563eb',
+            fundo: '#dbeafe'
+        },
+        {
+            titulo: 'Pecas em falta',
+            valor: `${resumo?.produtosBaixoEstoque || 0}`,
+            legenda: 'Baixo estoque',
+            icone: 'package',
+            cor: '#ea580c',
+            fundo: '#ffedd5'
+        }
+    ]), [resumo]);
 
+    const quickActions = useMemo(() => {
+        const prioridade = ['checklist', 'inventario', 'orcamento', 'vendas'];
+        const origem = [...SALES_MODULES, ...STOCK_MODULES];
+        return prioridade
+            .map(id => origem.find(item => item.rota === id))
+            .filter(Boolean)
+            .filter(item => temAcesso(item.permissao));
+    }, [permissoes]);
+
+    const renderModuleCard = (item) => {
+        const liberado = temAcesso(item.permissao);
         return (
             <TouchableOpacity
-                style={[styles.btnGrid, !liberado && styles.btnBloqueado]}
-                onPress={() => tentarAcessar(rota, chavePermissao)}
-                activeOpacity={liberado ? 0.7 : 1}
+                key={item.rota}
+                style={[styles.moduleCard, !liberado && styles.moduleCardLocked]}
+                activeOpacity={liberado ? 0.85 : 1}
+                onPress={() => tentarAcessar(item.rota, item.permissao)}
             >
-                {!liberado && <Feather name="lock" size={16} color="#94a3b8" style={styles.iconeCadeado} />}
-                <View style={[styles.iconeGrid, { backgroundColor: liberado ? corFundo : '#f1f5f9' }]}>
-                    <Feather name={icone} size={32} color={liberado ? corIcone : '#cbd5e1'} />
+                {!liberado && <Feather name="lock" size={16} color="#94a3b8" style={styles.lockIcon} />}
+                <View style={[styles.moduleIcon, { backgroundColor: liberado ? item.corFundo : '#f1f5f9' }]}>
+                    <Feather name={item.icone} size={24} color={liberado ? item.corIcone : '#cbd5e1'} />
                 </View>
-                <Text style={[styles.tituloGrid, !liberado && { color: '#94a3b8' }]}>{titulo}</Text>
-                <Text style={[styles.subGrid, !liberado && { color: '#cbd5e1' }]}>{subtitulo}</Text>
+                <Text style={[styles.moduleTitle, !liberado && styles.moduleTitleLocked]}>
+                    {item.titulo}
+                </Text>
+                <Text style={[styles.moduleSubtitle, !liberado && styles.moduleSubtitleLocked]}>
+                    {item.subtitulo}
+                </Text>
             </TouchableOpacity>
         );
     };
@@ -117,82 +165,100 @@ export default function Dashboard({ onNavigate, onLogout }) {
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.header}>
                 <View style={styles.headerTop}>
-                    {carregandoHeader ? <ActivityIndicator size="small" color="#64748b" /> : (
+                    {carregandoHeader ? (
+                        <ActivityIndicator size="small" color="#64748b" />
+                    ) : (
                         <View style={styles.badgeEmpresa}>
                             <Feather name="briefcase" size={12} color="#94a3b8" />
                             <Text style={styles.txtEmpresa}>{nomeEmpresa}</Text>
                         </View>
                     )}
+
                     <TouchableOpacity onPress={onLogout} style={styles.btnSair}>
                         <Feather name="log-out" size={16} color="#f8fafc" />
                         <Text style={styles.txtSair}>Sair</Text>
                     </TouchableOpacity>
                 </View>
+
                 <Text style={styles.txtSaudacao}>{saudacao},</Text>
-                <Text style={styles.txtNomeUsuario}>{nomeUsuario}!</Text>
+                <Text style={styles.txtNomeUsuario}>{nomeUsuario}</Text>
+                <Text style={styles.txtContexto}>Central mobile de operacao comercial e estoque</Text>
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.heroCard}>
+                    <View style={styles.heroTextBox}>
+                        <Text style={styles.heroKicker}>Painel do dia</Text>
+                        <Text style={styles.heroTitle}>Operacao na palma da mao</Text>
+                        <Text style={styles.heroSubtitle}>
+                            Recepcao, balcao, estoque e documentos com foco em velocidade.
+                        </Text>
+                    </View>
+                    <TouchableOpacity style={styles.heroPrimaryButton} onPress={() => onNavigate('orcamento')}>
+                        <Feather name="plus" size={18} color="#0f172a" />
+                        <Text style={styles.heroPrimaryText}>Novo documento</Text>
+                    </TouchableOpacity>
+                </View>
 
-                {/* 🚀 BLINDAGEM DA VISÃO GERAL: Só aparece se tiver a chave 'dash' */}
-                {temAcesso('dash') && (
-                    <View style={styles.resumoContainer}>
-                        <Text style={styles.lblSessao}>VISÃO GERAL DO NEGÓCIO</Text>
-                        {carregandoResumo ? (
-                            <View style={styles.kpiLoading}><ActivityIndicator size="large" color="#3b82f6" /><Text style={styles.txtLoadingKpi}>A processar métricas...</Text></View>
-                        ) : (
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kpiScroll}>
-                                <View style={styles.kpiCard}>
-                                    <View style={[styles.kpiIcone, { backgroundColor: '#dcfce7' }]}><Feather name="trending-up" size={20} color="#16a34a" /></View>
-                                    <Text style={styles.kpiValor}>R$ {(resumo?.faturamentoMes || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</Text>
-                                    <Text style={styles.kpiTitulo}>Faturação Mensal</Text>
-                                </View>
-                                <View style={[styles.kpiCard, { borderColor: '#fecaca', backgroundColor: '#fef2f2' }]}>
-                                    <View style={[styles.kpiIcone, { backgroundColor: '#fee2e2' }]}><Feather name="alert-circle" size={20} color="#dc2626" /></View>
-                                    <Text style={[styles.kpiValor, { color: '#dc2626' }]}>R$ {(resumo?.receberAtrasado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</Text>
-                                    <Text style={styles.kpiTitulo}>Contas em Atraso</Text>
-                                </View>
-                                <View style={styles.kpiCard}>
-                                    <View style={[styles.kpiIcone, { backgroundColor: '#eff6ff' }]}><Feather name="shopping-bag" size={20} color="#2563eb" /></View>
-                                    <Text style={styles.kpiValor}>{resumo?.vendasHoje || 0}</Text>
-                                    <Text style={styles.kpiTitulo}>Pedidos Hoje</Text>
-                                </View>
-                                <View style={styles.kpiCard}>
-                                    <View style={[styles.kpiIcone, { backgroundColor: '#ffedd5' }]}><Feather name="package" size={20} color="#ea580c" /></View>
-                                    <Text style={styles.kpiValor}>{resumo?.produtosBaixoEstoque || 0}</Text>
-                                    <Text style={styles.kpiTitulo}>Peças em Falta</Text>
-                                </View>
-                            </ScrollView>
-                        )}
-
-                        {!carregandoResumo && resumo?.crmAtrasados > 0 && (
-                            <View style={styles.crmAlertBox}>
-                                <Feather name="calendar" size={24} color="#ef4444" />
-                                <View style={{ flex: 1, marginLeft: 10 }}>
-                                    <Text style={styles.crmAlertTitle}>Atenção ao Pós-Venda</Text>
-                                    <Text style={styles.crmAlertSub}>Tem {resumo.crmAtrasados} revisões agendadas em atraso. Entre em contacto com os clientes.</Text>
-                                </View>
+                <Text style={styles.sectionLabel}>Acesso rapido</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsRow}>
+                    {quickActions.map(action => (
+                        <TouchableOpacity
+                            key={action.rota}
+                            style={styles.quickActionCard}
+                            onPress={() => tentarAcessar(action.rota, action.permissao)}
+                        >
+                            <View style={[styles.quickActionIcon, { backgroundColor: action.corFundo }]}>
+                                <Feather name={action.icone} size={18} color={action.corIcone} />
                             </View>
-                        )}
+                            <Text style={styles.quickActionTitle}>{action.titulo}</Text>
+                            <Text style={styles.quickActionSubtitle}>{action.subtitulo}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+
+                <Text style={styles.sectionLabel}>Radar do negocio</Text>
+                {carregandoResumo ? (
+                    <View style={styles.loadingBox}>
+                        <ActivityIndicator size="large" color="#2563eb" />
+                        <Text style={styles.loadingText}>A processar metricas...</Text>
+                    </View>
+                ) : (
+                    <View style={styles.statsGrid}>
+                        {stats.map(stat => (
+                            <View key={stat.titulo} style={styles.statCard}>
+                                <View style={[styles.statIcon, { backgroundColor: stat.fundo }]}>
+                                    <Feather name={stat.icone} size={20} color={stat.cor} />
+                                </View>
+                                <Text style={styles.statTitle}>{stat.titulo}</Text>
+                                <Text style={styles.statValue}>{stat.valor}</Text>
+                                <Text style={styles.statLegend}>{stat.legenda}</Text>
+                            </View>
+                        ))}
                     </View>
                 )}
 
-                <Text style={[styles.lblSessao, !temAcesso('dash') && { marginTop: 10 }]}>MÓDULOS DE VENDAS</Text>
-                <View style={styles.grid}>
-                    <BotaoModulo titulo="PDV Mobile" subtitulo="Orçamento e Venda" icone="shopping-cart" corFundo="#fefce8" corIcone="#ca8a04" rota="orcamento" chavePermissao="pdv" />
-                    <BotaoModulo titulo="Documentos" subtitulo="Central de Vendas" icone="file-text" corFundo="#eff6ff" corIcone="#3b82f6" rota="vendas" chavePermissao="vendas" />
-                    <BotaoModulo titulo="Clientes" subtitulo="Lista e Cadastro" icone="users" corFundo="#faf5ff" corIcone="#a855f7" rota="parceiros" chavePermissao="parceiros" />
-                    <BotaoModulo titulo="Vistoria" subtitulo="Fotos e Assinatura" icone="check-circle" corFundo="#ecfdf5" corIcone="#10b981" rota="checklist" chavePermissao="checklist" />
+                {!carregandoResumo && resumo?.crmAtrasados > 0 && (
+                    <View style={styles.alertBox}>
+                        <Feather name="calendar" size={22} color="#dc2626" />
+                        <View style={styles.alertContent}>
+                            <Text style={styles.alertTitle}>Pos-venda pede atencao</Text>
+                            <Text style={styles.alertSubtitle}>
+                                Existem {resumo.crmAtrasados} revisoes em atraso para contato.
+                            </Text>
+                        </View>
+                    </View>
+                )}
+
+                <Text style={styles.sectionLabel}>Vendas e atendimento</Text>
+                <View style={styles.moduleGrid}>
+                    {SALES_MODULES.map(renderModuleCard)}
                 </View>
 
-                <Text style={[styles.lblSessao, { marginTop: 20 }]}>LOGÍSTICA E ESTOQUE</Text>
-                <View style={styles.grid}>
-                    <BotaoModulo titulo="Receber Carga" subtitulo="Conferência Cega" icone="box" corFundo="#f0fdf4" corIcone="#22c55e" rota="recebimento" chavePermissao="estoque" />
-                    <BotaoModulo titulo="Separação" subtitulo="Modo Picking" icone="layers" corFundo="#fdf4ff" corIcone="#d946ef" rota="separacao" chavePermissao="vendas" />
-                    <BotaoModulo titulo="Peças" subtitulo="Gestão de Produtos" icone="package" corFundo="#f8fafc" corIcone="#64748b" rota="produtos" chavePermissao="estoque" />
-                    <BotaoModulo titulo="Inventário" subtitulo="Auditoria e Bipagem" icone="maximize" corFundo="#f0f9ff" corIcone="#0ea5e9" rota="inventario" chavePermissao="ajuste_estoque" />
+                <Text style={styles.sectionLabel}>Estoque e logistica</Text>
+                <View style={styles.moduleGrid}>
+                    {STOCK_MODULES.map(renderModuleCard)}
                 </View>
-
             </ScrollView>
         </SafeAreaView>
     );
@@ -200,32 +266,196 @@ export default function Dashboard({ onNavigate, onLogout }) {
 
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: '#0f172a' },
-    header: { padding: 25, paddingTop: Platform.OS === 'ios' ? 10 : 20, paddingBottom: 30, backgroundColor: '#0f172a' },
-    headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    badgeEmpresa: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 6 },
-    txtEmpresa: { color: '#94a3b8', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 },
-    btnSair: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ef4444', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-    txtSair: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-    txtSaudacao: { color: '#cbd5e1', fontSize: 16, fontWeight: 'bold' },
-    txtNomeUsuario: { color: '#f8fafc', fontSize: 32, fontWeight: 'black', letterSpacing: 1, marginTop: 2 },
-    scrollContent: { backgroundColor: '#f1f5f9', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 20, paddingTop: 30, paddingBottom: 50, minHeight: '100%' },
-    resumoContainer: { marginBottom: 25 },
-    kpiLoading: { height: 120, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0' },
-    txtLoadingKpi: { color: '#64748b', fontSize: 12, fontWeight: 'bold', marginTop: 10 },
-    kpiScroll: { gap: 15, paddingBottom: 10 },
-    kpiCard: { backgroundColor: '#fff', padding: 20, borderRadius: 20, width: 160, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 10, elevation: 2, marginRight: 15 },
-    kpiIcone: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-    kpiValor: { fontSize: 18, fontWeight: 'black', color: '#1e293b', marginBottom: 2 },
-    kpiTitulo: { fontSize: 11, fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' },
-    crmAlertBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef2f2', padding: 15, borderRadius: 16, borderWidth: 1, borderColor: '#fecaca', marginTop: 10 },
-    crmAlertTitle: { fontSize: 14, fontWeight: 'black', color: '#dc2626' },
-    crmAlertSub: { fontSize: 12, color: '#ef4444', fontWeight: 'bold', marginTop: 2 },
-    lblSessao: { fontSize: 11, fontWeight: 'black', color: '#94a3b8', letterSpacing: 1.5, marginBottom: 15, marginLeft: 5 },
-    grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-    btnGrid: { width: '48%', backgroundColor: '#fff', padding: 20, borderRadius: 24, marginBottom: 15, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 10, elevation: 2, position: 'relative' },
-    btnBloqueado: { backgroundColor: '#f8fafc', borderColor: '#f1f5f9', shadowOpacity: 0, elevation: 0 },
-    iconeCadeado: { position: 'absolute', top: 15, right: 15 },
-    iconeGrid: { width: 50, height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-    tituloGrid: { fontSize: 14, fontWeight: '900', color: '#1e293b' },
-    subGrid: { fontSize: 10, fontWeight: 'bold', color: '#64748b', marginTop: 4 },
+    header: {
+        paddingHorizontal: 22,
+        paddingTop: Platform.OS === 'ios' ? 6 : 18,
+        paddingBottom: 28,
+        backgroundColor: '#0f172a'
+    },
+    headerTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20
+    },
+    badgeEmpresa: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#1e293b',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 999
+    },
+    txtEmpresa: {
+        color: '#94a3b8',
+        fontSize: 10,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+        letterSpacing: 1
+    },
+    btnSair: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#ef4444',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999
+    },
+    txtSair: { color: '#fff', fontSize: 12, fontWeight: '800' },
+    txtSaudacao: { color: '#cbd5e1', fontSize: 16, fontWeight: '700' },
+    txtNomeUsuario: { color: '#f8fafc', fontSize: 31, fontWeight: '900', marginTop: 2 },
+    txtContexto: { color: '#94a3b8', fontSize: 13, fontWeight: '600', marginTop: 6 },
+    scrollContent: {
+        backgroundColor: '#f1f5f9',
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        paddingHorizontal: 20,
+        paddingTop: 24,
+        paddingBottom: 42
+    },
+    heroCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 24,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 3
+    },
+    heroTextBox: { marginBottom: 16 },
+    heroKicker: {
+        color: '#2563eb',
+        fontSize: 11,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+        letterSpacing: 1.5
+    },
+    heroTitle: { color: '#0f172a', fontSize: 24, fontWeight: '900', marginTop: 6 },
+    heroSubtitle: { color: '#64748b', fontSize: 14, fontWeight: '600', marginTop: 8, lineHeight: 20 },
+    heroPrimaryButton: {
+        backgroundColor: '#fde68a',
+        borderRadius: 18,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8
+    },
+    heroPrimaryText: { color: '#0f172a', fontSize: 14, fontWeight: '900' },
+    sectionLabel: {
+        fontSize: 11,
+        fontWeight: '900',
+        color: '#94a3b8',
+        letterSpacing: 1.6,
+        marginTop: 22,
+        marginBottom: 12,
+        marginLeft: 4,
+        textTransform: 'uppercase'
+    },
+    quickActionsRow: { paddingBottom: 4 },
+    quickActionCard: {
+        width: 150,
+        backgroundColor: '#ffffff',
+        borderRadius: 22,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        marginRight: 12
+    },
+    quickActionIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12
+    },
+    quickActionTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a' },
+    quickActionSubtitle: { fontSize: 11, fontWeight: '700', color: '#64748b', marginTop: 4, lineHeight: 16 },
+    loadingBox: {
+        backgroundColor: '#ffffff',
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        paddingVertical: 28,
+        alignItems: 'center'
+    },
+    loadingText: { color: '#64748b', fontSize: 12, fontWeight: '700', marginTop: 10 },
+    statsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between'
+    },
+    statCard: {
+        width: '48.2%',
+        backgroundColor: '#ffffff',
+        borderRadius: 22,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        marginBottom: 12
+    },
+    statIcon: {
+        width: 42,
+        height: 42,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12
+    },
+    statTitle: { fontSize: 11, fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.8 },
+    statValue: { fontSize: 18, fontWeight: '900', color: '#0f172a', marginTop: 8 },
+    statLegend: { fontSize: 11, fontWeight: '700', color: '#94a3b8', marginTop: 4 },
+    alertBox: {
+        marginTop: 4,
+        backgroundColor: '#fef2f2',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#fecaca',
+        padding: 14,
+        flexDirection: 'row',
+        alignItems: 'flex-start'
+    },
+    alertContent: { flex: 1, marginLeft: 10 },
+    alertTitle: { color: '#dc2626', fontSize: 14, fontWeight: '900' },
+    alertSubtitle: { color: '#ef4444', fontSize: 12, fontWeight: '700', marginTop: 3, lineHeight: 18 },
+    moduleGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+    moduleCard: {
+        width: '48.2%',
+        backgroundColor: '#ffffff',
+        borderRadius: 24,
+        padding: 18,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.03,
+        shadowRadius: 10,
+        elevation: 2,
+        position: 'relative'
+    },
+    moduleCardLocked: {
+        backgroundColor: '#f8fafc',
+        borderColor: '#f1f5f9',
+        shadowOpacity: 0,
+        elevation: 0
+    },
+    lockIcon: { position: 'absolute', top: 14, right: 14 },
+    moduleIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14
+    },
+    moduleTitle: { fontSize: 15, fontWeight: '900', color: '#0f172a' },
+    moduleTitleLocked: { color: '#94a3b8' },
+    moduleSubtitle: { fontSize: 11, fontWeight: '700', color: '#64748b', marginTop: 5, lineHeight: 16 },
+    moduleSubtitleLocked: { color: '#cbd5e1' }
 });

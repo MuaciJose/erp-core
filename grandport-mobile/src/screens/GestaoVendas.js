@@ -8,6 +8,7 @@ export default function GestaoVendas({ onVoltar, onNavigate }) {
     const [vendas, setVendas] = useState([]);
     const [busca, setBusca] = useState('');
     const [carregando, setCarregando] = useState(true);
+    const [filtroStatus, setFiltroStatus] = useState('TODOS');
 
     // Controle do Espelho (Modal de Detalhes)
     const [vendaSelecionada, setVendaSelecionada] = useState(null);
@@ -51,8 +52,22 @@ export default function GestaoVendas({ onVoltar, onNavigate }) {
         const idMatch = v.id?.toString().includes(termo);
         const clienteMatch = getNomeCliente(v.cliente).toLowerCase().includes(termo);
         const veiculoMatch = (v.veiculo?.modelo || "").toLowerCase().includes(termo);
-        return idMatch || clienteMatch || veiculoMatch;
+        const statusMatch = filtroStatus === 'TODOS' || v.status === filtroStatus;
+        return statusMatch && (idMatch || clienteMatch || veiculoMatch);
     });
+
+    const totalVendas = vendas.length;
+    const totalOrcamentos = vendas.filter(v => v.status === 'ORCAMENTO').length;
+    const totalCaixa = vendas.filter(v => v.status === 'AGUARDANDO_PAGAMENTO').length;
+    const totalConcluidas = vendas.filter(v => v.status === 'CONCLUIDA').length;
+
+    const STATUS_FILTERS = [
+        { id: 'TODOS', label: 'Todos' },
+        { id: 'ORCAMENTO', label: 'Orç.' },
+        { id: 'PEDIDO', label: 'Pedido' },
+        { id: 'AGUARDANDO_PAGAMENTO', label: 'Caixa' },
+        { id: 'CONCLUIDA', label: 'Faturado' }
+    ];
 
     const formatarData = (dataHora) => {
         if (!dataHora) return '--/--/----';
@@ -130,6 +145,33 @@ export default function GestaoVendas({ onVoltar, onNavigate }) {
                 </TouchableOpacity>
             </View>
 
+            <View style={styles.heroCard}>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.heroKicker}>Operação comercial</Text>
+                    <Text style={styles.heroTitle}>Central de vendas do dia</Text>
+                    <Text style={styles.heroSubtitle}>Consulte documentos, acompanhe fila de caixa e abra novos pedidos sem sair do fluxo.</Text>
+                </View>
+                <View style={styles.heroActionBadge}>
+                    <Text style={styles.heroActionLabel}>Registros</Text>
+                    <Text style={styles.heroActionValue}>{totalVendas}</Text>
+                </View>
+            </View>
+
+            <View style={styles.statsRow}>
+                <View style={styles.statCard}>
+                    <Text style={styles.statLabel}>Orçamentos</Text>
+                    <Text style={styles.statValue}>{totalOrcamentos}</Text>
+                </View>
+                <View style={styles.statCard}>
+                    <Text style={styles.statLabel}>No caixa</Text>
+                    <Text style={styles.statValue}>{totalCaixa}</Text>
+                </View>
+                <View style={styles.statCard}>
+                    <Text style={styles.statLabel}>Faturadas</Text>
+                    <Text style={styles.statValue}>{totalConcluidas}</Text>
+                </View>
+            </View>
+
             {/* BARRA DE BUSCA */}
             <View style={styles.buscaContainer}>
                 <View style={styles.inputWrapper}>
@@ -147,6 +189,18 @@ export default function GestaoVendas({ onVoltar, onNavigate }) {
                     )}
                 </View>
             </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersRow}>
+                {STATUS_FILTERS.map((status) => (
+                    <TouchableOpacity
+                        key={status.id}
+                        style={[styles.filterPill, filtroStatus === status.id && styles.filterPillActive]}
+                        onPress={() => setFiltroStatus(status.id)}
+                    >
+                        <Text style={[styles.filterPillText, filtroStatus === status.id && styles.filterPillTextActive]}>{status.label}</Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
 
             {/* LISTA DE VENDAS */}
             {carregando ? (
@@ -286,11 +340,56 @@ const styles = StyleSheet.create({
     titulo: { fontSize: 20, fontWeight: '900', color: '#1e293b' },
     subtitulo: { fontSize: 12, color: '#3b82f6', fontWeight: 'bold' },
     btnNovo: { backgroundColor: '#3b82f6', padding: 12, borderRadius: 12, shadowColor: '#3b82f6', shadowOpacity: 0.3, shadowRadius: 5, elevation: 3 },
+    heroCard: {
+        margin: 15,
+        marginBottom: 0,
+        backgroundColor: '#0f172a',
+        borderRadius: 20,
+        padding: 18,
+        flexDirection: 'row',
+        gap: 12
+    },
+    heroKicker: { fontSize: 10, fontWeight: '900', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: 1 },
+    heroTitle: { fontSize: 20, fontWeight: '900', color: '#f8fafc', marginTop: 6 },
+    heroSubtitle: { fontSize: 12, fontWeight: '700', color: '#cbd5e1', marginTop: 8, lineHeight: 18 },
+    heroActionBadge: {
+        minWidth: 78,
+        alignSelf: 'flex-start',
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 10
+    },
+    heroActionLabel: { fontSize: 9, fontWeight: '900', color: '#93c5fd', textTransform: 'uppercase' },
+    heroActionValue: { fontSize: 20, fontWeight: '900', color: '#fff', marginTop: 6 },
+    statsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 15, marginTop: 12 },
+    statCard: {
+        flex: 1,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        padding: 14
+    },
+    statLabel: { fontSize: 10, fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 },
+    statValue: { fontSize: 20, fontWeight: '900', color: '#1e293b', marginTop: 8 },
 
     buscaContainer: { padding: 15 },
     inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, overflow: 'hidden' },
     searchIcon: { position: 'absolute', left: 15, zIndex: 10 },
     searchInput: { flex: 1, padding: 15, paddingLeft: 45, fontSize: 16, fontWeight: 'bold', color: '#1e293b' },
+    filtersRow: { paddingHorizontal: 15, paddingBottom: 14, gap: 8 },
+    filterPill: {
+        backgroundColor: '#fff',
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        paddingHorizontal: 14,
+        paddingVertical: 10
+    },
+    filterPillActive: { backgroundColor: '#dbeafe', borderColor: '#93c5fd' },
+    filterPillText: { fontSize: 12, fontWeight: '900', color: '#475569' },
+    filterPillTextActive: { color: '#1d4ed8' },
 
     lista: { paddingHorizontal: 15, paddingBottom: 30 },
     centerBox: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 },

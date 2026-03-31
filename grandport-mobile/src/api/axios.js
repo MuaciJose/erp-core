@@ -1,15 +1,18 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearSession, getApiBaseUrl, getCleanToken } from './session';
 
 const api = axios.create({
-    // 🚀 AQUI ESTÁ A MÁGICA: O IP do seu Ubuntu na rede Wi-Fi
-    baseURL: process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.104:8080'
+    baseURL: getApiBaseUrl(),
+    timeout: 15000,
+    headers: {
+        Accept: 'application/json'
+    }
 });
 
 // Interceptor para anexar o Token JWT no Mobile
 api.interceptors.request.use(async (config) => {
     try {
-        const token = await AsyncStorage.getItem('grandport_token');
+        const token = await getCleanToken();
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -18,5 +21,22 @@ api.interceptors.request.use(async (config) => {
     }
     return config;
 });
+
+api.interceptors.response.use(
+    response => response,
+    async (error) => {
+        const status = error?.response?.status;
+
+        if (status === 401) {
+            try {
+                await clearSession();
+            } catch (clearError) {
+                console.error('Erro ao limpar sessão mobile:', clearError);
+            }
+        }
+
+        return Promise.reject(error);
+    }
+);
 
 export default api;

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import api from '../api/axios';
+import MobileHeroCard from '../components/MobileHeroCard';
+import MobileStatRow from '../components/MobileStatRow';
 
 export default function Parceiros({ onVoltar, onSelecionarCliente }) {
     const [parceiros, setParceiros] = useState([]);
@@ -78,6 +80,14 @@ export default function Parceiros({ onVoltar, onSelecionarCliente }) {
                     <Text style={styles.titulo}>Novo Cliente</Text>
                 </View>
 
+                <MobileHeroCard
+                    kicker="Cadastro rápido"
+                    title="Novo parceiro"
+                    subtitle="Use esse fluxo curto para criar cliente no balcão sem sair da operação."
+                    badgeLabel="Tipo"
+                    badgeValue={form.tipo}
+                />
+
                 <ScrollView style={styles.formBox} keyboardShouldPersistTaps="handled">
                     <Text style={styles.lblSessao}>Cadastro Rápido (Pista)</Text>
 
@@ -114,6 +124,22 @@ export default function Parceiros({ onVoltar, onSelecionarCliente }) {
                     <Feather name="user-plus" size={20} color="#fff" />
                 </TouchableOpacity>
             </View>
+
+            <MobileHeroCard
+                kicker="Relacionamento"
+                title="Parceiros e clientes"
+                subtitle="Pesquise, selecione e acione o contato sem sair do fluxo mobile."
+                badgeLabel="Registros"
+                badgeValue={parceirosFiltrados.length}
+            />
+
+            <MobileStatRow
+                items={[
+                    { label: 'Clientes', value: parceiros.filter((p) => p.tipo === 'CLIENTE').length },
+                    { label: 'Busca ativa', value: busca ? 'Sim' : 'Não' },
+                    { label: 'WhatsApp', value: parceiros.filter((p) => !!p.telefone).length }
+                ]}
+            />
 
             <View style={styles.buscaContainer}>
                 <View style={styles.inputWrapper}>

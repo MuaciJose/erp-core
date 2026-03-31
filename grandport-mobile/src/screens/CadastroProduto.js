@@ -4,10 +4,12 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { CameraView } from 'expo-camera';
 import Toast from 'react-native-toast-message';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useAudioPlayer } from 'expo-audio'; // 🚀 1. NOVO MOTOR DE ÁUDIO RECRUTADO
 import api from '../api/axios';
+import { getApiBaseUrl, getAuthHeaders } from '../api/session';
+import MobileHeroCard from '../components/MobileHeroCard';
+import MobileStatRow from '../components/MobileStatRow';
 
 // ============================================================================
 // 🔍 AUTOCOMPLETE MOBILE
@@ -244,15 +246,12 @@ export default function CadastroProduto({ onVoltar, produtoParaEditar }) {
                 formData.append('image', { uri: imagem, name: filename, type: 'image/jpeg' });
             }
 
-            let tokenRaw = await AsyncStorage.getItem('grandport_token');
-            let tokenLimpo = tokenRaw ? tokenRaw.replace(/['"]+/g, '') : '';
-
-            const urlAlvo = isEditing ? `${api.defaults.baseURL}/api/produtos/${produtoParaEditar.id}` : `${api.defaults.baseURL}/api/produtos`;
+            const urlAlvo = isEditing ? `${getApiBaseUrl()}/api/produtos/${produtoParaEditar.id}` : `${getApiBaseUrl()}/api/produtos`;
 
             const response = await fetch(urlAlvo, {
                 method: isEditing ? 'PUT' : 'POST',
                 body: formData,
-                headers: { 'Authorization': `Bearer ${tokenLimpo}` },
+                headers: await getAuthHeaders(),
             });
 
             if (!response.ok) {
@@ -289,6 +288,24 @@ export default function CadastroProduto({ onVoltar, produtoParaEditar }) {
                     <Text style={styles.tituloHeader}>{isEditing ? 'Editar Produto' : 'Novo Produto'}</Text>
                 </View>
             </View>
+
+            <MobileHeroCard
+                kicker="Catálogo"
+                title={isEditing ? 'Atualizar produto' : 'Cadastrar nova peça'}
+                subtitle="Mantenha ficha técnica, fiscal e comercial da peça no mesmo fluxo de cadastro."
+                badgeLabel="Modo"
+                badgeValue={isEditing ? 'Editar' : 'Novo'}
+                accent="#60a5fa"
+                backgroundColor="#1e3a8a"
+            />
+
+            <MobileStatRow
+                items={[
+                    { label: 'SKU', value: form.sku || 'Pendente' },
+                    { label: 'Marca', value: form.marcaId || 'Pendente' },
+                    { label: 'NCM', value: form.ncmCodigo || 'Pendente' }
+                ]}
+            />
 
             <ScrollView style={styles.formContainer} keyboardShouldPersistTaps="handled">
                 <View style={styles.card}>

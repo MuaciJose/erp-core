@@ -1,103 +1,107 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import Login from './src/screens/Login';
-import Dashboard from './src/screens/Dashboard';
-import Inventario from './src/screens/Inventario';
-import CadastroProduto from './src/screens/CadastroProduto';
-import Produtos from './src/screens/Produtos';
-import PrevisaoCompras from './src/screens/PrevisaoCompras';
-import OrcamentoMobile from './src/screens/OrcamentoMobile';
-import RecebimentoMercadoria from './src/screens/RecebimentoMercadoria';
-import SeparacaoPedidos from './src/screens/SeparacaoPedidos';
-import GestaoVendas from './src/screens/GestaoVendas';
-import Parceiros from './src/screens/Parceiros';
-import ChecklistMobile from './src/screens/ChecklistMobile';
+import AppShell from './src/components/AppShell';
+import { APP_ROUTES } from './src/navigation/routes';
+import { clearSession, STORAGE_KEYS } from './src/api/session';
 
 export default function App() {
-  const [carregando, setCarregando] = useState(true);
-  const [telaAtual, setTelaAtual] = useState('login');
+    const [carregando, setCarregando] = useState(true);
+    const [stack, setStack] = useState([{ key: 'login' }]);
 
-  useEffect(() => {
-    const verificarAcesso = async () => {
-      try {
-        const token = await AsyncStorage.getItem('grandport_token');
-        if (token) setTelaAtual('dashboard');
-      } catch (error) { console.error(error); }
-      finally { setCarregando(false); }
+    const rotaAtual = stack[stack.length - 1]?.key || 'login';
+    const routeDefinition = APP_ROUTES[rotaAtual];
+    const ScreenComponent = routeDefinition?.component;
+
+    useEffect(() => {
+        const verificarAcesso = async () => {
+            try {
+                const token = await AsyncStorage.getItem(STORAGE_KEYS.token);
+                if (token) {
+                    setStack([{ key: 'dashboard' }]);
+                }
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setCarregando(false);
+            }
+        };
+
+        verificarAcesso();
+    }, []);
+
+    const navigate = (routeKey, options = {}) => {
+        if (routeKey === 'login') {
+            setStack([{ key: 'login' }]);
+            return;
+        }
+
+        if (options.replace) {
+            setStack(prev => {
+                if (prev[0]?.key === 'login') {
+                    return [{ key: routeKey }];
+                }
+                return [prev[0], { key: routeKey }];
+            });
+            return;
+        }
+
+        setStack(prev => [...prev, { key: routeKey }]);
     };
-    verificarAcesso();
-  }, []);
 
-  if (carregando) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#2563eb" /></View>;
+    const goBack = () => {
+        setStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
+    };
 
-  return (
-      <View style={styles.container}>
+    const resetToDashboard = () => {
+        setStack([{ key: 'dashboard' }]);
+    };
 
-        {telaAtual === 'login' && <Login onLoginSuccess={() => setTelaAtual('dashboard')} />}
+    const handleLogout = async () => {
+        await clearSession();
+        setStack([{ key: 'login' }]);
+    };
 
-        {telaAtual === 'dashboard' && (
-            <Dashboard
-                onNavigate={(tela) => setTelaAtual(tela)}
-                onLogout={() => {
-                  // Limpa o token ao sair para garantir segurança
-                  AsyncStorage.removeItem('grandport_token');
-                  setTelaAtual('login');
-                }}
-            />
-        )}
+    if (carregando) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#2563eb" />
+            </View>
+        );
+    }
 
-        {telaAtual === 'inventario' && (
-            <Inventario onVoltar={() => setTelaAtual('dashboard')} />
-        )}
+    if (rotaAtual === 'login') {
+        return (
+            <View style={styles.container}>
+                <Login onLoginSuccess={() => setStack([{ key: 'dashboard' }])} />
+                <StatusBar style="auto" />
+                <Toast />
+            </View>
+        );
+    }
 
-        {telaAtual === 'cadastro' && (
-            <CadastroProduto onVoltar={() => setTelaAtual('dashboard')} />
-        )}
+    const screenProps = {
+        onVoltar: routeDefinition?.showTabBar ? resetToDashboard : goBack,
+        onNavigate: navigate,
+        onLogout: handleLogout
+    };
 
-        {telaAtual === 'produtos' && (
-            <Produtos onVoltar={() => setTelaAtual('dashboard')} />
-        )}
-
-        {telaAtual === 'previsao' && (
-            <PrevisaoCompras onVoltar={() => setTelaAtual('dashboard')} />
-        )}
-
-        {telaAtual === 'orcamento' && (
-            <OrcamentoMobile onVoltar={() => setTelaAtual('dashboard')} />
-        )}
-
-        {telaAtual === 'recebimento' && (
-            <RecebimentoMercadoria onVoltar={() => setTelaAtual('dashboard')} />
-        )}
-
-        {/* 🚀 CORREÇÃO DO COMUNICADOR: Mudado de 'picking' para 'separacao' */}
-        {telaAtual === 'separacao' && (
-            <SeparacaoPedidos onVoltar={() => setTelaAtual('dashboard')} />
-        )}
-
-        {telaAtual === 'vendas' && (
-            <GestaoVendas onVoltar={() => setTelaAtual('dashboard')} onNavigate={setTelaAtual} />
-        )}
-
-        {telaAtual === 'parceiros' && (
-            <Parceiros onVoltar={() => setTelaAtual('dashboard')} />
-        )}
-
-        {telaAtual === 'checklist' && (
-            <ChecklistMobile onVoltar={() => setTelaAtual('dashboard')} />
-        )}
-
-        <StatusBar style="auto" />
-        <Toast />
-      </View>
-  );
+    return (
+        <View style={styles.container}>
+            <AppShell currentRouteKey={rotaAtual} onNavigate={navigate}>
+                {ScreenComponent ? <ScreenComponent {...screenProps} /> : null}
+            </AppShell>
+            <StatusBar style="auto" />
+            <Toast />
+        </View>
+    );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0f172a' }
+    container: { flex: 1, backgroundColor: '#0f172a' },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0f172a' }
 });

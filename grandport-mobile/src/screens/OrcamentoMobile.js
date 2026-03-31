@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Linking, Alert, Modal, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import { useAudioPlayer } from 'expo-audio'; // 🚀 1. NOVO MOTOR DE ÁUDIO RECRUTADO
 import api from '../api/axios';
+import { getApiBaseUrl, getAuthHeaders } from '../api/session';
 
 export default function OrcamentoMobile({ onVoltar }) {
     // ============================================================================
@@ -190,6 +190,7 @@ export default function OrcamentoMobile({ onVoltar }) {
     const subtotal = carrinho.reduce((acc, item) => acc + ((item.precoVenda || 0) * item.qtde), 0);
     const valorDescontoReal = parseFloat(desconto.replace(',', '.')) || 0;
     const totalFinal = Math.max(0, subtotal - valorDescontoReal);
+    const quantidadeItens = carrinho.reduce((acc, item) => acc + item.qtde, 0);
 
     // ============================================================================
     // 🚀 SALVAR NO ERP
@@ -212,17 +213,12 @@ export default function OrcamentoMobile({ onVoltar }) {
                 }))
             };
 
-            let tokenRaw = await AsyncStorage.getItem('grandport_token');
-            let tokenLimpo = tokenRaw ? tokenRaw.replace(/['"]+/g, '') : '';
             const endpoint = tipo === 'orcamento' ? '/api/vendas/orcamento' : '/api/vendas/pedido';
 
-            const response = await fetch(`${api.defaults.baseURL}${endpoint}`, {
+            const response = await fetch(`${getApiBaseUrl()}${endpoint}`, {
                 method: 'POST',
                 body: JSON.stringify(payload),
-                headers: {
-                    'Authorization': `Bearer ${tokenLimpo}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
             });
 
             if (!response.ok) {
@@ -306,6 +302,32 @@ export default function OrcamentoMobile({ onVoltar }) {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <View style={styles.heroCard}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.heroKicker}>Balcão mobile</Text>
+                        <Text style={styles.heroTitle}>Monte orçamento ou pedido</Text>
+                        <Text style={styles.heroSubtitle}>Cliente, veículo, peças e fechamento em um fluxo só, com foco comercial.</Text>
+                    </View>
+                    <View style={styles.heroBadge}>
+                        <Text style={styles.heroBadgeLabel}>Itens</Text>
+                        <Text style={styles.heroBadgeValue}>{quantidadeItens}</Text>
+                    </View>
+                </View>
+
+                <View style={styles.summaryRow}>
+                    <View style={styles.summaryCard}>
+                        <Text style={styles.summaryLabel}>Cliente</Text>
+                        <Text style={styles.summaryValue} numberOfLines={1}>{clienteSelecionado?.nome || 'Consumidor final'}</Text>
+                    </View>
+                    <View style={styles.summaryCard}>
+                        <Text style={styles.summaryLabel}>Veículo</Text>
+                        <Text style={styles.summaryValue} numberOfLines={1}>{veiculoSelecionado?.placa || 'Não vinculado'}</Text>
+                    </View>
+                    <View style={styles.summaryCard}>
+                        <Text style={styles.summaryLabel}>Total</Text>
+                        <Text style={styles.summaryValue}>R$ {totalFinal.toFixed(2)}</Text>
+                    </View>
+                </View>
 
                 {/* CAIXA DO CLIENTE */}
                 <TouchableOpacity style={styles.clienteBox} onPress={() => setModalCliente(true)}>
@@ -552,6 +574,39 @@ const styles = StyleSheet.create({
     btnVoltar: { padding: 10, backgroundColor: '#f1f5f9', borderRadius: 12, marginRight: 15 },
     titulo: { fontSize: 20, fontWeight: '900', color: '#1e293b' },
     subtitulo: { fontSize: 12, color: '#ca8a04', fontWeight: 'bold' },
+    heroCard: {
+        margin: 15,
+        marginBottom: 0,
+        backgroundColor: '#111827',
+        borderRadius: 20,
+        padding: 18,
+        flexDirection: 'row',
+        gap: 12
+    },
+    heroKicker: { fontSize: 10, fontWeight: '900', color: '#fcd34d', textTransform: 'uppercase', letterSpacing: 1 },
+    heroTitle: { fontSize: 20, fontWeight: '900', color: '#f9fafb', marginTop: 6 },
+    heroSubtitle: { fontSize: 12, fontWeight: '700', color: '#cbd5e1', marginTop: 8, lineHeight: 18 },
+    heroBadge: {
+        minWidth: 76,
+        alignSelf: 'flex-start',
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 10
+    },
+    heroBadgeLabel: { fontSize: 9, fontWeight: '900', color: '#fcd34d', textTransform: 'uppercase' },
+    heroBadgeValue: { fontSize: 20, fontWeight: '900', color: '#fff', marginTop: 6 },
+    summaryRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 15, marginTop: 12 },
+    summaryCard: {
+        flex: 1,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        padding: 14
+    },
+    summaryLabel: { fontSize: 10, fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 },
+    summaryValue: { fontSize: 13, fontWeight: '900', color: '#1e293b', marginTop: 8 },
     clienteBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', margin: 15, marginBottom: 0, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0' },
     iconeCliente: { padding: 10, borderRadius: 12 },
     lblCliente: { fontSize: 10, fontWeight: 'black', color: '#94a3b8', letterSpacing: 1 },

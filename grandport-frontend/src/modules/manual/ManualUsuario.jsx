@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
 import {
-    BookOpen, LayoutDashboard, Package, ShoppingCart,
-    Keyboard, Info, ArrowLeft, Terminal, Printer, Smartphone, HelpCircle,
-    FileText // 🚀 O ícone que estava faltando e causando a tela branca!
+    ArrowLeft,
+    BookOpen,
+    FileText,
+    HelpCircle,
+    Keyboard,
+    LayoutDashboard,
+    Package,
+    Printer,
+    ShoppingCart,
+    Smartphone,
+    Wrench
 } from 'lucide-react';
 
 export const ManualUsuario = ({ onVoltar }) => {
@@ -11,21 +19,29 @@ export const ManualUsuario = ({ onVoltar }) => {
     const menu = [
         { id: 'introducao', icone: <BookOpen size={18} />, titulo: 'Introdução' },
         { id: 'dashboard', icone: <LayoutDashboard size={18} />, titulo: '1. Dashboard' },
-        { id: 'estoque', icone: <Package size={18} />, titulo: '2. Gestão de Peças' },
-        { id: 'pdv', icone: <ShoppingCart size={18} />, titulo: '3. Frente de Caixa (PDV)' },
-        { id: 'atalhos', icone: <Keyboard size={18} />, titulo: '4. Guia de Atalhos' },
+        { id: 'vendas', icone: <ShoppingCart size={18} />, titulo: '2. Vendas e Caixa' },
+        { id: 'estoque', icone: <Package size={18} />, titulo: '3. Estoque e Catálogo' },
+        { id: 'oficina', icone: <Wrench size={18} />, titulo: '4. Oficina e Recepção' },
+        { id: 'impressao', icone: <Printer size={18} />, titulo: '5. Impressão e Layouts' },
+        { id: 'mobile', icone: <Smartphone size={18} />, titulo: '6. Aplicativo Mobile' },
+        { id: 'atalhos', icone: <Keyboard size={18} />, titulo: '7. Atalhos do Balcão' }
     ];
 
-    // Componente visual para as "Teclas"
     const Tecla = ({ children }) => (
         <kbd className="bg-white border border-slate-300 border-b-2 text-slate-700 px-2 py-1 rounded-lg text-xs font-black shadow-sm font-mono mx-1">
             {children}
         </kbd>
     );
 
+    const Card = ({ title, children }) => (
+        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+            <strong className="text-slate-800 block mb-2">{title}</strong>
+            <div className="text-slate-600 text-sm leading-relaxed">{children}</div>
+        </div>
+    );
+
     return (
         <div className="p-8 max-w-7xl mx-auto animate-fade-in flex flex-col h-full min-h-screen bg-gray-50/50">
-
             {onVoltar && (
                 <div className="mb-6">
                     <button
@@ -38,15 +54,13 @@ export const ManualUsuario = ({ onVoltar }) => {
             )}
 
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col md:flex-row">
-
-                {/* MENU LATERAL */}
                 <div className="w-full md:w-80 bg-slate-900 p-6 flex flex-col">
                     <div className="mb-8 mt-2 px-2 text-white">
                         <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/30">
                             <HelpCircle size={24} />
                         </div>
                         <h2 className="text-2xl font-black tracking-tight">Central de Ajuda</h2>
-                        <p className="text-slate-400 text-sm font-medium mt-1">Manual de Operação STM Sistemas</p>
+                        <p className="text-slate-400 text-sm font-medium mt-1">Manual operacional do GrandPort ERP</p>
                     </div>
 
                     <div className="space-y-2 flex-1">
@@ -66,148 +80,236 @@ export const ManualUsuario = ({ onVoltar }) => {
                     </div>
 
                     <div className="mt-8 pt-6 border-t border-slate-800 text-slate-500 text-xs font-bold text-center">
-                        <p>Versão 1.0.0</p>
-                        <p>Desde Fevereiro, 2026</p>
+                        <p>Versão funcional de março de 2026</p>
+                        <p>ERP web + app mobile operacional</p>
                     </div>
                 </div>
 
-                {/* ÁREA DE CONTEÚDO */}
                 <div className="flex-1 p-8 md:p-12 overflow-y-auto max-h-[85vh] custom-scrollbar bg-white">
-
                     {secaoAtiva === 'introducao' && (
-                        <div className="animate-fade-in max-w-3xl">
-                            <h3 className="text-3xl font-black text-slate-800 mb-4">Bem-vindo ao seu ERP! 🚀</h3>
-                            <p className="text-slate-600 leading-relaxed text-lg mb-6">
-                                Este sistema foi desenhado do zero para a realidade de uma Auto Peças moderna. Nosso maior objetivo é <strong>eliminar cliques desnecessários</strong> e garantir extrema velocidade no atendimento de balcão.
+                        <div className="animate-fade-in max-w-4xl space-y-6">
+                            <h3 className="text-3xl font-black text-slate-800">Bem-vindo ao GrandPort ERP</h3>
+                            <p className="text-slate-600 leading-relaxed text-lg">
+                                O sistema foi construído para operação automotiva de verdade: balcão, oficina, estoque, financeiro, fiscal, impressão e operação mobile. A melhor forma de usar o ERP é tratar cada área como um fluxo: atendimento, execução, recebimento e controle.
                             </p>
+
                             <div className="bg-blue-50 border-l-4 border-blue-600 p-6 rounded-r-2xl">
                                 <h4 className="font-black text-blue-800 flex items-center gap-2 mb-2">
-                                    <Info size={20} /> Como usar este manual?
+                                    <HelpCircle size={20} /> Como usar este manual
                                 </h4>
                                 <p className="text-blue-700/80 font-medium">
-                                    Navegue pelo menu lateral para entender o funcionamento de cada tela. Recomendamos fortemente a leitura da aba <strong>"Guia de Atalhos"</strong> para todos os vendedores e caixas.
+                                    Use o menu lateral para navegar por área. Para operação de balcão, leia primeiro <strong>Vendas e Caixa</strong> e <strong>Atalhos do Balcão</strong>. Para parametrização, leia <strong>Impressão e Layouts</strong>. Para equipe de rua, leia <strong>Aplicativo Mobile</strong>.
                                 </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <Card title="Fluxo Comercial">
+                                    Orçamento, pedido, caixa, impressão de comprovante e envio por WhatsApp.
+                                </Card>
+                                <Card title="Fluxo Operacional">
+                                    Recepção do veículo, checklist, OS, peças, serviços e andamento da oficina.
+                                </Card>
+                                <Card title="Fluxo Administrativo">
+                                    Financeiro, fiscal, relatórios, layouts oficiais e configurações de empresa.
+                                </Card>
                             </div>
                         </div>
                     )}
 
                     {secaoAtiva === 'dashboard' && (
-                        <div className="animate-fade-in max-w-3xl space-y-6 text-slate-600 leading-relaxed">
-                            <h3 className="text-3xl font-black text-slate-800 mb-2 flex items-center gap-3"><LayoutDashboard className="text-blue-600" /> Visão do Negócio</h3>
-                            <p>O painel de controle é a central de inteligência da sua loja. Ele é atualizado em tempo real.</p>
+                        <div className="animate-fade-in max-w-4xl space-y-6 text-slate-600 leading-relaxed">
+                            <h3 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+                                <LayoutDashboard className="text-blue-600" /> Dashboard
+                            </h3>
+                            <p>O dashboard é a leitura executiva da operação. Ele centraliza indicadores, alertas, radar comercial, pendências financeiras e sinais de oficina.</p>
 
-                            <ul className="space-y-4 mt-6">
-                                <li className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                    <strong className="text-slate-800 block mb-1">Indicadores (KPIs)</strong>
-                                    Mostra instantaneamente a Receita Mensal, Contas em Atraso, Pedidos do Dia e Peças em Falta. Você pode clicar nos cards vermelhos ou laranjas para ir direto para as telas de resolução.
-                                </li>
-                                <li className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                    <strong className="text-slate-800 block mb-1">Top Performance & Logs</strong>
-                                    Acompanhe o ranking dos produtos mais vendidos (Curva A). O painel de Log avisará automaticamente sobre contas vencidas ou peças precisando de reposição.
-                                </li>
-                                <li className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                    <strong className="text-slate-800 block mb-1">Impressão Rápida</strong>
-                                    Na aba de Relatórios, clique no botão "Imprimir" para gerar um espelho A4 da saúde da sua empresa, pronto para a contabilidade.
-                                </li>
-                            </ul>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Card title="KPIs e alertas">
+                                    Use os cards para acompanhar receita, contas em atraso, pedidos do dia, itens críticos e gargalos. Quando houver indicador de risco, trate como fila de ação, não como painel decorativo.
+                                </Card>
+                                <Card title="Relatórios">
+                                    A aba de relatórios permite imprimir resumos gerenciais e apoiar reuniões, fechamento de mês e prestação de contas.
+                                </Card>
+                            </div>
+                        </div>
+                    )}
+
+                    {secaoAtiva === 'vendas' && (
+                        <div className="animate-fade-in max-w-4xl space-y-6 text-slate-600 leading-relaxed">
+                            <h3 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+                                <ShoppingCart className="text-blue-600" /> Vendas e Caixa
+                            </h3>
+                            <p>O módulo de vendas foi dividido em quatro frentes: gestão comercial, orçamento/pedido, PDV e fila de caixa.</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Card title="Central de Vendas">
+                                    Use para consultar documentos, buscar por cliente, veículo ou número, abrir o espelho e reabrir orçamentos e pedidos quando o status permitir.
+                                </Card>
+                                <Card title="Orçamento / Pedido">
+                                    Monte o documento, vincule cliente e veículo, adicione peças, registre desconto e observações. O documento pode ser salvo como orçamento ou convertido em pedido para seguir ao caixa.
+                                </Card>
+                                <Card title="PDV">
+                                    O PDV é a frente de atendimento rápido. Ele aceita operação majoritária por teclado, dispara impressão, integra WhatsApp e prepara a venda para emissão e recebimento.
+                                </Card>
+                                <Card title="Fila de Caixa">
+                                    Exibe pedidos aguardando pagamento. O caixa seleciona o documento, lança formas de pagamento, conclui a venda e imprime comprovante quando necessário.
+                                </Card>
+                            </div>
+
+                            <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-2xl">
+                                <strong className="text-emerald-800 block mb-2">Boas práticas de operação</strong>
+                                <p className="text-emerald-700 text-sm font-medium">
+                                    Orçamento serve para negociação. Pedido serve para compromisso comercial. Caixa serve para recebimento. Não misture os três momentos para não perder rastreabilidade.
+                                </p>
+                            </div>
                         </div>
                     )}
 
                     {secaoAtiva === 'estoque' && (
-                        <div className="animate-fade-in max-w-3xl space-y-6 text-slate-600 leading-relaxed">
-                            <h3 className="text-3xl font-black text-slate-800 mb-2 flex items-center gap-3"><Package className="text-blue-600" /> Gestão de Peças</h3>
-                            <p>O coração da sua loja. Um cadastro unificado que alimenta o PDV e as Notas Fiscais.</p>
+                        <div className="animate-fade-in max-w-4xl space-y-6 text-slate-600 leading-relaxed">
+                            <h3 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+                                <Package className="text-blue-600" /> Estoque e Catálogo
+                            </h3>
+                            <p>O cadastro de peças alimenta vendas, compras, recebimento, inventário e fiscal.</p>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                                <div className="border-2 border-slate-100 p-5 rounded-2xl">
-                                    <h4 className="font-black text-slate-800 mb-2">Busca & Fotos</h4>
-                                    <p className="text-sm">Use a barra de pesquisa para achar peças por Nome, Código, EAN ou Referência Original.</p>
-                                    <p className="text-sm mt-2 text-blue-600 font-bold bg-blue-50 p-2 rounded-lg">Dica: Passe o mouse sobre a miniatura da foto na lista para dar Zoom imediato sem precisar abrir o cadastro!</p>
-                                </div>
-                                <div className="border-2 border-slate-100 p-5 rounded-2xl">
-                                    <h4 className="font-black text-slate-800 mb-2">Precificação Automática</h4>
-                                    <p className="text-sm">Digite o Preço de Custo e a Margem (%), e o sistema calcula o Preço de Venda sozinho. Defina também um "Preço Mínimo" para travar descontos no balcão.</p>
-                                </div>
-                                <div className="border-2 border-slate-100 p-5 rounded-2xl">
-                                    <h4 className="font-black text-slate-800 mb-2">Dados Fiscais (NCM)</h4>
-                                    <p className="text-sm">O campo NCM tem pesquisa inteligente. Se uma peça não tiver NCM, o sistema bloqueará a emissão da NF-e para evitar multas.</p>
-                                </div>
-                                <div className="border-2 border-slate-100 p-5 rounded-2xl">
-                                    <h4 className="font-black text-slate-800 mb-2">Extrato de Movimentação</h4>
-                                    <p className="text-sm">Clique no ícone de "Relógio" ao lado de qualquer peça na lista para ver o histórico completo de entradas, saídas e ajustes manuais.</p>
-                                </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Card title="Cadastro de Produto">
+                                    Preencha descrição, SKU, EAN, referência original, marca, NCM, custos, preço de venda, estoque mínimo, localização e foto.
+                                </Card>
+                                <Card title="Inventário e conferência">
+                                    O sistema possui fluxo web e fluxo mobile para scan, conferência de saldo e ajuste. Use sempre um motivo operacional claro nos ajustes.
+                                </Card>
+                                <Card title="Recebimento de mercadoria">
+                                    No mobile, a entrada funciona por conferência cega: bipar a peça, montar o lote e confirmar o saldo final.
+                                </Card>
+                                <Card title="Busca">
+                                    Pesquise por nome, SKU, EAN, referência e aplicação. Essa consistência é o que dá velocidade ao balcão e evita erro fiscal.
+                                </Card>
                             </div>
                         </div>
                     )}
 
-                    {secaoAtiva === 'pdv' && (
-                        <div className="animate-fade-in max-w-3xl space-y-6 text-slate-600 leading-relaxed">
-                            <h3 className="text-3xl font-black text-slate-800 mb-2 flex items-center gap-3"><ShoppingCart className="text-blue-600" /> Frente de Caixa</h3>
-                            <p>Desenhada para vendas ultrarrápidas, você pode operar esta tela 100% pelo teclado.</p>
+                    {secaoAtiva === 'oficina' && (
+                        <div className="animate-fade-in max-w-4xl space-y-6 text-slate-600 leading-relaxed">
+                            <h3 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+                                <Wrench className="text-blue-600" /> Oficina e Recepção
+                            </h3>
+                            <p>A área de oficina conecta recepção do veículo, checklist, laudo, OS e acompanhamento da execução.</p>
 
-                            <ul className="space-y-4 mt-6">
-                                <li className="flex gap-4 items-start">
-                                    <div className="bg-emerald-100 text-emerald-600 p-2 rounded-lg mt-1"><Terminal size={20}/></div>
-                                    <div>
-                                        <strong className="text-slate-800 block">Pesquisa Eficiente</strong>
-                                        Pressione <Tecla>F3</Tecla> para focar na busca de peças. Ao achar a peça, se ela tiver foto, passe o mouse em cima para confirmar visualmente antes de dar Enter.
-                                    </div>
-                                </li>
-                                <li className="flex gap-4 items-start">
-                                    <div className="bg-purple-100 text-purple-600 p-2 rounded-lg mt-1"><FileText size={20}/></div>
-                                    <div>
-                                        <strong className="text-slate-800 block">Emissão e Cancelamento de NF-e</strong>
-                                        A emissão requer Cliente com CPF/CNPJ. Após gerar, você pode imprimir o DANFE, baixar o XML ou Cancelar. <strong>Atenção:</strong> A SEFAZ exige justificativa de no mínimo 15 caracteres para cancelamentos.
-                                    </div>
-                                </li>
-                                <li className="flex gap-4 items-start">
-                                    <div className="bg-green-100 text-green-600 p-2 rounded-lg mt-1"><Smartphone size={20}/></div>
-                                    <div>
-                                        <strong className="text-slate-800 block">Integração WhatsApp</strong>
-                                        O sistema está ligado ao motor do WhatsApp. Você pode enviar orçamentos em PDF direto para o cliente com um clique ou pressionando <Tecla>F11</Tecla>.
-                                    </div>
-                                </li>
-                                <li className="flex gap-4 items-start">
-                                    <div className="bg-red-100 text-red-600 p-2 rounded-lg mt-1"><BookOpen size={20}/></div>
-                                    <div>
-                                        <strong className="text-slate-800 block">Vendas Perdidas</strong>
-                                        Se o cliente achar caro ou faltar estoque, pressione <Tecla>F7</Tecla> e registre o motivo. Isso ajuda a diretoria a ajustar preços e comprar melhor.
-                                    </div>
-                                </li>
-                            </ul>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Card title="Recepção">
+                                    Registre veículo, KM, combustível, avarias, fotos e assinatura. Esse registro protege a oficina e reduz conflito na entrega.
+                                </Card>
+                                <Card title="Checklist / Laudo">
+                                    O laudo de vistoria usa template governado e pode ser padronizado pela central de impressão.
+                                </Card>
+                                <Card title="OS">
+                                    A ordem de serviço consolida cliente, veículo, peças, serviços, observações e totais. Use o painel de OS para acompanhar o andamento.
+                                </Card>
+                                <Card title="Pátio e execução">
+                                    O painel de OS deve ser usado como fila de produção: prioridade, gargalo, veículo parado e entrega.
+                                </Card>
+                            </div>
+                        </div>
+                    )}
+
+                    {secaoAtiva === 'impressao' && (
+                        <div className="animate-fade-in max-w-4xl space-y-6 text-slate-600 leading-relaxed">
+                            <h3 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+                                <Printer className="text-blue-600" /> Impressão e Layouts
+                            </h3>
+                            <p>O ERP possui governança de impressão para layouts HTML, laudo de vistoria e DANFE. O padrão correto de uso é: editar, salvar draft, publicar e validar preview.</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Card title="Central de Layouts">
+                                    Controla modelos HTML de OS, vendas, recibos, extratos e documentos similares. A biblioteca premium pode ser usada como base inicial.
+                                </Card>
+                                <Card title="Central de Laudos">
+                                    Gerencia o template JRXML do laudo de vistoria, com preview, histórico, diff e rollback.
+                                </Card>
+                                <Card title="Central DANFE">
+                                    Controla o template JRXML do DANFE com os mesmos recursos de biblioteca, preview e versionamento.
+                                </Card>
+                                <Card title="Regra operacional">
+                                    Salvar cria draft. Publicar coloca o modelo em produção. Se o documento não refletir a alteração, confirme se o template foi realmente publicado.
+                                </Card>
+                            </div>
+
+                            <div className="bg-amber-50 border border-amber-200 p-5 rounded-2xl">
+                                <strong className="text-amber-800 block mb-2">Atenção</strong>
+                                <p className="text-amber-700 text-sm font-medium">
+                                    Para a máquina de impressão funcionar corretamente em todos os ambientes, o banco precisa estar alinhado com as migrations de layout e versionamento.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {secaoAtiva === 'mobile' && (
+                        <div className="animate-fade-in max-w-4xl space-y-6 text-slate-600 leading-relaxed">
+                            <h3 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+                                <Smartphone className="text-blue-600" /> Aplicativo Mobile
+                            </h3>
+                            <p>O projeto possui um app mobile próprio em React Native/Expo. Ele não é uma cópia do ERP web; é uma operação móvel para recepção, estoque, vendas e cadastro rápido.</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Card title="Home Mobile">
+                                    Centraliza atalhos de operação e leitura rápida por papel do usuário.
+                                </Card>
+                                <Card title="Checklist Mobile">
+                                    Fluxo de recepção em etapas: veículo, dados, avarias, fotos e assinatura.
+                                </Card>
+                                <Card title="Inventário Mobile">
+                                    Consulta, conferência, scan e ajuste rápido de estoque no pátio ou depósito.
+                                </Card>
+                                <Card title="Balcão Mobile">
+                                    Permite orçamento/pedido, parceiros, recebimento de mercadoria e cadastro rápido de produto no telefone.
+                                </Card>
+                            </div>
                         </div>
                     )}
 
                     {secaoAtiva === 'atalhos' && (
-                        <div className="animate-fade-in max-w-3xl space-y-6 text-slate-600 leading-relaxed">
-                            <h3 className="text-3xl font-black text-slate-800 mb-2 flex items-center gap-3"><Keyboard className="text-blue-600" /> Guia de Atalhos (PDV)</h3>
-                            <p>Decore estes atalhos para se tornar um mestre na frente de caixa.</p>
+                        <div className="animate-fade-in max-w-4xl space-y-6 text-slate-600 leading-relaxed">
+                            <h3 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+                                <Keyboard className="text-blue-600" /> Atalhos do Balcão
+                            </h3>
+                            <p>Esses atalhos aceleram o atendimento no balcão e reduzem dependência de mouse.</p>
 
                             <div className="bg-slate-50 border-2 border-slate-100 rounded-3xl overflow-hidden mt-6">
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-200/50 text-slate-500 text-[10px] uppercase font-black tracking-widest">
-                                    <tr><th className="p-4">Atalho</th><th className="p-4">Ação / Funcionalidade</th></tr>
+                                        <tr>
+                                            <th className="p-4">Atalho</th>
+                                            <th className="p-4">Uso principal</th>
+                                        </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 text-sm">
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>F2</Tecla></td><td className="p-4 font-medium text-slate-700">Focar no campo de Busca de <strong>Cliente</strong>.</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>F3</Tecla></td><td className="p-4 font-medium text-slate-700">Focar no campo de Busca de <strong>Peças</strong>.</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>F4</Tecla></td><td className="p-4 font-medium text-slate-700">Focar no campo de <strong>Desconto</strong> (Alterna entre R$ e %).</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>F5</Tecla></td><td className="p-4 font-medium text-slate-700">Atualizar Estoque (Força a sincronização com o servidor).</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>F6</Tecla></td><td className="p-4 font-medium text-slate-700">Abrir janela de <strong>Orçamentos Salvos</strong> (Pendentes).</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>F7</Tecla></td><td className="p-4 font-medium text-slate-700 text-red-600">Registrar Venda Perdida.</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>F8</Tecla></td><td className="p-4 font-medium text-slate-700">Salvar Rascunho / Orçamento.</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>F9</Tecla></td><td className="p-4 font-medium text-slate-700 text-orange-600">Converter Orçamento em <strong>Pedido</strong>.</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>Ctrl</Tecla> + <Tecla>F9</Tecla></td><td className="p-4 font-medium text-slate-700 text-emerald-600">Finalizar venda e Enviar pro <strong>Caixa</strong>.</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>F10</Tecla></td><td className="p-4 font-medium text-slate-700 text-purple-600">Emitir <strong>Nota Fiscal Eletrônica (NF-e)</strong>.</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>F11</Tecla></td><td className="p-4 font-medium text-slate-700 text-green-600">Disparar PDF pelo <strong>WhatsApp</strong>.</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>Ctrl</Tecla> + <Tecla>P</Tecla></td><td className="p-4 font-medium text-slate-700">Impressão rápida via Iframe (Bobina/A4).</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>Alt</Tecla> + <Tecla>L</Tecla></td><td className="p-4 font-medium text-slate-700">Limpar a tela para novo atendimento.</td></tr>
-                                    <tr className="hover:bg-white"><td className="p-4"><Tecla>Esc</Tecla></td><td className="p-4 font-medium text-slate-700">Fechar modais / Voltar tela anterior.</td></tr>
+                                        <tr><td className="p-4"><Tecla>F2</Tecla></td><td className="p-4 font-medium text-slate-700">Foco no cliente.</td></tr>
+                                        <tr><td className="p-4"><Tecla>F3</Tecla></td><td className="p-4 font-medium text-slate-700">Foco na busca de peças.</td></tr>
+                                        <tr><td className="p-4"><Tecla>F4</Tecla></td><td className="p-4 font-medium text-slate-700">Campo de desconto.</td></tr>
+                                        <tr><td className="p-4"><Tecla>F8</Tecla></td><td className="p-4 font-medium text-slate-700">Salvar orçamento / draft comercial.</td></tr>
+                                        <tr><td className="p-4"><Tecla>F9</Tecla></td><td className="p-4 font-medium text-slate-700">Converter para pedido.</td></tr>
+                                        <tr><td className="p-4"><Tecla>Ctrl</Tecla> + <Tecla>F9</Tecla></td><td className="p-4 font-medium text-slate-700">Enviar para o caixa.</td></tr>
+                                        <tr><td className="p-4"><Tecla>F10</Tecla></td><td className="p-4 font-medium text-slate-700">Fluxo fiscal / emissão quando habilitado.</td></tr>
+                                        <tr><td className="p-4"><Tecla>F11</Tecla></td><td className="p-4 font-medium text-slate-700">Disparo por WhatsApp.</td></tr>
+                                        <tr><td className="p-4"><Tecla>Ctrl</Tecla> + <Tecla>P</Tecla></td><td className="p-4 font-medium text-slate-700">Impressão rápida.</td></tr>
+                                        <tr><td className="p-4"><Tecla>Esc</Tecla></td><td className="p-4 font-medium text-slate-700">Fechar modal ou voltar.</td></tr>
                                     </tbody>
                                 </table>
                             </div>
+
+                            <div className="bg-blue-50 border border-blue-200 p-5 rounded-2xl">
+                                <strong className="text-blue-800 block mb-2">Operação recomendada</strong>
+                                <p className="text-blue-700 text-sm font-medium">
+                                    Cliente, peça, desconto e fechamento devem seguir sempre a mesma ordem. Isso aumenta velocidade, reduz erro e melhora a curva de aprendizado da equipe.
+                                </p>
+                            </div>
                         </div>
                     )}
+
+                    <div className="mt-10 pt-6 border-t border-slate-100 text-xs text-slate-400">
+                        Manual atualizado com base no backend atual, frontend web e app mobile do projeto.
+                    </div>
                 </div>
             </div>
         </div>

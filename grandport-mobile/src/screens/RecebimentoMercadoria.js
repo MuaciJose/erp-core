@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import { useAudioPlayer } from 'expo-audio'; // 🚀 1. NOVO MOTOR DE ÁUDIO RECRUTADO
 import api from '../api/axios';
+import { getApiBaseUrl, getAuthHeaders } from '../api/session';
+import MobileHeroCard from '../components/MobileHeroCard';
+import MobileStatRow from '../components/MobileStatRow';
 
 export default function RecebimentoMercadoria({ onVoltar }) {
     const [lote, setLote] = useState([]);
@@ -124,9 +126,6 @@ export default function RecebimentoMercadoria({ onVoltar }) {
 
         setSalvando(true);
         try {
-            let tokenRaw = await AsyncStorage.getItem('grandport_token');
-            let tokenLimpo = tokenRaw ? tokenRaw.replace(/['"]+/g, '') : '';
-
             Toast.show({ type: 'info', text1: 'A processar entrada...', text2: 'Não feche a aplicação.' });
 
             // Dispara a atualização para cada peça do lote
@@ -139,13 +138,10 @@ export default function RecebimentoMercadoria({ onVoltar }) {
                     motivo: "Entrada via Conferência Cega (Mobile)"
                 };
 
-                const response = await fetch(`${api.defaults.baseURL}/api/produtos/${item.produto.id}/ajuste-estoque`, {
+                const response = await fetch(`${getApiBaseUrl()}/api/produtos/${item.produto.id}/ajuste-estoque`, {
                     method: 'PATCH',
                     body: JSON.stringify(payload),
-                    headers: {
-                        'Authorization': `Bearer ${tokenLimpo}`,
-                        'Content-Type': 'application/json'
-                    },
+                    headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
                 });
 
                 if (!response.ok) throw new Error(`Falha na peça: ${item.produto.nome}`);
@@ -193,6 +189,24 @@ export default function RecebimentoMercadoria({ onVoltar }) {
                     <Text style={styles.subtitulo}>{lote.length} referências bipadas</Text>
                 </View>
             </View>
+
+            <MobileHeroCard
+                kicker="Recebimento"
+                title="Conferência cega de mercadoria"
+                subtitle="Bipe as caixas, monte o lote e confirme a entrada com um fechamento só."
+                badgeLabel="Peças"
+                badgeValue={totalPecas}
+                accent="#86efac"
+                backgroundColor="#052e16"
+            />
+
+            <MobileStatRow
+                items={[
+                    { label: 'Referências', value: lote.length },
+                    { label: 'Busca', value: busca ? 'Ativa' : 'Livre' },
+                    { label: 'Scanner', value: cameraAtiva ? 'Aberto' : 'Pronto' }
+                ]}
+            />
 
             {/* BARRA DE BUSCA E SCANNER */}
             <View style={styles.buscaContainer}>

@@ -10,9 +10,9 @@ import {
     KeyboardAvoidingView,
     Platform
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import api from '../api/axios';
+import { saveSession } from '../api/session';
 
 export default function Login({ onLoginSuccess }) {
     const [username, setUsername] = useState('');
@@ -34,11 +34,7 @@ export default function Login({ onLoginSuccess }) {
 
             const { token, usuario } = response.data;
 
-            // 🚀 SALVA TUDO NO COFRE DO CELULAR (CORRIGIDO)
-            await AsyncStorage.setItem('grandport_token', token);
-            await AsyncStorage.setItem('grandport_user', JSON.stringify(usuario || {}));
-            await AsyncStorage.setItem('grandport_user_nome', usuario?.nome || 'Usuário');
-            await AsyncStorage.setItem('grandport_user_permissoes', JSON.stringify(usuario?.permissoes || []));
+            await saveSession(token, usuario || {});
 
             // Libera a passagem no App.js
             onLoginSuccess();
