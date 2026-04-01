@@ -32,6 +32,9 @@ logging:
     org.flywaydb: WARN
 
 app:
+  security:
+    redis:
+      required: false
   bootstrap-admin:
     enabled: false
   jobs:

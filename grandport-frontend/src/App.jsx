@@ -136,12 +136,7 @@ function App() {
         }
 
         const validarSessao = async () => {
-            const token = syncAuthHeader(api);
-
-            if (!token) {
-                setCarregandoApp(false);
-                return;
-            }
+            syncAuthHeader(api);
 
             try {
                 const res = await api.get('/auth/me');
@@ -150,7 +145,6 @@ function App() {
                 setPaginaAtiva(definirTelaInicial(usuario));
             } catch (error) {
                 clearSession();
-                delete api.defaults.headers.common.Authorization;
                 setUsuarioLogado(null);
                 setPaginaAtiva('');
             } finally {
@@ -218,7 +212,6 @@ function App() {
             console.error("Erro ao registrar logout", e);
         } finally {
             clearSession();
-            delete api.defaults.headers.common.Authorization;
             setUsuarioLogado(null);
             setPaginaAtiva('');
             setTelaPublica('login');

@@ -50,9 +50,8 @@ export const Login = ({ onLoginSuccess, onIrParaCadastro }) => {
     };
 
     const finalizarLogin = (data) => {
-        const { token, usuario } = data;
-        persistSession({ token, user: usuario, remember: lembrarAcesso });
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        const { usuario } = data;
+        persistSession({ user: usuario, remember: lembrarAcesso });
         onLoginSuccess(usuario);
     };
 

@@ -81,6 +81,12 @@ api:
       secret: ${JWT_SECRET:}
 
 app:
+  security:
+    cookie:
+      secure: ${APP_SECURITY_COOKIE_SECURE:false}
+      same-site: ${APP_SECURITY_COOKIE_SAME_SITE:Lax}
+    redis:
+      required: ${APP_SECURITY_REDIS_REQUIRED:false}
   bootstrap-admin:
     enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
     username: ${BOOTSTRAP_ADMIN_USERNAME:}

@@ -1,6 +1,7 @@
 package com.grandport.erp.modules.usuario.controller;
 
 import com.grandport.erp.config.security.LoginAttemptService;
+import com.grandport.erp.config.security.AuthCookieService;
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.admin.service.SecurityEventService;
 import com.grandport.erp.modules.assinatura.service.PlanoPermissaoService;
@@ -21,6 +22,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -41,6 +43,7 @@ import java.util.Map;
 public class AutenticacaoController {
 
     private final AuthenticationManager authenticationManager;
+    private final AuthCookieService authCookieService;
     private final TokenService tokenService;
     private final AuditoriaService auditoriaService;
     private final LoginAttemptService loginAttemptService;
@@ -108,7 +111,7 @@ public class AutenticacaoController {
                 ));
             }
 
-            return ResponseEntity.ok(buildSuccessResponse(usuario));
+            return buildSuccessResponseEntity(usuario);
         } catch (TenantAccessBlockedException ex) {
             return ResponseEntity.status(HttpStatus.LOCKED)
                     .body(Map.of("error", ex.getMessage()));
@@ -148,13 +151,15 @@ public class AutenticacaoController {
         }
 
         mfaChallengeService.consume(data.challengeToken());
-        return ResponseEntity.ok(buildSuccessResponse(usuario));
+        return buildSuccessResponseEntity(usuario);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity logout() {
+    public ResponseEntity<?> logout() {
         auditoriaService.registrar("SISTEMA", "LOGOUT", "Usuário realizou logout do sistema.");
-        return ResponseEntity.ok().build();
+        HttpHeaders headers = new HttpHeaders();
+        authCookieService.clearAuthCookie(headers);
+        return ResponseEntity.ok().headers(headers).build();
     }
 
     @GetMapping("/me")
@@ -205,5 +210,12 @@ public class AutenticacaoController {
                 null,
                 null
         );
+    }
+
+    private ResponseEntity<AuthFlowResponseDTO> buildSuccessResponseEntity(Usuario usuario) {
+        AuthFlowResponseDTO body = buildSuccessResponse(usuario);
+        HttpHeaders headers = new HttpHeaders();
+        authCookieService.writeAuthCookie(headers, body.token(), tokenService.getExpirationSeconds());
+        return ResponseEntity.ok().headers(headers).body(body);
     }
 }

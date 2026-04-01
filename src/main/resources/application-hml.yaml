@@ -40,6 +40,9 @@ logging:
     name: logs/erp-core-hml.log
 
 app:
+  security:
+    redis:
+      required: ${HML_APP_SECURITY_REDIS_REQUIRED:${APP_SECURITY_REDIS_REQUIRED:true}}
   bootstrap-admin:
     enabled: ${HML_BOOTSTRAP_ADMIN_ENABLED:false}
     username: ${HML_BOOTSTRAP_ADMIN_USERNAME:}

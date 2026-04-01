@@ -218,6 +218,60 @@ CREATE DATABASE grandport_erp;
 
 ---
 
+## 🐳 Deploy com Docker Compose
+
+Guia operacional curto: [DEPLOY.md](/home/ubuntu/IdeaProjects/erp-core/DEPLOY.md)
+
+Para homologacao/producao, o repositório agora assume Redis como dependencia obrigatoria da autenticacao segura. Nao dependa de lembrar disso manualmente: suba a stack completa.
+
+### Passo rapido
+
+```bash
+cp .env.example .env
+```
+
+Preencha pelo menos:
+
+```bash
+JWT_SECRET=uma-chave-longa-e-segura
+APP_API_BASE_URL=https://api.seu-dominio.com
+APP_SECURITY_REDIS_REQUIRED=true
+APP_SECURITY_COOKIE_SECURE=true
+POSTGRES_PASSWORD=uma-senha-forte
+```
+
+Suba a stack:
+
+```bash
+docker compose up -d --build
+```
+
+### O que sobe
+
+- `postgres`
+- `redis`
+- `erp-app`
+
+### Comportamento esperado
+
+- em `local/test`, Redis pode faltar e o sistema usa fallback em memoria
+- em `hml/producao`, Redis deve existir
+- se `APP_SECURITY_REDIS_REQUIRED=true` e Redis estiver indisponivel, a aplicacao falha no startup de forma intencional
+
+### Variaveis criticas de producao
+
+- `JWT_SECRET`
+- `APP_SECURITY_REDIS_REQUIRED=true`
+- `APP_SECURITY_COOKIE_SECURE=true`
+- `APP_API_BASE_URL`
+- `POSTGRES_PASSWORD`
+
+### Healthchecks
+
+O `docker-compose.yml` agora aguarda `postgres` e `redis` ficarem saudaveis antes de subir o app.
+
+---
+
 ### PASSO 4️⃣: Configurar Variáveis de Ambiente
 
 O projeto usa uma chave JWT para tokens. Configure-a:
@@ -625,4 +679,3 @@ Parabéns! Você agora tem todo o ambiente pronto para desenvolver no Grandport 
 ║  Happy Coding! 💻                      ║
 ╚════════════════════════════════════════╝
 ```
-

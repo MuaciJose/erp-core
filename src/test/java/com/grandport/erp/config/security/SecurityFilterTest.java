@@ -36,6 +36,12 @@ class SecurityFilterTest {
     private TokenService tokenService;
 
     @Mock
+    private AuthCookieService authCookieService;
+
+    @Mock
+    private RedisAvailabilityService redisAvailabilityService;
+
+    @Mock
     private UsuarioRepository usuarioRepository;
 
     @Mock
@@ -90,6 +96,7 @@ class SecurityFilterTest {
     @Test
     @DisplayName("Nao deve consultar usuario quando cabecalho Authorization nao existir")
     void naoDeveConsultarUsuarioSemCabecalhoAuthorization() throws ServletException, IOException {
+        when(authCookieService.resolveToken(org.mockito.ArgumentMatchers.any())).thenReturn(null);
         securityFilter.doFilterInternal(new MockHttpServletRequest(), new MockHttpServletResponse(), new MockFilterChain());
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());

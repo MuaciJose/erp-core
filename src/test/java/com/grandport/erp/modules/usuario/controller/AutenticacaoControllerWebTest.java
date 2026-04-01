@@ -4,6 +4,8 @@ import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.admin.service.SecurityEventService;
 import com.grandport.erp.modules.assinatura.service.PlanoPermissaoService;
 import com.grandport.erp.modules.assinatura.service.TenantAccessService;
+import com.grandport.erp.config.security.AuthCookieService;
+import com.grandport.erp.config.security.RedisAvailabilityService;
 import com.grandport.erp.config.security.LoginAttemptService;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.usuario.dto.UsuarioDTO;
@@ -41,6 +43,12 @@ class AutenticacaoControllerWebTest {
 
     @Mock
     private AuthenticationManager authenticationManager;
+
+    @Mock
+    private AuthCookieService authCookieService;
+
+    @Mock
+    private RedisAvailabilityService redisAvailabilityService;
 
     @Mock
     private TokenService tokenService;

@@ -28,6 +28,7 @@ import java.util.Map;
 public class SecurityFilter extends OncePerRequestFilter {
 
     private final TokenService tokenService;
+    private final AuthCookieService authCookieService;
     private final UsuarioRepository usuarioRepository;
     private final TenantAccessService tenantAccessService;
     private final PlanoPermissaoService planoPermissaoService;
@@ -83,9 +84,9 @@ public class SecurityFilter extends OncePerRequestFilter {
 
     private String recoverToken(HttpServletRequest request) {
         var authHeader = request.getHeader("Authorization");
-        if (authHeader == null || authHeader.isBlank() || !authHeader.startsWith("Bearer ")) {
-            return null;
+        if (authHeader != null && !authHeader.isBlank() && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
         }
-        return authHeader.substring(7);
+        return authCookieService.resolveToken(request);
     }
 }

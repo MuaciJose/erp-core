@@ -11,6 +11,9 @@ spring:
     show-sql: false
 
 app:
+  security:
+    redis:
+      required: false
   jobs:
     fiscal:
       contingencia:

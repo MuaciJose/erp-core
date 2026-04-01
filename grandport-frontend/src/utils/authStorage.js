@@ -60,7 +60,6 @@ export const persistSession = ({ token, user, remember }) => {
     window.sessionStorage.removeItem(USER_KEY);
 
     const storage = remember ? window.localStorage : window.sessionStorage;
-    storage.setItem(TOKEN_KEY, token);
     storage.setItem(USER_KEY, JSON.stringify(user));
     window.localStorage.setItem(REMEMBER_KEY, remember ? '1' : '0');
 };
@@ -75,21 +74,16 @@ export const clearSession = () => {
 };
 
 export const updateStoredUser = (user) => {
-    const token = getStoredToken();
-    if (!token) {
-        return;
-    }
     const remember = window.localStorage.getItem(REMEMBER_KEY) === '1';
     const storage = remember ? window.localStorage : window.sessionStorage;
+    const hasUser = storage.getItem(USER_KEY) || (!remember && window.localStorage.getItem(USER_KEY));
+    if (!hasUser) {
+        return;
+    }
     storage.setItem(USER_KEY, JSON.stringify(user));
 };
 
 export const syncAuthHeader = (api) => {
-    const token = getStoredToken();
-    if (token) {
-        api.defaults.headers.common.Authorization = `Bearer ${token}`;
-    } else {
-        delete api.defaults.headers.common.Authorization;
-    }
-    return token;
+    delete api.defaults.headers.common.Authorization;
+    return null;
 };

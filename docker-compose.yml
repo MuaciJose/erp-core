@@ -1,29 +1,38 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
     container_name: erp-postgres
     environment:
-      POSTGRES_DB: grandport_erp
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: ${POSTGRES_DB:-grandport_erp}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - erp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-grandport_erp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
     container_name: erp-redis
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     networks:
       - erp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
   erp-app:
     build:
@@ -31,16 +40,24 @@ services:
       dockerfile: Dockerfile
     container_name: erp-core-app
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/grandport_erp
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: admin
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-hml}
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-grandport_erp}
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      APP_SECURITY_REDIS_REQUIRED: ${APP_SECURITY_REDIS_REQUIRED:-true}
+      APP_SECURITY_COOKIE_SECURE: ${APP_SECURITY_COOKIE_SECURE:-true}
+      APP_SECURITY_COOKIE_SAME_SITE: ${APP_SECURITY_COOKIE_SAME_SITE:-Lax}
+      APP_API_BASE_URL: ${APP_API_BASE_URL:-http://localhost:8080}
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-8080}:8080"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - erp-network
     healthcheck:
@@ -57,4 +74,3 @@ volumes:
 networks:
   erp-network:
     driver: bridge
-

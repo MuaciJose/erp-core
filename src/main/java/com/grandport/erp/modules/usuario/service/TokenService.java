@@ -15,6 +15,8 @@ import java.time.ZoneOffset;
 
 @Service
 public class TokenService {
+
+    private static final long EXPIRATION_HOURS = 2;
     
     // Em produção, use uma variável de ambiente para essa secret
     @Value("${api.security.token.secret:}")
@@ -54,7 +56,10 @@ public class TokenService {
     }
 
     private Instant genExpirationDate() {
-        // Token expira em 2 horas (comum em ERPs para segurança de balcão)
-        return LocalDateTime.now().plusHours(2).toInstant(ZoneOffset.of("-03:00"));
+        return LocalDateTime.now().plusHours(EXPIRATION_HOURS).toInstant(ZoneOffset.of("-03:00"));
+    }
+
+    public long getExpirationSeconds() {
+        return EXPIRATION_HOURS * 3600;
     }
 }

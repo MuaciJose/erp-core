@@ -11,7 +11,6 @@ import { CentralDeLayouts } from './CentralDeLayouts';
 import { CentralDeLaudos } from './CentralDeLaudos';
 import { LayoutGovernanceDashboard } from './LayoutGovernanceDashboard';
 import { CentralDanfe } from './CentralDanfe';
-import { getStoredToken } from '../../utils/authStorage';
 
 // 🚀 LISTA OFICIAL PARA GARANTIR QUE O DADO ENVIADO AO JAVA SEJA SEMPRE VÁLIDO
 const ESTADOS_BRASIL = [
@@ -319,15 +318,9 @@ export const Configuracoes = () => {
 
                 const baseUrl = api.defaults.baseURL || 'http://localhost:8080';
 
-                let token = getStoredToken();
-                if (!token && api.defaults.headers.common['Authorization']) {
-                    token = api.defaults.headers.common['Authorization'];
-                }
-                const authHeader = token ? (token.startsWith('Bearer') ? token : `Bearer ${token}`) : '';
-
                 const uploadRes = await fetch(`${baseUrl}/api/configuracoes/certificado`, {
                     method: 'POST',
-                    headers: { 'Authorization': authHeader },
+                    credentials: 'include',
                     body: formData
                 });
 
