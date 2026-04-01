@@ -2,6 +2,7 @@ package com.grandport.erp.modules.empresa.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -35,4 +36,13 @@ public class Empresa {
 
     @Column(name = "motivo_bloqueio")
     private String motivoBloqueio;
+
+    @Column(name = "plano", nullable = false)
+    private String plano = "ESSENCIAL";
+
+    @Column(name = "valor_mensal", nullable = false, precision = 12, scale = 2)
+    private BigDecimal valorMensal = BigDecimal.ZERO;
+
+    @Column(name = "dias_tolerancia", nullable = false)
+    private Integer diasTolerancia = 0;
 }

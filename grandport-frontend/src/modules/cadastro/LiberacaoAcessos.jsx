@@ -14,6 +14,9 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
     const [filtroEmpresas, setFiltroEmpresas] = useState('TODAS');
     const [datasVencimento, setDatasVencimento] = useState({});
     const [motivosBloqueio, setMotivosBloqueio] = useState({});
+    const [planosEmpresa, setPlanosEmpresa] = useState({});
+    const [valoresEmpresa, setValoresEmpresa] = useState({});
+    const [toleranciasEmpresa, setToleranciasEmpresa] = useState({});
     const [abaAtiva, setAbaAtiva] = useState('solicitacoes');
 
     const carregarDados = async () => {
@@ -32,6 +35,9 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
             setEventosSeguranca(Array.isArray(resEventos.data) ? resEventos.data : []);
             setDatasVencimento(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.dataVencimento || ''])));
             setMotivosBloqueio(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.motivoBloqueio || ''])));
+            setPlanosEmpresa(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.plano || 'ESSENCIAL'])));
+            setValoresEmpresa(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.valorMensal ?? 0])));
+            setToleranciasEmpresa(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.diasTolerancia ?? 0])));
         } catch (error) {
             toast.error('Não foi possível carregar os dados da operação SaaS.');
         } finally {
@@ -195,6 +201,24 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
             await carregarDados();
         } catch (error) {
             toast.error(error?.response?.data?.message || 'Não foi possível reativar a empresa.', { id: toastId });
+        } finally {
+            setProcessandoId(null);
+        }
+    };
+
+    const salvarPlanoEmpresa = async (empresa) => {
+        setProcessandoId(`plano-${empresa.id}`);
+        const toastId = toast.loading(`Atualizando plano de ${empresa.razaoSocial}...`);
+        try {
+            await api.post(`/api/assinaturas/empresas/${empresa.id}/plano`, {
+                plano: planosEmpresa[empresa.id],
+                valorMensal: Number(valoresEmpresa[empresa.id] || 0),
+                diasTolerancia: Number(toleranciasEmpresa[empresa.id] || 0)
+            });
+            toast.success('Plano atualizado com sucesso.', { id: toastId });
+            await carregarDados();
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Não foi possível atualizar o plano.', { id: toastId });
         } finally {
             setProcessandoId(null);
         }
@@ -485,6 +509,8 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
                                             <div><span className="font-bold text-slate-700">Contato:</span> {empresa.telefone || '-'}</div>
                                             <div><span className="font-bold text-slate-700">CNPJ:</span> {empresa.cnpj}</div>
                                             <div><span className="font-bold text-slate-700">Vencimento:</span> {empresa.dataVencimento ? new Date(`${empresa.dataVencimento}T00:00:00`).toLocaleDateString('pt-BR') : '-'}</div>
+                                            <div><span className="font-bold text-slate-700">Plano:</span> {empresa.plano || 'ESSENCIAL'}</div>
+                                            <div><span className="font-bold text-slate-700">Valor:</span> R$ {Number(empresa.valorMensal || 0).toFixed(2)}</div>
                                         </div>
                                         {empresa.motivoBloqueio && (
                                             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -505,6 +531,40 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
                                                 />
                                             </label>
                                             <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
+                                                Plano
+                                                <select
+                                                    value={planosEmpresa[empresa.id] || 'ESSENCIAL'}
+                                                    onChange={(e) => setPlanosEmpresa(prev => ({ ...prev, [empresa.id]: e.target.value }))}
+                                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
+                                                >
+                                                    <option value="ESSENCIAL">ESSENCIAL</option>
+                                                    <option value="PROFISSIONAL">PROFISSIONAL</option>
+                                                    <option value="PREMIUM">PREMIUM</option>
+                                                </select>
+                                            </label>
+                                            <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
+                                                Valor mensal
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={valoresEmpresa[empresa.id] ?? 0}
+                                                    onChange={(e) => setValoresEmpresa(prev => ({ ...prev, [empresa.id]: e.target.value }))}
+                                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
+                                                />
+                                            </label>
+                                            <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
+                                                Dias de tolerância
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="1"
+                                                    value={toleranciasEmpresa[empresa.id] ?? 0}
+                                                    onChange={(e) => setToleranciasEmpresa(prev => ({ ...prev, [empresa.id]: e.target.value }))}
+                                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
+                                                />
+                                            </label>
+                                            <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
                                                 Motivo do bloqueio
                                                 <input
                                                     type="text"
@@ -517,6 +577,13 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
                                         </div>
 
                                         <div className="grid gap-2 md:grid-cols-3">
+                                            <button
+                                                onClick={() => salvarPlanoEmpresa(empresa)}
+                                                disabled={processandoId === `plano-${empresa.id}`}
+                                                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                            >
+                                                {processandoId === `plano-${empresa.id}` ? 'SALVANDO...' : 'Salvar plano'}
+                                            </button>
                                             <button
                                                 onClick={() => registrarPagamento(empresa)}
                                                 disabled={processandoId === `pagamento-${empresa.id}` || !datasVencimento[empresa.id]}
@@ -531,14 +598,14 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
                                             >
                                                 {processandoId === `reativar-${empresa.id}` ? 'REATIVANDO...' : 'Reativar'}
                                             </button>
-                                            <button
-                                                onClick={() => bloquearEmpresa(empresa)}
-                                                disabled={processandoId === `bloquear-${empresa.id}`}
-                                                className="rounded-2xl bg-red-600 px-4 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                                            >
-                                                {processandoId === `bloquear-${empresa.id}` ? 'BLOQUEANDO...' : 'Bloquear'}
-                                            </button>
                                         </div>
+                                        <button
+                                            onClick={() => bloquearEmpresa(empresa)}
+                                            disabled={processandoId === `bloquear-${empresa.id}`}
+                                            className="rounded-2xl bg-red-600 px-4 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                        >
+                                            {processandoId === `bloquear-${empresa.id}` ? 'BLOQUEANDO...' : 'Bloquear'}
+                                        </button>
                                     </div>
                                 </div>
                             </article>

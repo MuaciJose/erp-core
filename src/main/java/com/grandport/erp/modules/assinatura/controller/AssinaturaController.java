@@ -6,6 +6,7 @@ import com.grandport.erp.modules.assinatura.dto.ConviteAssinaturaDTO;
 import com.grandport.erp.modules.assinatura.dto.ConvitePublicoDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaAssinaturaResumoDTO;
 import com.grandport.erp.modules.assinatura.dto.RegistrarPagamentoDTO;
+import com.grandport.erp.modules.assinatura.dto.AtualizarPlanoEmpresaDTO;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoResumoDTO;
 import com.grandport.erp.modules.assinatura.service.AssinaturaService;
 import org.springframework.http.ResponseEntity;
@@ -125,6 +126,17 @@ public class AssinaturaController {
         try {
             assinaturaService.validarAcessoPlataforma();
             return ResponseEntity.ok(assinaturaService.reativarEmpresa(id, dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/empresas/{id}/plano")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public ResponseEntity<?> atualizarPlano(@PathVariable Long id, @RequestBody AtualizarPlanoEmpresaDTO dto) {
+        try {
+            assinaturaService.validarAcessoPlataforma();
+            return ResponseEntity.ok(assinaturaService.atualizarPlanoEmpresa(id, dto));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }

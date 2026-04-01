@@ -10,5 +10,8 @@ public record EmpresaAssinaturaResumoDTO(
         String statusAssinatura,
         String dataVencimento,
         String motivoBloqueio,
-        String adminPrincipal
+        String adminPrincipal,
+        String plano,
+        Double valorMensal,
+        Integer diasTolerancia
 ) {}

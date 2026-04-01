@@ -35,20 +35,23 @@ public class AssinaturaSchedulerService {
             if (empresa.getStatusAssinatura() == StatusAssinatura.BLOQUEADA || empresa.getStatusAssinatura() == StatusAssinatura.CANCELADA) {
                 continue;
             }
-            if (empresa.getDataVencimento() == null || !empresa.getDataVencimento().isBefore(hoje)) {
+            LocalDate dataCorte = empresa.getDataVencimento() == null
+                    ? null
+                    : empresa.getDataVencimento().plusDays(Math.max(empresa.getDiasTolerancia() == null ? 0 : empresa.getDiasTolerancia(), 0));
+            if (dataCorte == null || !dataCorte.isBefore(hoje)) {
                 continue;
             }
 
             if (empresa.getStatusAssinatura() != StatusAssinatura.INADIMPLENTE) {
                 empresa.setStatusAssinatura(StatusAssinatura.INADIMPLENTE);
-                empresa.setMotivoBloqueio("Assinatura vencida em " + empresa.getDataVencimento() + ".");
+                empresa.setMotivoBloqueio("Assinatura vencida em " + empresa.getDataVencimento() + " e fora da tolerância.");
                 securityEventService.registrar(
                         empresa.getId(),
                         "ASSINATURA_INADIMPLENTE",
                         "WARN",
                         "SCHEDULER",
                         null,
-                        "Empresa marcada automaticamente como inadimplente por vencimento em " + empresa.getDataVencimento() + "."
+                        "Empresa marcada automaticamente como inadimplente por vencimento em " + empresa.getDataVencimento() + " com tolerância de " + empresa.getDiasTolerancia() + " dia(s)."
                 );
                 bloqueadas++;
             }

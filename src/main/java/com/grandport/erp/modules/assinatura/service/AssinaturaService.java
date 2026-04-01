@@ -5,6 +5,7 @@ import com.grandport.erp.modules.assinatura.dto.ConviteAssinaturaDTO;
 import com.grandport.erp.modules.assinatura.dto.ConvitePublicoDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaAssinaturaResumoDTO;
 import com.grandport.erp.modules.assinatura.dto.RegistrarPagamentoDTO;
+import com.grandport.erp.modules.assinatura.dto.AtualizarPlanoEmpresaDTO;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoDTO;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoResumoDTO;
 import com.grandport.erp.modules.assinatura.model.AssinaturaInvite;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -73,6 +75,9 @@ public class AssinaturaService {
         empresa.setStatusAssinatura(StatusAssinatura.ATIVA);
         empresa.setDataVencimento(LocalDate.now().plusDays(30));
         empresa.setMotivoBloqueio(null);
+        empresa.setPlano("ESSENCIAL");
+        empresa.setValorMensal(BigDecimal.ZERO);
+        empresa.setDiasTolerancia(0);
 
         Empresa empresaSalva = empresaRepository.save(empresa);
 
@@ -238,6 +243,23 @@ public class AssinaturaService {
     }
 
     @Transactional
+    public EmpresaAssinaturaResumoDTO atualizarPlanoEmpresa(Long empresaId, AtualizarPlanoEmpresaDTO dto) {
+        Empresa empresa = empresaRepository.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
+        if (dto == null) {
+            throw new RuntimeException("Dados do plano não informados.");
+        }
+        if (dto.plano() == null || dto.plano().isBlank()) {
+            throw new RuntimeException("Informe o nome do plano.");
+        }
+
+        empresa.setPlano(dto.plano().trim().toUpperCase());
+        empresa.setValorMensal(BigDecimal.valueOf(dto.valorMensal() == null ? 0D : dto.valorMensal()));
+        empresa.setDiasTolerancia(dto.diasTolerancia() == null ? 0 : Math.max(dto.diasTolerancia(), 0));
+        return toEmpresaDto(empresaRepository.save(empresa));
+    }
+
+    @Transactional
     public ConviteAssinaturaDTO aprovarSolicitacao(Long solicitacaoId) {
         SolicitacaoAcesso solicitacao = solicitacaoAcessoRepository.findById(solicitacaoId)
                 .orElseThrow(() -> new RuntimeException("Solicitação não encontrada."));
@@ -312,7 +334,10 @@ public class AssinaturaService {
                 empresa.getStatusAssinatura() == null ? null : empresa.getStatusAssinatura().name(),
                 empresa.getDataVencimento() == null ? null : empresa.getDataVencimento().toString(),
                 empresa.getMotivoBloqueio(),
-                adminPrincipal
+                adminPrincipal,
+                empresa.getPlano(),
+                empresa.getValorMensal() == null ? 0D : empresa.getValorMensal().doubleValue(),
+                empresa.getDiasTolerancia()
         );
     }
 
