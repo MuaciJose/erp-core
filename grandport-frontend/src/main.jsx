@@ -8,7 +8,12 @@ import App from './App.jsx'
 import { registerSW } from 'virtual:pwa-register'
 
 // Registrar o Service Worker para permitir instalação e modo offline
-registerSW({ immediate: true })
+const updateSW = registerSW({
+    immediate: true,
+    onNeedRefresh() {
+        updateSW(true)
+    }
+})
 
 createRoot(document.getElementById('root')).render(
     <StrictMode>

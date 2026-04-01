@@ -3,6 +3,7 @@ package com.grandport.erp.modules.fiscal.service;
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 import com.grandport.erp.modules.fiscal.repository.NotaFiscalRepository;
 import com.grandport.erp.modules.vendas.model.Venda;
@@ -39,6 +40,9 @@ public class NfceContingenciaService {
 
     @Autowired
     private AuditoriaService auditoriaService;
+
+    @Autowired
+    private EmpresaContextService empresaContextService;
 
     // =========================================================================
     // 📊 VERIFICAÇÕES PRÉ-CONTINGÊNCIA
@@ -126,6 +130,7 @@ public class NfceContingenciaService {
 
         // ✅ PASSO 5: Cria a nota em status CONTINGENCIA
         NotaFiscal nota = new NotaFiscal();
+        nota.setEmpresaId(empresaContextService.getRequiredEmpresaId());
         nota.setVenda(venda);
         nota.setNumero(numeroNfce);
         nota.setSerie(String.valueOf(serieNfce));
@@ -186,7 +191,8 @@ public class NfceContingenciaService {
     public Map<String, Object> sincronizarContingencias() throws Exception {
         
         // ✅ PASSO 1: Localiza notas em contingência
-        List<NotaFiscal> notasContingencia = notaFiscalRepository.findAll().stream()
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        List<NotaFiscal> notasContingencia = notaFiscalRepository.findAllByEmpresaIdOrderByIdDesc(empresaId).stream()
             .filter(n -> "CONTINGENCIA".equals(n.getStatus()))
             .toList();
 
@@ -319,10 +325,10 @@ public class NfceContingenciaService {
      * Conta quantas notas estão em contingência
      */
     public long contarNodasContingencia() {
-        return notaFiscalRepository.findAll().stream()
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        return notaFiscalRepository.findAllByEmpresaIdOrderByIdDesc(empresaId).stream()
             .filter(n -> "CONTINGENCIA".equals(n.getStatus()))
             .count();
     }
 }
-
 

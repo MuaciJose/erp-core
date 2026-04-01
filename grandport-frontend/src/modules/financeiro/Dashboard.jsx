@@ -11,6 +11,7 @@ import {
     PieChart, Pie, Cell
 } from 'recharts';
 import { PainelInteligencia } from './PainelInteligencia';
+import { getStoredUser } from '../../utils/authStorage';
 
 // 🚀 IMPORTAÇÃO DO BANNER DO PWA
 import { InstallPWABanner } from '../../components/InstallPWABanner';
@@ -46,15 +47,10 @@ export const Dashboard = ({ setPaginaAtiva }) => {
     };
 
     useEffect(() => {
-        const userStr = localStorage.getItem('grandport_user') || localStorage.getItem('usuario') || localStorage.getItem('user');
-        if (userStr) {
-            try {
-                const userObj = JSON.parse(userStr);
-                const nomeCompleto = userObj.nome || userObj.nomeCompleto || 'Admin';
-                setNomeUsuario(nomeCompleto.split(' ')[0]);
-            } catch (e) {
-                setNomeUsuario(userStr);
-            }
+        const userObj = getStoredUser();
+        if (userObj) {
+            const nomeCompleto = userObj.nome || userObj.nomeCompleto || 'Admin';
+            setNomeUsuario(nomeCompleto.split(' ')[0]);
         }
 
         const carregarDashboard = async () => {

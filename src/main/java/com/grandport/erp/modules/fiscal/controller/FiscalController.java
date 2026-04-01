@@ -2,6 +2,7 @@ package com.grandport.erp.modules.fiscal.controller;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 import com.grandport.erp.modules.fiscal.repository.NotaFiscalRepository;
 import com.grandport.erp.modules.fiscal.service.DanfeService;
@@ -71,14 +72,17 @@ public class FiscalController {
     @Autowired
     private SincronizacaoErpService sincronizacaoErpService;
 
+    @Autowired
+    private EmpresaContextService empresaContextService;
+
     // =======================================================================
     // 🚀 LISTAR TODAS AS NOTAS (PARA O GERENCIADOR FISCAL)
     // =======================================================================
     @GetMapping("/notas")
     public ResponseEntity<List<NotaFiscal>> listarTodasAsNotas() {
         try {
-            List<NotaFiscal> notas = notaFiscalRepository.findAll();
-            notas.sort((n1, n2) -> n2.getId().compareTo(n1.getId()));
+            Long empresaId = empresaContextService.getRequiredEmpresaId();
+            List<NotaFiscal> notas = notaFiscalRepository.findAllByEmpresaIdOrderByIdDesc(empresaId);
             return ResponseEntity.ok(notas);
         } catch (Exception e) {
             System.err.println("[ERRO - LISTAR NOTAS] " + e.getMessage());
@@ -93,7 +97,8 @@ public class FiscalController {
     public ResponseEntity<?> emitirCupom(@PathVariable Long vendaId) {
         try {
             Map<String, Object> resultadoSefaz = nfeService.emitirNfeSefaz(vendaId);
-            NotaFiscal notaSalva = notaFiscalRepository.findByVendaId(vendaId);
+            Long empresaId = empresaContextService.getRequiredEmpresaId();
+            NotaFiscal notaSalva = notaFiscalRepository.findByEmpresaIdAndVendaId(empresaId, vendaId);
             Map<String, Object> response = new HashMap<>(resultadoSefaz);
 
             if (notaSalva != null) {
@@ -135,7 +140,8 @@ public class FiscalController {
     @GetMapping("/{nfeId}/danfe")
     public ResponseEntity<byte[]> baixarDanfe(@PathVariable Long nfeId) {
         try {
-            NotaFiscal nota = notaFiscalRepository.findById(nfeId)
+            Long empresaId = empresaContextService.getRequiredEmpresaId();
+            NotaFiscal nota = notaFiscalRepository.findByEmpresaIdAndId(empresaId, nfeId)
                     .orElseThrow(() -> new Exception("Nota Fiscal não encontrada."));
 
             byte[] pdfBytes = danfeService.gerarDanfePdf(nota);
@@ -152,9 +158,8 @@ public class FiscalController {
     @GetMapping(value = "/danfe/avulsa/{chaveAcesso}", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> baixarDanfeAvulsa(@PathVariable String chaveAcesso) {
         try {
-            NotaFiscal nota = notaFiscalRepository.findAll().stream()
-                    .filter(n -> chaveAcesso.equals(n.getChaveAcesso()))
-                    .findFirst()
+            Long empresaId = empresaContextService.getRequiredEmpresaId();
+            NotaFiscal nota = notaFiscalRepository.findByEmpresaIdAndChaveAcesso(empresaId, chaveAcesso)
                     .orElseThrow(() -> new Exception("Nota Fiscal não encontrada no Banco de Dados."));
 
             byte[] pdfBytes = danfeService.gerarDanfeAvulsaPdf(nota);
@@ -173,7 +178,8 @@ public class FiscalController {
     @GetMapping("/{nfeId}/xml")
     public ResponseEntity<byte[]> baixarXml(@PathVariable Long nfeId) {
         try {
-            NotaFiscal nota = notaFiscalRepository.findById(nfeId)
+            Long empresaId = empresaContextService.getRequiredEmpresaId();
+            NotaFiscal nota = notaFiscalRepository.findByEmpresaIdAndId(empresaId, nfeId)
                     .orElseThrow(() -> new Exception("Nota Fiscal não encontrada."));
 
             String diretorioXml = System.getProperty("user.dir") + "/nfe_xmls/";

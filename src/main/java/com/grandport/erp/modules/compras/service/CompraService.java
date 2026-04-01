@@ -40,7 +40,8 @@ public class CompraService {
     @Autowired private AuditoriaService auditoriaService;
 
     public List<ImportacaoResumoDTO> listarHistorico() {
-        return compraXMLRepository.findAll().stream().map(entidade -> {
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        return compraXMLRepository.findAllByEmpresaIdOrderByDataImportacaoDesc(empresaId).stream().map(entidade -> {
             ImportacaoResumoDTO dto = new ImportacaoResumoDTO();
             dto.setId(entidade.getId());
             dto.setNumero(entidade.getNumero());
@@ -87,7 +88,8 @@ public class CompraService {
         NfeDTO nfe = nfeProc.getNfe();
         NfeDTO.InfoNfe info = nfe.getInfNFe();
 
-        Optional<CompraXML> notaExistente = compraXMLRepository.findByNumeroAndCnpjFornecedor(info.getIde().getNumeroNota(), info.getEmitente().getCnpj());
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        Optional<CompraXML> notaExistente = compraXMLRepository.findByEmpresaIdAndNumeroAndCnpjFornecedor(empresaId, info.getIde().getNumeroNota(), info.getEmitente().getCnpj());
         if(notaExistente.isPresent()) {
             throw new RuntimeException("XML Duplicado: Esta nota já foi importada no sistema.");
         }
@@ -105,6 +107,7 @@ public class CompraService {
         historico.setDataImportacao(LocalDateTime.now());
         historico.setValorTotal(total);
         historico.setStatus("Pendente Revisão");
+        historico.setEmpresaId(empresaId);
 
         for (NfeDTO.Detalhe detalhe : info.getDetalhes()) {
             ItemNotaDTO itemXml = detalhe.getProduto();
@@ -153,7 +156,8 @@ public class CompraService {
 
     @Transactional
     public void finalizarNota(Long id, ConfirmacaoNotaDTO dto) {
-        CompraXML nota = compraXMLRepository.findById(id)
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        CompraXML nota = compraXMLRepository.findByEmpresaIdAndId(empresaId, id)
                 .orElseThrow(() -> new RuntimeException("Nota não encontrada"));
 
         if("Finalizado".equals(nota.getStatus())) {

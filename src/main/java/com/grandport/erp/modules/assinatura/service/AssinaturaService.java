@@ -87,7 +87,7 @@ public class AssinaturaService {
         admin.setNomeCompleto(dto.nomeAdmin());
         admin.setUsername(dto.emailAdmin()); // Onde vai ficar salvo o e-mail de login
         admin.setSenha(passwordEncoder.encode(dto.senhaAdmin()));
-        admin.setForcePasswordChange(false);
+        admin.setForcePasswordChange(true);
         admin.setTipoAcesso(TipoAcesso.TENANT_ADMIN);
 
         // O motor do SaaS ativado

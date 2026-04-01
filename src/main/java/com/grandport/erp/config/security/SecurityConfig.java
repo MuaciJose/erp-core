@@ -1,6 +1,7 @@
 package com.grandport.erp.config.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -19,6 +20,8 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebSecurity
@@ -27,6 +30,8 @@ import java.util.Arrays;
 public class SecurityConfig {
 
     private final SecurityFilter securityFilter;
+    @Value("${app.security.cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173}")
+    private String allowedOrigins;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -53,9 +58,12 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/**").hasAuthority("ROLE_PLATFORM_ADMIN")
 
                         // ================= ROTAS PÚBLICAS =================
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/mfa/verify").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/assinaturas/nova-empresa").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/assinaturas/solicitacoes-acesso").permitAll()
@@ -65,8 +73,7 @@ public class SecurityConfig {
 
 
 
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
-                        .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").hasAuthority("ROLE_PLATFORM_ADMIN")
 
 
                         .requestMatchers("/api/parceiros/consulta-cnpj/**").permitAll()
@@ -97,17 +104,12 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // ✅ SEGURANÇA: Definir domínios específicos (não wildcard)
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:3000",              // Dev frontend React
-            "http://localhost:5173",              // Dev Vite
-            "http://127.0.0.1:3000",              // Dev local
-            "http://127.0.0.1:5173",              // Dev local Vite
-            "https://www.seudominio.com",         // Produção
-            "https://app.seudominio.com",         // Produção app
-            "https://admin.seudominio.com"        // Admin produção
-        ));
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank())
+                .collect(Collectors.toList());
 
+        configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Content-Type", "Authorization", "Accept", "X-Requested-With"));
         configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Total-Count"));

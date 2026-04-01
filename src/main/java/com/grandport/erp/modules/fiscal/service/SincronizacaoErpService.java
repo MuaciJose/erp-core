@@ -67,7 +67,11 @@ public class SincronizacaoErpService {
      * 
      */
     private Long obterEmpresaIdDoUsuarioAutenticado() {
-        return empresaContextService.getRequiredEmpresaId();
+        try {
+            return empresaContextService.getRequiredEmpresaId();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // =========================================================================
@@ -242,7 +246,7 @@ public class SincronizacaoErpService {
             log.info("Iniciando robo de sincronizacao automatica.");
 
             // ✅ Sincroniza status de todas as notas com vendas
-            List<NotaFiscal> notasComVenda = notaFiscalRepository.findAll().stream()
+            List<NotaFiscal> notasComVenda = listarNotasDoEscopoAtual().stream()
                 .filter(n -> n.getVenda() != null)
                 .toList();
 
@@ -281,7 +285,7 @@ public class SincronizacaoErpService {
     public Map<String, Object> validarIntegridade() {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracaoSistema();
         
-        List<NotaFiscal> notas = notaFiscalRepository.findAll().stream()
+        List<NotaFiscal> notas = listarNotasDoEscopoAtual().stream()
             .filter(n -> "AUTORIZADA".equals(n.getStatus()) || 
                          "SINCRONIZADA".equals(n.getStatus()))
             .sorted((a, b) -> Long.compare(a.getNumero(), b.getNumero()))
@@ -310,7 +314,7 @@ public class SincronizacaoErpService {
             "Inicializando limpeza de inconsistências fiscais...");
         
         // Localiza notas sem vendas vinculadas
-        List<NotaFiscal> notasOrfas = notaFiscalRepository.findAll().stream()
+        List<NotaFiscal> notasOrfas = listarNotasDoEscopoAtual().stream()
             .filter(n -> n.getVenda() == null && 
                         ("RASCUNHO".equals(n.getStatus()) || 
                          "ENVIADA".equals(n.getStatus())))
@@ -325,5 +329,13 @@ public class SincronizacaoErpService {
             auditoriaService.registrar("SISTEMA", "NOTA_ORFA_DELETADA",
                 "Nota órfã deletada: " + nota.getId());
         }
+    }
+
+    private List<NotaFiscal> listarNotasDoEscopoAtual() {
+        Long empresaId = obterEmpresaIdDoUsuarioAutenticado();
+        if (empresaId != null) {
+            return notaFiscalRepository.findAllByEmpresaIdOrderByIdDesc(empresaId);
+        }
+        return notaFiscalRepository.findAll();
     }
 }

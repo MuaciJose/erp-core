@@ -2,6 +2,8 @@ package com.grandport.erp.config.security;
 
 import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
+import com.grandport.erp.modules.assinatura.service.PlanoPermissaoService;
+import com.grandport.erp.modules.assinatura.service.TenantAccessService;
 import com.grandport.erp.modules.usuario.service.TokenService;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doNothing;
+import static java.util.List.of;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Testes - Security Filter")
@@ -33,6 +37,12 @@ class SecurityFilterTest {
 
     @Mock
     private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private TenantAccessService tenantAccessService;
+
+    @Mock
+    private PlanoPermissaoService planoPermissaoService;
 
     @InjectMocks
     private SecurityFilter securityFilter;
@@ -54,6 +64,8 @@ class SecurityFilterTest {
 
         when(tokenService.validateToken("token-valido")).thenReturn("admin");
         when(usuarioRepository.findByUsername("admin")).thenReturn(usuario);
+        when(planoPermissaoService.getAuthorities(usuario)).thenReturn(of());
+        doNothing().when(tenantAccessService).validarAcesso(usuario);
 
         securityFilter.doFilterInternal(request, new MockHttpServletResponse(), new MockFilterChain());
 

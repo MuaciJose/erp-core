@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { Calculator, X, DollarSign, Percent, PieChart, Info } from 'lucide-react';
+import { getStoredUser } from '../utils/authStorage';
 
 export const WidgetCalculadora = () => {
     const [aberto, setAberto] = useState(false);
@@ -24,10 +25,7 @@ export const WidgetCalculadora = () => {
     const [erro, setErro] = useState('');
 
     useEffect(() => {
-        const userSaved = localStorage.getItem('grandport_user');
-        if (userSaved) {
-            setUsuario(JSON.parse(userSaved));
-        }
+        setUsuario(getStoredUser());
     }, [aberto]);
 
     useEffect(() => {

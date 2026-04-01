@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.vendas.controller;
 
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import com.grandport.erp.modules.vendas.service.RelatorioService;
@@ -29,6 +30,9 @@ public class RelatorioVendaController {
     // INJETADO O REPOSITÓRIO PARA BUSCAR AS VENDAS DA COMISSÃO
     @Autowired
     private VendaRepository vendaRepository;
+
+    @Autowired
+    private EmpresaContextService empresaContextService;
 
     // SEU ENDPOINT ORIGINAL MANTIDO INTACTO
     @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
@@ -70,7 +74,8 @@ public class RelatorioVendaController {
         LocalDateTime fim = LocalDate.parse(fimStr).atTime(LocalTime.MAX);
 
         // Busca e filtra vendas no período e pelo vendedor (se selecionado)
-        List<Venda> vendasNoPeriodo = vendaRepository.findAll().stream()
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        List<Venda> vendasNoPeriodo = vendaRepository.findAllByEmpresa(empresaId).stream()
                 .filter(v -> "CONCLUIDA".equals(v.getStatus().name()))
                 .filter(v -> !v.getDataHora().isBefore(inicio) && !v.getDataHora().isAfter(fim))
                 .filter(v -> vendedorId == null || vendedorId.equals(v.getVendedorId()))

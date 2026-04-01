@@ -66,7 +66,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt', // 🚀 'prompt' avisa o usuário quando há uma nova versão do ERP
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
         name: 'GrandPort ERP',

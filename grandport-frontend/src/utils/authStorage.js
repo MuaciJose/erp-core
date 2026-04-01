@@ -1,10 +1,33 @@
 const TOKEN_KEY = 'grandport_token';
 const USER_KEY = 'grandport_user';
 const REMEMBER_KEY = 'grandport_remember';
+const LEGACY_KEYS = [
+    'token',
+    'usuario',
+    'user',
+    'usuarioId',
+    'userId',
+    'nome',
+    'usuarioNome',
+    'username'
+];
 
 const storages = () => [window.localStorage, window.sessionStorage];
 
+const removeFromAllStorages = (key) => {
+    for (const storage of storages()) {
+        storage.removeItem(key);
+    }
+};
+
+export const cleanupLegacyAuthData = () => {
+    for (const key of LEGACY_KEYS) {
+        removeFromAllStorages(key);
+    }
+};
+
 const readFirst = (key) => {
+    cleanupLegacyAuthData();
     for (const storage of storages()) {
         const value = storage.getItem(key);
         if (value) {
@@ -18,10 +41,19 @@ export const getStoredToken = () => readFirst(TOKEN_KEY);
 
 export const getStoredUser = () => {
     const value = readFirst(USER_KEY);
-    return value ? JSON.parse(value) : null;
+    if (!value) {
+        return null;
+    }
+    try {
+        return JSON.parse(value);
+    } catch (error) {
+        clearSession();
+        return null;
+    }
 };
 
 export const persistSession = ({ token, user, remember }) => {
+    cleanupLegacyAuthData();
     window.localStorage.removeItem(TOKEN_KEY);
     window.localStorage.removeItem(USER_KEY);
     window.sessionStorage.removeItem(TOKEN_KEY);
@@ -34,6 +66,7 @@ export const persistSession = ({ token, user, remember }) => {
 };
 
 export const clearSession = () => {
+    cleanupLegacyAuthData();
     window.localStorage.removeItem(TOKEN_KEY);
     window.localStorage.removeItem(USER_KEY);
     window.localStorage.removeItem(REMEMBER_KEY);

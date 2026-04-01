@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
+import { getStoredUser } from '../../utils/authStorage';
 import toast from 'react-hot-toast';
 import {
     Wrench, Car, User, Search, Plus, Trash2, CheckCircle, Save,
@@ -209,16 +210,8 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         if (isBloqueada) return;
         const existe = itensServicos.find(i => i.servicoId === serv.id);
 
-        let idLogado = localStorage.getItem('usuarioId') || localStorage.getItem('userId') || '';
-        if (!idLogado) {
-            try {
-                const token = localStorage.getItem('token');
-                if (token) {
-                    const payload = JSON.parse(atob(token.split('.')[1]));
-                    idLogado = payload.id || payload.userId || '';
-                }
-            } catch(e) {}
-        }
+        const usuarioLogado = getStoredUser();
+        let idLogado = usuarioLogado?.id || '';
 
         let mecanicoAuto = '';
         if (idLogado) {
@@ -335,16 +328,8 @@ export const OrdemServico = ({ osParaEditar, onVoltar }) => {
         const servicoSemMecanico = itensServicos.find(s => !s.mecanicoId);
         if(servicoSemMecanico) { notificar('erro', `Falta selecionar o mecânico para o serviço: ${servicoSemMecanico.nome}`); return false; }
 
-        let consultorIdLogado = localStorage.getItem('usuarioId') || localStorage.getItem('userId') || null;
-        if (!consultorIdLogado) {
-            try {
-                const token = localStorage.getItem('token');
-                if (token) {
-                    const payload = JSON.parse(atob(token.split('.')[1]));
-                    consultorIdLogado = payload.id || payload.userId || null;
-                }
-            } catch(e) {}
-        }
+        const usuarioLogado = getStoredUser();
+        const consultorIdLogado = usuarioLogado?.id || null;
 
         const payload = {
             clienteId: clienteSelecionado.id,

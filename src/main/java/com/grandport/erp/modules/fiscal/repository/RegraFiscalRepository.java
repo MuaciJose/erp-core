@@ -12,4 +12,6 @@ public interface RegraFiscalRepository extends JpaRepository<RegraFiscal, Long> 
 
     // Método inteligente que o sistema vai usar na hora de emitir a NFe
     Optional<RegraFiscal> findFirstByEstadoDestinoAndNcmPrefixoStartingWith(String estado, String ncm);
+    List<RegraFiscal> findAllByEmpresaIdOrderByIdDesc(Long empresaId);
+    Optional<RegraFiscal> findByEmpresaIdAndId(Long empresaId, Long id);
 }

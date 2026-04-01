@@ -1,12 +1,21 @@
 package com.grandport.erp.modules.usuario.service;
 
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.WriterException;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 import org.springframework.stereotype.Service;
 
+import javax.imageio.ImageIO;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Locale;
 
 @Service
@@ -28,6 +37,34 @@ public class TotpService {
                 "?secret=" + secret +
                 "&issuer=" + normalizedIssuer +
                 "&algorithm=SHA1&digits=6&period=30";
+    }
+
+    public String buildQrCodeDataUrl(String value, int size) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            BitMatrix matrix = new QRCodeWriter().encode(value, BarcodeFormat.QR_CODE, size, size);
+            BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+            Graphics2D graphics = image.createGraphics();
+            graphics.setColor(Color.WHITE);
+            graphics.fillRect(0, 0, size, size);
+            graphics.setColor(Color.BLACK);
+            for (int x = 0; x < size; x++) {
+                for (int y = 0; y < size; y++) {
+                    if (matrix.get(x, y)) {
+                        graphics.fillRect(x, y, 1, 1);
+                    }
+                }
+            }
+            graphics.dispose();
+
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            ImageIO.write(image, "PNG", output);
+            return "data:image/png;base64," + Base64.getEncoder().encodeToString(output.toByteArray());
+        } catch (WriterException | java.io.IOException e) {
+            return null;
+        }
     }
 
     public boolean verifyCode(String secret, String code) {

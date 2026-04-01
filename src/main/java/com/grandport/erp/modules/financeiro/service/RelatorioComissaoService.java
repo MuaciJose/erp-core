@@ -2,6 +2,7 @@ package com.grandport.erp.modules.financeiro.service;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.model.VendedorComissao;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.os.repository.OrdemServicoRepository;
@@ -22,6 +23,9 @@ public class RelatorioComissaoService {
     @Autowired
     private OrdemServicoRepository osRepository;
 
+    @Autowired
+    private EmpresaContextService empresaContextService;
+
     // 🚀 BLINDAGEM MÁXIMA: Usando texto para o Java nunca errar o ID e não zerar a comissão
     private double getComissaoPadrao(ConfiguracaoSistema empresa, Long usuarioId) {
         if (empresa == null || empresa.getVendedores() == null || usuarioId == null) return 0.0;
@@ -40,7 +44,8 @@ public class RelatorioComissaoService {
         // =======================================================
         // 1. PROCESSA AS VENDAS (BALCÃO)
         // =======================================================
-        List<Venda> vendas = vendaRepository.findAll();
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        List<Venda> vendas = vendaRepository.findAllByEmpresa(empresaId);
 
         for (Venda venda : vendas) {
             if (venda.getDataHora() == null || venda.getDataHora().isBefore(inicio) || venda.getDataHora().isAfter(fim)) continue;
@@ -78,7 +83,7 @@ public class RelatorioComissaoService {
         // =======================================================
         // 2. PROCESSA AS ORDENS DE SERVIÇO (OFICINA)
         // =======================================================
-        List<OrdemServico> ordens = osRepository.findAll();
+        List<OrdemServico> ordens = osRepository.findAllByEmpresaIdOrderByDataEntradaDesc(empresaId);
 
         for (OrdemServico os : ordens) {
             if (os.getDataEntrada() == null || os.getDataEntrada().isBefore(inicio) || os.getDataEntrada().isAfter(fim)) continue;

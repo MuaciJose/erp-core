@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
 import { Lock, Unlock, DollarSign, CreditCard, Smartphone, ArrowDownCircle, Printer, Delete, X, User, Calendar, History, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getStoredUser } from '../../utils/authStorage';
 
 export const ControleCaixa = () => {
     const [caixa, setCaixa] = useState(null);
@@ -49,14 +50,8 @@ export const ControleCaixa = () => {
     useEffect(() => {
         const buscarUsuarioLogado = () => {
             try {
-                let nomeAchado = localStorage.getItem('nome') || localStorage.getItem('usuarioNome') || localStorage.getItem('username');
-                if (!nomeAchado) {
-                    const objUsuario = localStorage.getItem('usuario') || localStorage.getItem('user');
-                    if (objUsuario) {
-                        const parsed = JSON.parse(objUsuario);
-                        nomeAchado = parsed.nome || parsed.username || parsed.login;
-                    }
-                }
+                const usuario = getStoredUser();
+                const nomeAchado = usuario?.nome || usuario?.nomeCompleto || usuario?.username || usuario?.login;
                 setOperador(nomeAchado || 'Admin');
             } catch (error) { setOperador('Admin'); }
         };

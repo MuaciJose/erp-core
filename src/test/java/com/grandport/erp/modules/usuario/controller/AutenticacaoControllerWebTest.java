@@ -1,8 +1,17 @@
 package com.grandport.erp.modules.usuario.controller;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+import com.grandport.erp.modules.admin.service.SecurityEventService;
+import com.grandport.erp.modules.assinatura.service.PlanoPermissaoService;
+import com.grandport.erp.modules.assinatura.service.TenantAccessService;
+import com.grandport.erp.config.security.LoginAttemptService;
 import com.grandport.erp.modules.usuario.model.Usuario;
+import com.grandport.erp.modules.usuario.dto.UsuarioDTO;
+import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
+import com.grandport.erp.modules.usuario.service.MfaChallengeService;
+import com.grandport.erp.modules.usuario.service.PasswordPolicyService;
 import com.grandport.erp.modules.usuario.service.TokenService;
+import com.grandport.erp.modules.usuario.service.TotpService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +48,30 @@ class AutenticacaoControllerWebTest {
     @Mock
     private AuditoriaService auditoriaService;
 
+    @Mock
+    private LoginAttemptService loginAttemptService;
+
+    @Mock
+    private PasswordPolicyService passwordPolicyService;
+
+    @Mock
+    private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private MfaChallengeService mfaChallengeService;
+
+    @Mock
+    private TotpService totpService;
+
+    @Mock
+    private SecurityEventService securityEventService;
+
+    @Mock
+    private TenantAccessService tenantAccessService;
+
+    @Mock
+    private PlanoPermissaoService planoPermissaoService;
+
     @InjectMocks
     private AutenticacaoController autenticacaoController;
 
@@ -64,6 +97,8 @@ class AutenticacaoControllerWebTest {
 
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
         when(tokenService.gerarToken(usuario)).thenReturn("jwt-token-web");
+        when(loginAttemptService.isBlocked(any())).thenReturn(false);
+        when(planoPermissaoService.toDtoFiltrado(usuario)).thenReturn(new UsuarioDTO(usuario));
 
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

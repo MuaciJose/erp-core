@@ -41,6 +41,14 @@ export const Login = ({ onLoginSuccess, onIrParaCadastro }) => {
         }
     };
 
+    const handleSubmit = (e) => {
+        if (mfaState) {
+            handleVerifyMfa(e);
+            return;
+        }
+        handleLogin(e);
+    };
+
     const finalizarLogin = (data) => {
         const { token, usuario } = data;
         persistSession({ token, user: usuario, remember: lembrarAcesso });
@@ -48,7 +56,8 @@ export const Login = ({ onLoginSuccess, onIrParaCadastro }) => {
         onLoginSuccess(usuario);
     };
 
-    const handleVerifyMfa = async () => {
+    const handleVerifyMfa = async (e) => {
+        e?.preventDefault?.();
         if (!codigoMfa.trim()) {
             setErro('Informe o código do autenticador.');
             return;
@@ -87,7 +96,7 @@ export const Login = ({ onLoginSuccess, onIrParaCadastro }) => {
                     </p>
                 </div>
 
-                <form onSubmit={handleLogin} className="p-8">
+                <form onSubmit={handleSubmit} className="p-8">
                     {erro && (
                         <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-bold text-center mb-6 border border-red-100">
                             {erro}
@@ -164,7 +173,12 @@ export const Login = ({ onLoginSuccess, onIrParaCadastro }) => {
                                 <div className="mt-4 grid gap-4 md:grid-cols-[220px,1fr] items-start">
                                     <div className="flex flex-col items-center gap-2">
                                         <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Escaneie no autenticador</div>
-                                        <MfaQrCode value={mfaState.otpauthUri} size={180} />
+                                        <MfaQrCode value={mfaState.qrCodeDataUrl} size={180} />
+                                        {!mfaState.qrCodeDataUrl && (
+                                            <div className="text-[11px] text-amber-700 text-center font-semibold">
+                                                QR do MFA nao recebido. Use a chave manual.
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="rounded-xl bg-white border border-blue-100 p-3">
                                         <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Chave manual</div>
@@ -214,8 +228,7 @@ export const Login = ({ onLoginSuccess, onIrParaCadastro }) => {
                                 VOLTAR
                             </button>
                             <button
-                                type="button"
-                                onClick={handleVerifyMfa}
+                                type="submit"
                                 disabled={loading}
                                 className="bg-slate-900 text-white py-4 rounded-xl font-black text-lg flex justify-center items-center gap-2 hover:bg-blue-600 transition-all shadow-lg hover:shadow-blue-900/30 disabled:opacity-70"
                             >

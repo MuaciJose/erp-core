@@ -5,6 +5,7 @@ import {
     Calendar, Target, Printer, Loader2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getStoredUser } from '../../utils/authStorage';
 
 export const FluxoCaixaDre = () => {
     const [dados, setDados] = useState(null);
@@ -39,7 +40,8 @@ export const FluxoCaixaDre = () => {
             console.log("Erro ao buscar da API, tentando cache local...");
         }
 
-        const nomeCache = localStorage.getItem('nomeEmpresa') || localStorage.getItem('nomeFantasia');
+        const usuario = getStoredUser();
+        const nomeCache = usuario?.empresaNome || usuario?.nomeFantasia || usuario?.razaoSocial;
         setNomeEmpresa(nomeCache || "GrandPort Auto Peças");
     };
 

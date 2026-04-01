@@ -8,5 +8,6 @@ public record AuthFlowResponseDTO(
         String challengeToken,
         String setupSecret,
         String otpauthUri,
+        String qrCodeDataUrl,
         String message
 ) {}

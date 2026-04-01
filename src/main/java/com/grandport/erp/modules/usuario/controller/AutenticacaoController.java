@@ -92,6 +92,7 @@ public class AutenticacaoController {
                     setupSecret = totpService.generateSecret();
                 }
                 String challengeToken = mfaChallengeService.createChallenge(usuario, setupSecret);
+                String otpauthUri = setupRequired ? totpService.buildOtpAuthUri("Grandport ERP", usuario.getUsername(), setupSecret) : null;
                 return ResponseEntity.ok(new AuthFlowResponseDTO(
                         null,
                         planoPermissaoService.toDtoFiltrado(usuario),
@@ -99,7 +100,8 @@ public class AutenticacaoController {
                         setupRequired,
                         challengeToken,
                         setupSecret,
-                        setupRequired ? totpService.buildOtpAuthUri("Grandport ERP", usuario.getUsername(), setupSecret) : null,
+                        otpauthUri,
+                        setupRequired ? totpService.buildQrCodeDataUrl(otpauthUri, 220) : null,
                         setupRequired
                                 ? "Configure o aplicativo autenticador e informe o código para concluir o acesso."
                                 : "Informe o código do autenticador para concluir o login."
@@ -187,7 +189,7 @@ public class AutenticacaoController {
     }
 
     private boolean requiresMfa(Usuario usuario) {
-        return usuario.isMfaEnabled();
+        return usuario != null && (usuario.isMfaEnabled() || usuario.getTipoAcesso() != null && usuario.getTipoAcesso() != com.grandport.erp.modules.usuario.model.TipoAcesso.TENANT_USER);
     }
 
     private AuthFlowResponseDTO buildSuccessResponse(Usuario usuario) {
@@ -197,6 +199,7 @@ public class AutenticacaoController {
                 planoPermissaoService.toDtoFiltrado(usuario),
                 false,
                 false,
+                null,
                 null,
                 null,
                 null,
