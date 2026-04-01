@@ -6,7 +6,12 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 @Entity
-@Table(name = "categorias")
+@Table(
+        name = "categorias",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_categorias_empresa_nome", columnNames = {"empresa_id", "nome"})
+        }
+)
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class Categoria extends BaseEntityMultiEmpresa {
@@ -14,7 +19,7 @@ public class Categoria extends BaseEntityMultiEmpresa {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
+    @Column(nullable = false)
     private String nome;
 
     private Boolean ativo = true;

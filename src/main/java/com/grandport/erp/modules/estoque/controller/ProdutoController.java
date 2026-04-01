@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.estoque.controller;
 
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.estoque.dto.AtualizarPrecoRequestDTO;
 import com.grandport.erp.modules.estoque.dto.ProdutoRequestDTO;
 import com.grandport.erp.modules.estoque.dto.ProdutoResponseDTO;
@@ -29,6 +30,7 @@ public class ProdutoController {
     @Autowired private FileStorageService fileService;
     @Autowired private ProdutoRepository produtoRepository;
     @Autowired private MovimentacaoEstoqueRepository movimentacaoRepository;
+    @Autowired private EmpresaContextService empresaContextService;
 
     // =========================================================================================
     // 1. ROTAS HÍBRIDAS DE CADASTRO/EDIÇÃO (JSON + IMAGEM NO MESMO PACOTE)
@@ -93,7 +95,7 @@ public class ProdutoController {
         if (busca != null && !busca.isEmpty()) {
             return ResponseEntity.ok(service.buscarProdutos(busca));
         }
-        return ResponseEntity.ok(produtoRepository.findAll());
+        return ResponseEntity.ok(produtoRepository.findAllByEmpresa(empresaContextService.getRequiredEmpresaId()));
     }
 
     // =========================================================================================
@@ -103,7 +105,8 @@ public class ProdutoController {
     @GetMapping("/movimentacoes")
     @Operation(summary = "Lista o histórico de movimentações e ajustes de estoque")
     public ResponseEntity<List<Map<String, Object>>> listarMovimentacoes() {
-        List<com.grandport.erp.modules.estoque.model.MovimentacaoEstoque> movs = movimentacaoRepository.findAll();
+        List<com.grandport.erp.modules.estoque.model.MovimentacaoEstoque> movs =
+                movimentacaoRepository.findByEmpresaIdOrderByDataMovimentacaoDesc(empresaContextService.getRequiredEmpresaId());
 
         List<Map<String, Object>> dados = movs.stream().map(m -> {
             Map<String, Object> map = new HashMap<>();
@@ -128,14 +131,14 @@ public class ProdutoController {
     @GetMapping("/barcode/{ean}")
     @Operation(summary = "Busca rápida para App Mobile via Código de Barras")
     public ResponseEntity<Produto> buscarPorCodigoBarras(@PathVariable String ean) {
-        return produtoRepository.findByCodigoBarras(ean)
+        return produtoRepository.findByCodigoBarrasAndEmpresa(ean, empresaContextService.getRequiredEmpresaId())
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/mobile/scan/{ean}")
     public ResponseEntity<ProdutoResponseDTO> scanProduto(@PathVariable String ean) {
-        return produtoRepository.findByCodigoBarras(ean)
+        return produtoRepository.findByCodigoBarrasAndEmpresa(ean, empresaContextService.getRequiredEmpresaId())
                 .map(p -> ResponseEntity.ok(new ProdutoResponseDTO(p)))
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -164,7 +167,11 @@ public class ProdutoController {
         if (p.getReferenciaOriginal() == null || p.getReferenciaOriginal().isEmpty()) {
             return ResponseEntity.ok(Collections.emptyList());
         }
-        return ResponseEntity.ok(produtoRepository.findByReferenciaOriginalAndIdNot(p.getReferenciaOriginal(), id));
+        return ResponseEntity.ok(produtoRepository.findByReferenciaOriginalAndIdNotAndEmpresa(
+                p.getReferenciaOriginal(),
+                id,
+                empresaContextService.getRequiredEmpresaId()
+        ));
     }
 
     // ========================================================================

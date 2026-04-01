@@ -8,7 +8,12 @@ import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "parceiros")
+@Table(
+        name = "parceiros",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_parceiros_empresa_documento", columnNames = {"empresa_id", "documento"})
+        }
+)
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class Parceiro extends BaseEntityMultiEmpresa {
@@ -18,7 +23,7 @@ public class Parceiro extends BaseEntityMultiEmpresa {
     @Column(nullable = false)
     private String nome;
 
-    @Column(unique = true)
+    @Column
     private String documento; // CPF ou CNPJ
 
     private String email;

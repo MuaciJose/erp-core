@@ -60,7 +60,7 @@ public class NcmService {
             mapaJson.put(n.getCodigo(), n);
         }
 
-        List<Ncm> ncmsNoBanco = repository.findAll();
+        List<Ncm> ncmsNoBanco = repository.findByEmpresaId(empresaId);
         Map<String, Ncm> mapaBanco = ncmsNoBanco.stream()
                 .collect(Collectors.toMap(Ncm::getCodigo, n -> n, (n1, n2) -> n1));
 
@@ -92,7 +92,7 @@ public class NcmService {
     @Transactional
     public void limparTabela() {
         try {
-            repository.deleteAllInBatch();
+            repository.deleteByEmpresaId(empresaContextService.getRequiredEmpresaId());
             auditoriaService.registrar("SISTEMA", "EXCLUSAO_NCM_LOTE", "ALERTA: A tabela de NCMs foi completamente esvaziada pelo usuário.");
         } catch (DataIntegrityViolationException e) {
             throw new RuntimeException("Não é possível limpar a tabela pois existem produtos ou notas usando estes NCMs. Apenas faça o upload do novo arquivo para atualizar os dados.");

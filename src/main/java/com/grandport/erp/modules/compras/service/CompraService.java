@@ -115,13 +115,13 @@ public class CompraService {
 
             if (codigoEan != null && !codigoEan.equalsIgnoreCase("SEM GTIN") && !codigoEan.trim().isEmpty()) {
                 try {
-                    prodOpt = produtoRepository.findByCodigoBarras(codigoEan);
+                    prodOpt = produtoRepository.findByCodigoBarrasAndEmpresa(codigoEan, empresaContextService.getRequiredEmpresaId());
                 } catch (Exception e) {}
             }
 
             if (prodOpt.isEmpty() && codigoFornecedor != null && !codigoFornecedor.trim().isEmpty()) {
                 try {
-                    prodOpt = produtoRepository.findBySku(codigoFornecedor);
+                    prodOpt = produtoRepository.findBySkuAndEmpresa(codigoFornecedor, empresaContextService.getRequiredEmpresaId());
                 } catch (Exception e) {}
             }
 
@@ -179,10 +179,10 @@ public class CompraService {
                     String skuFornecedor = itemXml.getCodigoFornecedor();
 
                     if (codigoEan != null && !codigoEan.equalsIgnoreCase("SEM GTIN") && !codigoEan.trim().isEmpty()) {
-                        try { prodOpt = produtoRepository.findByCodigoBarras(codigoEan); } catch (Exception e) {}
+                        try { prodOpt = produtoRepository.findByCodigoBarrasAndEmpresa(codigoEan, empresaContextService.getRequiredEmpresaId()); } catch (Exception e) {}
                     }
                     if (prodOpt.isEmpty() && skuFornecedor != null && !skuFornecedor.trim().isEmpty()) {
-                        try { prodOpt = produtoRepository.findBySku(skuFornecedor); } catch (Exception e) {}
+                        try { prodOpt = produtoRepository.findBySkuAndEmpresa(skuFornecedor, empresaContextService.getRequiredEmpresaId()); } catch (Exception e) {}
                     }
 
                     produtoFinal = prodOpt.orElseGet(() -> criarNovoProdutoPelaNota(itemXml, itemDto.getPrecoVenda()));
@@ -207,7 +207,7 @@ public class CompraService {
             }
         }
 
-        Parceiro fornecedor = parceiroRepository.findByDocumento(nota.getCnpjFornecedor())
+        Parceiro fornecedor = parceiroRepository.findByEmpresaIdAndDocumento(empresaContextService.getRequiredEmpresaId(), nota.getCnpjFornecedor())
                 .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
 
         for (CompraParcela parcela : nota.getParcelas()) {
@@ -228,7 +228,8 @@ public class CompraService {
     }
 
     private Parceiro processarFornecedor(NfeDTO.Emitente emitente, ImportacaoResumoDTO resumo) {
-        Optional<Parceiro> fornecedorExistente = parceiroRepository.findByDocumento(emitente.getCnpj());
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        Optional<Parceiro> fornecedorExistente = parceiroRepository.findByEmpresaIdAndDocumento(empresaId, emitente.getCnpj());
         Parceiro fornecedor;
         boolean isNew = false;
 
@@ -239,6 +240,7 @@ public class CompraService {
             fornecedor.setNome(emitente.getNome());
             fornecedor.setDocumento(emitente.getCnpj());
             fornecedor.setTipo(TipoParceiro.FORNECEDOR);
+            fornecedor.setEmpresaId(empresaId);
             parceiroRepository.save(fornecedor);
             isNew = true;
         }
@@ -283,10 +285,11 @@ public class CompraService {
                 });
         novo.setNcm(ncm);
 
-        Marca marca = marcaRepository.findAll().stream().findFirst()
+        Marca marca = marcaRepository.findByEmpresaIdOrderByNomeAsc(empresaContextService.getRequiredEmpresaId()).stream().findFirst()
                 .orElseGet(() -> {
                     Marca novaMarca = new Marca();
                     novaMarca.setNome("GENÉRICA");
+                    novaMarca.setEmpresaId(empresaContextService.getRequiredEmpresaId());
                     return marcaRepository.save(novaMarca);
                 });
         novo.setMarca(marca);

@@ -9,7 +9,12 @@ import lombok.EqualsAndHashCode;
 
 
 @Entity
-@Table(name = "marcas")
+@Table(
+        name = "marcas",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_marcas_empresa_nome", columnNames = {"empresa_id", "nome"})
+        }
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -20,7 +25,7 @@ public class Marca extends BaseEntityMultiEmpresa {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String nome; // Ex: Bosch, Cofap, Nakata
 
     private String siteFabricante; // Útil para consulta rápida no Desktop

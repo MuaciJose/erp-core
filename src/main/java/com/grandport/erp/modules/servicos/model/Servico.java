@@ -8,7 +8,12 @@ import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "servicos_catalogo")
+@Table(
+        name = "servicos_catalogo",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_servicos_empresa_codigo", columnNames = {"empresa_id", "codigo"})
+        }
+)
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class Servico extends BaseEntityMultiEmpresa {
@@ -17,7 +22,7 @@ public class Servico extends BaseEntityMultiEmpresa {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, length = 50)
+    @Column(length = 50)
     private String codigo; // Ex: ALINHAMENTO-01
 
     @Column(nullable = false)

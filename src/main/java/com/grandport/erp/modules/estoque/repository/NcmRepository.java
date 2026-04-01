@@ -4,12 +4,19 @@ import com.grandport.erp.modules.estoque.model.Ncm;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
 public interface NcmRepository extends JpaRepository<Ncm, Long> {
+
+    List<Ncm> findByEmpresaId(Long empresaId);
+
+    @Modifying
+    @Query("DELETE FROM Ncm n WHERE n.empresaId = :empresaId")
+    void deleteByEmpresaId(@Param("empresaId") Long empresaId);
 
     Optional<Ncm> findByCodigoAndEmpresaId(String codigo, Long empresaId);
 

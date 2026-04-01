@@ -1,6 +1,7 @@
 package com.grandport.erp.modules.veiculo.service;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 import com.grandport.erp.modules.usuario.model.Usuario;
@@ -36,17 +37,21 @@ public class VeiculoService {
     @Autowired private VendaRepository vendaRepository;
     @Autowired private AuditoriaService auditoriaService;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private EmpresaContextService empresaContextService;
 
     // 🚀 INJETANDO OS REPOSITÓRIOS DA OFICINA
     @Autowired private OrdemServicoRepository osRepository;
     @Autowired private ChecklistRepository checklistRepository;
 
     public List<Veiculo> listarPorCliente(Long clienteId) {
-        return repository.findByClienteId(clienteId);
+        return repository.findByEmpresaIdAndClienteId(empresaContextService.getRequiredEmpresaId(), clienteId);
     }
 
     // 🚀 HISTÓRICO MISTO DO CARRO: VENDAS + OS + CHECKLISTS (REFATORADO COM BUILDER)
     public List<HistoricoVeiculoDTO> buscarHistorico(Long veiculoId) {
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        repository.findByEmpresaIdAndId(empresaId, veiculoId)
+                .orElseThrow(() -> new RuntimeException("Veículo não encontrado."));
 
         List<HistoricoVeiculoDTO> historico = new ArrayList<>();
 
@@ -139,15 +144,17 @@ public class VeiculoService {
 
     @Transactional
     public Veiculo cadastrar(Long clienteId, Veiculo veiculo) {
-        Optional<Veiculo> existente = repository.findByPlacaIgnoreCase(veiculo.getPlaca());
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        Optional<Veiculo> existente = repository.findByEmpresaIdAndPlacaIgnoreCase(empresaId, veiculo.getPlaca());
         if (existente.isPresent()) {
             throw new VeiculoConflitoException(existente.get());
         }
 
-        Parceiro cliente = parceiroRepository.findById(clienteId)
+        Parceiro cliente = parceiroRepository.findByEmpresaIdAndId(empresaId, clienteId)
                 .orElseThrow(() -> new RuntimeException("Cliente não encontrado."));
 
         veiculo.setCliente(cliente);
+        veiculo.setEmpresaId(empresaId);
         Veiculo salvo = repository.save(veiculo);
 
         String placa = salvo.getPlaca() != null ? salvo.getPlaca().toUpperCase() : "S/ Placa";
@@ -158,13 +165,14 @@ public class VeiculoService {
 
     @Transactional
     public void transferirDono(Long veiculoId, Long novoClienteId) {
-        Veiculo veiculo = repository.findById(veiculoId)
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        Veiculo veiculo = repository.findByEmpresaIdAndId(empresaId, veiculoId)
                 .orElseThrow(() -> new RuntimeException("Veículo não encontrado."));
 
         Parceiro antigoDono = veiculo.getCliente();
         String nomeAntigoDono = antigoDono != null ? antigoDono.getNome() : "Sem dono anterior";
 
-        Parceiro novoDono = parceiroRepository.findById(novoClienteId)
+        Parceiro novoDono = parceiroRepository.findByEmpresaIdAndId(empresaId, novoClienteId)
                 .orElseThrow(() -> new RuntimeException("Novo dono não encontrado."));
 
         veiculo.setCliente(novoDono);

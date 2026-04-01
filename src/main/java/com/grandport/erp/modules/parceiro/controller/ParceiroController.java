@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.parceiro.controller;
 
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.parceiro.dto.BrasilApiCepDTO;
 import com.grandport.erp.modules.parceiro.dto.BrasilApiCnpjDTO;
 import com.grandport.erp.modules.parceiro.dto.HistoricoComprasClienteDTO;
@@ -20,13 +21,15 @@ public class ParceiroController {
     @Autowired private ParceiroRepository repository;
     @Autowired private ParceiroService service;
     @Autowired private ConsultaDocumentoService consultaService;
+    @Autowired private EmpresaContextService empresaContextService;
 
     @GetMapping
     public ResponseEntity<List<Parceiro>> listar(@RequestParam(required = false) String termo) {
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
         if (termo != null && !termo.isEmpty()) {
-            return ResponseEntity.ok(repository.buscarPorTermo(termo));
+            return ResponseEntity.ok(repository.buscarPorTermo(termo, empresaId));
         }
-        return ResponseEntity.ok(repository.findAll());
+        return ResponseEntity.ok(repository.findByEmpresaId(empresaId));
     }
 
     @GetMapping("/{id}/historico-compras")

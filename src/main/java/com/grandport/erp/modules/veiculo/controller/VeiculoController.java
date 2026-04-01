@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.veiculo.controller;
 
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.veiculo.dto.HistoricoVeiculoDTO;
 import com.grandport.erp.modules.veiculo.dto.TransferenciaForcadaDTO;
 import com.grandport.erp.modules.veiculo.model.Veiculo;
@@ -25,13 +26,15 @@ public class VeiculoController {
 
     @Autowired
     private VeiculoRepository veiculoRepository; // 🚀 INJEÇÃO DO REPOSITÓRIO
+    @Autowired
+    private EmpresaContextService empresaContextService;
 
     // =========================================================
     // 🚀 A ROTA QUE FALTAVA PARA O TABLET FUNCIONAR!
     // =========================================================
     @GetMapping
     public ResponseEntity<List<Veiculo>> listarTodos() {
-        return ResponseEntity.ok(veiculoRepository.findAll());
+        return ResponseEntity.ok(veiculoRepository.findByEmpresaIdOrderByPlacaAsc(empresaContextService.getRequiredEmpresaId()));
     }
     // =========================================================
 

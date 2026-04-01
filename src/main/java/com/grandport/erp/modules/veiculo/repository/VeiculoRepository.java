@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface VeiculoRepository extends JpaRepository<Veiculo, Long> {
-    List<Veiculo> findByClienteId(Long clienteId);
-    Optional<Veiculo> findByPlacaIgnoreCase(String placa);
+    List<Veiculo> findByEmpresaIdOrderByPlacaAsc(Long empresaId);
+    List<Veiculo> findByEmpresaIdAndClienteId(Long empresaId, Long clienteId);
+    Optional<Veiculo> findByEmpresaIdAndId(Long empresaId, Long id);
+    Optional<Veiculo> findByEmpresaIdAndPlacaIgnoreCase(Long empresaId, String placa);
 }

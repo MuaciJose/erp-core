@@ -221,7 +221,11 @@ public class NfeService {
             xml.append("        <prod>\n");
             xml.append("          <cProd>").append(item.getProduto().getSku()).append("</cProd>\n");
             xml.append("          <xProd>").append(item.getProduto().getNome()).append("</xProd>\n");
-            xml.append("          <NCM>").append(item.getProduto().getNcm() != null ? item.getProduto().getNcm() : "00000000").append("</NCM>\n");
+            xml.append("          <NCM>")
+                    .append(item.getProduto().getNcm() != null && item.getProduto().getNcm().getCodigo() != null
+                            ? item.getProduto().getNcm().getCodigo()
+                            : "00000000")
+                    .append("</NCM>\n");
             xml.append("          <CFOP>").append(impostos.get("CFOP")).append("</CFOP>\n");
             xml.append("          <uCom>UN</uCom>\n");
             xml.append("          <qCom>").append(item.getQuantidade()).append("</qCom>\n");

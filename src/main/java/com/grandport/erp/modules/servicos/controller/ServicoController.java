@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.servicos.controller;
 
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.servicos.model.Servico;
 import com.grandport.erp.modules.servicos.repository.ServicoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,23 +13,26 @@ public class ServicoController {
 
     @Autowired
     private ServicoRepository servicoRepository;
+    @Autowired
+    private EmpresaContextService empresaContextService;
 
     @GetMapping
     public List<Servico> listarTodos(@RequestParam(required = false) String busca) {
         if (busca != null && !busca.isEmpty()) {
-            return servicoRepository.buscarPorNomeOuCodigo(busca);
+            return servicoRepository.buscarPorNomeOuCodigo(busca, empresaContextService.getRequiredEmpresaId());
         }
-        return servicoRepository.findAll();
+        return servicoRepository.findByEmpresaIdOrderByNomeAsc(empresaContextService.getRequiredEmpresaId());
     }
 
     @PostMapping
     public Servico criar(@RequestBody Servico servico) {
+        servico.setEmpresaId(empresaContextService.getRequiredEmpresaId());
         return servicoRepository.save(servico);
     }
 
     @PutMapping("/{id}")
     public Servico atualizar(@PathVariable Long id, @RequestBody Servico servicoAtualizado) {
-        return servicoRepository.findById(id).map(s -> {
+        return servicoRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id).map(s -> {
             s.setCodigo(servicoAtualizado.getCodigo());
             s.setNome(servicoAtualizado.getNome());
             s.setDescricao(servicoAtualizado.getDescricao());

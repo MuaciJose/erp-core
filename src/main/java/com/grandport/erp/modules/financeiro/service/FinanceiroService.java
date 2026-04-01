@@ -284,7 +284,7 @@ public class FinanceiroService {
             conta.setPlanoConta(pc);
         }
 
-        parceiroRepository.findByNome(dto.getFornecedor()).ifPresent(conta::setParceiro);
+        parceiroRepository.findByEmpresaIdAndNome(empresaId, dto.getFornecedor()).ifPresent(conta::setParceiro);
         ContaPagar salva = pagarRepo.save(conta);
         auditoriaService.registrar("FINANCEIRO", "CRIACAO_DESPESA", "Registrou despesa manual: " + salva.getDescricao() + " no valor de R$ " + dto.getValor());
         return salva;

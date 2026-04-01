@@ -1,6 +1,7 @@
 package com.grandport.erp.modules.parceiro.service;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.parceiro.dto.HistoricoComprasClienteDTO;
 import com.grandport.erp.modules.parceiro.model.Parceiro;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
@@ -24,12 +25,14 @@ public class ParceiroService {
     @Autowired private ParceiroRepository repository;
     @Autowired private AuditoriaService auditoriaService;
     @Autowired private VendaRepository vendaRepository;
+    @Autowired private EmpresaContextService empresaContextService;
 
     // 🚀 INJETANDO O REPOSITÓRIO DE OS
     @Autowired private OrdemServicoRepository osRepository;
 
     @Transactional
     public Parceiro criar(Parceiro parceiro) {
+        parceiro.setEmpresaId(empresaContextService.getRequiredEmpresaId());
         Parceiro salvo = repository.save(parceiro);
         String doc = salvo.getDocumento() != null ? salvo.getDocumento() : "S/ Doc";
         auditoriaService.registrar("CADASTROS", "CRIACAO_PARCEIRO", "Cadastrou o parceiro: " + salvo.getNome() + " (" + salvo.getTipo() + ") | Doc: " + doc);
@@ -38,7 +41,8 @@ public class ParceiroService {
 
     @Transactional
     public Parceiro atualizar(Long id, Parceiro dadosAtualizados) {
-        Parceiro parceiroExistente = repository.findById(id)
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        Parceiro parceiroExistente = repository.findByEmpresaIdAndId(empresaId, id)
                 .orElseThrow(() -> new RuntimeException("Parceiro não encontrado com ID: " + id));
 
         BigDecimal limiteAntigo = parceiroExistente.getLimiteCredito();
@@ -68,11 +72,13 @@ public class ParceiroService {
 
     @Transactional
     public void excluir(Long id) {
-        Parceiro p = repository.findById(id).orElseThrow(() -> new RuntimeException("Parceiro não encontrado"));
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        Parceiro p = repository.findByEmpresaIdAndId(empresaId, id)
+                .orElseThrow(() -> new RuntimeException("Parceiro não encontrado"));
         String nome = p.getNome();
         String doc = p.getDocumento() != null ? p.getDocumento() : "S/ Doc";
 
-        repository.deleteById(id);
+        repository.delete(p);
         auditoriaService.registrar("CADASTROS", "EXCLUSAO_PARCEIRO", "Excluiu o parceiro: " + nome + " (Doc: " + doc + ")");
     }
 

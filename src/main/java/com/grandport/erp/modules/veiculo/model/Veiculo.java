@@ -7,7 +7,12 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 @Entity
-@Table(name = "veiculos")
+@Table(
+        name = "veiculos",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_veiculos_empresa_placa", columnNames = {"empresa_id", "placa"})
+        }
+)
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class Veiculo extends BaseEntityMultiEmpresa {
@@ -15,7 +20,7 @@ public class Veiculo extends BaseEntityMultiEmpresa {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
+    @Column(nullable = false)
     private String placa;
 
     private String marca;

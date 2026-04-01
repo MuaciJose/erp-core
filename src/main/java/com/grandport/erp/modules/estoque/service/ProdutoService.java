@@ -35,7 +35,7 @@ public class ProdutoService {
     public Produto cadastrar(ProdutoRequestDTO dto, String imagePath) {
         Marca marca = null;
         if (dto.marcaId() != null) {
-            marca = marcaRepository.findById(dto.marcaId()).orElse(null);
+            marca = marcaRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), dto.marcaId()).orElse(null);
         }
 
         Ncm ncm = null;
@@ -63,7 +63,7 @@ public class ProdutoService {
 
         Marca marca = null;
         if (dto.marcaId() != null) {
-            marca = marcaRepository.findById(dto.marcaId()).orElse(null);
+            marca = marcaRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), dto.marcaId()).orElse(null);
         }
 
         Ncm ncm = null;
@@ -163,15 +163,15 @@ public class ProdutoService {
     }
 
     public List<Produto> listarAlertasEstoque() {
-        return produtoRepository.findAlertasEstoque();
+        return produtoRepository.findAlertasEstoqueByEmpresa(empresaContextService.getRequiredEmpresaId());
     }
 
     public List<Produto> buscarProdutos(String termo) {
-        return produtoRepository.buscarPorTermo(termo);
+        return produtoRepository.buscarPorTermo(termo, empresaContextService.getRequiredEmpresaId());
     }
 
     public Produto findById(Long id) {
-        return produtoRepository.findById(id)
+        return produtoRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id)
                 .orElseThrow(() -> new RuntimeException("Produto não encontrado: ID " + id));
     }
 
@@ -212,7 +212,7 @@ public class ProdutoService {
      * @return Mapa contendo status de sincronização fiscal
      */
     public java.util.Map<String, Object> validarIntegridadeFiscal() {
-        java.util.List<Produto> todosProdutos = produtoRepository.findAll();
+        java.util.List<Produto> todosProdutos = produtoRepository.findAllByEmpresa(empresaContextService.getRequiredEmpresaId());
         java.util.List<Produto> produtosIncompletos = new java.util.ArrayList<>();
 
         // Verificar cada produto

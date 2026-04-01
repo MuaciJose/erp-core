@@ -11,11 +11,13 @@ import java.util.Optional;
 public interface ParceiroRepository extends JpaRepository<Parceiro, Long> {
 
     Optional<Parceiro> findByEmpresaIdAndId(Long empresaId, Long id);
-    Optional<Parceiro> findByDocumento(String documento);
-    Optional<Parceiro> findByNome(String nome);
+    Optional<Parceiro> findByEmpresaIdAndDocumento(Long empresaId, String documento);
+    Optional<Parceiro> findByEmpresaIdAndNome(Long empresaId, String nome);
+    List<Parceiro> findByEmpresaId(Long empresaId);
 
     @Query("SELECT p FROM Parceiro p WHERE " +
+           "p.empresaId = :empresaId AND (" +
            "LOWER(p.nome) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +
-           "p.documento LIKE CONCAT('%', :termo, '%')")
-    List<Parceiro> buscarPorTermo(@Param("termo") String termo);
+           "p.documento LIKE CONCAT('%', :termo, '%'))")
+    List<Parceiro> buscarPorTermo(@Param("termo") String termo, @Param("empresaId") Long empresaId);
 }

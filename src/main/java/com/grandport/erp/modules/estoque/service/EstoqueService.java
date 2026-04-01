@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.estoque.service;
 
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.estoque.dto.PrevisaoCompraDTO;
 import com.grandport.erp.modules.estoque.model.MovimentacaoEstoque;
 import com.grandport.erp.modules.estoque.model.Produto;
@@ -24,6 +25,7 @@ public class EstoqueService {
 
     // 🚀 Repositório para gravar o extrato
     @Autowired private MovimentacaoEstoqueRepository movimentacaoRepository;
+    @Autowired private EmpresaContextService empresaContextService;
 
     // 🚀 2. INJEÇÃO DO MOTOR DE AUDITORIA
     @Autowired private AuditoriaService auditoriaService;
@@ -41,6 +43,7 @@ public class EstoqueService {
         mov.setMotivo(motivo);
         mov.setParceiro(parceiro); // 🚀 Salva o Cliente/Fornecedor
         mov.setDocumento(documento); // 🚀 Salva o Nº da Nota
+        mov.setEmpresaId(produto.getEmpresaId());
 
         // Garante que a data seja gravada no momento exato do registro
         mov.setDataMovimentacao(LocalDateTime.now());
@@ -71,14 +74,17 @@ public class EstoqueService {
      * Retorna o histórico para o "reloginho" do React
      */
     public List<MovimentacaoEstoque> listarHistoricoPorProduto(Long produtoId) {
-        return movimentacaoRepository.findByProdutoIdOrderByDataMovimentacaoDesc(produtoId);
+        return movimentacaoRepository.findByProdutoIdAndEmpresaIdOrderByDataMovimentacaoDesc(
+                produtoId,
+                empresaContextService.getRequiredEmpresaId()
+        );
     }
 
     /**
      * SUA LÓGICA ORIGINAL: Previsão de Compras (Mantida 100%)
      */
     public List<PrevisaoCompraDTO> gerarPrevisaoReposicao() {
-        List<Produto> produtos = produtoRepository.findAll();
+        List<Produto> produtos = produtoRepository.findAllByEmpresa(empresaContextService.getRequiredEmpresaId());
 
         return produtos.stream()
                 .map(p -> {

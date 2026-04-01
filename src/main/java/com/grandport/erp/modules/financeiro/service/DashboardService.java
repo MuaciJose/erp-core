@@ -56,7 +56,7 @@ public class DashboardService {
         resumo.setVendasHoje(vendasHoje != null ? vendasHoje : 0L);
 
         // KPIs de Estoque
-        Long baixoEstoque = produtoRepository.countProdutosBaixoEstoque();
+        Long baixoEstoque = produtoRepository.countProdutosBaixoEstoqueByEmpresa(empresaId);
         resumo.setProdutosBaixoEstoque(baixoEstoque != null ? baixoEstoque : 0L);
 
         // =========================================================================
