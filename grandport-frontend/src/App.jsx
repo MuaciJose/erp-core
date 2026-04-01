@@ -24,6 +24,7 @@ import { PlanoContas } from './modules/financeiro/PlanoContas';
 import { ConciliacaoBancaria } from './modules/financeiro/ConciliacaoBancaria';
 import { GestaoUsuarios } from './modules/cadastro/GestaoUsuarios';
 import { LiberacaoAcessos } from './modules/cadastro/LiberacaoAcessos';
+import { CentralSaas } from './modules/admin/CentralSaas';
 import { Auditoria } from './modules/cadastro/Auditoria';
 import { WidgetCalculadora } from './components/WidgetCalculadora';
 import { RelatorioComissoes } from './modules/vendas/RelatorioComissoes';
@@ -241,7 +242,7 @@ function App() {
     const temPermissao =
         usuarioLogado.permissoes.includes(paginaAtiva) ||
         permissoesExtra.includes(paginaAtiva) ||
-        (paginaAtiva === 'liberacao-acessos' && usuarioLogado.tipoAcesso === 'PLATFORM_ADMIN');
+        ((paginaAtiva === 'liberacao-acessos' || paginaAtiva === 'central-saas') && usuarioLogado.tipoAcesso === 'PLATFORM_ADMIN');
     const agendaTemAtrasos = (resumoAgendaTopo?.atrasados || 0) > 0;
     const podeVerAgenda = usuarioLogado?.permissoes?.includes('agenda');
     const exigeTrocaSenha = !!usuarioLogado?.forcePasswordChange;
@@ -389,6 +390,7 @@ function App() {
                             {paginaAtiva === 'conciliacao' && <ConciliacaoBancaria />}
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
                             {paginaAtiva === 'liberacao-acessos' && <LiberacaoAcessos />}
+                            {paginaAtiva === 'central-saas' && <CentralSaas />}
                             {paginaAtiva === 'auditoria' && <Auditoria />}
                             {paginaAtiva === 'configuracoes' && (
                                 <Suspense fallback={

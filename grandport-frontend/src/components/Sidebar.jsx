@@ -123,7 +123,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Clientes & Fornecedores', acao: 'parceiros' },
                 { titulo: 'Tabela de Mão de Obra', acao: 'servicos' },
                 { titulo: 'Equipe e Acessos', acao: 'usuarios' },
-                { titulo: 'Liberação de Acessos', acao: 'liberacao-acessos', permissao: 'usuarios' },
+                { titulo: 'Central SaaS', acao: 'central-saas', permissao: 'usuarios' },
                 { titulo: 'Auditoria de Sistema', acao: 'auditoria' },
                 { titulo: 'Fiscal / NCM', acao: 'fiscal' },
                 { titulo: 'Regras Fiscais (NF-e)', acao: 'regras-fiscais' },
@@ -141,7 +141,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
         if (menu.submenus) {
             // Verifica se o usuário tem permissão para alguma tela do submenu
             const submenusPermitidos = menu.submenus.filter(sub => {
-                if (sub.acao === 'liberacao-acessos') return isPlatformAdmin;
+                if (sub.acao === 'central-saas') return isPlatformAdmin;
                 return permissoesUsuario.includes(sub.permissao || sub.acao) || rotasLivres.includes(sub.acao);
             });
             // Se tiver pelo menos um submenu liberado, renderiza o menu principal
