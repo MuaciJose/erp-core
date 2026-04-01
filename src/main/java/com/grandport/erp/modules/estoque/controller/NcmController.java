@@ -3,6 +3,7 @@ package com.grandport.erp.modules.estoque.controller;
 import com.grandport.erp.modules.estoque.model.Ncm;
 import com.grandport.erp.modules.estoque.service.NcmService;
 import com.grandport.erp.modules.estoque.repository.NcmRepository;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,9 @@ public class NcmController {
     // 🚀 ADICIONADO PARA A PAGINAÇÃO
     @Autowired
     private NcmRepository repository;
+
+    @Autowired
+    private EmpresaContextService empresaContextService;
 
     @PostMapping("/upload")
     @Operation(summary = "Faz o upload de um JSON com a lista de NCMs")
@@ -78,7 +82,7 @@ public class NcmController {
 
         // Ordena pelo código NCM de forma crescente
         Pageable pageable = PageRequest.of(page, size, Sort.by("codigo").ascending());
-        Page<Ncm> ncms = repository.buscarPaginado(busca, pageable);
+        Page<Ncm> ncms = repository.buscarPaginado(busca, empresaContextService.getRequiredEmpresaId(), pageable);
 
         return ResponseEntity.ok(ncms);
     }

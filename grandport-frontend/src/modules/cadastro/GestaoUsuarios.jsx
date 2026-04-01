@@ -261,7 +261,7 @@ export const GestaoUsuarios = () => {
         }
     };
 
-    const marcarTudoAdmin = () => setUsuarioForm(prev => ({ ...prev, permissoes: todasAsPermissoes }));
+    const marcarTudoAdmin = () => setUsuarioForm(prev => ({ ...prev, permissoes: Array.from(permissoesPorPlano[planoEmpresa] || permissoesPorPlano.ESSENCIAL) }));
     const limparTudo = () => setUsuarioForm(prev => ({ ...prev, permissoes: [] }));
 
     if (loading) return <div className="p-8 text-center font-bold text-gray-500 animate-pulse">Carregando equipe...</div>;

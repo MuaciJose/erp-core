@@ -1,6 +1,7 @@
 package com.grandport.erp.modules.estoque.service;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.estoque.dto.AtualizarPrecoRequestDTO;
 import com.grandport.erp.modules.estoque.dto.ProdutoRequestDTO;
 import com.grandport.erp.modules.estoque.model.Marca;
@@ -25,6 +26,7 @@ public class ProdutoService {
     @Autowired private MarcaRepository marcaRepository;
     @Autowired private NcmRepository ncmRepository;
     @Autowired private MovimentacaoEstoqueRepository movimentacaoRepository;
+    @Autowired private EmpresaContextService empresaContextService;
 
     // Motor de Auditoria já estava injetado perfeitamente!
     @Autowired private AuditoriaService auditoriaService;
@@ -38,7 +40,7 @@ public class ProdutoService {
 
         Ncm ncm = null;
         if (dto.ncmCodigo() != null && !dto.ncmCodigo().trim().isEmpty()) {
-            ncm = ncmRepository.findById(dto.ncmCodigo()).orElse(null);
+            ncm = ncmRepository.findByCodigoAndEmpresaId(dto.ncmCodigo(), empresaContextService.getRequiredEmpresaId()).orElse(null);
         }
 
         Produto produto = new Produto();
@@ -66,7 +68,7 @@ public class ProdutoService {
 
         Ncm ncm = null;
         if (dto.ncmCodigo() != null && !dto.ncmCodigo().trim().isEmpty()) {
-            ncm = ncmRepository.findById(dto.ncmCodigo()).orElse(null);
+            ncm = ncmRepository.findByCodigoAndEmpresaId(dto.ncmCodigo(), empresaContextService.getRequiredEmpresaId()).orElse(null);
         }
 
         updateProdutoFromDto(produto, dto, marca, ncm, imagePath);

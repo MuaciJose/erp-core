@@ -85,7 +85,7 @@ public class Produto extends BaseEntityMultiEmpresa {
 
     // ================= RELACIONAMENTOS FISCAIS =================
     @ManyToOne
-    @JoinColumn(name = "ncm_codigo", nullable = false)
+    @JoinColumn(name = "ncm_id", nullable = false)
     private Ncm ncm;
 
     // ================= DADOS FISCAIS =================

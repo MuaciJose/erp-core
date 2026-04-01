@@ -12,6 +12,7 @@ import com.grandport.erp.modules.parceiro.model.*;
 import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 // 🚀 1. IMPORTAÇÃO DA AUDITORIA
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ public class CompraService {
 
     @Autowired private ProdutoRepository produtoRepository;
     @Autowired private NcmRepository ncmRepository;
+    @Autowired private EmpresaContextService empresaContextService;
     @Autowired private MarcaRepository marcaRepository;
     @Autowired private ParceiroRepository parceiroRepository;
     @Autowired private FinanceiroService financeiroService;
@@ -270,9 +272,11 @@ public class CompraService {
         novo.setQuantidadeEstoque(0);
         novo.setPrecoVenda(precoVenda != null ? precoVenda : item.getPrecoCusto().multiply(new BigDecimal("1.40")));
 
-        Ncm ncm = ncmRepository.findById(item.getNcm())
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        Ncm ncm = ncmRepository.findByCodigoAndEmpresaId(item.getNcm(), empresaId)
                 .orElseGet(() -> {
                     Ncm novoNcm = new Ncm();
+                    novoNcm.setEmpresaId(empresaId);
                     novoNcm.setCodigo(item.getNcm());
                     novoNcm.setDescricao("Importado via XML");
                     return ncmRepository.save(novoNcm);

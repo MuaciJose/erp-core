@@ -13,7 +13,10 @@ import lombok.EqualsAndHashCode;
 public class Ncm extends BaseEntityMultiEmpresa {
 
     @Id
-    @Column(name = "codigo", length = 20)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "codigo", length = 20, nullable = false)
     @JsonProperty("Codigo") // Lê "Codigo" do JSON e salva em "codigo" no banco
     private String codigo;
 
