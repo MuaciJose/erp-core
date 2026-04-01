@@ -18,6 +18,7 @@ export const GestaoUsuarios = () => {
         ativo: true,
         mfaEnabled: false,
         forcePasswordChange: true,
+        tipoAcesso: 'TENANT_USER',
         isMecanico: false,
         comissaoServico: '',
         permissoes: []
@@ -155,7 +156,7 @@ export const GestaoUsuarios = () => {
 
     const abrirModalNovo = () => {
         setUsuarioForm({
-            id: null, nome: '', email: '', senha: '', ativo: true, mfaEnabled: false, forcePasswordChange: true,
+            id: null, nome: '', email: '', senha: '', ativo: true, mfaEnabled: false, forcePasswordChange: true, tipoAcesso: 'TENANT_USER',
             isMecanico: false, comissaoServico: '', permissoes: todasAsPermissoes
         });
         setModalAberto(true);
@@ -313,6 +314,7 @@ export const GestaoUsuarios = () => {
                                 <div className="mt-2 flex justify-center gap-1 flex-wrap">
                                     {user.mfaEnabled && <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black">MFA</span>}
                                     {user.forcePasswordChange && <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black">TROCA SENHA</span>}
+                                    {user.tipoAcesso && <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-black">{user.tipoAcesso}</span>}
                                 </div>
                             </td>
                             <td className="p-4 pr-6 flex justify-center gap-3">
@@ -393,6 +395,18 @@ export const GestaoUsuarios = () => {
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <label className="block">
+                                    <span className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Acesso</span>
+                                    <select
+                                        value={usuarioForm.tipoAcesso || 'TENANT_USER'}
+                                        onChange={(e) => setUsuarioForm({ ...usuarioForm, tipoAcesso: e.target.value })}
+                                        className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-600 outline-none font-bold text-slate-700"
+                                    >
+                                        <option value="TENANT_USER">Funcionário da empresa</option>
+                                        <option value="TENANT_ADMIN">Admin da empresa</option>
+                                    </select>
+                                </label>
+
                                 <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 cursor-pointer">
                                     <div className={`w-6 h-6 rounded flex items-center justify-center border-2 ${usuarioForm.mfaEnabled ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300'}`}>
                                         {usuarioForm.mfaEnabled && <CheckCircle size={16} />}

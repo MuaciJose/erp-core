@@ -19,7 +19,7 @@ public class SecurityEventController {
     private final SecurityEventService securityEventService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'AUDITORIA')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_AUDITORIA')")
     public List<SecurityEvent> listar(@RequestParam(defaultValue = "20") int limit) {
         return securityEventService.listarRecentes(limit);
     }

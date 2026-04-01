@@ -27,7 +27,7 @@ api.interceptors.response.use(
     async (error) => {
         const status = error?.response?.status;
 
-        if (status === 401) {
+        if (status === 401 || status === 423) {
             try {
                 await clearSession();
             } catch (clearError) {

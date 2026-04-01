@@ -58,6 +58,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/assinaturas/nova-empresa").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/assinaturas/solicitacoes-acesso").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/assinaturas/convites/publico/**").permitAll()
 
 
 

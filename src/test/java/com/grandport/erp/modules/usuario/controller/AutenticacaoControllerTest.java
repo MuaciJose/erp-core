@@ -1,10 +1,16 @@
 package com.grandport.erp.modules.usuario.controller;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+import com.grandport.erp.modules.admin.service.SecurityEventService;
+import com.grandport.erp.modules.usuario.dto.AuthFlowResponseDTO;
 import com.grandport.erp.modules.usuario.dto.LoginDTO;
-import com.grandport.erp.modules.usuario.dto.LoginResponseDTO;
 import com.grandport.erp.modules.usuario.model.Usuario;
+import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
+import com.grandport.erp.modules.usuario.service.MfaChallengeService;
+import com.grandport.erp.modules.usuario.service.PasswordPolicyService;
 import com.grandport.erp.modules.usuario.service.TokenService;
+import com.grandport.erp.modules.usuario.service.TotpService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,11 +20,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +43,30 @@ class AutenticacaoControllerTest {
     @Mock
     private AuditoriaService auditoriaService;
 
+    @Mock
+    private com.grandport.erp.config.security.LoginAttemptService loginAttemptService;
+
+    @Mock
+    private PasswordPolicyService passwordPolicyService;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private MfaChallengeService mfaChallengeService;
+
+    @Mock
+    private TotpService totpService;
+
+    @Mock
+    private SecurityEventService securityEventService;
+
+    @Mock
+    private HttpServletRequest request;
+
     @InjectMocks
     private AutenticacaoController autenticacaoController;
 
@@ -49,20 +81,25 @@ class AutenticacaoControllerTest {
 
         var authentication = new UsernamePasswordAuthenticationToken(usuario, null, usuario.getAuthorities());
 
+        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
+        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(loginAttemptService.isBlocked(any())).thenReturn(false);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
         when(tokenService.gerarToken(usuario)).thenReturn("jwt-token");
 
-        var response = autenticacaoController.login(new LoginDTO("admin", "admin123"));
+        var response = autenticacaoController.login(new LoginDTO("admin", "admin123"), request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertInstanceOf(LoginResponseDTO.class, response.getBody());
+        assertInstanceOf(AuthFlowResponseDTO.class, response.getBody());
 
-        LoginResponseDTO body = (LoginResponseDTO) response.getBody();
+        AuthFlowResponseDTO body = (AuthFlowResponseDTO) response.getBody();
         assertEquals("jwt-token", body.token());
         assertEquals("Administrador", body.usuario().getNome());
         assertEquals("admin", body.usuario().getEmail());
 
-        verify(auditoriaService).registrar("SISTEMA", "LOGIN", "Usuário realizou login no sistema.");
+        verify(loginAttemptService).recordSuccess(eq("ip:127.0.0.1"));
+        verify(loginAttemptService).recordSuccess(eq("user:admin"));
+        verify(auditoriaService).registrar("SEGURANCA", "LOGIN_SUCESSO", "Login realizado para o usuário: admin");
     }
 }

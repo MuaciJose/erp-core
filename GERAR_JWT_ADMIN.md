@@ -143,6 +143,94 @@ Login esperado:
 - usuario: `admin`
 - senha: `admin123`
 
+## Passo a Passo Atual do Projeto
+
+Use este fluxo no estado atual do sistema.
+
+### 1. Alinhar o banco antes do boot
+
+Confirme que as migrations mais novas foram aplicadas:
+
+- `V11__Add_Mfa_And_Password_Security_To_Usuarios.sql`
+- `V12__Create_Security_Events.sql`
+- `V13__Create_Assinatura_Invites_And_Solicitacoes.sql`
+
+Consulta rapida:
+
+```sql
+SELECT installed_rank, version, description, success
+FROM flyway_schema_history
+WHERE version IN ('11', '12', '13')
+ORDER BY installed_rank;
+```
+
+### 2. Gerar um `JWT_SECRET` forte
+
+Exemplo no Linux:
+
+```bash
+openssl rand -base64 64
+```
+
+### 3. Exportar as variaveis de bootstrap
+
+```bash
+export BOOTSTRAP_ADMIN_ENABLED=true
+export BOOTSTRAP_ADMIN_USERNAME=admin
+export BOOTSTRAP_ADMIN_PASSWORD='admin123'
+export JWT_SECRET='cole-aqui-o-segredo-gerado'
+```
+
+### 4. Subir a aplicacao
+
+```bash
+mvn spring-boot:run
+```
+
+Ou com profile `local`:
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+### 5. Fazer o primeiro login
+
+Abra:
+
+```text
+http://localhost:8080
+```
+
+Entre com:
+
+- usuario: `admin`
+- senha: `admin123`
+
+### 6. Observar o fluxo de seguranca no login
+
+No estado atual do sistema, o login pode exigir:
+
+- validacao real da sessao com `/auth/me`
+- troca obrigatoria de senha
+- MFA para perfis criticos
+
+Se o usuario cair em MFA:
+
+1. escaneie o QR code mostrado na tela
+2. ou use a chave manual
+3. informe o codigo de 6 digitos
+4. conclua o login
+
+### 7. Entender o cadastro publico
+
+O sistema nao cria mais empresa livremente pela tela publica.
+
+Agora o fluxo correto e:
+
+1. o visitante envia uma solicitacao de acesso comercial
+2. a equipe interna gera um convite
+3. a criacao real da empresa so acontece com `inviteToken`
+
 Importante:
 
 - o bootstrap so cria o admin se ele ainda nao existir

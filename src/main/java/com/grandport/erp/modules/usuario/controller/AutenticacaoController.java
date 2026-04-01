@@ -14,6 +14,8 @@ import com.grandport.erp.modules.usuario.service.MfaChallengeService;
 import com.grandport.erp.modules.usuario.service.PasswordPolicyService;
 import com.grandport.erp.modules.usuario.service.TokenService;
 import com.grandport.erp.modules.usuario.service.TotpService;
+import com.grandport.erp.modules.assinatura.service.TenantAccessBlockedException;
+import com.grandport.erp.modules.assinatura.service.TenantAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +49,7 @@ public class AutenticacaoController {
     private final MfaChallengeService mfaChallengeService;
     private final TotpService totpService;
     private final SecurityEventService securityEventService;
+    private final TenantAccessService tenantAccessService;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody @Valid LoginDTO data, HttpServletRequest request) {
@@ -74,6 +77,7 @@ public class AutenticacaoController {
             var auth = this.authenticationManager.authenticate(usernamePassword);
 
             Usuario usuario = (Usuario) auth.getPrincipal();
+            tenantAccessService.validarAcesso(usuario);
             loginAttemptService.recordSuccess(ipKey);
             loginAttemptService.recordSuccess(userKey);
             auditoriaService.registrar("SEGURANCA", "LOGIN_SUCESSO", "Login realizado para o usuário: " + usuario.getUsername());
@@ -101,6 +105,9 @@ public class AutenticacaoController {
             }
 
             return ResponseEntity.ok(buildSuccessResponse(usuario));
+        } catch (TenantAccessBlockedException ex) {
+            return ResponseEntity.status(HttpStatus.LOCKED)
+                    .body(Map.of("error", ex.getMessage()));
         } catch (AuthenticationException ex) {
             loginAttemptService.recordFailure(ipKey);
             loginAttemptService.recordFailure(userKey);
@@ -178,15 +185,7 @@ public class AutenticacaoController {
     }
 
     private boolean requiresMfa(Usuario usuario) {
-        boolean criticalProfile = usuario.getPermissoes() != null && usuario.getPermissoes().stream().anyMatch(permissao ->
-                permissao.equalsIgnoreCase("usuarios")
-                        || permissao.equalsIgnoreCase("configuracoes")
-                        || permissao.equalsIgnoreCase("auditoria")
-                        || permissao.equalsIgnoreCase("contas-pagar")
-                        || permissao.equalsIgnoreCase("contas-receber")
-                        || permissao.equalsIgnoreCase("dre")
-        );
-        return usuario.isMfaEnabled() || criticalProfile;
+        return usuario.isMfaEnabled();
     }
 
     private AuthFlowResponseDTO buildSuccessResponse(Usuario usuario) {

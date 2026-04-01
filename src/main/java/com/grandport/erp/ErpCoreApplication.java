@@ -1,6 +1,7 @@
 package com.grandport.erp;
 
 import com.grandport.erp.modules.usuario.model.Usuario;
+import com.grandport.erp.modules.usuario.model.TipoAcesso;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -51,8 +52,7 @@ public class ErpCoreApplication {
                     "contas-pagar", "contas-receber", "bancos", "conciliacao", "plano-contas", "dre",
                     "parceiros", "usuarios", "auditoria", "fiscal", "configuracoes", "calculadora", "recibo-avulso","historico-recibos","ncm", "whatsapp",
                     "backup","regras-fiscais","categorias","gerenciador-nfe","emitir-nfe-avulsa","manual","revisoes","crm","etiquetas",
-                    "os","servicos","listagem-os","checklist","curva-abc","fluxo-caixa-projecao"
-            );
+                    "os","servicos","listagem-os","checklist","curva-abc","fluxo-caixa-projecao"            );
 
             Usuario admin = repository.findByUsername(bootstrapUsername);
 
@@ -63,6 +63,7 @@ public class ErpCoreApplication {
                 admin.setNomeCompleto("Administrador do Sistema");
                 admin.setPermissoes(todasPermissoes);
                 admin.setEmpresaId(1L);
+                admin.setTipoAcesso(TipoAcesso.PLATFORM_ADMIN);
 
                 repository.save(admin);
                 log.warn("Usuário bootstrap [{}] criado. Desabilite BOOTSTRAP_ADMIN_ENABLED após o provisionamento.", bootstrapUsername);
@@ -71,6 +72,7 @@ public class ErpCoreApplication {
                 if (admin.getEmpresaId() == null) {
                     admin.setEmpresaId(1L);
                 }
+                admin.setTipoAcesso(TipoAcesso.PLATFORM_ADMIN);
 
                 repository.save(admin);
                 log.info("Permissões do usuário bootstrap [{}] atualizadas.", bootstrapUsername);

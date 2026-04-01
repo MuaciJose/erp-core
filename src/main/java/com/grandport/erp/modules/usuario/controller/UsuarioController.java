@@ -3,6 +3,7 @@ package com.grandport.erp.modules.usuario.controller;
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.admin.service.SecurityEventService;
 import com.grandport.erp.modules.usuario.dto.UsuarioDTO;
+import com.grandport.erp.modules.usuario.model.TipoAcesso;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
 import com.grandport.erp.modules.usuario.service.PasswordPolicyService;
@@ -19,7 +20,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/usuarios")
-@PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+@PreAuthorize("hasAuthority('ROLE_USUARIOS')")
 public class UsuarioController {
 
     @Autowired private UsuarioRepository repository;
@@ -52,6 +53,11 @@ public class UsuarioController {
 
         passwordPolicyService.validateOrThrow(dto.getSenha());
 
+        TipoAcesso tipoSolicitado = dto.getTipoAcesso() != null ? dto.getTipoAcesso() : TipoAcesso.TENANT_USER;
+        if (tipoSolicitado == TipoAcesso.PLATFORM_ADMIN && usuarioLogado.getTipoAcesso() != TipoAcesso.PLATFORM_ADMIN) {
+            throw new RuntimeException("Apenas administradores da plataforma podem criar PLATFORM_ADMIN.");
+        }
+
         Usuario novo = new Usuario();
         novo.setNomeCompleto(dto.getNome());
         novo.setUsername(dto.getEmail());
@@ -60,6 +66,7 @@ public class UsuarioController {
         novo.setAtivo(true);
         novo.setMfaEnabled(dto.isMfaEnabled());
         novo.setForcePasswordChange(dto.isForcePasswordChange());
+        novo.setTipoAcesso(tipoSolicitado);
 
         // 🔐 A CHAVE DE SEGURANÇA: Força o novo usuário a ter o mesmo ID de empresa do criador!
         novo.setEmpresaId(usuarioLogado.getEmpresaId());
@@ -85,6 +92,14 @@ public class UsuarioController {
         usuario.setPermissoes(dto.getPermissoes());
         usuario.setMfaEnabled(dto.isMfaEnabled());
         usuario.setForcePasswordChange(dto.isForcePasswordChange());
+        TipoAcesso tipoSolicitado = dto.getTipoAcesso() != null ? dto.getTipoAcesso() : usuario.getTipoAcesso();
+        if (tipoSolicitado == TipoAcesso.PLATFORM_ADMIN && usuarioLogado.getTipoAcesso() != TipoAcesso.PLATFORM_ADMIN) {
+            throw new RuntimeException("Apenas administradores da plataforma podem definir PLATFORM_ADMIN.");
+        }
+        if (usuario.getTipoAcesso() == TipoAcesso.PLATFORM_ADMIN && usuarioLogado.getTipoAcesso() != TipoAcesso.PLATFORM_ADMIN) {
+            throw new RuntimeException("Apenas administradores da plataforma podem editar PLATFORM_ADMIN.");
+        }
+        usuario.setTipoAcesso(tipoSolicitado);
 
         if (dto.getSenha() != null && !dto.getSenha().isEmpty()) {
             passwordPolicyService.validateOrThrow(dto.getSenha());

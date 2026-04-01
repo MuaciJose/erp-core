@@ -9,8 +9,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Locale;
+import java.util.Set;
 
 @Entity
 @Table(name = "usuarios")
@@ -44,6 +46,10 @@ public class Usuario implements UserDetails {
     @Column(name = "force_password_change", nullable = false)
     private boolean forcePasswordChange = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_acesso", nullable = false)
+    private TipoAcesso tipoAcesso = TipoAcesso.TENANT_USER;
+
     @Column(name = "is_mecanico")
     private Boolean isMecanico = false;
 
@@ -58,9 +64,34 @@ public class Usuario implements UserDetails {
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         if (permissoes == null) return new ArrayList<>();
-        return permissoes.stream()
-                .map(p -> new SimpleGrantedAuthority("ROLE_" + p.toUpperCase()))
-                .collect(Collectors.toList());
+
+        Set<String> authorities = new LinkedHashSet<>();
+
+        for (String permissao : permissoes) {
+            if (permissao == null || permissao.isBlank()) continue;
+            String normalizada = permissao.trim().toUpperCase(Locale.ROOT);
+            authorities.add("ROLE_" + normalizada);
+
+            switch (normalizada) {
+                case "USUARIOS" -> authorities.add("ROLE_ADMIN");
+                case "CONFIGURACOES" -> authorities.add("ROLE_CONFIGURADOR");
+                case "AUDITORIA" -> authorities.add("ROLE_AUDITORIA");
+                case "CONTAS-PAGAR", "CONTAS-RECEBER", "BANCOS", "CONCILIACAO", "PLANO-CONTAS", "DRE" ->
+                        authorities.add("ROLE_FINANCEIRO");
+                case "VENDAS", "ORCAMENTOS", "CRM", "REVISOES" -> authorities.add("ROLE_VENDEDOR");
+                case "CAIXA", "FILA-CAIXA", "PDV" -> authorities.add("ROLE_CAIXA");
+                default -> {
+                }
+            }
+        }
+
+        if (tipoAcesso != null) {
+            authorities.add("ROLE_" + tipoAcesso.name());
+        }
+
+        return authorities.stream()
+                .map(SimpleGrantedAuthority::new)
+                .toList();
     }
     @Override public String getPassword() { return senha; }
     @Override public String getUsername() { return username; }

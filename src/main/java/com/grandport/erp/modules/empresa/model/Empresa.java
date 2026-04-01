@@ -2,6 +2,7 @@ package com.grandport.erp.modules.empresa.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -24,4 +25,14 @@ public class Empresa {
 
     private LocalDateTime dataCadastro = LocalDateTime.now();
     private Boolean ativo = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status_assinatura", nullable = false)
+    private StatusAssinatura statusAssinatura = StatusAssinatura.ATIVA;
+
+    @Column(name = "data_vencimento")
+    private LocalDate dataVencimento = LocalDate.now().plusDays(30);
+
+    @Column(name = "motivo_bloqueio")
+    private String motivoBloqueio;
 }

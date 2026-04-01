@@ -47,7 +47,7 @@ public class RelatorioVendaController {
     // NOVO ENDPOINT: /api/vendas/{id}/whatsapp
     @PostMapping("/{id}/whatsapp")
     // 👉 ADICIONE ESTA LINHA ABAIXO PARA LIBERAR O ACESSO (Ajuste a ROLE se necessário, ex: hasAnyRole('ADMIN', 'CAIXA'))
-    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'CAIXA')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_VENDAS', 'ROLE_CAIXA', 'ROLE_FILA-CAIXA')")
     public ResponseEntity<String> enviarReciboWhatsApp(@PathVariable Long id) {
         try {
             whatsAppService.enviarReciboPdfPorWhatsApp(id);

@@ -74,27 +74,27 @@ public class ConfiguracaoController {
     private DanfeService danfeService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<ConfiguracaoSistema> obterConfig() {
         return ResponseEntity.ok(service.obterConfiguracao());
     }
 
     @PutMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<ConfiguracaoSistema> salvarConfig(@RequestBody ConfiguracaoSistema config) {
         return ResponseEntity.ok(service.atualizarConfiguracao(config));
     }
 
     // 🆕 POST também funciona (alternativa ao PUT para compatibilidade)
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<ConfiguracaoSistema> salvarConfigPost(@RequestBody ConfiguracaoSistema config) {
         return ResponseEntity.ok(service.atualizarConfiguracao(config));
     }
 
     // 🆕 Inicializar configuração para nova empresa
     @PostMapping("/inicializar")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<ConfiguracaoSistema> inicializarConfiguracao() {
         ConfiguracaoSistema config = service.obterConfiguracao();
         return ResponseEntity.ok(config);
@@ -198,13 +198,13 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/layouts/overview")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterResumoGovernancaImpressao() {
         return ResponseEntity.ok(printingGovernanceOverviewService.getOverview());
     }
 
     @GetMapping("/laudo-vistoria/template")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterTemplateLaudoVistoria() {
         var state = laudoVistoriaTemplateVersioningService.getEditorState();
         var official = laudoVistoriaTemplateService.getOfficialTemplate();
@@ -225,13 +225,13 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/laudo-vistoria/template/official")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterTemplateOficialLaudoVistoria() {
         return ResponseEntity.ok(laudoVistoriaTemplateService.getOfficialTemplate());
     }
 
     @GetMapping("/danfe/template")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterTemplateDanfe() {
         var state = danfeTemplateVersioningService.getEditorState();
         var official = danfeTemplateService.getOfficialTemplate();
@@ -252,19 +252,19 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/danfe/template/official")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterTemplateOficialDanfe() {
         return ResponseEntity.ok(danfeTemplateService.getOfficialTemplate());
     }
 
     @GetMapping("/danfe/template/library")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> listarBibliotecaDanfe() {
         return ResponseEntity.ok(premiumTemplateLibraryService.listDanfeTemplates());
     }
 
     @GetMapping("/danfe/template/library/{styleId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterTemplateBibliotecaDanfe(@PathVariable String styleId) {
         try {
             return ResponseEntity.ok(premiumTemplateLibraryService.getDanfeTemplate(styleId));
@@ -274,7 +274,7 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/danfe/template/library/{styleId}/preview")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> previewTemplateBibliotecaDanfe(@PathVariable String styleId) {
         try {
             var template = premiumTemplateLibraryService.getDanfeTemplate(styleId);
@@ -291,7 +291,7 @@ public class ConfiguracaoController {
     }
 
     @PutMapping("/danfe/template")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> salvarTemplateDanfe(@RequestBody Map<String, String> payload) {
         try {
             var draft = danfeTemplateVersioningService.saveDraft(payload.get("jrxml"), payload.get("changeReason"));
@@ -306,13 +306,13 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/danfe/template/historico")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterHistoricoTemplateDanfe() {
         return ResponseEntity.ok(danfeTemplateVersioningService.getHistory());
     }
 
     @PostMapping("/danfe/template/publish")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> publicarTemplateDanfe(@RequestBody(required = false) Map<String, String> payload) {
         try {
             var published = danfeTemplateVersioningService.publishDraft(payload != null ? payload.get("changeReason") : null);
@@ -326,7 +326,7 @@ public class ConfiguracaoController {
     }
 
     @PostMapping("/danfe/template/rollback/{versionId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> rollbackTemplateDanfe(
             @PathVariable Long versionId,
             @RequestBody(required = false) Map<String, String> payload) {
@@ -345,20 +345,20 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/danfe/template/diff")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterDiffTemplateDanfe() {
         return ResponseEntity.ok(danfeTemplateVersioningService.diffDraftAgainstPublished());
     }
 
     @PostMapping("/danfe/template/reset")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> resetarTemplateDanfe() {
         danfeTemplateVersioningService.resetPublished();
         return ResponseEntity.ok(Map.of("mensagem", "Template do DANFE resetado para o padrão."));
     }
 
     @PostMapping("/danfe/template/preview")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> previewTemplateDanfe(@RequestBody(required = false) Map<String, String> payload) {
         try {
             String jrxml = payload != null ? payload.get("jrxml") : null;
@@ -375,13 +375,13 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/laudo-vistoria/template/library")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> listarBibliotecaLaudoVistoria() {
         return ResponseEntity.ok(premiumTemplateLibraryService.listLaudoTemplates());
     }
 
     @GetMapping("/laudo-vistoria/template/library/{styleId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterTemplateBibliotecaLaudoVistoria(@PathVariable String styleId) {
         try {
             return ResponseEntity.ok(premiumTemplateLibraryService.getLaudoTemplate(styleId));
@@ -391,7 +391,7 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/laudo-vistoria/template/library/{styleId}/preview")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> previewTemplateBibliotecaLaudoVistoria(
             @PathVariable String styleId,
             @RequestParam(required = false) Long checklistId) {
@@ -410,7 +410,7 @@ public class ConfiguracaoController {
     }
 
     @PutMapping("/laudo-vistoria/template")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> salvarTemplateLaudoVistoria(@RequestBody Map<String, String> payload) {
         try {
             var draft = laudoVistoriaTemplateVersioningService.saveDraft(payload.get("jrxml"), payload.get("changeReason"));
@@ -425,13 +425,13 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/laudo-vistoria/template/historico")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterHistoricoTemplateLaudoVistoria() {
         return ResponseEntity.ok(laudoVistoriaTemplateVersioningService.getHistory());
     }
 
     @PostMapping("/laudo-vistoria/template/publish")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> publicarTemplateLaudoVistoria(@RequestBody(required = false) Map<String, String> payload) {
         try {
             var published = laudoVistoriaTemplateVersioningService.publishDraft(payload != null ? payload.get("changeReason") : null);
@@ -445,7 +445,7 @@ public class ConfiguracaoController {
     }
 
     @PostMapping("/laudo-vistoria/template/rollback/{versionId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> rollbackTemplateLaudoVistoria(
             @PathVariable Long versionId,
             @RequestBody(required = false) Map<String, String> payload) {
@@ -464,20 +464,20 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/laudo-vistoria/template/diff")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterDiffTemplateLaudoVistoria() {
         return ResponseEntity.ok(laudoVistoriaTemplateVersioningService.diffDraftAgainstPublished());
     }
 
     @PostMapping("/laudo-vistoria/template/reset")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> resetarTemplateLaudoVistoria() {
         laudoVistoriaTemplateVersioningService.resetPublished();
         return ResponseEntity.ok(Map.of("mensagem", "Template do laudo resetado para o padrão."));
     }
 
     @GetMapping("/laudo-vistoria/template/preview")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> previewTemplateLaudoVistoria(@RequestParam(required = false) Long checklistId) {
         try {
             byte[] pdf = laudoVistoriaService.gerarPreviewPdf(checklistId);
@@ -491,7 +491,7 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/laudo-vistoria/template/preview-contexts")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> listarContextosPreviewLaudoVistoria() {
         return ResponseEntity.ok(
                 checklistService.listarRecentesDaEmpresa().stream()
@@ -513,7 +513,7 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/layouts/{tipoLayout}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterLayout(@PathVariable String tipoLayout) {
         try {
             LayoutTemplateVersioningService.LayoutEditorState state = layoutTemplateVersioningService.getEditorState(tipoLayout);
@@ -536,7 +536,7 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/layouts/{tipoLayout}/official")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterTemplateOficialLayout(@PathVariable String tipoLayout) {
         try {
             return ResponseEntity.ok(officialLayoutTemplateService.getOfficialTemplate(tipoLayout));
@@ -546,7 +546,7 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/layouts/{tipoLayout}/library")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> listarBibliotecaLayout(@PathVariable String tipoLayout) {
         try {
             return ResponseEntity.ok(premiumTemplateLibraryService.listHtmlTemplates(tipoLayout));
@@ -556,7 +556,7 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/layouts/{tipoLayout}/library/{styleId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterTemplateBibliotecaLayout(
             @PathVariable String tipoLayout,
             @PathVariable String styleId) {
@@ -568,7 +568,7 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/layouts/{tipoLayout}/library/{styleId}/preview-pdf")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> previewTemplateBibliotecaLayout(
             @PathVariable String tipoLayout,
             @PathVariable String styleId) {
@@ -591,7 +591,7 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/layouts/{tipoLayout}/metadata")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterMetadataLayout(@PathVariable String tipoLayout) {
         try {
             return ResponseEntity.ok(layoutTemplateGovernanceService.getMetadata(tipoLayout));
@@ -601,7 +601,7 @@ public class ConfiguracaoController {
     }
 
     @PostMapping("/layouts/{tipoLayout}/preview-pdf")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> gerarPreviewLayout(@PathVariable String tipoLayout, @RequestBody Map<String, String> payload) {
         String html = payload.get("html");
         if (html == null || html.trim().isEmpty()) {
@@ -635,7 +635,7 @@ public class ConfiguracaoController {
     }
 
     @PutMapping("/layouts/{tipoLayout}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> atualizarLayout(
             @PathVariable String tipoLayout,
             @RequestBody Map<String, String> payload) {
@@ -674,7 +674,7 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/layouts/{tipoLayout}/historico")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterHistoricoLayout(@PathVariable String tipoLayout) {
         try {
             return ResponseEntity.ok(layoutTemplateVersioningService.getHistory(tipoLayout));
@@ -684,7 +684,7 @@ public class ConfiguracaoController {
     }
 
     @PostMapping("/layouts/{tipoLayout}/publish")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> publicarDraft(@PathVariable String tipoLayout) {
         try {
             LayoutTemplateVersioningService.LayoutVersionSummary published = layoutTemplateVersioningService.publishDraft(
@@ -702,7 +702,7 @@ public class ConfiguracaoController {
     }
 
     @PostMapping("/layouts/{tipoLayout}/publish-with-reason")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> publicarDraftComMotivo(@PathVariable String tipoLayout, @RequestBody(required = false) Map<String, String> payload) {
         try {
             LayoutTemplateVersioningService.LayoutVersionSummary published = layoutTemplateVersioningService.publishDraft(
@@ -720,7 +720,7 @@ public class ConfiguracaoController {
     }
 
     @PostMapping("/layouts/{tipoLayout}/rollback/{versionId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> rollbackLayout(@PathVariable String tipoLayout, @PathVariable Long versionId) {
         try {
             LayoutTemplateVersioningService.LayoutVersionSummary published =
@@ -736,7 +736,7 @@ public class ConfiguracaoController {
     }
 
     @PostMapping("/layouts/{tipoLayout}/rollback/{versionId}/with-reason")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> rollbackLayoutComMotivo(
             @PathVariable String tipoLayout,
             @PathVariable Long versionId,
@@ -759,7 +759,7 @@ public class ConfiguracaoController {
     }
 
     @GetMapping("/layouts/{tipoLayout}/diff")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CONFIGURADOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> obterDiffLayout(@PathVariable String tipoLayout) {
         try {
             return ResponseEntity.ok(layoutTemplateVersioningService.diffDraftAgainstPublished(tipoLayout));
@@ -769,7 +769,7 @@ public class ConfiguracaoController {
     }
 
     @PostMapping("/layouts/reset/{tipoLayout}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<Map<String, String>> resetarLayout(@PathVariable String tipoLayout) {
         try {
             layoutTemplateVersioningService.resetPublishedLayout(tipoLayout);

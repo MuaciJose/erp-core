@@ -1,5 +1,8 @@
 package com.grandport.erp.config.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.grandport.erp.modules.assinatura.service.TenantAccessBlockedException;
+import com.grandport.erp.modules.assinatura.service.TenantAccessService;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
 import com.grandport.erp.modules.usuario.service.TokenService;
 import jakarta.servlet.FilterChain;
@@ -8,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Map;
 
 @Component
 @Slf4j
@@ -23,6 +28,7 @@ public class SecurityFilter extends OncePerRequestFilter {
 
     private final TokenService tokenService;
     private final UsuarioRepository usuarioRepository;
+    private final TenantAccessService tenantAccessService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -44,6 +50,9 @@ public class SecurityFilter extends OncePerRequestFilter {
                     }
 
                     if (user != null) {
+                        if (user instanceof com.grandport.erp.modules.usuario.model.Usuario u) {
+                            tenantAccessService.validarAcesso(u);
+                        }
                         var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
                         SecurityContextHolder.getContext().setAuthentication(authentication);
                     } else {
@@ -51,6 +60,13 @@ public class SecurityFilter extends OncePerRequestFilter {
                         log.warn("JWT válido para usuário inexistente no banco: {}", login);
                     }
                 }
+            } catch (TenantAccessBlockedException blocked) {
+                SecurityContextHolder.clearContext();
+                response.setStatus(HttpStatus.LOCKED.value());
+                response.setContentType("application/json");
+                response.setCharacterEncoding("UTF-8");
+                response.getWriter().write(new ObjectMapper().writeValueAsString(Map.of("error", blocked.getMessage())));
+                return;
             } catch (Exception e) {
                 SecurityContextHolder.clearContext();
                 log.warn("Falha ao processar JWT: {}", e.getMessage());

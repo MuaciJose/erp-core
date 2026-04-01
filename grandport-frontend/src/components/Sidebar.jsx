@@ -59,6 +59,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
     };
 
     const permissoesUsuario = usuarioLogado?.permissoes || [];
+    const isPlatformAdmin = usuarioLogado?.tipoAcesso === 'PLATFORM_ADMIN';
 
     // ============================================================================
     // 🚀 MENUS ATUALIZADOS E SINCRONIZADOS COM A GESTÃO DE USUÁRIOS
@@ -122,6 +123,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
                 { titulo: 'Clientes & Fornecedores', acao: 'parceiros' },
                 { titulo: 'Tabela de Mão de Obra', acao: 'servicos' },
                 { titulo: 'Equipe e Acessos', acao: 'usuarios' },
+                { titulo: 'Liberação de Acessos', acao: 'liberacao-acessos', permissao: 'usuarios' },
                 { titulo: 'Auditoria de Sistema', acao: 'auditoria' },
                 { titulo: 'Fiscal / NCM', acao: 'fiscal' },
                 { titulo: 'Regras Fiscais (NF-e)', acao: 'regras-fiscais' },
@@ -138,9 +140,10 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {
             // Verifica se o usuário tem permissão para alguma tela do submenu
-            const submenusPermitidos = menu.submenus.filter(sub =>
-                permissoesUsuario.includes(sub.acao) || rotasLivres.includes(sub.acao)
-            );
+            const submenusPermitidos = menu.submenus.filter(sub => {
+                if (sub.acao === 'liberacao-acessos') return isPlatformAdmin;
+                return permissoesUsuario.includes(sub.permissao || sub.acao) || rotasLivres.includes(sub.acao);
+            });
             // Se tiver pelo menos um submenu liberado, renderiza o menu principal
             if (submenusPermitidos.length > 0) return { ...menu, submenus: submenusPermitidos };
             return null;

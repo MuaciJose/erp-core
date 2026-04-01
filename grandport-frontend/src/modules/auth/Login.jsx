@@ -226,13 +226,13 @@ export const Login = ({ onLoginSuccess, onIrParaCadastro }) => {
 
                     {/* 🚀 AQUI ENTRA A NOSSA NOVA ROTA PARA O CADASTRO SAAS */}
                     <div className="mt-8 text-center border-t border-slate-100 pt-6">
-                        <p className="text-xs text-slate-500 font-medium mb-2">Ainda não usa nosso ERP?</p>
+                        <p className="text-xs text-slate-500 font-medium mb-2">Quer conhecer o ERP?</p>
                         <button
                             type="button"
                             onClick={onIrParaCadastro}
                             className="text-blue-600 font-black hover:text-blue-800 transition-colors uppercase tracking-wider text-sm flex items-center justify-center gap-1 mx-auto bg-transparent border-none cursor-pointer"
                         >
-                            Crie sua conta e teste agora <ArrowRight size={16} />
+                            Solicitar acesso comercial <ArrowRight size={16} />
                         </button>
                     </div>
 

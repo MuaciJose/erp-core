@@ -81,7 +81,7 @@ public class VendaController {
     }
 
     @PostMapping("/{id}/pagar")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'CAIXA', 'VENDEDOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_VENDAS', 'ROLE_CAIXA', 'ROLE_FILA-CAIXA', 'ROLE_CRM')")
     public ResponseEntity<?> finalizarPagamento(@PathVariable Long id, @RequestBody List<Map<String, Object>> payload) {
         try {
             // 🚀 O AMORTECEDOR À PROVA DE BALAS (Especial para Java Records)

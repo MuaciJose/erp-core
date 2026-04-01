@@ -19,10 +19,13 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.status === 401 && !error?.config?.url?.includes('/auth/login')) {
+    const status = error?.response?.status;
+    if ((status === 401 || status === 423) && !error?.config?.url?.includes('/auth/login')) {
       clearSession();
       delete api.defaults.headers.common.Authorization;
-      window.dispatchEvent(new CustomEvent('grandport:session-expired'));
+      window.dispatchEvent(new CustomEvent(status === 423 ? 'grandport:tenant-blocked' : 'grandport:session-expired', {
+        detail: { message: error?.response?.data?.error }
+      }));
     }
     return Promise.reject(error);
   }

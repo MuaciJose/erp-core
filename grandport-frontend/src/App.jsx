@@ -3,7 +3,7 @@ import api from './api/axios';
 import { clearSession, syncAuthHeader, updateStoredUser } from './utils/authStorage';
 
 // --- IMPORTAÇÃO DO TOAST ---
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './modules/financeiro/Dashboard';
@@ -13,6 +13,7 @@ import { PrevisaoCompras } from './modules/estoque/PrevisaoCompras';
 import { Parceiros } from './modules/cadastro/Parceiros';
 import { Login } from './modules/auth/Login';
 import CadastroEmpresa from './modules/auth/CadastroEmpresa'; // 🚀 IMPORTAÇÃO DA NOVA TELA AQUI
+import FinalizarCadastroEmpresa from './modules/auth/FinalizarCadastroEmpresa';
 import { CargaNcm } from './modules/admin/CargaNcm';
 import { RelatorioFaltas } from './modules/admin/RelatorioFaltas';
 import { ContasPagar } from './modules/financeiro/ContasPagar';
@@ -22,6 +23,7 @@ import { FluxoCaixaProjecao } from './modules/financeiro/FluxoCaixaProjecao'; //
 import { PlanoContas } from './modules/financeiro/PlanoContas';
 import { ConciliacaoBancaria } from './modules/financeiro/ConciliacaoBancaria';
 import { GestaoUsuarios } from './modules/cadastro/GestaoUsuarios';
+import { LiberacaoAcessos } from './modules/cadastro/LiberacaoAcessos';
 import { Auditoria } from './modules/cadastro/Auditoria';
 import { WidgetCalculadora } from './components/WidgetCalculadora';
 import { RelatorioComissoes } from './modules/vendas/RelatorioComissoes';
@@ -112,6 +114,7 @@ function App() {
 
     // 🚀 NOVO ESTADO: Controla as telas antes do usuário logar
     const [telaPublica, setTelaPublica] = useState('login');
+    const [inviteTokenPublico, setInviteTokenPublico] = useState('');
 
     const definirTelaInicial = (usuario) => {
         const permissoes = usuario.permissoes || [];
@@ -124,6 +127,13 @@ function App() {
     };
 
     useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const inviteToken = params.get('inviteToken');
+        if (inviteToken) {
+            setInviteTokenPublico(inviteToken);
+            setTelaPublica('finalizar-cadastro');
+        }
+
         const validarSessao = async () => {
             const token = syncAuthHeader(api);
 
@@ -158,14 +168,22 @@ function App() {
         const handleSessionExpired = () => {
             setUsuarioLogado(null);
             setPaginaAtiva('');
+            setTelaPublica(inviteToken ? 'finalizar-cadastro' : 'login');
+        };
+        const handleTenantBlocked = (event) => {
+            setUsuarioLogado(null);
+            setPaginaAtiva('');
             setTelaPublica('login');
+            toast.error(event?.detail?.message || 'O acesso desta empresa foi bloqueado pela plataforma.');
         };
         window.addEventListener('grandport:navigate', handleCustomNavigate);
         window.addEventListener('grandport:session-expired', handleSessionExpired);
+        window.addEventListener('grandport:tenant-blocked', handleTenantBlocked);
         return () => {
             document.removeEventListener('fullscreenchange', handleFSChange);
             window.removeEventListener('grandport:navigate', handleCustomNavigate);
             window.removeEventListener('grandport:session-expired', handleSessionExpired);
+            window.removeEventListener('grandport:tenant-blocked', handleTenantBlocked);
         };
     }, []);
 
@@ -210,6 +228,9 @@ function App() {
 
     // 🚀 O NOVO PÁTIO DE ENTRADA DO SAAS
     if (!usuarioLogado) {
+        if (telaPublica === 'finalizar-cadastro') {
+            return <FinalizarCadastroEmpresa inviteToken={inviteTokenPublico} onVoltarLogin={() => setTelaPublica('login')} />;
+        }
         if (telaPublica === 'cadastro') {
             return <CadastroEmpresa onVoltarLogin={() => setTelaPublica('login')} />;
         }
@@ -217,7 +238,10 @@ function App() {
     }
 
     const permissoesExtra = ['revisoes', 'agenda', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual', 'checklist', 'inventario', 'estoque'];
-    const temPermissao = usuarioLogado.permissoes.includes(paginaAtiva) || permissoesExtra.includes(paginaAtiva);
+    const temPermissao =
+        usuarioLogado.permissoes.includes(paginaAtiva) ||
+        permissoesExtra.includes(paginaAtiva) ||
+        (paginaAtiva === 'liberacao-acessos' && usuarioLogado.tipoAcesso === 'PLATFORM_ADMIN');
     const agendaTemAtrasos = (resumoAgendaTopo?.atrasados || 0) > 0;
     const podeVerAgenda = usuarioLogado?.permissoes?.includes('agenda');
     const exigeTrocaSenha = !!usuarioLogado?.forcePasswordChange;
@@ -364,6 +388,7 @@ function App() {
                             {paginaAtiva === 'plano-contas' && <PlanoContas />}
                             {paginaAtiva === 'conciliacao' && <ConciliacaoBancaria />}
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
+                            {paginaAtiva === 'liberacao-acessos' && <LiberacaoAcessos />}
                             {paginaAtiva === 'auditoria' && <Auditoria />}
                             {paginaAtiva === 'configuracoes' && (
                                 <Suspense fallback={

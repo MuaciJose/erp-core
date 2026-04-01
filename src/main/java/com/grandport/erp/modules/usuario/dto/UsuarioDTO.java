@@ -1,6 +1,7 @@
 package com.grandport.erp.modules.usuario.dto;
 
 import com.grandport.erp.modules.usuario.model.Usuario;
+import com.grandport.erp.modules.usuario.model.TipoAcesso;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.util.List;
@@ -15,6 +16,7 @@ public class UsuarioDTO {
     private boolean ativo;
     private boolean mfaEnabled;
     private boolean forcePasswordChange;
+    private TipoAcesso tipoAcesso;
     private List<String> permissoes;
 
     public UsuarioDTO(Usuario u) {
@@ -24,6 +26,7 @@ public class UsuarioDTO {
         this.ativo = u.isAtivo();
         this.mfaEnabled = u.isMfaEnabled();
         this.forcePasswordChange = u.isForcePasswordChange();
+        this.tipoAcesso = u.getTipoAcesso();
         this.permissoes = u.getPermissoes();
     }
 }

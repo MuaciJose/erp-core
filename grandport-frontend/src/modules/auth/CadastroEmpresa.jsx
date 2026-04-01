@@ -11,9 +11,9 @@ const CadastroEmpresa = ({ onVoltarLogin }) => {
         razaoSocial: '',
         cnpj: '',
         telefone: '',
-        nomeAdmin: '',
-        emailAdmin: '',
-        senhaAdmin: ''
+        nomeContato: '',
+        emailContato: '',
+        observacoes: ''
     });
 
     const handleChange = (e) => {
@@ -26,31 +26,19 @@ const CadastroEmpresa = ({ onVoltarLogin }) => {
         setErro('');
 
         try {
-            await api.post('/api/assinaturas/nova-empresa', formData);
+            await api.post('/api/assinaturas/solicitacoes-acesso', formData);
 
             setSucesso(true);
             setLoading(false);
 
-            // 🔐 CRÍTICO: Limpar dados antigos de autenticação para forçar novo login
-            // Isso garante que o usuário terá novo token com a empresaId correta
-            localStorage.removeItem('token');
-            localStorage.removeItem('empresaId');
-            localStorage.removeItem('usuarioId');
-            localStorage.removeItem('user');
-            
-            // Remove do sessionStorage também (se existir)
-            sessionStorage.removeItem('token');
-            sessionStorage.removeItem('empresaId');
-
             // Redireciona para o login após 3 segundos usando a função do App.jsx
-            // O TenantResolver do backend lerá a nova empresaId do token JWT gerado
             setTimeout(() => {
                 onVoltarLogin();
             }, 3000);
 
         } catch (error) {
             setLoading(false);
-            setErro(error.response?.data?.message || 'Erro ao criar conta. Verifique os dados e tente novamente.');
+            setErro(error.response?.data?.message || 'Erro ao solicitar acesso. Verifique os dados e tente novamente.');
         }
     };
 
@@ -59,9 +47,9 @@ const CadastroEmpresa = ({ onVoltarLogin }) => {
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
                 <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl text-center space-y-4 border border-slate-100">
                     <CheckCircle2 size={64} className="text-emerald-500 mx-auto animate-bounce" />
-                    <h2 className="text-2xl font-bold text-slate-800">Quartel-General Criado!</h2>
+                    <h2 className="text-2xl font-bold text-slate-800">Solicitação Enviada!</h2>
                     <p className="text-slate-600">
-                        Sua empresa foi registrada com sucesso. O seu sistema ERP já está pronto e isolado na nuvem.
+                        Recebemos seus dados. Nossa equipe vai validar o cadastro e liberar o acesso por convite.
                     </p>
                     <p className="text-sm text-slate-400">Redirecionando para o login...</p>
                 </div>
@@ -77,16 +65,16 @@ const CadastroEmpresa = ({ onVoltarLogin }) => {
                 <div className="w-full md:w-2/5 bg-slate-900 text-white p-10 flex flex-col justify-center relative overflow-hidden">
                     <div className="relative z-10 space-y-6">
                         <Building2 size={48} className="text-blue-400" />
-                        <h1 className="text-3xl font-bold">Otimize a sua Empresa.</h1>
+                        <h1 className="text-3xl font-bold">Solicite seu acesso.</h1>
                         <p className="text-slate-300">
-                            Crie sua conta agora e tenha acesso imediato ao ERP mais completo do mercado. Vendas, Estoque, OS e Financeiro.
+                            O acesso agora é controlado por aprovação comercial. Envie seus dados e nossa equipe libera um convite seguro para sua empresa.
                         </p>
                         <div className="pt-8 space-y-4">
                             <div className="flex items-center gap-3 text-sm text-slate-300">
-                                <CheckCircle2 size={18} className="text-emerald-400" /> Sistema em Nuvem Segura
+                                <CheckCircle2 size={18} className="text-emerald-400" /> Liberação controlada
                             </div>
                             <div className="flex items-center gap-3 text-sm text-slate-300">
-                                <CheckCircle2 size={18} className="text-emerald-400" /> Múltiplos Usuários
+                                <CheckCircle2 size={18} className="text-emerald-400" /> Implantação orientada
                             </div>
                         </div>
                     </div>
@@ -96,8 +84,8 @@ const CadastroEmpresa = ({ onVoltarLogin }) => {
                 {/* LADO DIREITO: Formulário */}
                 <div className="w-full md:w-3/5 p-10 overflow-y-auto max-h-[90vh]">
                     <div className="mb-8">
-                        <h2 className="text-2xl font-bold text-slate-800">Crie sua Conta</h2>
-                        <p className="text-slate-500 text-sm">Preencha os dados abaixo para liberar o seu acesso.</p>
+                        <h2 className="text-2xl font-bold text-slate-800">Solicitar Acesso</h2>
+                        <p className="text-slate-500 text-sm">Preencha os dados abaixo para nossa equipe avaliar e liberar seu ambiente com convite.</p>
                     </div>
 
                     {erro && (
@@ -126,19 +114,19 @@ const CadastroEmpresa = ({ onVoltarLogin }) => {
                         </div>
 
                         <div className="space-y-4 pt-2">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Usuário Administrador</h3>
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Contato Responsável</h3>
                             <div className="grid grid-cols-1 gap-4">
                                 <div className="relative">
                                     <User size={18} className="absolute left-3 top-3 text-slate-400" />
-                                    <input type="text" name="nomeAdmin" required placeholder="Seu Nome Completo" value={formData.nomeAdmin} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500" />
+                                    <input type="text" name="nomeContato" required placeholder="Seu Nome Completo" value={formData.nomeContato} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500" />
                                 </div>
                                 <div className="relative">
                                     <Mail size={18} className="absolute left-3 top-3 text-slate-400" />
-                                    <input type="email" name="emailAdmin" required placeholder="Seu E-mail (Login)" value={formData.emailAdmin} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500" />
+                                    <input type="email" name="emailContato" required placeholder="Seu E-mail Comercial" value={formData.emailContato} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500" />
                                 </div>
                                 <div className="relative">
                                     <Lock size={18} className="absolute left-3 top-3 text-slate-400" />
-                                    <input type="password" name="senhaAdmin" required placeholder="Crie uma Senha" value={formData.senhaAdmin} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500" />
+                                    <textarea name="observacoes" placeholder="Conte brevemente sua operação, número de usuários ou necessidade principal" value={formData.observacoes} onChange={handleChange} className="w-full pl-10 pr-4 py-2 min-h-[96px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 resize-y" />
                                 </div>
                             </div>
                         </div>
@@ -148,7 +136,7 @@ const CadastroEmpresa = ({ onVoltarLogin }) => {
                             disabled={loading}
                             className={`w-full py-3 rounded-lg font-bold text-white flex items-center justify-center gap-2 transition-all ${loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-blue-500/30'}`}
                         >
-                            {loading ? 'Preparando Servidor...' : 'CRIAR MINHA CONTA'} <ArrowRight size={18} />
+                            {loading ? 'ENVIANDO SOLICITAÇÃO...' : 'SOLICITAR ACESSO'} <ArrowRight size={18} />
                         </button>
                     </form>
 

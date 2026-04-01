@@ -23,7 +23,7 @@ public class VendaPerdidaController {
     private VendaPerdidaService service;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE', 'VENDEDOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_VENDAS', 'ROLE_CRM')")
     public ResponseEntity<?> registrarVendaPerdida(@RequestBody Map<String, Object> payload) {
 
         // 🚀 O Java agora lê os dados avançados que o React manda
@@ -50,7 +50,7 @@ public class VendaPerdidaController {
     }
 
     @GetMapping("/ranking")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GERENTE')") // Apenas gerentes veem o ranking
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CRM')") // Perfis administrativos e comerciais
     public ResponseEntity<List<VendaPerdidaRankingDTO>> getRanking() {
         return ResponseEntity.ok(service.getRankingVendasPerdidas());
     }
