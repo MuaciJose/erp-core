@@ -17,6 +17,7 @@ public class UsuarioDTO {
     private boolean mfaEnabled;
     private boolean forcePasswordChange;
     private TipoAcesso tipoAcesso;
+    private String planoEmpresa;
     private List<String> permissoes;
 
     public UsuarioDTO(Usuario u) {

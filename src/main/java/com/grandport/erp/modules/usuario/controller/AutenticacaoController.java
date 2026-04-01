@@ -3,6 +3,7 @@ package com.grandport.erp.modules.usuario.controller;
 import com.grandport.erp.config.security.LoginAttemptService;
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.admin.service.SecurityEventService;
+import com.grandport.erp.modules.assinatura.service.PlanoPermissaoService;
 import com.grandport.erp.modules.usuario.dto.AuthFlowResponseDTO;
 import com.grandport.erp.modules.usuario.dto.LoginDTO;
 import com.grandport.erp.modules.usuario.dto.MfaVerifyDTO;
@@ -50,6 +51,7 @@ public class AutenticacaoController {
     private final TotpService totpService;
     private final SecurityEventService securityEventService;
     private final TenantAccessService tenantAccessService;
+    private final PlanoPermissaoService planoPermissaoService;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody @Valid LoginDTO data, HttpServletRequest request) {
@@ -92,7 +94,7 @@ public class AutenticacaoController {
                 String challengeToken = mfaChallengeService.createChallenge(usuario, setupSecret);
                 return ResponseEntity.ok(new AuthFlowResponseDTO(
                         null,
-                        new UsuarioDTO(usuario),
+                        planoPermissaoService.toDtoFiltrado(usuario),
                         !setupRequired,
                         setupRequired,
                         challengeToken,
@@ -156,7 +158,7 @@ public class AutenticacaoController {
     @GetMapping("/me")
     public ResponseEntity<UsuarioDTO> me(Authentication authentication) {
         Usuario usuario = (Usuario) authentication.getPrincipal();
-        return ResponseEntity.ok(new UsuarioDTO(usuario));
+        return ResponseEntity.ok(planoPermissaoService.toDtoFiltrado(usuario));
     }
 
     @PostMapping("/trocar-senha")
@@ -173,7 +175,7 @@ public class AutenticacaoController {
         usuarioRepository.save(usuario);
         auditoriaService.registrar("SEGURANCA", "TROCA_SENHA", "Usuário trocou a própria senha.");
         securityEventService.registrar(usuario.getEmpresaId(), "TROCA_SENHA", "INFO", usuario.getUsername(), null, "Senha alterada pelo próprio usuário.");
-        return ResponseEntity.ok(new UsuarioDTO(usuario));
+        return ResponseEntity.ok(planoPermissaoService.toDtoFiltrado(usuario));
     }
 
     private String resolveClientIp(HttpServletRequest request) {
@@ -192,7 +194,7 @@ public class AutenticacaoController {
         var token = tokenService.gerarToken(usuario);
         return new AuthFlowResponseDTO(
                 token,
-                new UsuarioDTO(usuario),
+                planoPermissaoService.toDtoFiltrado(usuario),
                 false,
                 false,
                 null,

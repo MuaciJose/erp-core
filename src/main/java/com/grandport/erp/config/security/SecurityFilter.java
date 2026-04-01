@@ -1,6 +1,7 @@
 package com.grandport.erp.config.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.grandport.erp.modules.assinatura.service.PlanoPermissaoService;
 import com.grandport.erp.modules.assinatura.service.TenantAccessBlockedException;
 import com.grandport.erp.modules.assinatura.service.TenantAccessService;
 import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
@@ -29,6 +30,7 @@ public class SecurityFilter extends OncePerRequestFilter {
     private final TokenService tokenService;
     private final UsuarioRepository usuarioRepository;
     private final TenantAccessService tenantAccessService;
+    private final PlanoPermissaoService planoPermissaoService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -53,7 +55,10 @@ public class SecurityFilter extends OncePerRequestFilter {
                         if (user instanceof com.grandport.erp.modules.usuario.model.Usuario u) {
                             tenantAccessService.validarAcesso(u);
                         }
-                        var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+                        var authentication = new UsernamePasswordAuthenticationToken(user, null,
+                                user instanceof com.grandport.erp.modules.usuario.model.Usuario u
+                                        ? planoPermissaoService.getAuthorities(u)
+                                        : user.getAuthorities());
                         SecurityContextHolder.getContext().setAuthentication(authentication);
                     } else {
                         SecurityContextHolder.clearContext();

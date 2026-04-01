@@ -2,6 +2,7 @@ package com.grandport.erp.modules.usuario.controller;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.admin.service.SecurityEventService;
+import com.grandport.erp.modules.assinatura.service.PlanoPermissaoService;
 import com.grandport.erp.modules.usuario.dto.UsuarioDTO;
 import com.grandport.erp.modules.usuario.model.TipoAcesso;
 import com.grandport.erp.modules.usuario.model.Usuario;
@@ -28,6 +29,7 @@ public class UsuarioController {
     @Autowired private SecurityEventService securityEventService;
     @Autowired private PasswordPolicyService passwordPolicyService;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private PlanoPermissaoService planoPermissaoService;
 
     // =======================================================================
     // 🚀 1. LISTAGEM BLINDADA (Só enxerga a própria base)
@@ -39,7 +41,7 @@ public class UsuarioController {
 
         // Troca o findAll() pelo findByEmpresaId()!
         List<UsuarioDTO> usuarios = repository.findByEmpresaId(usuarioLogado.getEmpresaId()).stream()
-                .map(UsuarioDTO::new)
+                .map(planoPermissaoService::toDtoFiltrado)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(usuarios);
     }
@@ -62,7 +64,7 @@ public class UsuarioController {
         novo.setNomeCompleto(dto.getNome());
         novo.setUsername(dto.getEmail());
         novo.setSenha(passwordEncoder.encode(dto.getSenha()));
-        novo.setPermissoes(dto.getPermissoes());
+        novo.setPermissoes(planoPermissaoService.filtrarPermissoes(usuarioLogado.getEmpresaId(), dto.getPermissoes()));
         novo.setAtivo(true);
         novo.setMfaEnabled(dto.isMfaEnabled());
         novo.setForcePasswordChange(dto.isForcePasswordChange());
@@ -73,7 +75,7 @@ public class UsuarioController {
 
         Usuario salvo = repository.save(novo);
         auditoriaService.registrar("SISTEMA", "CRIACAO_USUARIO", "Cadastrou o usuário: " + salvo.getNomeCompleto());
-        return ResponseEntity.ok(new UsuarioDTO(salvo));
+        return ResponseEntity.ok(planoPermissaoService.toDtoFiltrado(salvo));
     }
 
     // =======================================================================
@@ -89,7 +91,7 @@ public class UsuarioController {
 
         usuario.setNomeCompleto(dto.getNome());
         usuario.setUsername(dto.getEmail());
-        usuario.setPermissoes(dto.getPermissoes());
+        usuario.setPermissoes(planoPermissaoService.filtrarPermissoes(usuarioLogado.getEmpresaId(), dto.getPermissoes()));
         usuario.setMfaEnabled(dto.isMfaEnabled());
         usuario.setForcePasswordChange(dto.isForcePasswordChange());
         TipoAcesso tipoSolicitado = dto.getTipoAcesso() != null ? dto.getTipoAcesso() : usuario.getTipoAcesso();
@@ -109,7 +111,7 @@ public class UsuarioController {
 
         Usuario salvo = repository.save(usuario);
         auditoriaService.registrar("SISTEMA", "EDICAO_USUARIO", "Atualizou o usuário: " + salvo.getNomeCompleto());
-        return ResponseEntity.ok(new UsuarioDTO(salvo));
+        return ResponseEntity.ok(planoPermissaoService.toDtoFiltrado(salvo));
     }
 
     @PutMapping("/{id}/status")

@@ -7,6 +7,7 @@ export const GestaoUsuarios = () => {
     const [loading, setLoading] = useState(true);
     const [modalAberto, setModalAberto] = useState(false);
     const [eventosSeguranca, setEventosSeguranca] = useState([]);
+    const [planoEmpresa, setPlanoEmpresa] = useState('ESSENCIAL');
 
     const [notificacao, setNotificacao] = useState(null);
 
@@ -99,6 +100,23 @@ export const GestaoUsuarios = () => {
     ];
 
     const todasAsPermissoes = modulosPermissoes.flatMap(modulo => modulo.telas.map(tela => tela.acao));
+    const permissoesPorPlano = {
+        ESSENCIAL: new Set([
+            'dash', 'pdv', 'vendas', 'checklist', 'os', 'listagem-os',
+            'fila-caixa', 'caixa', 'estoque', 'marcas', 'categorias', 'ajuste_estoque',
+            'parceiros', 'servicos', 'agenda', 'manual', 'usuarios', 'configuracoes'
+        ]),
+        PROFISSIONAL: new Set([
+            'dash', 'pdv', 'vendas', 'checklist', 'os', 'listagem-os',
+            'fila-caixa', 'caixa', 'estoque', 'marcas', 'categorias', 'ajuste_estoque',
+            'parceiros', 'servicos', 'agenda', 'manual', 'usuarios', 'configuracoes',
+            'orcamentos', 'relatorio-comissoes', 'crm', 'revisoes', 'whatsapp',
+            'compras', 'previsao', 'faltas', 'curva-abc', 'etiquetas',
+            'contas-pagar', 'contas-receber', 'bancos', 'conciliacao',
+            'recibo-avulso', 'historico-recibos'
+        ]),
+        PREMIUM: new Set(todasAsPermissoes)
+    };
 
     const showToast = (tipo, titulo, mensagem) => {
         setNotificacao({ tipo, titulo, mensagem });
@@ -110,6 +128,9 @@ export const GestaoUsuarios = () => {
         try {
             const res = await api.get('/api/usuarios');
             setUsuarios(res.data);
+            if (Array.isArray(res.data) && res.data.length > 0 && res.data[0]?.planoEmpresa) {
+                setPlanoEmpresa(res.data[0].planoEmpresa);
+            }
         } catch (error) {
             console.error("Erro ao carregar usuários", error);
         } finally {
@@ -132,6 +153,11 @@ export const GestaoUsuarios = () => {
     }, []);
 
     const handleTogglePermissao = (acaoTela) => {
+        const permitidasNoPlano = permissoesPorPlano[planoEmpresa] || permissoesPorPlano.ESSENCIAL;
+        if (!permitidasNoPlano.has(acaoTela)) {
+            showToast('aviso', 'Módulo fora do plano', `A permissão selecionada não está disponível no plano ${planoEmpresa}.`);
+            return;
+        }
         setUsuarioForm(prev => {
             const jaTem = prev.permissoes.includes(acaoTela);
             if (jaTem) {
@@ -143,7 +169,8 @@ export const GestaoUsuarios = () => {
     };
 
     const handleToggleGrupo = (telas) => {
-        const acoesDoGrupo = telas.map(t => t.acao);
+        const permitidasNoPlano = permissoesPorPlano[planoEmpresa] || permissoesPorPlano.ESSENCIAL;
+        const acoesDoGrupo = telas.map(t => t.acao).filter(acao => permitidasNoPlano.has(acao));
         const todasMarcadas = acoesDoGrupo.every(a => usuarioForm.permissoes.includes(a));
 
         if (todasMarcadas) {
@@ -157,7 +184,7 @@ export const GestaoUsuarios = () => {
     const abrirModalNovo = () => {
         setUsuarioForm({
             id: null, nome: '', email: '', senha: '', ativo: true, mfaEnabled: false, forcePasswordChange: true, tipoAcesso: 'TENANT_USER',
-            isMecanico: false, comissaoServico: '', permissoes: todasAsPermissoes
+            isMecanico: false, comissaoServico: '', permissoes: Array.from(permissoesPorPlano[planoEmpresa] || permissoesPorPlano.ESSENCIAL)
         });
         setModalAberto(true);
     };
@@ -270,6 +297,7 @@ export const GestaoUsuarios = () => {
                         EQUIPE E ACESSOS
                     </h1>
                     <p className="text-slate-500 mt-1">Gerencie os funcionários, mecânicos e níveis de permissão</p>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-600 mt-2">Plano da empresa: {planoEmpresa}</p>
                 </div>
                 <button onClick={abrirModalNovo} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg">
                     <UserPlus size={20} /> NOVO USUÁRIO
@@ -483,11 +511,24 @@ export const GestaoUsuarios = () => {
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 {modulo.telas.map(tela => (
-                                                    <label key={tela.acao} className="flex items-center gap-3 cursor-pointer group" onClick={() => handleTogglePermissao(tela.acao)}>
-                                                        <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${usuarioForm.permissoes.includes(tela.acao) ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white group-hover:border-blue-400'}`}>
+                                                    <label
+                                                        key={tela.acao}
+                                                        className={`flex items-center gap-3 group ${
+                                                            (permissoesPorPlano[planoEmpresa] || permissoesPorPlano.ESSENCIAL).has(tela.acao) ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                                                        }`}
+                                                        onClick={() => handleTogglePermissao(tela.acao)}
+                                                    >
+                                                        <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${
+                                                            usuarioForm.permissoes.includes(tela.acao)
+                                                                ? 'bg-blue-600 border-blue-600 text-white'
+                                                                : 'border-slate-300 bg-white'
+                                                        }`}>
                                                             {usuarioForm.permissoes.includes(tela.acao) && <CheckCircle size={14} />}
                                                         </div>
                                                         <span className="text-sm font-medium text-slate-700 select-none group-hover:text-blue-800">{tela.nome}</span>
+                                                        {!(permissoesPorPlano[planoEmpresa] || permissoesPorPlano.ESSENCIAL).has(tela.acao) && (
+                                                            <span className="ml-auto text-[10px] font-black uppercase tracking-widest text-slate-500">Fora do plano</span>
+                                                        )}
                                                     </label>
                                                 ))}
                                             </div>
