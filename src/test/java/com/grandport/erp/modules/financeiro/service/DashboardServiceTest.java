@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -106,16 +107,7 @@ class DashboardServiceTest {
     @Test
     @DisplayName("Deve respeitar periodo de 7 dias ao consultar vendas")
     void deveRespeitarPeriodoDeSeteDias() {
-        when(vendaRepository.sumTotalVendasPeriodoEmpresa(any(), any(), eq(99L)))
-                .thenReturn(Optional.of(BigDecimal.ZERO));
-        when(contaReceberRepository.sumContasAtrasadas(99L))
-                .thenReturn(Optional.of(BigDecimal.ZERO));
-        when(vendaRepository.countVendasByDataEmpresa(any(), any(), eq(99L))).thenReturn(0L);
-        when(produtoRepository.countProdutosBaixoEstoqueByEmpresa(99L)).thenReturn(0L);
-        when(revisaoRepository.countRevisoesAtrasadasByEmpresa(99L)).thenReturn(0L);
-        when(revisaoRepository.countRevisoesParaHojeByEmpresa(99L)).thenReturn(0L);
-        when(vendaRepository.findTop5ProdutosMaisVendidosMesEmpresa(any(), any(), eq(99L))).thenReturn(List.of());
-        when(vendaRepository.findCategoriasMaisVendidasPeriodoEmpresa(any(), any(), eq(99L))).thenReturn(List.of());
+        mockResumoVazio();
 
         dashboardService.getResumoDashboard("7D");
 
@@ -127,5 +119,69 @@ class DashboardServiceTest {
         LocalDate inicioEsperado = LocalDate.now().minusDays(6);
         assertEquals(inicioEsperado, inicioCaptor.getValue().toLocalDate());
         assertEquals(LocalDate.now(), fimCaptor.getValue().toLocalDate());
+    }
+
+    @Test
+    @DisplayName("Deve respeitar periodo de hoje ao consultar vendas")
+    void deveRespeitarPeriodoDeHoje() {
+        mockResumoVazio();
+
+        dashboardService.getResumoDashboard("TODAY");
+
+        ArgumentCaptor<LocalDateTime> inicioCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> fimCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+
+        verify(vendaRepository).findTop5ProdutosMaisVendidosMesEmpresa(inicioCaptor.capture(), fimCaptor.capture(), eq(99L));
+
+        assertEquals(LocalDate.now(), inicioCaptor.getValue().toLocalDate());
+        assertEquals(0, inicioCaptor.getValue().toLocalTime().getHour());
+        assertEquals(LocalDate.now(), fimCaptor.getValue().toLocalDate());
+    }
+
+    @Test
+    @DisplayName("Deve respeitar periodo de 30 dias ao consultar vendas")
+    void deveRespeitarPeriodoDeTrintaDias() {
+        mockResumoVazio();
+
+        dashboardService.getResumoDashboard("30D");
+
+        ArgumentCaptor<LocalDateTime> inicioCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> fimCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+
+        verify(vendaRepository).findTop5ProdutosMaisVendidosMesEmpresa(inicioCaptor.capture(), fimCaptor.capture(), eq(99L));
+
+        LocalDate inicioEsperado = LocalDate.now().minusDays(29);
+        assertEquals(inicioEsperado, inicioCaptor.getValue().toLocalDate());
+        assertEquals(LocalDate.now(), fimCaptor.getValue().toLocalDate());
+    }
+
+    @Test
+    @DisplayName("Deve usar mes atual quando periodo for invalido")
+    void deveUsarMesAtualQuandoPeriodoForInvalido() {
+        mockResumoVazio();
+
+        dashboardService.getResumoDashboard("INVALIDO");
+
+        ArgumentCaptor<LocalDateTime> inicioCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> fimCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+
+        verify(vendaRepository).findTop5ProdutosMaisVendidosMesEmpresa(inicioCaptor.capture(), fimCaptor.capture(), eq(99L));
+
+        assertEquals(LocalDate.now().withDayOfMonth(1), inicioCaptor.getValue().toLocalDate());
+        assertEquals(LocalDate.now(), fimCaptor.getValue().toLocalDate());
+    }
+
+    private void mockResumoVazio() {
+        clearInvocations(vendaRepository, contaReceberRepository, produtoRepository, revisaoRepository);
+        when(vendaRepository.sumTotalVendasPeriodoEmpresa(any(), any(), eq(99L)))
+                .thenReturn(Optional.of(BigDecimal.ZERO));
+        when(contaReceberRepository.sumContasAtrasadas(99L))
+                .thenReturn(Optional.of(BigDecimal.ZERO));
+        when(vendaRepository.countVendasByDataEmpresa(any(), any(), eq(99L))).thenReturn(0L);
+        when(produtoRepository.countProdutosBaixoEstoqueByEmpresa(99L)).thenReturn(0L);
+        when(revisaoRepository.countRevisoesAtrasadasByEmpresa(99L)).thenReturn(0L);
+        when(revisaoRepository.countRevisoesParaHojeByEmpresa(99L)).thenReturn(0L);
+        when(vendaRepository.findTop5ProdutosMaisVendidosMesEmpresa(any(), any(), eq(99L))).thenReturn(List.of());
+        when(vendaRepository.findCategoriasMaisVendidasPeriodoEmpresa(any(), any(), eq(99L))).thenReturn(List.of());
     }
 }
