@@ -11,12 +11,18 @@ import com.grandport.erp.modules.assinatura.dto.EmpresaIncidenteDTO;
 import com.grandport.erp.modules.assinatura.dto.RegistrarPagamentoDTO;
 import com.grandport.erp.modules.assinatura.dto.SalvarEmpresaIncidenteDTO;
 import com.grandport.erp.modules.assinatura.dto.AtualizarPlanoEmpresaDTO;
+import com.grandport.erp.modules.assinatura.dto.AtualizarCadastroComplementarDTO;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoResumoDTO;
 import com.grandport.erp.modules.assinatura.dto.WebhookPagamentoDTO;
 import com.grandport.erp.modules.assinatura.dto.AtualizarLicencaModuloDTO;
+import com.grandport.erp.modules.assinatura.dto.EmpresaCadastroComplementarDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaTimelineEventoDTO;
+import com.grandport.erp.modules.assinatura.dto.LiberacaoManualCadastroComplementarDTO;
 import com.grandport.erp.modules.assinatura.dto.ModuloLicencaResumoDTO;
+import com.grandport.erp.modules.assinatura.dto.PlataformaAvisoOperacionalDTO;
+import com.grandport.erp.modules.assinatura.dto.ProrrogarCadastroComplementarDTO;
 import com.grandport.erp.modules.assinatura.dto.SaasOperacaoResumoDTO;
+import com.grandport.erp.modules.assinatura.dto.SalvarPlataformaAvisoOperacionalDTO;
 import com.grandport.erp.modules.assinatura.service.AssinaturaService;
 import com.grandport.erp.modules.assinatura.service.CobrancaAssinaturaService;
 import com.grandport.erp.modules.assinatura.service.IncidenteEmpresaService;
@@ -116,11 +122,76 @@ public class AssinaturaController {
         return assinaturaService.listarEmpresas();
     }
 
+    @GetMapping("/empresas/{id}/cadastro-complementar")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public EmpresaCadastroComplementarDTO obterCadastroComplementarEmpresa(@PathVariable Long id) {
+        return assinaturaService.obterCadastroComplementarEmpresa(id);
+    }
+
+    @PostMapping("/empresas/{id}/cadastro-complementar")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public ResponseEntity<?> atualizarCadastroComplementarEmpresa(@PathVariable Long id, @RequestBody AtualizarCadastroComplementarDTO dto) {
+        try {
+            return ResponseEntity.ok(assinaturaService.atualizarCadastroComplementarEmpresa(id, dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/empresas/{id}/cadastro-complementar/prorrogar")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public ResponseEntity<?> prorrogarCadastroComplementarEmpresa(@PathVariable Long id, @RequestBody(required = false) ProrrogarCadastroComplementarDTO dto) {
+        try {
+            return ResponseEntity.ok(assinaturaService.prorrogarCadastroComplementarEmpresa(id, dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/empresas/{id}/cadastro-complementar/liberacao-manual")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public ResponseEntity<?> atualizarLiberacaoManualCadastroComplementarEmpresa(@PathVariable Long id, @RequestBody(required = false) LiberacaoManualCadastroComplementarDTO dto) {
+        try {
+            return ResponseEntity.ok(assinaturaService.atualizarLiberacaoManualCadastroComplementarEmpresa(id, dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/minha-empresa/cadastro-complementar")
+    public EmpresaCadastroComplementarDTO obterMeuCadastroComplementar() {
+        return assinaturaService.obterMeuCadastroComplementar();
+    }
+
+    @PostMapping("/minha-empresa/cadastro-complementar")
+    public ResponseEntity<?> atualizarMeuCadastroComplementar(@RequestBody AtualizarCadastroComplementarDTO dto) {
+        try {
+            return ResponseEntity.ok(assinaturaService.atualizarMeuCadastroComplementar(dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     @GetMapping("/resumo-operacao")
     @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public SaasOperacaoResumoDTO resumoOperacao() {
         assinaturaService.validarAcessoPlataforma();
         return assinaturaService.obterResumoOperacao();
+    }
+
+    @GetMapping("/plataforma/aviso-manutencao")
+    public PlataformaAvisoOperacionalDTO obterAvisoManutencaoPlataforma() {
+        return assinaturaService.obterAvisoManutencaoPlataforma();
+    }
+
+    @PostMapping("/plataforma/aviso-manutencao")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public ResponseEntity<?> salvarAvisoManutencaoPlataforma(@RequestBody(required = false) SalvarPlataformaAvisoOperacionalDTO dto) {
+        try {
+            return ResponseEntity.ok(assinaturaService.salvarAvisoManutencaoPlataforma(dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @PostMapping("/empresas/{id}/bloquear")
@@ -129,6 +200,17 @@ public class AssinaturaController {
         try {
             assinaturaService.validarAcessoPlataforma();
             return ResponseEntity.ok(assinaturaService.bloquearEmpresa(id, payload == null ? null : payload.get("motivoBloqueio")));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/empresas/{id}/cancelar")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public ResponseEntity<?> cancelarEmpresa(@PathVariable Long id, @RequestBody(required = false) Map<String, String> payload) {
+        try {
+            assinaturaService.validarAcessoPlataforma();
+            return ResponseEntity.ok(assinaturaService.cancelarEmpresa(id, payload == null ? null : payload.get("motivoBloqueio")));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }

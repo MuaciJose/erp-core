@@ -25,6 +25,7 @@ public class Empresa {
     private String telefone;
 
     private LocalDateTime dataCadastro = LocalDateTime.now();
+    private LocalDateTime dataDesligamento;
     private Boolean ativo = true;
 
     @Enumerated(EnumType.STRING)

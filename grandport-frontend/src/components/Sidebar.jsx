@@ -105,6 +105,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout, 
                 { titulo: 'Gestão de Revisões', acao: 'revisoes' }, // 🚀 MOVIDO PARA CÁ
                 { titulo: 'Agenda Corporativa', acao: 'agenda' },
                 { titulo: 'Atendimento SaaS', acao: 'atendimento' },
+                { titulo: 'Ficha Cadastral', acao: 'ficha-cadastral' },
                 { titulo: 'Integração WhatsApp', acao: 'whatsapp' }
             ]
         },
@@ -154,7 +155,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout, 
         { id: 'manual', titulo: 'Manual do Usuário', icone: <HelpCircle size={20} />, acao: 'manual' }
     ];
 
-    const rotasLivres = ['manual', 'agenda', 'atendimento'];
+    const rotasLivres = ['manual', 'agenda', 'atendimento', 'ficha-cadastral'];
 
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {

@@ -1,0 +1,2 @@
+ALTER TABLE empresas
+    ADD COLUMN IF NOT EXISTS data_desligamento TIMESTAMP NULL;

@@ -70,11 +70,36 @@ export const PlatformOverview = ({ onAbrirCentralSaas, onAbrirAuditoria, onEntra
             .filter((empresa) => Number(empresa.valorExtrasMensal || 0) > 0 && (!Array.isArray(empresa.extrasCobrados) || empresa.extrasCobrados.length === 0))
             .slice(0, 5);
 
+        const onboardingVencido = empresas
+            .filter((empresa) => empresa.onboardingStatus === 'VENCIDO' && !empresa.onboardingLiberacaoManualAtiva)
+            .slice(0, 5);
+
+        const onboardingProximo = empresas
+            .filter((empresa) => ['PENDENTE_COMPLEMENTO', 'EM_PREENCHIMENTO'].includes(empresa.onboardingStatus))
+            .filter((empresa) => typeof empresa.onboardingDiasRestantes === 'number' && empresa.onboardingDiasRestantes >= 0 && empresa.onboardingDiasRestantes <= 3)
+            .slice(0, 5);
+
+        const liberacaoManualAtiva = empresas
+            .filter((empresa) => empresa.onboardingLiberacaoManualAtiva)
+            .slice(0, 5);
+
+        const liberacaoManualAntiga = empresas
+            .filter((empresa) => empresa.onboardingLiberacaoManualAtiva && empresa.onboardingLiberacaoManualEm)
+            .filter((empresa) => {
+                const dias = Math.floor((Date.now() - new Date(empresa.onboardingLiberacaoManualEm).getTime()) / 86400000);
+                return dias >= 7;
+            })
+            .slice(0, 5);
+
         return {
             trialsVencendo,
             semCobrancaEmitida,
             bloqueioProlongado,
-            divergenciaComercial
+            divergenciaComercial,
+            onboardingVencido,
+            onboardingProximo,
+            liberacaoManualAtiva,
+            liberacaoManualAntiga
         };
     }, [empresas]);
 
@@ -87,13 +112,23 @@ export const PlatformOverview = ({ onAbrirCentralSaas, onAbrirAuditoria, onEntra
         const moduloBloqueado = empresas.filter((empresa) => (empresa.totalModulosBloqueadosComercialmente || 0) > 0);
         const semCobranca = empresas.filter((empresa) => !empresa.ultimaCobrancaStatus || empresa.ultimaCobrancaStatus === 'CANCELADA');
         const vencendoHoje = empresas.filter((empresa) => empresa.dataVencimento === hojeIso);
+        const onboardingVencido = empresas.filter((empresa) => empresa.onboardingStatus === 'VENCIDO' && !empresa.onboardingLiberacaoManualAtiva);
+        const liberacaoManualAtiva = empresas.filter((empresa) => empresa.onboardingLiberacaoManualAtiva);
+        const liberacaoManualAntiga = empresas.filter((empresa) => {
+            if (!empresa.onboardingLiberacaoManualAtiva || !empresa.onboardingLiberacaoManualEm) return false;
+            const dias = Math.floor((Date.now() - new Date(empresa.onboardingLiberacaoManualEm).getTime()) / 86400000);
+            return dias >= 7;
+        });
 
         return {
             inadimplencia,
             semAcesso,
             moduloBloqueado,
             semCobranca,
-            vencendoHoje
+            vencendoHoje,
+            onboardingVencido,
+            liberacaoManualAtiva,
+            liberacaoManualAntiga
         };
     }, [empresas]);
 
@@ -112,7 +147,7 @@ export const PlatformOverview = ({ onAbrirCentralSaas, onAbrirAuditoria, onEntra
                 ? ['timeline', 'incidentes']
                 : filtroEmpresas === 'INADIMPLENTES'
                     ? ['cobranca']
-                    : []
+                    : ['cadastro']
         });
     };
 
@@ -354,6 +389,48 @@ export const PlatformOverview = ({ onAbrirCentralSaas, onAbrirAuditoria, onEntra
                             Próximo passo: agir antes de virar inadimplência ou bloquear add-ons.
                         </div>
                     </button>
+
+                    <button
+                        onClick={() => abrirCentralComContexto({ abaAtiva: 'empresas', filtroEmpresas: 'TODAS', titulo: 'Cenário: onboarding vencido', descricao: 'Empresas com ficha cadastral vencida exigindo cobrança, prorrogação ou liberação manual.', autoAbrir: ['cadastro'] })}
+                        className="rounded-3xl border border-sky-200 bg-sky-50 p-5 text-left transition hover:border-sky-300 hover:bg-sky-100"
+                    >
+                        <div className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">Onboarding Vencido</div>
+                        <div className="mt-2 text-3xl font-black text-sky-900">{acaoAgora.onboardingVencido.length}</div>
+                        <div className="mt-3 text-sm font-medium text-sky-950">
+                            Empresas com ficha vencida e sem override manual exigindo decisão da plataforma.
+                        </div>
+                        <div className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-sky-800">
+                            Próximo passo: abrir ficha completa, prorrogar prazo ou liberar manualmente.
+                        </div>
+                    </button>
+
+                    <button
+                        onClick={() => abrirCentralComContexto({ abaAtiva: 'empresas', filtroEmpresas: 'TODAS', titulo: 'Cenário: liberação manual ativa', descricao: 'Empresas com exceção manual ativa no onboarding, exigindo revisão periódica da plataforma.', autoAbrir: ['cadastro'] })}
+                        className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-left transition hover:border-emerald-300 hover:bg-emerald-100"
+                    >
+                        <div className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Liberação Manual Ativa</div>
+                        <div className="mt-2 text-3xl font-black text-emerald-900">{acaoAgora.liberacaoManualAtiva.length}</div>
+                        <div className="mt-3 text-sm font-medium text-emerald-950">
+                            Empresas operando com exceção manual de onboarding concedida pela plataforma.
+                        </div>
+                        <div className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
+                            Próximo passo: revisar motivo, prazo e necessidade de manter o override.
+                        </div>
+                    </button>
+
+                    <button
+                        onClick={() => abrirCentralComContexto({ abaAtiva: 'empresas', filtroEmpresas: 'TODAS', titulo: 'Cenário: liberação manual antiga', descricao: 'Empresas com exceção manual há 7 dias ou mais, exigindo revisão obrigatória.', autoAbrir: ['cadastro'] })}
+                        className="rounded-3xl border border-teal-200 bg-teal-50 p-5 text-left transition hover:border-teal-300 hover:bg-teal-100"
+                    >
+                        <div className="text-xs font-black uppercase tracking-[0.18em] text-teal-700">Liberação Manual Antiga</div>
+                        <div className="mt-2 text-3xl font-black text-teal-900">{acaoAgora.liberacaoManualAntiga.length}</div>
+                        <div className="mt-3 text-sm font-medium text-teal-950">
+                            Exceções manuais com 7 dias ou mais, que não devem ficar esquecidas na operação.
+                        </div>
+                        <div className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-teal-800">
+                            Próximo passo: reavaliar, remover override ou exigir conclusão da ficha.
+                        </div>
+                    </button>
                 </div>
             </section>
 
@@ -375,6 +452,134 @@ export const PlatformOverview = ({ onAbrirCentralSaas, onAbrirAuditoria, onEntra
                 </div>
 
                 <div className="mt-5 grid gap-4 xl:grid-cols-2">
+                    <article className="rounded-3xl border border-sky-200 bg-sky-50 p-5">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">Onboarding vencido</div>
+                            <button
+                                onClick={() => abrirCentralComContexto({ abaAtiva: 'empresas', filtroEmpresas: 'TODAS', titulo: 'Onboarding vencido', descricao: 'Empresas com ficha cadastral vencida exigindo ação da plataforma.', autoAbrir: ['cadastro'] })}
+                                className="rounded-2xl border border-sky-200 bg-white/80 px-3 py-2 text-xs font-black text-sky-800 transition hover:bg-white"
+                            >
+                                Abrir filtro
+                            </button>
+                        </div>
+                        <div className="mt-2 text-3xl font-black text-sky-900">{saudePlataforma.onboardingVencido.length}</div>
+                        <div className="mt-4 space-y-2">
+                            {saudePlataforma.onboardingVencido.length === 0 && (
+                                <div className="rounded-2xl border border-sky-200/60 bg-white/70 p-4 text-sm font-semibold text-sky-900">
+                                    Nenhuma empresa com ficha vencida exigindo intervenção agora.
+                                </div>
+                            )}
+                            {saudePlataforma.onboardingVencido.map((empresa) => (
+                                <button
+                                    key={`onboarding-vencido-${empresa.id}`}
+                                    onClick={() => abrirEmpresaNaCentral(empresa)}
+                                    className="w-full rounded-2xl border border-sky-200/60 bg-white/70 p-4 text-left transition hover:border-sky-300 hover:bg-white"
+                                >
+                                    <div className="text-sm font-black text-slate-900">{empresa.razaoSocial}</div>
+                                    <div className="mt-1 text-sm text-slate-600">
+                                        Prazo: {empresa.onboardingPrazoConclusao || '-'} · Pendências: {Array.isArray(empresa.onboardingPendencias) ? empresa.onboardingPendencias.length : 0}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </article>
+
+                    <article className="rounded-3xl border border-cyan-200 bg-cyan-50 p-5">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700">Onboarding vencendo</div>
+                            <button
+                                onClick={() => abrirCentralComContexto({ abaAtiva: 'empresas', filtroEmpresas: 'TODAS', titulo: 'Onboarding vencendo', descricao: 'Empresas com prazo curto para concluir a ficha cadastral.', autoAbrir: ['cadastro'] })}
+                                className="rounded-2xl border border-cyan-200 bg-white/80 px-3 py-2 text-xs font-black text-cyan-800 transition hover:bg-white"
+                            >
+                                Abrir filtro
+                            </button>
+                        </div>
+                        <div className="mt-2 text-3xl font-black text-cyan-900">{saudePlataforma.onboardingProximo.length}</div>
+                        <div className="mt-4 space-y-2">
+                            {saudePlataforma.onboardingProximo.length === 0 && (
+                                <div className="rounded-2xl border border-cyan-200/60 bg-white/70 p-4 text-sm font-semibold text-cyan-900">
+                                    Nenhuma empresa com ficha perto do vencimento crítico.
+                                </div>
+                            )}
+                            {saudePlataforma.onboardingProximo.map((empresa) => (
+                                <button
+                                    key={`onboarding-proximo-${empresa.id}`}
+                                    onClick={() => abrirEmpresaNaCentral(empresa)}
+                                    className="w-full rounded-2xl border border-cyan-200/60 bg-white/70 p-4 text-left transition hover:border-cyan-300 hover:bg-white"
+                                >
+                                    <div className="text-sm font-black text-slate-900">{empresa.razaoSocial}</div>
+                                    <div className="mt-1 text-sm text-slate-600">
+                                        Dias restantes: {empresa.onboardingDiasRestantes ?? '-'} · Progresso: {empresa.onboardingPercentualPreenchimento ?? 0}%
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </article>
+
+                    <article className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Liberação manual ativa</div>
+                            <button
+                                onClick={() => abrirCentralComContexto({ abaAtiva: 'empresas', filtroEmpresas: 'TODAS', titulo: 'Liberação manual ativa', descricao: 'Empresas operando com exceção manual no onboarding.', autoAbrir: ['cadastro'] })}
+                                className="rounded-2xl border border-emerald-200 bg-white/80 px-3 py-2 text-xs font-black text-emerald-800 transition hover:bg-white"
+                            >
+                                Abrir filtro
+                            </button>
+                        </div>
+                        <div className="mt-2 text-3xl font-black text-emerald-900">{saudePlataforma.liberacaoManualAtiva.length}</div>
+                        <div className="mt-4 space-y-2">
+                            {saudePlataforma.liberacaoManualAtiva.length === 0 && (
+                                <div className="rounded-2xl border border-emerald-200/60 bg-white/70 p-4 text-sm font-semibold text-emerald-900">
+                                    Nenhuma empresa com exceção manual ativa no onboarding.
+                                </div>
+                            )}
+                            {saudePlataforma.liberacaoManualAtiva.map((empresa) => (
+                                <button
+                                    key={`liberacao-manual-${empresa.id}`}
+                                    onClick={() => abrirEmpresaNaCentral(empresa)}
+                                    className="w-full rounded-2xl border border-emerald-200/60 bg-white/70 p-4 text-left transition hover:border-emerald-300 hover:bg-white"
+                                >
+                                    <div className="text-sm font-black text-slate-900">{empresa.razaoSocial}</div>
+                                    <div className="mt-1 text-sm text-slate-600">
+                                        Status da ficha: {empresa.onboardingStatus || '-'} · Liberado por: {empresa.onboardingLiberacaoManualPor || '-'}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </article>
+
+                    <article className="rounded-3xl border border-teal-200 bg-teal-50 p-5">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="text-xs font-black uppercase tracking-[0.18em] text-teal-700">Liberação manual antiga</div>
+                            <button
+                                onClick={() => abrirCentralComContexto({ abaAtiva: 'empresas', filtroEmpresas: 'TODAS', titulo: 'Liberação manual antiga', descricao: 'Exceções manuais com 7 dias ou mais exigindo revisão.', autoAbrir: ['cadastro'] })}
+                                className="rounded-2xl border border-teal-200 bg-white/80 px-3 py-2 text-xs font-black text-teal-800 transition hover:bg-white"
+                            >
+                                Abrir filtro
+                            </button>
+                        </div>
+                        <div className="mt-2 text-3xl font-black text-teal-900">{saudePlataforma.liberacaoManualAntiga.length}</div>
+                        <div className="mt-4 space-y-2">
+                            {saudePlataforma.liberacaoManualAntiga.length === 0 && (
+                                <div className="rounded-2xl border border-teal-200/60 bg-white/70 p-4 text-sm font-semibold text-teal-900">
+                                    Nenhuma exceção manual antiga precisando revisão.
+                                </div>
+                            )}
+                            {saudePlataforma.liberacaoManualAntiga.map((empresa) => (
+                                <button
+                                    key={`liberacao-manual-antiga-${empresa.id}`}
+                                    onClick={() => abrirEmpresaNaCentral(empresa)}
+                                    className="w-full rounded-2xl border border-teal-200/60 bg-white/70 p-4 text-left transition hover:border-teal-300 hover:bg-white"
+                                >
+                                    <div className="text-sm font-black text-slate-900">{empresa.razaoSocial}</div>
+                                    <div className="mt-1 text-sm text-slate-600">
+                                        Entrada: {empresa.dataCadastro ? new Date(empresa.dataCadastro).toLocaleDateString('pt-BR') : '-'} · Override desde: {empresa.onboardingLiberacaoManualEm ? new Date(empresa.onboardingLiberacaoManualEm).toLocaleDateString('pt-BR') : '-'}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </article>
+
                     <article className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
                         <div className="flex items-start justify-between gap-3">
                             <div className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Trials e vencimentos</div>

@@ -2,6 +2,8 @@ package com.grandport.erp.modules.assinatura.service;
 
 import com.grandport.erp.modules.empresa.model.Empresa;
 import com.grandport.erp.modules.empresa.repository.EmpresaRepository;
+import com.grandport.erp.modules.assinatura.model.EmpresaCadastroComplementar;
+import com.grandport.erp.modules.assinatura.repository.EmpresaCadastroComplementarRepository;
 import com.grandport.erp.modules.usuario.model.TipoAcesso;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import com.grandport.erp.modules.usuario.dto.UsuarioDTO;
@@ -23,6 +25,16 @@ public class PlanoPermissaoService {
 
     private final EmpresaRepository empresaRepository;
     private final LicenciamentoModuloService licenciamentoModuloService;
+    private final EmpresaCadastroComplementarRepository empresaCadastroComplementarRepository;
+
+    private static final Set<String> PERMISSOES_BLOQUEADAS_ONBOARDING_VENCIDO = Set.of(
+            "configuracoes",
+            "fiscal",
+            "regras-fiscais",
+            "gerenciador-nfe",
+            "emitir-nfe-avulsa",
+            "ncm"
+    );
 
     public List<String> filtrarPermissoes(Long empresaId, List<String> permissoes) {
         if (permissoes == null) {
@@ -30,10 +42,12 @@ public class PlanoPermissaoService {
         }
 
         Set<String> permitidas = licenciamentoModuloService.modulosLiberados(empresaId);
+        boolean onboardingVencido = onboardingVencido(empresaId);
 
         return permissoes.stream()
                 .filter(p -> p != null && !p.isBlank())
                 .filter(permitidas::contains)
+                .filter(p -> !onboardingVencido || !PERMISSOES_BLOQUEADAS_ONBOARDING_VENCIDO.contains(p))
                 .distinct()
                 .toList();
     }
@@ -78,6 +92,16 @@ public class PlanoPermissaoService {
         }
 
         return authorities.stream().map(SimpleGrantedAuthority::new).toList();
+    }
+
+    private boolean onboardingVencido(Long empresaId) {
+        if (empresaId == null) {
+            return false;
+        }
+
+        return empresaCadastroComplementarRepository.findByEmpresaId(empresaId)
+                .map(cadastro -> "VENCIDO".equalsIgnoreCase(cadastro.getStatusOnboarding()) && !cadastro.isLiberacaoManualAtiva())
+                .orElse(false);
     }
 
 }

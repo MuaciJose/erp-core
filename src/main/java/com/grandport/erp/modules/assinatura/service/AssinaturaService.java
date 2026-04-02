@@ -10,8 +10,14 @@ import com.grandport.erp.modules.assinatura.dto.EmpresaTimelineEventoDTO;
 import com.grandport.erp.modules.assinatura.dto.RegistrarPagamentoDTO;
 import com.grandport.erp.modules.assinatura.dto.SaasOperacaoResumoDTO;
 import com.grandport.erp.modules.assinatura.dto.AtualizarPlanoEmpresaDTO;
+import com.grandport.erp.modules.assinatura.dto.AtualizarCadastroComplementarDTO;
 import com.grandport.erp.modules.assinatura.model.AssinaturaCobranca;
 import com.grandport.erp.modules.assinatura.dto.ModuloLicencaResumoDTO;
+import com.grandport.erp.modules.assinatura.dto.EmpresaCadastroComplementarDTO;
+import com.grandport.erp.modules.assinatura.dto.LiberacaoManualCadastroComplementarDTO;
+import com.grandport.erp.modules.assinatura.dto.PlataformaAvisoOperacionalDTO;
+import com.grandport.erp.modules.assinatura.dto.ProrrogarCadastroComplementarDTO;
+import com.grandport.erp.modules.assinatura.dto.SalvarPlataformaAvisoOperacionalDTO;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoDTO;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoResumoDTO;
 import com.grandport.erp.modules.admin.model.LogAuditoria;
@@ -19,8 +25,10 @@ import com.grandport.erp.modules.admin.model.SecurityEvent;
 import com.grandport.erp.modules.admin.repository.LogAuditoriaRepository;
 import com.grandport.erp.modules.admin.repository.SecurityEventRepository;
 import com.grandport.erp.modules.assinatura.model.AssinaturaInvite;
+import com.grandport.erp.modules.assinatura.model.EmpresaCadastroComplementar;
 import com.grandport.erp.modules.assinatura.model.SolicitacaoAcesso;
 import com.grandport.erp.modules.assinatura.repository.AssinaturaInviteRepository;
+import com.grandport.erp.modules.assinatura.repository.EmpresaCadastroComplementarRepository;
 import com.grandport.erp.modules.assinatura.repository.SolicitacaoAcessoRepository;
 import com.grandport.erp.modules.empresa.model.Empresa;
 import com.grandport.erp.modules.empresa.model.StatusAssinatura;
@@ -56,10 +64,12 @@ public class AssinaturaService {
     private final CobrancaAssinaturaService cobrancaAssinaturaService;
     private final LicenciamentoModuloService licenciamentoModuloService;
     private final IncidenteEmpresaService incidenteEmpresaService;
+    private final EmpresaCadastroComplementarRepository empresaCadastroComplementarRepository;
+    private final PlataformaAvisoOperacionalService plataformaAvisoOperacionalService;
     private final LogAuditoriaRepository logAuditoriaRepository;
     private final SecurityEventRepository securityEventRepository;
 
-    public AssinaturaService(EmpresaRepository empresaRepository, UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, PasswordPolicyService passwordPolicyService, AssinaturaInviteRepository assinaturaInviteRepository, SolicitacaoAcessoRepository solicitacaoAcessoRepository, CobrancaAssinaturaService cobrancaAssinaturaService, LicenciamentoModuloService licenciamentoModuloService, IncidenteEmpresaService incidenteEmpresaService, LogAuditoriaRepository logAuditoriaRepository, SecurityEventRepository securityEventRepository) {
+    public AssinaturaService(EmpresaRepository empresaRepository, UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, PasswordPolicyService passwordPolicyService, AssinaturaInviteRepository assinaturaInviteRepository, SolicitacaoAcessoRepository solicitacaoAcessoRepository, CobrancaAssinaturaService cobrancaAssinaturaService, LicenciamentoModuloService licenciamentoModuloService, IncidenteEmpresaService incidenteEmpresaService, EmpresaCadastroComplementarRepository empresaCadastroComplementarRepository, PlataformaAvisoOperacionalService plataformaAvisoOperacionalService, LogAuditoriaRepository logAuditoriaRepository, SecurityEventRepository securityEventRepository) {
         this.empresaRepository = empresaRepository;
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
@@ -69,6 +79,8 @@ public class AssinaturaService {
         this.cobrancaAssinaturaService = cobrancaAssinaturaService;
         this.licenciamentoModuloService = licenciamentoModuloService;
         this.incidenteEmpresaService = incidenteEmpresaService;
+        this.empresaCadastroComplementarRepository = empresaCadastroComplementarRepository;
+        this.plataformaAvisoOperacionalService = plataformaAvisoOperacionalService;
         this.logAuditoriaRepository = logAuditoriaRepository;
         this.securityEventRepository = securityEventRepository;
     }
@@ -126,6 +138,7 @@ public class AssinaturaService {
         ));
 
         usuarioRepository.save(admin);
+        empresaCadastroComplementarRepository.save(criarCadastroComplementarInicial(empresaSalva.getId()));
         invite.setAtivo(false);
         invite.setUsedAt(LocalDateTime.now());
         assinaturaInviteRepository.save(invite);
@@ -171,6 +184,17 @@ public class AssinaturaService {
         if (usuario.getTipoAcesso() != TipoAcesso.PLATFORM_ADMIN) {
             throw new RuntimeException("Apenas administradores da plataforma podem gerenciar solicitações e convites.");
         }
+    }
+
+    @Transactional(readOnly = true)
+    public PlataformaAvisoOperacionalDTO obterAvisoManutencaoPlataforma() {
+        return plataformaAvisoOperacionalService.obterAvisoManutencao();
+    }
+
+    @Transactional
+    public PlataformaAvisoOperacionalDTO salvarAvisoManutencaoPlataforma(SalvarPlataformaAvisoOperacionalDTO dto) {
+        validarAcessoPlataforma();
+        return plataformaAvisoOperacionalService.salvarAvisoManutencao(dto, usuarioAtual());
     }
 
     @Transactional(readOnly = true)
@@ -327,10 +351,27 @@ public class AssinaturaService {
     public EmpresaAssinaturaResumoDTO bloquearEmpresa(Long empresaId, String motivoBloqueio) {
         Empresa empresa = empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
-        empresa.setStatusAssinatura(StatusAssinatura.BLOQUEADA);
-        empresa.setMotivoBloqueio(motivoBloqueio == null || motivoBloqueio.isBlank()
+        String motivo = motivoBloqueio == null || motivoBloqueio.isBlank()
                 ? "Bloqueio manual pela plataforma."
-                : motivoBloqueio.trim());
+                : motivoBloqueio.trim();
+        empresa.setStatusAssinatura(StatusAssinatura.BLOQUEADA);
+        empresa.setMotivoBloqueio(motivo);
+        registrarAuditoriaEmpresa(empresaId, "ASSINATURA_BLOQUEADA", "Empresa bloqueada pela plataforma. Motivo: " + motivo);
+        return toEmpresaDto(empresaRepository.save(empresa));
+    }
+
+    @Transactional
+    public EmpresaAssinaturaResumoDTO cancelarEmpresa(Long empresaId, String motivoBloqueio) {
+        Empresa empresa = empresaRepository.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
+        String motivo = motivoBloqueio == null || motivoBloqueio.isBlank()
+                ? "Desligamento da plataforma."
+                : motivoBloqueio.trim();
+        empresa.setAtivo(false);
+        empresa.setStatusAssinatura(StatusAssinatura.CANCELADA);
+        empresa.setDataDesligamento(LocalDateTime.now());
+        empresa.setMotivoBloqueio(motivo);
+        registrarAuditoriaEmpresa(empresaId, "ASSINATURA_CANCELADA", "Empresa desligada da plataforma. Motivo: " + motivo);
         return toEmpresaDto(empresaRepository.save(empresa));
     }
 
@@ -342,11 +383,14 @@ public class AssinaturaService {
             throw new RuntimeException("Informe a nova data de vencimento para registrar o pagamento.");
         }
 
+        empresa.setAtivo(true);
+        empresa.setDataDesligamento(null);
         empresa.setStatusAssinatura(StatusAssinatura.ATIVA);
         empresa.setMotivoBloqueio(null);
         LocalDate novoVencimento = LocalDate.parse(dto.novaDataVencimento());
         empresa.setDataVencimento(novoVencimento);
         cobrancaAssinaturaService.registrarPagamentoManual(empresaId, novoVencimento);
+        registrarAuditoriaEmpresa(empresaId, "ASSINATURA_PAGAMENTO_MANUAL", "Pagamento manual registrado. Novo vencimento: " + novoVencimento + ".");
         return toEmpresaDto(empresaRepository.save(empresa));
     }
 
@@ -354,6 +398,8 @@ public class AssinaturaService {
     public EmpresaAssinaturaResumoDTO reativarEmpresa(Long empresaId, RegistrarPagamentoDTO dto) {
         Empresa empresa = empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
+        empresa.setAtivo(true);
+        empresa.setDataDesligamento(null);
         empresa.setStatusAssinatura(StatusAssinatura.ATIVA);
         empresa.setMotivoBloqueio(null);
         if (dto != null && dto.novaDataVencimento() != null && !dto.novaDataVencimento().isBlank()) {
@@ -362,6 +408,7 @@ public class AssinaturaService {
             empresa.setDataVencimento(LocalDate.now().plusDays(30));
         }
         cobrancaAssinaturaService.registrarPagamentoManual(empresaId, empresa.getDataVencimento());
+        registrarAuditoriaEmpresa(empresaId, "ASSINATURA_REATIVADA", "Empresa reativada pela plataforma. Novo vencimento: " + empresa.getDataVencimento() + ".");
         return toEmpresaDto(empresaRepository.save(empresa));
     }
 
@@ -453,6 +500,7 @@ public class AssinaturaService {
         int totalModulosBloqueados = (int) licencas.stream().filter(item -> !item.ativo()).count();
         int totalModulosBloqueadosComercialmente = (int) licencas.stream().filter(ModuloLicencaResumoDTO::bloqueadoComercial).count();
         EmpresaCobrancaComposicaoDTO composicao = licenciamentoModuloService.montarComposicaoCobrancaEmpresa(empresa);
+        EmpresaCadastroComplementarDTO cadastroComplementar = toCadastroComplementarDto(empresa, obterCadastroComplementarOuPadrao(empresa.getId()));
 
         return new EmpresaAssinaturaResumoDTO(
                 empresa.getId(),
@@ -460,6 +508,8 @@ public class AssinaturaService {
                 empresa.getCnpj(),
                 empresa.getEmailContato(),
                 empresa.getTelefone(),
+                empresa.getDataCadastro() == null ? null : empresa.getDataCadastro().toString(),
+                empresa.getDataDesligamento() == null ? null : empresa.getDataDesligamento().toString(),
                 empresa.getAtivo(),
                 empresa.getStatusAssinatura() == null ? null : empresa.getStatusAssinatura().name(),
                 empresa.getDataVencimento() == null ? null : empresa.getDataVencimento().toString(),
@@ -475,11 +525,90 @@ public class AssinaturaService {
                 composicao.valorExtras(),
                 composicao.valorTotalPrevisto(),
                 composicao.extrasCobrados(),
+                cadastroComplementar.statusOnboarding(),
+                cadastroComplementar.prazoConclusao(),
+                cadastroComplementar.liberacaoManualAtiva(),
+                cadastroComplementar.liberacaoManualPor(),
+                cadastroComplementar.liberacaoManualEm(),
+                cadastroComplementar.percentualPreenchimento(),
+                cadastroComplementar.diasRestantes(),
+                cadastroComplementar.pendencias(),
                 ultimaCobranca == null || ultimaCobranca.getStatus() == null ? null : ultimaCobranca.getStatus().name(),
                 ultimaCobranca == null || ultimaCobranca.getDataVencimento() == null ? null : ultimaCobranca.getDataVencimento().toString(),
                 ultimaCobranca == null || ultimaCobranca.getValor() == null ? null : ultimaCobranca.getValor().doubleValue(),
                 ultimaCobranca == null ? null : ultimaCobranca.getPaymentLink()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public EmpresaCadastroComplementarDTO obterCadastroComplementarEmpresa(Long empresaId) {
+        validarAcessoPlataforma();
+        Empresa empresa = empresaRepository.findById(empresaId).orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
+        return toCadastroComplementarDto(empresa, obterCadastroComplementarOuPadrao(empresaId));
+    }
+
+    @Transactional
+    public EmpresaCadastroComplementarDTO atualizarCadastroComplementarEmpresa(Long empresaId, AtualizarCadastroComplementarDTO dto) {
+        validarAcessoPlataforma();
+        Empresa empresa = empresaRepository.findById(empresaId).orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
+        EmpresaCadastroComplementar cadastro = aplicarCadastroComplementar(obterOuCriarCadastroComplementarPersistido(empresaId), dto);
+        return toCadastroComplementarDto(empresa, empresaCadastroComplementarRepository.save(cadastro));
+    }
+
+    @Transactional
+    public EmpresaCadastroComplementarDTO prorrogarCadastroComplementarEmpresa(Long empresaId, ProrrogarCadastroComplementarDTO dto) {
+        validarAcessoPlataforma();
+        Empresa empresa = empresaRepository.findById(empresaId).orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
+        EmpresaCadastroComplementar cadastro = obterOuCriarCadastroComplementarPersistido(empresaId);
+        int dias = dto == null || dto.dias() == null || dto.dias() <= 0 ? 7 : dto.dias();
+        LocalDate base = cadastro.getPrazoConclusao() == null ? LocalDate.now() : cadastro.getPrazoConclusao();
+        cadastro.setPrazoConclusao(base.plusDays(dias));
+        cadastro.setUpdatedAt(LocalDateTime.now());
+        if (!cadastroCompleto(cadastro)) {
+            cadastro.setStatusOnboarding("PENDENTE_COMPLEMENTO");
+        }
+        return toCadastroComplementarDto(empresa, empresaCadastroComplementarRepository.save(cadastro));
+    }
+
+    @Transactional
+    public EmpresaCadastroComplementarDTO atualizarLiberacaoManualCadastroComplementarEmpresa(Long empresaId, LiberacaoManualCadastroComplementarDTO dto) {
+        validarAcessoPlataforma();
+        Empresa empresa = empresaRepository.findById(empresaId).orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
+        EmpresaCadastroComplementar cadastro = obterOuCriarCadastroComplementarPersistido(empresaId);
+        boolean liberar = dto != null && Boolean.TRUE.equals(dto.liberar());
+        String motivo = liberar ? textoNormalizado(dto.motivo()) : null;
+
+        cadastro.setLiberacaoManualAtiva(liberar);
+        cadastro.setLiberacaoManualMotivo(motivo);
+        cadastro.setLiberacaoManualPor(liberar ? usuarioAtual() : null);
+        cadastro.setLiberacaoManualEm(liberar ? LocalDateTime.now() : null);
+        cadastro.setUpdatedAt(LocalDateTime.now());
+
+        registrarAuditoriaOnboarding(
+                empresaId,
+                liberar ? "ONBOARDING_LIBERACAO_MANUAL_ATIVADA" : "ONBOARDING_LIBERACAO_MANUAL_REMOVIDA",
+                liberar
+                        ? "Liberação manual do onboarding ativada para " + empresa.getRazaoSocial()
+                        + (motivo == null ? "." : " Motivo: " + motivo)
+                        : "Liberação manual do onboarding removida para " + empresa.getRazaoSocial() + "."
+        );
+
+        return toCadastroComplementarDto(empresa, empresaCadastroComplementarRepository.save(cadastro));
+    }
+
+    @Transactional(readOnly = true)
+    public EmpresaCadastroComplementarDTO obterMeuCadastroComplementar() {
+        Usuario usuario = usuarioAutenticado();
+        Empresa empresa = empresaRepository.findById(usuario.getEmpresaId()).orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
+        return toCadastroComplementarDto(empresa, obterCadastroComplementarOuPadrao(usuario.getEmpresaId()));
+    }
+
+    @Transactional
+    public EmpresaCadastroComplementarDTO atualizarMeuCadastroComplementar(AtualizarCadastroComplementarDTO dto) {
+        Usuario usuario = usuarioAutenticado();
+        Empresa empresa = empresaRepository.findById(usuario.getEmpresaId()).orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
+        EmpresaCadastroComplementar cadastro = aplicarCadastroComplementar(obterOuCriarCadastroComplementarPersistido(usuario.getEmpresaId()), dto);
+        return toCadastroComplementarDto(empresa, empresaCadastroComplementarRepository.save(cadastro));
     }
 
     public String usuarioAtual() {
@@ -488,5 +617,187 @@ public class AssinaturaService {
             return "SISTEMA";
         }
         return authentication.getName();
+    }
+
+    private Usuario usuarioAutenticado() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof Usuario usuario)) {
+            throw new RuntimeException("Usuário autenticado não encontrado.");
+        }
+        return usuario;
+    }
+
+    private EmpresaCadastroComplementar criarCadastroComplementarInicial(Long empresaId) {
+        EmpresaCadastroComplementar cadastro = new EmpresaCadastroComplementar();
+        cadastro.setEmpresaId(empresaId);
+        cadastro.setPrazoConclusao(LocalDate.now().plusDays(7));
+        cadastro.setStatusOnboarding("PENDENTE_COMPLEMENTO");
+        cadastro.setCreatedAt(LocalDateTime.now());
+        cadastro.setUpdatedAt(LocalDateTime.now());
+        return cadastro;
+    }
+
+    private EmpresaCadastroComplementar obterCadastroComplementarOuPadrao(Long empresaId) {
+        return empresaCadastroComplementarRepository.findByEmpresaId(empresaId)
+                .orElseGet(() -> criarCadastroComplementarInicial(empresaId));
+    }
+
+    private EmpresaCadastroComplementar obterOuCriarCadastroComplementarPersistido(Long empresaId) {
+        return empresaCadastroComplementarRepository.findByEmpresaId(empresaId)
+                .orElseGet(() -> empresaCadastroComplementarRepository.save(criarCadastroComplementarInicial(empresaId)));
+    }
+
+    private EmpresaCadastroComplementar aplicarCadastroComplementar(EmpresaCadastroComplementar cadastro, AtualizarCadastroComplementarDTO dto) {
+        cadastro.setNomeFantasia(textoNormalizado(dto.nomeFantasia()));
+        cadastro.setInscricaoEstadual(textoNormalizado(dto.inscricaoEstadual()));
+        cadastro.setInscricaoMunicipal(textoNormalizado(dto.inscricaoMunicipal()));
+        cadastro.setRegimeTributario(textoNormalizado(dto.regimeTributario()));
+        cadastro.setWebsite(textoNormalizado(dto.website()));
+        cadastro.setCep(textoNormalizado(dto.cep()));
+        cadastro.setLogradouro(textoNormalizado(dto.logradouro()));
+        cadastro.setNumero(textoNormalizado(dto.numero()));
+        cadastro.setComplemento(textoNormalizado(dto.complemento()));
+        cadastro.setBairro(textoNormalizado(dto.bairro()));
+        cadastro.setCidade(textoNormalizado(dto.cidade()));
+        cadastro.setUf(textoNormalizado(dto.uf()));
+        cadastro.setResponsavelFinanceiroNome(textoNormalizado(dto.responsavelFinanceiroNome()));
+        cadastro.setResponsavelFinanceiroEmail(textoNormalizado(dto.responsavelFinanceiroEmail()));
+        cadastro.setResponsavelFinanceiroTelefone(textoNormalizado(dto.responsavelFinanceiroTelefone()));
+        cadastro.setResponsavelOperacionalNome(textoNormalizado(dto.responsavelOperacionalNome()));
+        cadastro.setResponsavelOperacionalEmail(textoNormalizado(dto.responsavelOperacionalEmail()));
+        cadastro.setResponsavelOperacionalTelefone(textoNormalizado(dto.responsavelOperacionalTelefone()));
+        cadastro.setObservacoes(textoNormalizado(dto.observacoes()));
+        cadastro.setAceiteLgpd(Boolean.TRUE.equals(dto.aceiteLgpd()));
+        cadastro.setUpdatedAt(LocalDateTime.now());
+        atualizarStatusCadastro(cadastro);
+        return cadastro;
+    }
+
+    private void atualizarStatusCadastro(EmpresaCadastroComplementar cadastro) {
+        if (cadastroCompleto(cadastro)) {
+            cadastro.setStatusOnboarding("COMPLETO");
+            if (cadastro.getConcluidoEm() == null) {
+                cadastro.setConcluidoEm(LocalDateTime.now());
+            }
+            return;
+        }
+
+        cadastro.setConcluidoEm(null);
+        boolean temConteudo = percentualCadastro(cadastro) > 0;
+        if (cadastro.getPrazoConclusao() != null && cadastro.getPrazoConclusao().isBefore(LocalDate.now())) {
+            cadastro.setStatusOnboarding("VENCIDO");
+        } else if (temConteudo) {
+            cadastro.setStatusOnboarding("EM_PREENCHIMENTO");
+        } else {
+            cadastro.setStatusOnboarding("PENDENTE_COMPLEMENTO");
+        }
+    }
+
+    private EmpresaCadastroComplementarDTO toCadastroComplementarDto(Empresa empresa, EmpresaCadastroComplementar cadastro) {
+        atualizarStatusCadastro(cadastro);
+        List<String> pendencias = pendenciasCadastro(cadastro);
+        LocalDate hoje = LocalDate.now();
+        Integer diasRestantes = cadastro.getPrazoConclusao() == null ? null : (int) java.time.temporal.ChronoUnit.DAYS.between(hoje, cadastro.getPrazoConclusao());
+        return new EmpresaCadastroComplementarDTO(
+                cadastro.getEmpresaId(),
+                empresa == null ? null : empresa.getRazaoSocial(),
+                empresa == null ? null : empresa.getCnpj(),
+                empresa == null ? null : empresa.getEmailContato(),
+                empresa == null ? null : empresa.getTelefone(),
+                cadastro.getStatusOnboarding(),
+                cadastro.getPrazoConclusao() == null ? null : cadastro.getPrazoConclusao().toString(),
+                cadastro.getConcluidoEm() == null ? null : cadastro.getConcluidoEm().toString(),
+                cadastro.isLiberacaoManualAtiva(),
+                cadastro.getLiberacaoManualEm() == null ? null : cadastro.getLiberacaoManualEm().toString(),
+                cadastro.getLiberacaoManualPor(),
+                cadastro.getLiberacaoManualMotivo(),
+                percentualCadastro(cadastro),
+                diasRestantes,
+                pendencias,
+                cadastro.getNomeFantasia(),
+                cadastro.getInscricaoEstadual(),
+                cadastro.getInscricaoMunicipal(),
+                cadastro.getRegimeTributario(),
+                cadastro.getWebsite(),
+                cadastro.getCep(),
+                cadastro.getLogradouro(),
+                cadastro.getNumero(),
+                cadastro.getComplemento(),
+                cadastro.getBairro(),
+                cadastro.getCidade(),
+                cadastro.getUf(),
+                cadastro.getResponsavelFinanceiroNome(),
+                cadastro.getResponsavelFinanceiroEmail(),
+                cadastro.getResponsavelFinanceiroTelefone(),
+                cadastro.getResponsavelOperacionalNome(),
+                cadastro.getResponsavelOperacionalEmail(),
+                cadastro.getResponsavelOperacionalTelefone(),
+                cadastro.isAceiteLgpd(),
+                cadastro.getObservacoes()
+        );
+    }
+
+    private int percentualCadastro(EmpresaCadastroComplementar cadastro) {
+        int total = 11;
+        int preenchidos = 0;
+        if (textoNormalizado(cadastro.getNomeFantasia()) != null) preenchidos++;
+        if (textoNormalizado(cadastro.getRegimeTributario()) != null) preenchidos++;
+        if (textoNormalizado(cadastro.getCep()) != null) preenchidos++;
+        if (textoNormalizado(cadastro.getLogradouro()) != null) preenchidos++;
+        if (textoNormalizado(cadastro.getNumero()) != null) preenchidos++;
+        if (textoNormalizado(cadastro.getBairro()) != null) preenchidos++;
+        if (textoNormalizado(cadastro.getCidade()) != null) preenchidos++;
+        if (textoNormalizado(cadastro.getUf()) != null) preenchidos++;
+        if (textoNormalizado(cadastro.getResponsavelFinanceiroNome()) != null) preenchidos++;
+        if (textoNormalizado(cadastro.getResponsavelFinanceiroEmail()) != null) preenchidos++;
+        if (cadastro.isAceiteLgpd()) preenchidos++;
+        return (int) Math.round((preenchidos * 100D) / total);
+    }
+
+    private boolean cadastroCompleto(EmpresaCadastroComplementar cadastro) {
+        return pendenciasCadastro(cadastro).isEmpty();
+    }
+
+    private List<String> pendenciasCadastro(EmpresaCadastroComplementar cadastro) {
+        List<String> pendencias = new ArrayList<>();
+        if (textoNormalizado(cadastro.getNomeFantasia()) == null) pendencias.add("Nome fantasia");
+        if (textoNormalizado(cadastro.getRegimeTributario()) == null) pendencias.add("Regime tributário");
+        if (textoNormalizado(cadastro.getCep()) == null || textoNormalizado(cadastro.getLogradouro()) == null
+                || textoNormalizado(cadastro.getNumero()) == null || textoNormalizado(cadastro.getBairro()) == null
+                || textoNormalizado(cadastro.getCidade()) == null || textoNormalizado(cadastro.getUf()) == null) {
+            pendencias.add("Endereço completo");
+        }
+        if (textoNormalizado(cadastro.getResponsavelFinanceiroNome()) == null
+                || textoNormalizado(cadastro.getResponsavelFinanceiroEmail()) == null) {
+            pendencias.add("Responsável financeiro");
+        }
+        if (!cadastro.isAceiteLgpd()) pendencias.add("Aceite LGPD");
+        return pendencias;
+    }
+
+    private String textoNormalizado(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        return valor.trim();
+    }
+
+    private void registrarAuditoriaOnboarding(Long empresaId, String acao, String detalhes) {
+        registrarAuditoriaEmpresa(empresaId, acao, detalhes, "ONBOARDING");
+    }
+
+    private void registrarAuditoriaEmpresa(Long empresaId, String acao, String detalhes) {
+        registrarAuditoriaEmpresa(empresaId, acao, detalhes, "ASSINATURA");
+    }
+
+    private void registrarAuditoriaEmpresa(Long empresaId, String acao, String detalhes, String modulo) {
+        LogAuditoria log = new LogAuditoria();
+        log.setEmpresaId(empresaId);
+        log.setDataHora(LocalDateTime.now());
+        log.setUsuarioNome(usuarioAtual());
+        log.setModulo(modulo);
+        log.setAcao(acao);
+        log.setDetalhes(detalhes);
+        logAuditoriaRepository.save(log);
     }
 }

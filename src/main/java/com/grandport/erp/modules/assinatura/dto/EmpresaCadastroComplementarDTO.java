@@ -1,0 +1,41 @@
+package com.grandport.erp.modules.assinatura.dto;
+
+import java.util.List;
+
+public record EmpresaCadastroComplementarDTO(
+        Long empresaId,
+        String razaoSocial,
+        String cnpj,
+        String emailContato,
+        String telefone,
+        String statusOnboarding,
+        String prazoConclusao,
+        String concluidoEm,
+        Boolean liberacaoManualAtiva,
+        String liberacaoManualEm,
+        String liberacaoManualPor,
+        String liberacaoManualMotivo,
+        Integer percentualPreenchimento,
+        Integer diasRestantes,
+        List<String> pendencias,
+        String nomeFantasia,
+        String inscricaoEstadual,
+        String inscricaoMunicipal,
+        String regimeTributario,
+        String website,
+        String cep,
+        String logradouro,
+        String numero,
+        String complemento,
+        String bairro,
+        String cidade,
+        String uf,
+        String responsavelFinanceiroNome,
+        String responsavelFinanceiroEmail,
+        String responsavelFinanceiroTelefone,
+        String responsavelOperacionalNome,
+        String responsavelOperacionalEmail,
+        String responsavelOperacionalTelefone,
+        Boolean aceiteLgpd,
+        String observacoes
+) {}

@@ -34,6 +34,7 @@ import { RelatorioComissoes } from './modules/vendas/RelatorioComissoes';
 import { ManualUsuario } from './modules/manual/ManualUsuario';
 import { AgendaCorporativa } from './modules/agenda/AgendaCorporativa';
 import { AtendimentoSaas } from './modules/atendimento/AtendimentoSaas';
+import { FichaCadastralEmpresa } from './modules/assinatura/FichaCadastralEmpresa';
 
 // 🚀 MÓDULOS IMPORTADOS
 import { ReciboAvulso } from './modules/financeiro/ReciboAvulso';
@@ -106,6 +107,7 @@ const lazyFallback = (
 );
 
 function App() {
+    const paginasRestritasPorOnboarding = ['configuracoes', 'fiscal', 'regras-fiscais', 'gerenciador-nfe', 'emitir-nfe-avulsa', 'ncm'];
     const [usuarioLogado, setUsuarioLogado] = useState(null);
     const [paginaAtiva, setPaginaAtiva] = useState('');
     const [modoAplicacao, setModoAplicacao] = useState('erp');
@@ -117,6 +119,8 @@ function App() {
     const [confirmacaoSenhaObrigatoria, setConfirmacaoSenhaObrigatoria] = useState('');
     const [salvandoTrocaSenha, setSalvandoTrocaSenha] = useState(false);
     const [erroTrocaSenha, setErroTrocaSenha] = useState('');
+    const [onboardingEmpresa, setOnboardingEmpresa] = useState(null);
+    const [avisoManutencaoPlataforma, setAvisoManutencaoPlataforma] = useState(null);
 
     // 🚀 NOVO ESTADO: Controla as telas antes do usuário logar
     const [telaPublica, setTelaPublica] = useState('login');
@@ -197,6 +201,32 @@ function App() {
         setModoAplicacao(usuario?.tipoAcesso === 'PLATFORM_ADMIN' ? 'platform' : 'erp');
     };
 
+    useEffect(() => {
+        if (!usuarioLogado || usuarioLogado?.tipoAcesso === 'PLATFORM_ADMIN') {
+            setOnboardingEmpresa(null);
+            setAvisoManutencaoPlataforma(null);
+            return;
+        }
+
+        const carregarAvisosOperacionais = async () => {
+            try {
+                const [resOnboarding, resAviso] = await Promise.all([
+                    api.get('/api/assinaturas/minha-empresa/cadastro-complementar'),
+                    api.get('/api/assinaturas/plataforma/aviso-manutencao')
+                ]);
+                setOnboardingEmpresa(resOnboarding.data || null);
+                setAvisoManutencaoPlataforma(resAviso.data || null);
+            } catch (error) {
+                setOnboardingEmpresa(null);
+                setAvisoManutencaoPlataforma(null);
+            }
+        };
+
+        carregarAvisosOperacionais();
+        const intervalo = window.setInterval(carregarAvisosOperacionais, 120000);
+        return () => window.clearInterval(intervalo);
+    }, [usuarioLogado?.empresaId, usuarioLogado?.tipoAcesso]);
+
     const handleLogout = async () => {
         try {
             await api.post('/auth/logout');
@@ -224,7 +254,7 @@ function App() {
         return <Login onLoginSuccess={handleLoginSucesso} onIrParaCadastro={() => setTelaPublica('cadastro')} />;
     }
 
-    const permissoesExtra = ['revisoes', 'agenda', 'atendimento', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual', 'checklist', 'inventario', 'estoque'];
+    const permissoesExtra = ['revisoes', 'agenda', 'atendimento', 'ficha-cadastral', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual', 'checklist', 'inventario', 'estoque'];
     const temPermissao =
         usuarioLogado.permissoes.includes(paginaAtiva) ||
         permissoesExtra.includes(paginaAtiva) ||
@@ -232,6 +262,27 @@ function App() {
     const podeVerAgenda = usuarioLogado?.permissoes?.includes('agenda');
     const exigeTrocaSenha = !!usuarioLogado?.forcePasswordChange;
     const isPlatformAdmin = usuarioLogado?.tipoAcesso === 'PLATFORM_ADMIN';
+    const onboardingPendente =
+        onboardingEmpresa &&
+        ['PENDENTE_COMPLEMENTO', 'EM_PREENCHIMENTO', 'VENCIDO'].includes(onboardingEmpresa.statusOnboarding);
+    const mostrarBannerOnboarding = onboardingPendente && paginaAtiva !== 'ficha-cadastral' && modoAplicacao === 'erp';
+    const mostrarBannerManutencao = !!avisoManutencaoPlataforma?.ativo && modoAplicacao === 'erp';
+    const classeBannerManutencao =
+        avisoManutencaoPlataforma?.severidade === 'INCIDENTE'
+            ? 'border-red-200 bg-red-50 text-red-900'
+            : avisoManutencaoPlataforma?.severidade === 'INFORMATIVO'
+                ? 'border-blue-200 bg-blue-50 text-blue-900'
+                : 'border-amber-200 bg-amber-50 text-amber-900';
+    const acessoBloqueadoPorOnboarding =
+        onboardingEmpresa?.statusOnboarding === 'VENCIDO' &&
+        paginasRestritasPorOnboarding.includes(paginaAtiva);
+
+    const toneBannerOnboarding =
+        onboardingEmpresa?.statusOnboarding === 'VENCIDO'
+            ? 'border-red-200 bg-red-50 text-red-900'
+            : onboardingEmpresa?.statusOnboarding === 'EM_PREENCHIMENTO'
+                ? 'border-blue-200 bg-blue-50 text-blue-900'
+                : 'border-amber-200 bg-amber-50 text-amber-900';
 
     const handleTrocarSenhaObrigatoria = async () => {
         setErroTrocaSenha('');
@@ -326,10 +377,116 @@ function App() {
 
             <main className={`flex-1 h-full overflow-y-auto ${isFullScreen ? 'p-0' : 'p-4'}`}>
                 <div className={`${isFullScreen ? 'w-full h-full' : 'max-w-[1600px] mx-auto'}`}>
+                    {mostrarBannerManutencao && (
+                        <div className={`mb-4 rounded-[1.75rem] border px-5 py-4 shadow-sm ${classeBannerManutencao}`}>
+                            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                                <div className="space-y-2">
+                                    <div className="text-xs font-black uppercase tracking-[0.22em]">
+                                        Aviso da plataforma
+                                    </div>
+                                    <div className="text-lg font-black">
+                                        {avisoManutencaoPlataforma?.titulo || 'Manutenção programada'}
+                                    </div>
+                                    {avisoManutencaoPlataforma?.mensagem && (
+                                        <div className="text-sm font-semibold">
+                                            {avisoManutencaoPlataforma.mensagem}
+                                        </div>
+                                    )}
+                                    <div className="text-sm font-semibold opacity-90">
+                                        {avisoManutencaoPlataforma?.inicioPrevisto
+                                            ? `Início previsto: ${new Date(avisoManutencaoPlataforma.inicioPrevisto).toLocaleString('pt-BR')}`
+                                            : 'Início previsto não informado'}
+                                        {avisoManutencaoPlataforma?.fimPrevisto
+                                            ? ` · Fim previsto: ${new Date(avisoManutencaoPlataforma.fimPrevisto).toLocaleString('pt-BR')}`
+                                            : ''}
+                                    </div>
+                                </div>
+                                <div className="rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm font-bold">
+                                    {avisoManutencaoPlataforma?.bloquearAcesso
+                                        ? 'O acesso pode ser bloqueado durante a janela informada.'
+                                        : 'A comunicação foi publicada pela plataforma.'}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {mostrarBannerOnboarding && (
+                        <div className={`mb-4 rounded-[1.75rem] border px-5 py-4 shadow-sm ${toneBannerOnboarding}`}>
+                            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                                <div className="space-y-2">
+                                    <div className="text-xs font-black uppercase tracking-[0.22em]">
+                                        Ficha cadastral da empresa
+                                    </div>
+                                    <div className="text-lg font-black">
+                                        {onboardingEmpresa?.statusOnboarding === 'VENCIDO'
+                                            ? 'O prazo para completar a ficha cadastral expirou.'
+                                            : 'Sua empresa ainda precisa concluir a ficha cadastral obrigatória.'}
+                                    </div>
+                                    <div className="text-sm font-semibold opacity-80">
+                                        {onboardingEmpresa?.prazoConclusao
+                                            ? `Prazo final: ${new Date(`${onboardingEmpresa.prazoConclusao}T00:00:00`).toLocaleDateString('pt-BR')}`
+                                            : 'Prazo ainda não definido'} · {onboardingEmpresa?.percentualPreenchimento || 0}% preenchido · {onboardingEmpresa?.pendencias?.length || 0} pendência(s)
+                                    </div>
+                                    {Array.isArray(onboardingEmpresa?.pendencias) && onboardingEmpresa.pendencias.length > 0 && (
+                                        <div className="text-sm font-semibold">
+                                            Pendências: {onboardingEmpresa.pendencias.join(', ')}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <div className="h-3 w-48 overflow-hidden rounded-full bg-white/60">
+                                        <div
+                                            className="h-full rounded-full bg-slate-900 transition-all"
+                                            style={{ width: `${Math.max(0, Math.min(100, onboardingEmpresa?.percentualPreenchimento || 0))}%` }}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => setPaginaAtiva('ficha-cadastral')}
+                                        className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-700"
+                                    >
+                                        Abrir ficha cadastral
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {!temPermissao ? (
                         <div className="p-10 text-center mt-20">
                             <h2 className="text-2xl font-black text-red-500 mb-2">ACESSO NEGADO</h2>
-                            <p className="text-slate-500">Você não tem permissão para visualizar esta tela.</p>
+                            {acessoBloqueadoPorOnboarding ? (
+                                <div className="mx-auto max-w-2xl space-y-4">
+                                    <p className="text-slate-600">
+                                        Este recurso foi restringido porque a ficha cadastral da empresa venceu e ainda precisa ser concluída.
+                                    </p>
+                                    <div className="rounded-3xl border border-red-200 bg-red-50 p-5 text-left text-sm text-red-900 shadow-sm">
+                                        <div className="text-xs font-black uppercase tracking-[0.22em] text-red-700">Restrição temporária</div>
+                                        <div className="mt-2 font-semibold">
+                                            Recursos fiscais e configurações críticas ficam bloqueados até a conclusão da ficha cadastral obrigatória.
+                                        </div>
+                                        <div className="mt-3">
+                                            <span className="font-black">Pendências atuais:</span>{' '}
+                                            {Array.isArray(onboardingEmpresa?.pendencias) && onboardingEmpresa.pendencias.length > 0
+                                                ? onboardingEmpresa.pendencias.join(', ')
+                                                : 'Ficha cadastral incompleta'}
+                                        </div>
+                                        <div className="mt-4 flex flex-wrap gap-3">
+                                            <button
+                                                onClick={() => setPaginaAtiva('ficha-cadastral')}
+                                                className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-700"
+                                            >
+                                                Concluir ficha cadastral
+                                            </button>
+                                            <button
+                                                onClick={() => setPaginaAtiva('dash')}
+                                                className="rounded-2xl border border-red-200 bg-white px-5 py-3 text-sm font-black text-red-700 transition hover:bg-red-100"
+                                            >
+                                                Voltar ao dashboard
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-slate-500">Você não tem permissão para visualizar esta tela.</p>
+                            )}
                         </div>
                     ) : (
                         <>
@@ -343,6 +500,7 @@ function App() {
                             {paginaAtiva === 'revisoes' && <PainelRevisoes />}
                             {paginaAtiva === 'agenda' && <AgendaCorporativa />}
                             {paginaAtiva === 'atendimento' && <AtendimentoSaas modo="cliente" />}
+                            {paginaAtiva === 'ficha-cadastral' && <FichaCadastralEmpresa />}
                             {paginaAtiva === 'crm' && <PainelRevisoes />}
                             {paginaAtiva === 'etiquetas' && <GeradorEtiquetas />}
 

@@ -115,14 +115,27 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
     const [planosEmpresa, setPlanosEmpresa] = useState({});
     const [valoresEmpresa, setValoresEmpresa] = useState({});
     const [toleranciasEmpresa, setToleranciasEmpresa] = useState({});
+    const [motivosLiberacaoManual, setMotivosLiberacaoManual] = useState({});
     const [licencasPorEmpresa, setLicencasPorEmpresa] = useState({});
     const [licencasLoading, setLicencasLoading] = useState({});
+    const [blocosEmpresaAbertos, setBlocosEmpresaAbertos] = useState({});
+    const [cadastroComplementarPorEmpresa, setCadastroComplementarPorEmpresa] = useState({});
+    const [cadastroComplementarLoading, setCadastroComplementarLoading] = useState({});
     const [observacoesModulo, setObservacoesModulo] = useState({});
     const [timelinePorEmpresa, setTimelinePorEmpresa] = useState({});
     const [timelineLoading, setTimelineLoading] = useState({});
     const [incidentesPorEmpresa, setIncidentesPorEmpresa] = useState({});
     const [incidentesLoading, setIncidentesLoading] = useState({});
     const [formIncidentePorEmpresa, setFormIncidentePorEmpresa] = useState({});
+    const [avisoManutencao, setAvisoManutencao] = useState({
+        ativo: false,
+        severidade: 'MANUTENCAO',
+        bloquearAcesso: false,
+        titulo: 'Manutenção programada',
+        mensagem: '',
+        inicioPrevisto: '',
+        fimPrevisto: ''
+    });
     const [contextoVisual, setContextoVisual] = useState(contextoInicial);
     const [manualChecklist, setManualChecklist] = useState(() => {
         try {
@@ -158,11 +171,26 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
             setEmpresas(empresasRecebidas);
             setEventosSeguranca(Array.isArray(resEventos.data) ? resEventos.data : []);
             setResumoOperacao(resResumo.data || null);
+            try {
+                const resAviso = await api.get('/api/assinaturas/plataforma/aviso-manutencao');
+                setAvisoManutencao({
+                    ativo: !!resAviso.data?.ativo,
+                    severidade: resAviso.data?.severidade || 'MANUTENCAO',
+                    bloquearAcesso: !!resAviso.data?.bloquearAcesso,
+                    titulo: resAviso.data?.titulo || 'Manutenção programada',
+                    mensagem: resAviso.data?.mensagem || '',
+                    inicioPrevisto: resAviso.data?.inicioPrevisto ? String(resAviso.data.inicioPrevisto).slice(0, 16) : '',
+                    fimPrevisto: resAviso.data?.fimPrevisto ? String(resAviso.data.fimPrevisto).slice(0, 16) : ''
+                });
+            } catch {
+                // mantém formulário local
+            }
             setDatasVencimento(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.dataVencimento || ''])));
             setMotivosBloqueio(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.motivoBloqueio || ''])));
             setPlanosEmpresa(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.plano || 'ESSENCIAL'])));
             setValoresEmpresa(Object.fromEntries(empresasRecebidas.map(item => [item.id, maskCurrencyInput(item.valorMensal ?? 0)])));
             setToleranciasEmpresa(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.diasTolerancia ?? 0])));
+            setMotivosLiberacaoManual(Object.fromEntries(empresasRecebidas.map(item => [item.id, ''])));
         } catch (error) {
             toast.error('Não foi possível carregar os dados da operação SaaS.');
         } finally {
@@ -197,6 +225,9 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
         if (contextoVisual.autoAbrir.includes('licencas')) {
             carregarLicencasEmpresa(empresaAlvo.id);
         }
+        if (contextoVisual.autoAbrir.includes('cadastro')) {
+            carregarCadastroComplementarEmpresa(empresaAlvo.id);
+        }
         if (contextoVisual.autoAbrir.includes('timeline')) {
             carregarTimelineEmpresa(empresaAlvo.id);
         }
@@ -222,6 +253,7 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
         if (filtroEmpresas === 'ATIVAS') base = empresas.filter(item => item.statusAssinatura === 'ATIVA');
         if (filtroEmpresas === 'INADIMPLENTES') base = empresas.filter(item => item.statusAssinatura === 'INADIMPLENTE');
         if (filtroEmpresas === 'BLOQUEADAS') base = empresas.filter(item => item.statusAssinatura === 'BLOQUEADA');
+        if (filtroEmpresas === 'CANCELADAS') base = empresas.filter(item => item.statusAssinatura === 'CANCELADA');
         if (filtroEmpresas === 'VENCE_HOJE') base = empresas.filter(item => item.dataVencimento === hoje);
         if (filtroEmpresas === 'VENCE_7_DIAS') {
             base = empresas.filter(item => item.dataVencimento && item.dataVencimento >= hoje && item.dataVencimento <= limite);
@@ -299,6 +331,7 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
             ativas: empresas.filter(item => item.statusAssinatura === 'ATIVA').length,
             inadimplentes: empresas.filter(item => item.statusAssinatura === 'INADIMPLENTE').length,
             bloqueadas: empresas.filter(item => item.statusAssinatura === 'BLOQUEADA').length,
+            canceladas: empresas.filter(item => item.statusAssinatura === 'CANCELADA').length,
             vencendo7Dias: empresas.filter(item => item.dataVencimento && item.dataVencimento >= hoje && item.dataVencimento <= limite).length
         };
     }, [empresas]);
@@ -375,6 +408,14 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
         return 'bg-slate-100 text-slate-700';
     };
 
+    const onboardingBadgeClasses = (status) => {
+        if (status === 'COMPLETO') return 'bg-emerald-100 text-emerald-700';
+        if (status === 'EM_PREENCHIMENTO') return 'bg-blue-100 text-blue-700';
+        if (status === 'VENCIDO') return 'bg-red-100 text-red-700';
+        if (status === 'PENDENTE_COMPLEMENTO') return 'bg-amber-100 text-amber-700';
+        return 'bg-slate-100 text-slate-700';
+    };
+
     const alternarChecklistManual = (id) => {
         setManualChecklist((prev) => ({ ...prev, [id]: !prev[id] }));
     };
@@ -400,6 +441,22 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
             await carregarDados();
         } catch (error) {
             toast.error(error?.response?.data?.message || 'Não foi possível bloquear a empresa.', { id: toastId });
+        } finally {
+            setProcessandoId(null);
+        }
+    };
+
+    const cancelarEmpresa = async (empresa) => {
+        setProcessandoId(`cancelar-${empresa.id}`);
+        const toastId = toast.loading(`Desligando ${empresa.razaoSocial} da plataforma...`);
+        try {
+            await api.post(`/api/assinaturas/empresas/${empresa.id}/cancelar`, {
+                motivoBloqueio: motivosBloqueio[empresa.id]
+            });
+            toast.success('Empresa desligada da plataforma.', { id: toastId });
+            await carregarDados();
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Não foi possível desligar a empresa da plataforma.', { id: toastId });
         } finally {
             setProcessandoId(null);
         }
@@ -455,6 +512,40 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
         }
     };
 
+    const prorrogarCadastroComplementar = async (empresa, dias = 7) => {
+        setProcessandoId(`onboarding-${empresa.id}`);
+        const toastId = toast.loading(`Prorrogando ficha cadastral de ${empresa.razaoSocial}...`);
+        try {
+            await api.post(`/api/assinaturas/empresas/${empresa.id}/cadastro-complementar/prorrogar`, { dias });
+            toast.success(`Prazo da ficha cadastral prorrogado em ${dias} dias.`, { id: toastId });
+            await carregarDados();
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Não foi possível prorrogar o prazo da ficha cadastral.', { id: toastId });
+        } finally {
+            setProcessandoId(null);
+        }
+    };
+
+    const atualizarLiberacaoManualCadastro = async (empresa, liberar) => {
+        setProcessandoId(`liberacao-manual-${empresa.id}`);
+        const toastId = toast.loading(liberar
+            ? `Liberando acesso manual de ${empresa.razaoSocial}...`
+            : `Removendo liberação manual de ${empresa.razaoSocial}...`);
+        try {
+            const payload = liberar
+                ? { liberar: true, motivo: motivosLiberacaoManual[empresa.id] || '' }
+                : { liberar: false, motivo: '' };
+            const res = await api.post(`/api/assinaturas/empresas/${empresa.id}/cadastro-complementar/liberacao-manual`, payload);
+            setCadastroComplementarPorEmpresa(prev => ({ ...prev, [empresa.id]: res.data || null }));
+            toast.success(liberar ? 'Liberação manual ativada.' : 'Liberação manual removida.', { id: toastId });
+            await carregarDados();
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Não foi possível atualizar a liberação manual.', { id: toastId });
+        } finally {
+            setProcessandoId(null);
+        }
+    };
+
     const criarCobrancaManual = async (empresa) => {
         setProcessandoId(`cobranca-${empresa.id}`);
         const toastId = toast.loading(`Criando cobrança de ${empresa.razaoSocial}...`);
@@ -475,12 +566,73 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
         }
     };
 
+    const salvarAvisoManutencao = async () => {
+        setProcessandoId('aviso-manutencao');
+        const toastId = toast.loading(avisoManutencao.ativo ? 'Publicando aviso de manutenção...' : 'Atualizando aviso de manutenção...');
+        try {
+            const res = await api.post('/api/assinaturas/plataforma/aviso-manutencao', {
+                ativo: !!avisoManutencao.ativo,
+                severidade: avisoManutencao.severidade,
+                bloquearAcesso: !!avisoManutencao.bloquearAcesso,
+                titulo: avisoManutencao.titulo,
+                mensagem: avisoManutencao.mensagem,
+                inicioPrevisto: avisoManutencao.inicioPrevisto ? `${avisoManutencao.inicioPrevisto}:00` : null,
+                fimPrevisto: avisoManutencao.fimPrevisto ? `${avisoManutencao.fimPrevisto}:00` : null
+            });
+            setAvisoManutencao({
+                ativo: !!res.data?.ativo,
+                severidade: res.data?.severidade || 'MANUTENCAO',
+                bloquearAcesso: !!res.data?.bloquearAcesso,
+                titulo: res.data?.titulo || 'Manutenção programada',
+                mensagem: res.data?.mensagem || '',
+                inicioPrevisto: res.data?.inicioPrevisto ? String(res.data.inicioPrevisto).slice(0, 16) : '',
+                fimPrevisto: res.data?.fimPrevisto ? String(res.data.fimPrevisto).slice(0, 16) : ''
+            });
+            toast.success('Aviso de manutenção atualizado.', { id: toastId });
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Não foi possível atualizar o aviso de manutenção.', { id: toastId });
+        } finally {
+            setProcessandoId(null);
+        }
+    };
+
+    const abrirBlocoEmpresa = (empresaId, bloco) => {
+        setBlocosEmpresaAbertos((prev) => ({
+            ...prev,
+            [empresaId]: {
+                ...(prev[empresaId] || {}),
+                [bloco]: true
+            }
+        }));
+
+        window.requestAnimationFrame(() => {
+            const elemento = document.getElementById(`empresa-${empresaId}-${bloco}`);
+            elemento?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+    };
+
+    const alternarBlocoEmpresa = (empresaId, bloco) => {
+        const estaAberto = !!blocosEmpresaAbertos[empresaId]?.[bloco];
+        if (estaAberto) {
+            setBlocosEmpresaAbertos((prev) => ({
+                ...prev,
+                [empresaId]: {
+                    ...(prev[empresaId] || {}),
+                    [bloco]: false
+                }
+            }));
+            return;
+        }
+        abrirBlocoEmpresa(empresaId, bloco);
+    };
+
     const carregarTimelineEmpresa = async (empresaId, force = false) => {
         if (!force && timelinePorEmpresa[empresaId]) return;
         setTimelineLoading(prev => ({ ...prev, [empresaId]: true }));
         try {
             const res = await api.get(`/api/assinaturas/empresas/${empresaId}/timeline`);
             setTimelinePorEmpresa(prev => ({ ...prev, [empresaId]: Array.isArray(res.data) ? res.data : [] }));
+            abrirBlocoEmpresa(empresaId, 'timeline');
         } catch (error) {
             toast.error('Não foi possível carregar a timeline desta empresa.');
         } finally {
@@ -499,10 +651,24 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                 ...prev,
                 ...Object.fromEntries(licencas.map(item => [`${empresaId}:${item.modulo}`, item.observacao || '']))
             }));
+            abrirBlocoEmpresa(empresaId, 'licencas');
         } catch (error) {
             toast.error('Não foi possível carregar o licenciamento desta empresa.');
         } finally {
             setLicencasLoading(prev => ({ ...prev, [empresaId]: false }));
+        }
+    };
+
+    const carregarCadastroComplementarEmpresa = async (empresaId, force = false) => {
+        if (!force && cadastroComplementarPorEmpresa[empresaId]) return;
+        setCadastroComplementarLoading(prev => ({ ...prev, [empresaId]: true }));
+        try {
+            const res = await api.get(`/api/assinaturas/empresas/${empresaId}/cadastro-complementar`);
+            setCadastroComplementarPorEmpresa(prev => ({ ...prev, [empresaId]: res.data || null }));
+        } catch (error) {
+            toast.error('Não foi possível carregar a ficha cadastral desta empresa.');
+        } finally {
+            setCadastroComplementarLoading(prev => ({ ...prev, [empresaId]: false }));
         }
     };
 
@@ -737,6 +903,10 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
             csvCell(empresa.statusAssinatura || ''),
             csvCell(empresa.plano || ''),
             csvCell(empresa.dataVencimento || ''),
+            csvCell(empresa.onboardingStatus || ''),
+            csvCell(empresa.onboardingPrazoConclusao || ''),
+            csvCell(empresa.onboardingPercentualPreenchimento ?? 0),
+            csvCell(Array.isArray(empresa.onboardingPendencias) ? empresa.onboardingPendencias.join(', ') : ''),
             csvCell(Number(empresa.valorMensal || 0).toFixed(2).replace('.', ',')),
             csvCell(Number(empresa.valorExtrasMensal || 0).toFixed(2).replace('.', ',')),
             csvCell(Number(empresa.valorTotalMensalPrevisto || empresa.valorMensal || 0).toFixed(2).replace('.', ',')),
@@ -759,6 +929,10 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                 'Status',
                 'Plano',
                 'Vencimento',
+                'Status Onboarding',
+                'Prazo Onboarding',
+                '% Ficha',
+                'Pendencias Cadastrais',
                 'Valor Plano',
                 'Valor Extras',
                 'Total Previsto',
@@ -1031,7 +1205,7 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                     </div>
                 </section>
 
-                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
                     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Empresas</div>
                         <div className="mt-2 text-3xl font-black text-slate-900">{resumoEmpresas.total}</div>
@@ -1047,6 +1221,10 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                     <div className="rounded-3xl border border-red-200 bg-red-50 p-5 shadow-sm">
                         <div className="text-xs font-black uppercase tracking-[0.22em] text-red-700">Bloqueadas</div>
                         <div className="mt-2 text-3xl font-black text-red-900">{resumoEmpresas.bloqueadas}</div>
+                    </div>
+                    <div className="rounded-3xl border border-slate-300 bg-slate-100 p-5 shadow-sm">
+                        <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-700">Canceladas</div>
+                        <div className="mt-2 text-3xl font-black text-slate-900">{resumoEmpresas.canceladas}</div>
                     </div>
                     <div className="rounded-3xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
                         <div className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Vencendo 7 dias</div>
@@ -1077,6 +1255,104 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                         <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
                             <div className="text-xs font-black uppercase tracking-[0.22em] text-amber-700">Trials Ativos</div>
                             <div className="mt-2 text-3xl font-black text-amber-900">{resumoOperacao.trialsAtivos}</div>
+                        </div>
+                    </section>
+                )}
+
+                {abaAtiva === 'empresas' && (
+                    <section className={`rounded-3xl border p-6 shadow-sm ${avisoManutencao.ativo ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+                        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                            <div className="max-w-3xl">
+                                <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Aviso global da plataforma</div>
+                                <h2 className="mt-2 text-lg font-black text-slate-900">Manutenção para clientes assinantes</h2>
+                                <p className="mt-2 text-sm text-slate-600">
+                                    Ative aqui um aviso operacional para aparecer no ERP das empresas durante manutenção programada ou incidente controlado.
+                                </p>
+                            </div>
+                            <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={!!avisoManutencao.ativo}
+                                    onChange={(e) => setAvisoManutencao((prev) => ({ ...prev, ativo: e.target.checked }))}
+                                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                                />
+                                Aviso ativo
+                            </label>
+                        </div>
+
+                        <div className="mt-5 grid gap-3 md:grid-cols-2">
+                            <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
+                                Severidade
+                                <select
+                                    value={avisoManutencao.severidade || 'MANUTENCAO'}
+                                    onChange={(e) => setAvisoManutencao((prev) => ({ ...prev, severidade: e.target.value }))}
+                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-amber-500"
+                                >
+                                    <option value="INFORMATIVO">Informativo</option>
+                                    <option value="MANUTENCAO">Manutenção</option>
+                                    <option value="INCIDENTE">Incidente</option>
+                                </select>
+                            </label>
+                            <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={!!avisoManutencao.bloquearAcesso}
+                                    onChange={(e) => setAvisoManutencao((prev) => ({ ...prev, bloquearAcesso: e.target.checked }))}
+                                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                                />
+                                Bloquear acesso dos clientes durante a janela
+                            </label>
+                            <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 md:col-span-2">
+                                Título do aviso
+                                <input
+                                    type="text"
+                                    value={avisoManutencao.titulo}
+                                    onChange={(e) => setAvisoManutencao((prev) => ({ ...prev, titulo: e.target.value }))}
+                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-amber-500"
+                                />
+                            </label>
+                            <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
+                                Início previsto
+                                <input
+                                    type="datetime-local"
+                                    value={avisoManutencao.inicioPrevisto || ''}
+                                    onChange={(e) => setAvisoManutencao((prev) => ({ ...prev, inicioPrevisto: e.target.value }))}
+                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-amber-500"
+                                />
+                            </label>
+                            <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
+                                Fim previsto
+                                <input
+                                    type="datetime-local"
+                                    value={avisoManutencao.fimPrevisto || ''}
+                                    onChange={(e) => setAvisoManutencao((prev) => ({ ...prev, fimPrevisto: e.target.value }))}
+                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-amber-500"
+                                />
+                            </label>
+                            <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 md:col-span-2">
+                                Mensagem para os clientes
+                                <textarea
+                                    value={avisoManutencao.mensagem || ''}
+                                    onChange={(e) => setAvisoManutencao((prev) => ({ ...prev, mensagem: e.target.value }))}
+                                    className="min-h-[110px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-amber-500"
+                                    placeholder="Ex: Hoje às 22:00 teremos manutenção programada no módulo operacional. O sistema pode apresentar instabilidade temporária."
+                                />
+                            </label>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-3">
+                            <button
+                                onClick={salvarAvisoManutencao}
+                                disabled={processandoId === 'aviso-manutencao'}
+                                className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            >
+                                {processandoId === 'aviso-manutencao' ? 'SALVANDO...' : 'Salvar aviso de manutenção'}
+                            </button>
+                            {avisoManutencao.ativo && (
+                                <div className="rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-semibold text-amber-900">
+                                    O aviso está ativo e aparecerá para as empresas assinantes no ERP.
+                                </div>
+                            )}
                         </div>
                     </section>
                 )}
@@ -1245,6 +1521,7 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                 ['ATIVAS', 'Ativas'],
                                 ['INADIMPLENTES', 'Inadimplentes'],
                                 ['BLOQUEADAS', 'Bloqueadas'],
+                                ['CANCELADAS', 'Canceladas'],
                                 ['VENCE_HOJE', 'Vence hoje'],
                                 ['VENCE_7_DIAS', 'Vence 7 dias']
                             ].map(([valor, label]) => (
@@ -1480,6 +1757,7 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                             const empresaEmFoco = buscaContextoNormalizada
                                 && empresa.razaoSocial?.toLowerCase().includes(buscaContextoNormalizada);
                             const destaqueCobranca = empresaEmFoco && Array.isArray(contextoVisual?.autoAbrir) && contextoVisual.autoAbrir.includes('cobranca');
+                            const fichaCadastral = cadastroComplementarPorEmpresa[empresa.id];
                             return (
                             <article
                                 key={empresa.id}
@@ -1518,7 +1796,9 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                                            <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                                            <div><span className="font-bold text-slate-700">Entrada na plataforma:</span> {empresa.dataCadastro ? new Date(empresa.dataCadastro).toLocaleDateString('pt-BR') : '-'}</div>
+                                            <div><span className="font-bold text-slate-700">Desligamento:</span> {empresa.dataDesligamento ? new Date(empresa.dataDesligamento).toLocaleDateString('pt-BR') : '-'}</div>
                                             <div><span className="font-bold text-slate-700">Admin:</span> {empresa.adminPrincipal || '-'}</div>
                                             <div><span className="font-bold text-slate-700">Contato:</span> {maskPhone(empresa.telefone) || '-'}</div>
                                             <div><span className="font-bold text-slate-700">CNPJ:</span> {maskCnpj(empresa.cnpj)}</div>
@@ -1532,6 +1812,96 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                             <div><span className="font-bold text-slate-700">Total previsto:</span> {formatCurrencyBRL(empresa.valorTotalMensalPrevisto || empresa.valorMensal || 0)}</div>
                                             <div><span className="font-bold text-slate-700">Última cobrança:</span> {empresa.ultimaCobrancaStatus || '-'}</div>
                                             <div><span className="font-bold text-slate-700">Venc. cobrança:</span> {empresa.ultimaCobrancaVencimento ? new Date(`${empresa.ultimaCobrancaVencimento}T00:00:00`).toLocaleDateString('pt-BR') : '-'}</div>
+                                        </div>
+                                        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <div className="text-xs font-black uppercase tracking-[0.22em] text-sky-700">Onboarding cadastral</div>
+                                                <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${onboardingBadgeClasses(empresa.onboardingStatus)}`}>
+                                                    {empresa.onboardingStatus || 'PENDENTE_COMPLEMENTO'}
+                                                </span>
+                                            </div>
+                                            <div className="mt-3 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
+                                                <div><span className="font-bold">Prazo:</span> {empresa.onboardingPrazoConclusao ? new Date(`${empresa.onboardingPrazoConclusao}T00:00:00`).toLocaleDateString('pt-BR') : '-'}</div>
+                                                <div><span className="font-bold">Progresso:</span> {empresa.onboardingPercentualPreenchimento ?? 0}%</div>
+                                                <div><span className="font-bold">Dias restantes:</span> {empresa.onboardingDiasRestantes ?? '-'}</div>
+                                                <div><span className="font-bold">Pendências:</span> {Array.isArray(empresa.onboardingPendencias) ? empresa.onboardingPendencias.length : 0}</div>
+                                            </div>
+                                            {empresa.onboardingLiberacaoManualAtiva && (
+                                                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
+                                                    <span className="font-black">Liberação manual ativa:</span> acesso sensível liberado pela plataforma
+                                                    {empresa.onboardingLiberacaoManualPor ? ` por ${empresa.onboardingLiberacaoManualPor}` : ''}.
+                                                </div>
+                                            )}
+                                            <div className="mt-3 h-2 overflow-hidden rounded-full bg-sky-100">
+                                                <div
+                                                    className="h-full rounded-full bg-sky-600 transition-all"
+                                                    style={{ width: `${Math.max(0, Math.min(100, empresa.onboardingPercentualPreenchimento ?? 0))}%` }}
+                                                />
+                                            </div>
+                                            {Array.isArray(empresa.onboardingPendencias) && empresa.onboardingPendencias.length > 0 && (
+                                                <div className="mt-3 text-sm text-sky-950">
+                                                    <span className="font-black">Pendências críticas:</span> {empresa.onboardingPendencias.join(', ')}
+                                                </div>
+                                            )}
+                                            {fichaCadastral && (
+                                                <div className="mt-4 rounded-2xl border border-white/80 bg-white/80 p-4">
+                                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                                        <div className="text-xs font-black uppercase tracking-[0.22em] text-sky-700">Ficha completa</div>
+                                                        {fichaCadastral.concluidoEm && (
+                                                            <div className="text-xs font-bold text-emerald-700">
+                                                                Concluída em {new Date(fichaCadastral.concluidoEm).toLocaleString('pt-BR')}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="mt-3 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
+                                                        <div><span className="font-bold">Nome fantasia:</span> {fichaCadastral.nomeFantasia || '-'}</div>
+                                                        <div><span className="font-bold">Regime tributário:</span> {fichaCadastral.regimeTributario || '-'}</div>
+                                                        <div><span className="font-bold">Inscrição estadual:</span> {fichaCadastral.inscricaoEstadual || '-'}</div>
+                                                        <div><span className="font-bold">Inscrição municipal:</span> {fichaCadastral.inscricaoMunicipal || '-'}</div>
+                                                        <div><span className="font-bold">Website:</span> {fichaCadastral.website || '-'}</div>
+                                                        <div><span className="font-bold">LGPD:</span> {fichaCadastral.aceiteLgpd ? 'Aceito' : 'Pendente'}</div>
+                                                    </div>
+                                                    <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                                                        <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Endereço</div>
+                                                        <div className="mt-2">
+                                                            {[fichaCadastral.logradouro, fichaCadastral.numero, fichaCadastral.complemento].filter(Boolean).join(', ') || '-'}
+                                                        </div>
+                                                        <div>
+                                                            {[fichaCadastral.bairro, fichaCadastral.cidade, fichaCadastral.uf].filter(Boolean).join(' - ') || '-'}
+                                                        </div>
+                                                        <div><span className="font-bold">CEP:</span> {fichaCadastral.cep || '-'}</div>
+                                                    </div>
+                                                    <div className="mt-3 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
+                                                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                                                            <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Responsável financeiro</div>
+                                                            <div className="mt-2">{fichaCadastral.responsavelFinanceiroNome || '-'}</div>
+                                                            <div>{fichaCadastral.responsavelFinanceiroEmail || '-'}</div>
+                                                            <div>{maskPhone(fichaCadastral.responsavelFinanceiroTelefone) || '-'}</div>
+                                                        </div>
+                                                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                                                            <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Responsável operacional</div>
+                                                            <div className="mt-2">{fichaCadastral.responsavelOperacionalNome || '-'}</div>
+                                                            <div>{fichaCadastral.responsavelOperacionalEmail || '-'}</div>
+                                                            <div>{maskPhone(fichaCadastral.responsavelOperacionalTelefone) || '-'}</div>
+                                                        </div>
+                                                    </div>
+                                                    {fichaCadastral.observacoes && (
+                                                        <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                                                            <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Observações</div>
+                                                            <div className="mt-2 whitespace-pre-wrap">{fichaCadastral.observacoes}</div>
+                                                        </div>
+                                                    )}
+                                                    {(fichaCadastral.liberacaoManualAtiva || fichaCadastral.liberacaoManualMotivo || fichaCadastral.liberacaoManualPor) && (
+                                                        <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
+                                                            <div className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Liberação manual</div>
+                                                            <div className="mt-2"><span className="font-bold">Status:</span> {fichaCadastral.liberacaoManualAtiva ? 'Ativa' : 'Inativa'}</div>
+                                                            <div><span className="font-bold">Por:</span> {fichaCadastral.liberacaoManualPor || '-'}</div>
+                                                            <div><span className="font-bold">Em:</span> {fichaCadastral.liberacaoManualEm ? new Date(fichaCadastral.liberacaoManualEm).toLocaleString('pt-BR') : '-'}</div>
+                                                            <div><span className="font-bold">Motivo:</span> {fichaCadastral.liberacaoManualMotivo || '-'}</div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                         {Array.isArray(empresa.extrasCobrados) && empresa.extrasCobrados.length > 0 && (
                                             <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950">
@@ -1607,6 +1977,30 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                                     className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
                                                 />
                                             </label>
+                                            <button
+                                                onClick={() => prorrogarCadastroComplementar(empresa, 7)}
+                                                disabled={processandoId === `onboarding-${empresa.id}`}
+                                                className="rounded-2xl border border-sky-300 bg-sky-50 px-4 py-3 text-sm font-black text-sky-800 transition hover:border-sky-400 disabled:bg-slate-100 disabled:text-slate-400"
+                                            >
+                                                +7 dias ficha cadastral
+                                            </button>
+                                            <button
+                                                onClick={() => carregarCadastroComplementarEmpresa(empresa.id, true)}
+                                                disabled={cadastroComplementarLoading[empresa.id]}
+                                                className="rounded-2xl border border-sky-300 bg-white px-4 py-3 text-sm font-black text-sky-800 transition hover:border-sky-400 disabled:bg-slate-100 disabled:text-slate-400"
+                                            >
+                                                {cadastroComplementarLoading[empresa.id] ? 'CARREGANDO FICHA...' : 'Ver ficha completa'}
+                                            </button>
+                                            <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 md:col-span-2">
+                                                Motivo da liberação manual
+                                                <input
+                                                    type="text"
+                                                    value={motivosLiberacaoManual[empresa.id] || ''}
+                                                    onChange={(e) => setMotivosLiberacaoManual(prev => ({ ...prev, [empresa.id]: e.target.value }))}
+                                                    placeholder="Ex: prazo estendido pela implantação"
+                                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
+                                                />
+                                            </label>
                                         </div>
 
                                         <div className="grid gap-2 md:grid-cols-3">
@@ -1625,11 +2019,21 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                                 {processandoId === `cobranca-${empresa.id}` ? 'CRIANDO...' : 'Criar cobrança'}
                                             </button>
                                             <button
-                                                onClick={() => carregarLicencasEmpresa(empresa.id, true)}
+                                                onClick={() => {
+                                                    if (licencasPorEmpresa[empresa.id]) {
+                                                        alternarBlocoEmpresa(empresa.id, 'licencas');
+                                                        return;
+                                                    }
+                                                    carregarLicencasEmpresa(empresa.id, true);
+                                                }}
                                                 disabled={licencasLoading[empresa.id]}
                                                 className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-black text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                                             >
-                                                {licencasLoading[empresa.id] ? 'SINCRONIZANDO...' : 'Licenciamento'}
+                                                {licencasLoading[empresa.id]
+                                                    ? 'SINCRONIZANDO...'
+                                                    : blocosEmpresaAbertos[empresa.id]?.licencas
+                                                        ? 'Ocultar licenciamento'
+                                                        : 'Licenciamento'}
                                             </button>
                                             <button
                                                 onClick={() => carregarIncidentesEmpresa(empresa.id, true)}
@@ -1651,11 +2055,21 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                                 Exportar incidentes
                                             </button>
                                             <button
-                                                onClick={() => carregarTimelineEmpresa(empresa.id, true)}
+                                                onClick={() => {
+                                                    if (timelinePorEmpresa[empresa.id]) {
+                                                        alternarBlocoEmpresa(empresa.id, 'timeline');
+                                                        return;
+                                                    }
+                                                    carregarTimelineEmpresa(empresa.id, true);
+                                                }}
                                                 disabled={timelineLoading[empresa.id]}
                                                 className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                                             >
-                                                {timelineLoading[empresa.id] ? 'CARREGANDO...' : 'Timeline'}
+                                                {timelineLoading[empresa.id]
+                                                    ? 'CARREGANDO...'
+                                                    : blocosEmpresaAbertos[empresa.id]?.timeline
+                                                        ? 'Ocultar timeline'
+                                                        : 'Timeline'}
                                             </button>
                                             <button
                                                 onClick={() => registrarPagamento(empresa)}
@@ -1663,6 +2077,21 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                                 className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                                             >
                                                 {processandoId === `pagamento-${empresa.id}` ? 'SALVANDO...' : 'Registrar pagamento'}
+                                            </button>
+                                            <button
+                                                onClick={() => atualizarLiberacaoManualCadastro(empresa, !empresa.onboardingLiberacaoManualAtiva)}
+                                                disabled={processandoId === `liberacao-manual-${empresa.id}`}
+                                                className={`rounded-2xl px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:bg-slate-100 ${
+                                                    empresa.onboardingLiberacaoManualAtiva
+                                                        ? 'border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                                                        : 'border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100'
+                                                }`}
+                                            >
+                                                {processandoId === `liberacao-manual-${empresa.id}`
+                                                    ? 'SALVANDO...'
+                                                    : empresa.onboardingLiberacaoManualAtiva
+                                                        ? 'Remover liberação manual'
+                                                        : 'Liberar mesmo pendente'}
                                             </button>
                                         </div>
                                         <div className="grid gap-2 md:grid-cols-2">
@@ -1681,9 +2110,16 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                         >
                                             {processandoId === `bloquear-${empresa.id}` ? 'BLOQUEANDO...' : 'Bloquear'}
                                         </button>
+                                        <button
+                                            onClick={() => cancelarEmpresa(empresa)}
+                                            disabled={processandoId === `cancelar-${empresa.id}`}
+                                            className="rounded-2xl border border-slate-300 bg-slate-900 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                        >
+                                            {processandoId === `cancelar-${empresa.id}` ? 'DESLIGANDO...' : 'Desligar da plataforma'}
+                                        </button>
 
-                                        {licencasPorEmpresa[empresa.id] && (
-                                            <div className="rounded-3xl border border-violet-200 bg-white p-4">
+                                        {licencasPorEmpresa[empresa.id] && blocosEmpresaAbertos[empresa.id]?.licencas && (
+                                            <div id={`empresa-${empresa.id}-licencas`} className="rounded-3xl border border-violet-200 bg-white p-4">
                                                 <div className="flex items-center justify-between gap-3">
                                                     <div>
                                                         <h4 className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-violet-700">
@@ -1809,8 +2245,8 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                             </div>
                                         )}
 
-                                        {timelinePorEmpresa[empresa.id] && (
-                                            <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                                        {timelinePorEmpresa[empresa.id] && blocosEmpresaAbertos[empresa.id]?.timeline && (
+                                            <div id={`empresa-${empresa.id}-timeline`} className="rounded-3xl border border-slate-200 bg-white p-4">
                                                 <div className="flex items-center justify-between gap-3">
                                                     <div>
                                                         <h4 className="text-sm font-black uppercase tracking-[0.18em] text-slate-700">Timeline da empresa</h4>

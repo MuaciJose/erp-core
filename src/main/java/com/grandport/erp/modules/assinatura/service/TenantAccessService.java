@@ -18,6 +18,7 @@ public class TenantAccessService {
 
     private final EmpresaRepository empresaRepository;
     private final SecurityEventService securityEventService;
+    private final PlataformaAvisoOperacionalService plataformaAvisoOperacionalService;
 
     @Transactional
     public void validarAcesso(Usuario usuario) {
@@ -30,6 +31,10 @@ public class TenantAccessService {
 
         if (!Boolean.TRUE.equals(empresa.getAtivo())) {
             throw blocked(usuario, empresa, "A empresa está inativa e não pode acessar o sistema.");
+        }
+
+        if (plataformaAvisoOperacionalService.manutencaoBloqueandoAcesso()) {
+            throw blocked(usuario, empresa, "A plataforma está em manutenção no momento. Aguarde a liberação do ambiente.");
         }
 
         if (empresa.getStatusAssinatura() == StatusAssinatura.CANCELADA) {
