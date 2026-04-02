@@ -22,6 +22,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout, 
     const [isRetratil, setIsRetratil] = useState(false);
     const [nomeEmpresa, setNomeEmpresa] = useState('GRANDPORT ERP');
     const [resumoAgenda, setResumoAgenda] = useState(null);
+    const [contadorAtendimento, setContadorAtendimento] = useState(0);
 
     useEffect(() => {
         apiSidebar.get('/api/configuracoes')
@@ -47,6 +48,22 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout, 
 
         carregarResumoAgenda();
         const intervalo = window.setInterval(carregarResumoAgenda, 120000);
+        return () => window.clearInterval(intervalo);
+    }, []);
+
+    useEffect(() => {
+        const carregarPendenciasAtendimento = async () => {
+            try {
+                const res = await apiSidebar.get('/api/atendimentos/meus');
+                const lista = Array.isArray(res.data) ? res.data : [];
+                setContadorAtendimento(lista.filter((item) => item.status === 'AGUARDANDO_CLIENTE').length);
+            } catch (err) {
+                setContadorAtendimento(0);
+            }
+        };
+
+        carregarPendenciasAtendimento();
+        const intervalo = window.setInterval(carregarPendenciasAtendimento, 120000);
         return () => window.clearInterval(intervalo);
     }, []);
 
@@ -87,6 +104,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout, 
                 { titulo: 'Painel de CRM', acao: 'crm' },
                 { titulo: 'Gestão de Revisões', acao: 'revisoes' }, // 🚀 MOVIDO PARA CÁ
                 { titulo: 'Agenda Corporativa', acao: 'agenda' },
+                { titulo: 'Atendimento SaaS', acao: 'atendimento' },
                 { titulo: 'Integração WhatsApp', acao: 'whatsapp' }
             ]
         },
@@ -136,7 +154,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout, 
         { id: 'manual', titulo: 'Manual do Usuário', icone: <HelpCircle size={20} />, acao: 'manual' }
     ];
 
-    const rotasLivres = ['manual', 'agenda'];
+    const rotasLivres = ['manual', 'agenda', 'atendimento'];
 
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {
@@ -255,6 +273,11 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout, 
                                                         (resumoAgenda?.atrasados || 0) > 0 ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'
                                                     }`}>
                                                         {contadorAgenda}
+                                                    </span>
+                                                )}
+                                                {sub.acao === 'atendimento' && contadorAtendimento > 0 && (
+                                                    <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-700">
+                                                        {contadorAtendimento}
                                                     </span>
                                                 )}
                                             </button>

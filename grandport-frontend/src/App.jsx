@@ -33,6 +33,7 @@ import { WidgetCalculadora } from './components/WidgetCalculadora';
 import { RelatorioComissoes } from './modules/vendas/RelatorioComissoes';
 import { ManualUsuario } from './modules/manual/ManualUsuario';
 import { AgendaCorporativa } from './modules/agenda/AgendaCorporativa';
+import { AtendimentoSaas } from './modules/atendimento/AtendimentoSaas';
 
 // 🚀 MÓDULOS IMPORTADOS
 import { ReciboAvulso } from './modules/financeiro/ReciboAvulso';
@@ -223,7 +224,7 @@ function App() {
         return <Login onLoginSuccess={handleLoginSucesso} onIrParaCadastro={() => setTelaPublica('cadastro')} />;
     }
 
-    const permissoesExtra = ['revisoes', 'agenda', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual', 'checklist', 'inventario', 'estoque'];
+    const permissoesExtra = ['revisoes', 'agenda', 'atendimento', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual', 'checklist', 'inventario', 'estoque'];
     const temPermissao =
         usuarioLogado.permissoes.includes(paginaAtiva) ||
         permissoesExtra.includes(paginaAtiva) ||
@@ -301,6 +302,7 @@ function App() {
                         />
                     )}
                     {paginaAtiva === 'central-saas' && <CentralSaas contextoInicial={contextoCentralSaas} />}
+                    {paginaAtiva === 'atendimento-saas' && <AtendimentoSaas modo="plataforma" />}
                     {paginaAtiva === 'auditoria' && <Auditoria />}
                 </PlatformConsoleLayout>
             </>
@@ -340,6 +342,7 @@ function App() {
 
                             {paginaAtiva === 'revisoes' && <PainelRevisoes />}
                             {paginaAtiva === 'agenda' && <AgendaCorporativa />}
+                            {paginaAtiva === 'atendimento' && <AtendimentoSaas modo="cliente" />}
                             {paginaAtiva === 'crm' && <PainelRevisoes />}
                             {paginaAtiva === 'etiquetas' && <GeradorEtiquetas />}
 

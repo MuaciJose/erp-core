@@ -5,11 +5,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 public interface EmpresaIncidenteRepository extends JpaRepository<EmpresaIncidente, Long> {
 
     List<EmpresaIncidente> findByEmpresaIdOrderByUpdatedAtDesc(Long empresaId);
+
+    List<EmpresaIncidente> findByIdIn(Collection<Long> ids);
 
     @Query("""
             select count(ei)

@@ -1,9 +1,11 @@
-import React from 'react';
-import { Blocks, Building2, FileClock, LogOut, Shield, Wrench } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Blocks, Building2, FileClock, LogOut, MessageCircle, Shield, Wrench } from 'lucide-react';
+import api from '../api/axios';
 
 const navItems = [
     { id: 'platform-overview', label: 'Visao Geral', icon: Blocks },
     { id: 'central-saas', label: 'Operacao SaaS', icon: Building2 },
+    { id: 'atendimento-saas', label: 'Atendimento', icon: MessageCircle },
     { id: 'auditoria', label: 'Auditoria', icon: Shield }
 ];
 
@@ -15,6 +17,26 @@ export const PlatformConsoleLayout = ({
     onEntrarErp,
     children
 }) => {
+    const [contadorAtendimento, setContadorAtendimento] = useState(0);
+
+    useEffect(() => {
+        const carregarPendencias = async () => {
+            try {
+                const res = await api.get('/api/atendimentos/plataforma/tickets', {
+                    params: { status: 'AGUARDANDO_PLATAFORMA' }
+                });
+                const lista = Array.isArray(res.data) ? res.data : [];
+                setContadorAtendimento(lista.length);
+            } catch (error) {
+                setContadorAtendimento(0);
+            }
+        };
+
+        carregarPendencias();
+        const intervalo = window.setInterval(carregarPendencias, 120000);
+        return () => window.clearInterval(intervalo);
+    }, []);
+
     return (
         <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#e2e8f0,_#f8fafc_48%,_#e2e8f0)] text-slate-900">
             <header className="border-b border-slate-200 bg-white/85 backdrop-blur-xl sticky top-0 z-40">
@@ -63,6 +85,13 @@ export const PlatformConsoleLayout = ({
                             >
                                 <Icon size={16} />
                                 {item.label}
+                                {item.id === 'atendimento-saas' && contadorAtendimento > 0 && (
+                                    <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] font-black ${
+                                        active ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+                                    }`}>
+                                        {contadorAtendimento}
+                                    </span>
+                                )}
                             </button>
                         );
                     })}
