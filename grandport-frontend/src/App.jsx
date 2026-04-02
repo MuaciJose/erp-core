@@ -6,6 +6,7 @@ import { clearSession, syncAuthHeader, updateStoredUser } from './utils/authStor
 import { Toaster, toast } from 'react-hot-toast';
 
 import { Sidebar } from './components/Sidebar';
+import { PlatformConsoleLayout } from './components/PlatformConsoleLayout';
 import { Dashboard } from './modules/financeiro/Dashboard';
 import { Marcas } from './modules/estoque/Marcas';
 import { AjusteEstoque } from './modules/estoque/AjusteEstoque';
@@ -104,6 +105,7 @@ const lazyFallback = (
 function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
     const [paginaAtiva, setPaginaAtiva] = useState('');
+    const [modoAplicacao, setModoAplicacao] = useState('erp');
     const [carregandoApp, setCarregandoApp] = useState(true);
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [resumoAgendaTopo, setResumoAgendaTopo] = useState(null);
@@ -118,6 +120,7 @@ function App() {
     const [inviteTokenPublico, setInviteTokenPublico] = useState('');
 
     const definirTelaInicial = (usuario) => {
+        if (usuario?.tipoAcesso === 'PLATFORM_ADMIN') return 'platform-overview';
         const permissoes = usuario.permissoes || [];
         if (permissoes.includes('dash')) return 'dash';
         if (permissoes.includes('pdv')) return 'pdv';
@@ -143,10 +146,12 @@ function App() {
                 const usuario = res.data;
                 setUsuarioLogado(usuario);
                 setPaginaAtiva(definirTelaInicial(usuario));
+                setModoAplicacao(usuario?.tipoAcesso === 'PLATFORM_ADMIN' ? 'platform' : 'erp');
             } catch (error) {
                 clearSession();
                 setUsuarioLogado(null);
                 setPaginaAtiva('');
+                setModoAplicacao('erp');
             } finally {
                 setCarregandoApp(false);
             }
@@ -168,6 +173,7 @@ function App() {
         const handleTenantBlocked = (event) => {
             setUsuarioLogado(null);
             setPaginaAtiva('');
+            setModoAplicacao('erp');
             setTelaPublica('login');
             toast.error(event?.detail?.message || 'O acesso desta empresa foi bloqueado pela plataforma.');
         };
@@ -183,7 +189,10 @@ function App() {
     }, []);
 
     useEffect(() => {
-        if (!usuarioLogado) return;
+        if (!usuarioLogado || modoAplicacao !== 'erp' || paginaAtiva !== 'dash') {
+            setResumoAgendaTopo(null);
+            return;
+        }
 
         const carregarResumoAgenda = async () => {
             try {
@@ -198,11 +207,12 @@ function App() {
         carregarResumoAgenda();
         const intervalo = window.setInterval(carregarResumoAgenda, 120000);
         return () => window.clearInterval(intervalo);
-    }, [usuarioLogado]);
+    }, [usuarioLogado, modoAplicacao, paginaAtiva]);
 
     const handleLoginSucesso = (usuario) => {
         setUsuarioLogado(usuario);
         setPaginaAtiva(definirTelaInicial(usuario));
+        setModoAplicacao(usuario?.tipoAcesso === 'PLATFORM_ADMIN' ? 'platform' : 'erp');
     };
 
     const handleLogout = async () => {
@@ -214,6 +224,7 @@ function App() {
             clearSession();
             setUsuarioLogado(null);
             setPaginaAtiva('');
+            setModoAplicacao('erp');
             setTelaPublica('login');
         }
     };
@@ -239,6 +250,7 @@ function App() {
     const agendaTemAtrasos = (resumoAgendaTopo?.atrasados || 0) > 0;
     const podeVerAgenda = usuarioLogado?.permissoes?.includes('agenda');
     const exigeTrocaSenha = !!usuarioLogado?.forcePasswordChange;
+    const isPlatformAdmin = usuarioLogado?.tipoAcesso === 'PLATFORM_ADMIN';
 
     const abrirAgendaAtrasados = () => {
         localStorage.setItem('agenda_quick_filter', 'atrasados');
@@ -274,6 +286,90 @@ function App() {
         }
     };
 
+    const handleOpenPlatformConsole = () => {
+        if (!isPlatformAdmin) {
+            return;
+        }
+        setModoAplicacao('platform');
+        setPaginaAtiva('platform-overview');
+    };
+
+    const handleEntrarErp = () => {
+        const telaInicialErp = usuarioLogado?.tipoAcesso === 'PLATFORM_ADMIN'
+            ? 'dash'
+            : definirTelaInicial(usuarioLogado);
+        setModoAplicacao('erp');
+        setPaginaAtiva(telaInicialErp);
+    };
+
+    const renderPlatformOverview = () => (
+        <div className="space-y-6">
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
+                <div className="max-w-3xl">
+                    <div className="text-[11px] font-black uppercase tracking-[0.28em] text-blue-700">Governanca</div>
+                    <h2 className="mt-3 text-4xl font-black tracking-tight text-slate-900">Painel mestre da plataforma</h2>
+                    <p className="mt-4 text-base leading-7 text-slate-600">
+                        Este ambiente separa a operacao SaaS do ERP operacional. Daqui voce controla empresas, licenciamento, cobrancas, seguranca e decide quando entrar no ERP.
+                    </p>
+                </div>
+                <div className="mt-8 grid gap-4 md:grid-cols-3">
+                    <button
+                        onClick={() => setPaginaAtiva('central-saas')}
+                        className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                    >
+                        <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">Operacao</div>
+                        <div className="mt-2 text-xl font-black text-slate-900">Central SaaS</div>
+                        <p className="mt-2 text-sm text-slate-600">Empresas, planos, modulos, cobrancas e status comercial.</p>
+                    </button>
+                    <button
+                        onClick={() => setPaginaAtiva('auditoria')}
+                        className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                    >
+                        <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">Seguranca</div>
+                        <div className="mt-2 text-xl font-black text-slate-900">Auditoria</div>
+                        <p className="mt-2 text-sm text-slate-600">Eventos sensiveis, rastreabilidade e investigacao operacional.</p>
+                    </button>
+                    <button
+                        onClick={handleEntrarErp}
+                        className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                    >
+                        <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">Produto</div>
+                        <div className="mt-2 text-xl font-black text-slate-900">Entrar no ERP</div>
+                        <p className="mt-2 text-sm text-slate-600">Acesse o ambiente operacional sem misturar a governanca da plataforma.</p>
+                    </button>
+                </div>
+            </section>
+        </div>
+    );
+
+    if (isPlatformAdmin && modoAplicacao === 'platform') {
+        return (
+            <>
+                <Toaster
+                    position="top-right"
+                    reverseOrder={false}
+                    toastOptions={{
+                        duration: 4000,
+                        style: { background: '#1e293b', color: '#fff', borderRadius: '12px', fontWeight: 'bold' },
+                        success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
+                        error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } }
+                    }}
+                />
+                <PlatformConsoleLayout
+                    paginaAtiva={paginaAtiva}
+                    setPaginaAtiva={setPaginaAtiva}
+                    usuarioLogado={usuarioLogado}
+                    onLogout={handleLogout}
+                    onEntrarErp={handleEntrarErp}
+                >
+                    {paginaAtiva === 'platform-overview' && renderPlatformOverview()}
+                    {paginaAtiva === 'central-saas' && <CentralSaas />}
+                    {paginaAtiva === 'auditoria' && <Auditoria />}
+                </PlatformConsoleLayout>
+            </>
+        );
+    }
+
     return (
         <div className="flex h-screen w-screen bg-slate-50 overflow-hidden font-sans">
 
@@ -294,12 +390,13 @@ function App() {
                     setPaginaAtiva={setPaginaAtiva}
                     usuarioLogado={usuarioLogado}
                     onLogout={handleLogout}
+                    onOpenPlatformConsole={handleOpenPlatformConsole}
                 />
             )}
 
             <main className={`flex-1 h-full overflow-y-auto ${isFullScreen ? 'p-0' : 'p-4'}`}>
                 <div className={`${isFullScreen ? 'w-full h-full' : 'max-w-[1600px] mx-auto'}`}>
-                    {!isFullScreen && podeVerAgenda && resumoAgendaTopo && (
+                    {!isFullScreen && paginaAtiva === 'dash' && podeVerAgenda && resumoAgendaTopo && (
                         <div className={`mb-4 rounded-2xl border px-5 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 ${
                             agendaTemAtrasos
                                 ? 'bg-rose-50 border-rose-200'

@@ -64,6 +64,7 @@ public class SecurityConfig {
                         // ================= ROTAS PÚBLICAS =================
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/mfa/verify").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/assinaturas/webhooks/pagamentos").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/assinaturas/nova-empresa").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/assinaturas/solicitacoes-acesso").permitAll()

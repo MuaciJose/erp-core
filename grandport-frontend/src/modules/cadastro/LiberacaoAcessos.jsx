@@ -224,6 +224,26 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
         }
     };
 
+    const criarCobrancaManual = async (empresa) => {
+        setProcessandoId(`cobranca-${empresa.id}`);
+        const toastId = toast.loading(`Criando cobrança de ${empresa.razaoSocial}...`);
+        try {
+            await api.post(`/api/assinaturas/empresas/${empresa.id}/cobrancas`, {
+                referencia: `MENSALIDADE-${datasVencimento[empresa.id] || new Date().toISOString().slice(0, 10)}`,
+                valor: Number(valoresEmpresa[empresa.id] || empresa.valorMensal || 0),
+                dataVencimento: datasVencimento[empresa.id],
+                gatewayNome: 'MANUAL',
+                descricao: `Cobrança manual do plano ${planosEmpresa[empresa.id] || empresa.plano || 'ESSENCIAL'}`
+            });
+            toast.success('Cobrança criada com sucesso.', { id: toastId });
+            await carregarDados();
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Não foi possível criar a cobrança.', { id: toastId });
+        } finally {
+            setProcessandoId(null);
+        }
+    };
+
     const abas = [
         { id: 'solicitacoes', label: 'Solicitações', count: solicitacoes.filter(item => item.status === 'PENDENTE').length },
         { id: 'empresas', label: 'Empresas', count: empresas.length },
@@ -511,10 +531,20 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
                                             <div><span className="font-bold text-slate-700">Vencimento:</span> {empresa.dataVencimento ? new Date(`${empresa.dataVencimento}T00:00:00`).toLocaleDateString('pt-BR') : '-'}</div>
                                             <div><span className="font-bold text-slate-700">Plano:</span> {empresa.plano || 'ESSENCIAL'}</div>
                                             <div><span className="font-bold text-slate-700">Valor:</span> R$ {Number(empresa.valorMensal || 0).toFixed(2)}</div>
+                                            <div><span className="font-bold text-slate-700">Última cobrança:</span> {empresa.ultimaCobrancaStatus || '-'}</div>
+                                            <div><span className="font-bold text-slate-700">Venc. cobrança:</span> {empresa.ultimaCobrancaVencimento ? new Date(`${empresa.ultimaCobrancaVencimento}T00:00:00`).toLocaleDateString('pt-BR') : '-'}</div>
                                         </div>
                                         {empresa.motivoBloqueio && (
                                             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                                                 <span className="font-black">Motivo atual:</span> {empresa.motivoBloqueio}
+                                            </div>
+                                        )}
+                                        {empresa.ultimoLinkCobranca && (
+                                            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                                                <span className="font-black">Link da última cobrança:</span>{' '}
+                                                <a href={empresa.ultimoLinkCobranca} target="_blank" rel="noreferrer" className="font-bold underline break-all">
+                                                    Abrir link de pagamento
+                                                </a>
                                             </div>
                                         )}
                                     </div>
@@ -585,12 +615,21 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
                                                 {processandoId === `plano-${empresa.id}` ? 'SALVANDO...' : 'Salvar plano'}
                                             </button>
                                             <button
+                                                onClick={() => criarCobrancaManual(empresa)}
+                                                disabled={processandoId === `cobranca-${empresa.id}` || !datasVencimento[empresa.id]}
+                                                className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                            >
+                                                {processandoId === `cobranca-${empresa.id}` ? 'CRIANDO...' : 'Criar cobrança'}
+                                            </button>
+                                            <button
                                                 onClick={() => registrarPagamento(empresa)}
                                                 disabled={processandoId === `pagamento-${empresa.id}` || !datasVencimento[empresa.id]}
                                                 className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                                             >
                                                 {processandoId === `pagamento-${empresa.id}` ? 'SALVANDO...' : 'Registrar pagamento'}
                                             </button>
+                                        </div>
+                                        <div className="grid gap-2 md:grid-cols-2">
                                             <button
                                                 onClick={() => reativarEmpresa(empresa)}
                                                 disabled={processandoId === `reativar-${empresa.id}`}

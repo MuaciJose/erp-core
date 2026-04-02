@@ -276,6 +276,12 @@ O `docker-compose.yml` agora aguarda `postgres` e `redis` ficarem saudaveis ante
 
 O projeto usa uma chave JWT para tokens. Configure-a:
 
+### Padrão profissional de ambiente
+
+- desenvolvimento local: `http://localhost:5173` -> `http://localhost:8080`
+- homologacao/producao: dominio real com HTTPS
+- IP da rede local: use apenas para testar celular/tablet, nao como padrao do dia a dia
+
 #### Windows (PowerShell):
 
 ```powershell

@@ -12,11 +12,12 @@ import {
     Menu,
     ChevronLeft,
     HelpCircle,
-    MessageCircle
+    MessageCircle,
+    Shield
 } from 'lucide-react';
 import apiSidebar from '../api/axios';
 
-export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }) => {
+export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout, onOpenPlatformConsole }) => {
     const [menuExpandido, setMenuExpandido] = useState('vendas');
     const [isRetratil, setIsRetratil] = useState(false);
     const [nomeEmpresa, setNomeEmpresa] = useState('GRANDPORT ERP');
@@ -186,6 +187,20 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout }
             </div>
 
             <div className="flex-1 overflow-y-auto py-6 px-3 space-y-2 custom-scrollbar overflow-x-hidden">
+                {isPlatformAdmin && !isRetratil && (
+                    <button
+                        onClick={onOpenPlatformConsole}
+                        className="w-full mb-3 rounded-2xl border border-blue-400/30 bg-blue-500/10 px-4 py-3 text-left text-white transition hover:bg-blue-500/20"
+                    >
+                        <div className="flex items-center gap-3">
+                            <Shield size={18} className="text-blue-300" />
+                            <div>
+                                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-300">Plataforma</div>
+                                <div className="text-sm font-black">Voltar ao Console SaaS</div>
+                            </div>
+                        </div>
+                    </button>
+                )}
                 {menusFiltrados.map((menu, indexOuter) => (
                     <div key={menu.id || indexOuter} className="relative group">
                         {menu.submenus ? (

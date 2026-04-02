@@ -26,6 +26,7 @@ SPRING_PROFILES_ACTIVE=hml
 JWT_SECRET=troque-por-uma-chave-longa-e-segura
 APP_SECURITY_REDIS_REQUIRED=true
 APP_SECURITY_COOKIE_SECURE=true
+APP_BILLING_WEBHOOK_TOKEN=um-token-secreto-para-webhook
 APP_API_BASE_URL=https://api.seu-dominio.com
 POSTGRES_PASSWORD=uma-senha-forte
 ```

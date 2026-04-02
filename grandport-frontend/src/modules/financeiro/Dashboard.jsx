@@ -253,7 +253,7 @@ export const Dashboard = ({ setPaginaAtiva }) => {
                 </div>
             </div>
 
-            <PainelInteligencia />
+            <PainelInteligencia compacto />
 
             {abaAtiva === 'geral' ? (
                 <div className="animate-fade-in">

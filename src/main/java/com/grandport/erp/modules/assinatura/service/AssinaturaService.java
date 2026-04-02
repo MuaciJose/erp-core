@@ -6,6 +6,7 @@ import com.grandport.erp.modules.assinatura.dto.ConvitePublicoDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaAssinaturaResumoDTO;
 import com.grandport.erp.modules.assinatura.dto.RegistrarPagamentoDTO;
 import com.grandport.erp.modules.assinatura.dto.AtualizarPlanoEmpresaDTO;
+import com.grandport.erp.modules.assinatura.model.AssinaturaCobranca;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoDTO;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoResumoDTO;
 import com.grandport.erp.modules.assinatura.model.AssinaturaInvite;
@@ -41,14 +42,16 @@ public class AssinaturaService {
     private final PasswordPolicyService passwordPolicyService;
     private final AssinaturaInviteRepository assinaturaInviteRepository;
     private final SolicitacaoAcessoRepository solicitacaoAcessoRepository;
+    private final CobrancaAssinaturaService cobrancaAssinaturaService;
 
-    public AssinaturaService(EmpresaRepository empresaRepository, UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, PasswordPolicyService passwordPolicyService, AssinaturaInviteRepository assinaturaInviteRepository, SolicitacaoAcessoRepository solicitacaoAcessoRepository) {
+    public AssinaturaService(EmpresaRepository empresaRepository, UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, PasswordPolicyService passwordPolicyService, AssinaturaInviteRepository assinaturaInviteRepository, SolicitacaoAcessoRepository solicitacaoAcessoRepository, CobrancaAssinaturaService cobrancaAssinaturaService) {
         this.empresaRepository = empresaRepository;
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.passwordPolicyService = passwordPolicyService;
         this.assinaturaInviteRepository = assinaturaInviteRepository;
         this.solicitacaoAcessoRepository = solicitacaoAcessoRepository;
+        this.cobrancaAssinaturaService = cobrancaAssinaturaService;
     }
 
     @Transactional
@@ -224,7 +227,9 @@ public class AssinaturaService {
 
         empresa.setStatusAssinatura(StatusAssinatura.ATIVA);
         empresa.setMotivoBloqueio(null);
-        empresa.setDataVencimento(LocalDate.parse(dto.novaDataVencimento()));
+        LocalDate novoVencimento = LocalDate.parse(dto.novaDataVencimento());
+        empresa.setDataVencimento(novoVencimento);
+        cobrancaAssinaturaService.registrarPagamentoManual(empresaId, novoVencimento);
         return toEmpresaDto(empresaRepository.save(empresa));
     }
 
@@ -239,6 +244,7 @@ public class AssinaturaService {
         } else if (empresa.getDataVencimento() == null || empresa.getDataVencimento().isBefore(LocalDate.now())) {
             empresa.setDataVencimento(LocalDate.now().plusDays(30));
         }
+        cobrancaAssinaturaService.registrarPagamentoManual(empresaId, empresa.getDataVencimento());
         return toEmpresaDto(empresaRepository.save(empresa));
     }
 
@@ -323,6 +329,7 @@ public class AssinaturaService {
         String adminPrincipal = usuarioRepository.findFirstByEmpresaIdAndTipoAcessoOrderByIdAsc(empresa.getId(), TipoAcesso.TENANT_ADMIN)
                 .map(Usuario::getUsername)
                 .orElse(empresa.getEmailContato());
+        AssinaturaCobranca ultimaCobranca = cobrancaAssinaturaService.obterUltimaCobranca(empresa.getId());
 
         return new EmpresaAssinaturaResumoDTO(
                 empresa.getId(),
@@ -337,7 +344,11 @@ public class AssinaturaService {
                 adminPrincipal,
                 empresa.getPlano(),
                 empresa.getValorMensal() == null ? 0D : empresa.getValorMensal().doubleValue(),
-                empresa.getDiasTolerancia()
+                empresa.getDiasTolerancia(),
+                ultimaCobranca == null || ultimaCobranca.getStatus() == null ? null : ultimaCobranca.getStatus().name(),
+                ultimaCobranca == null || ultimaCobranca.getDataVencimento() == null ? null : ultimaCobranca.getDataVencimento().toString(),
+                ultimaCobranca == null || ultimaCobranca.getValor() == null ? null : ultimaCobranca.getValor().doubleValue(),
+                ultimaCobranca == null ? null : ultimaCobranca.getPaymentLink()
         );
     }
 

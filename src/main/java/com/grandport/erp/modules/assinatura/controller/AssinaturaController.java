@@ -3,12 +3,16 @@ package com.grandport.erp.modules.assinatura.controller;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoDTO;
 import com.grandport.erp.modules.assinatura.dto.NovaEmpresaDTO;
 import com.grandport.erp.modules.assinatura.dto.ConviteAssinaturaDTO;
+import com.grandport.erp.modules.assinatura.dto.CobrancaAssinaturaDTO;
+import com.grandport.erp.modules.assinatura.dto.CriarCobrancaDTO;
 import com.grandport.erp.modules.assinatura.dto.ConvitePublicoDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaAssinaturaResumoDTO;
 import com.grandport.erp.modules.assinatura.dto.RegistrarPagamentoDTO;
 import com.grandport.erp.modules.assinatura.dto.AtualizarPlanoEmpresaDTO;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoResumoDTO;
+import com.grandport.erp.modules.assinatura.dto.WebhookPagamentoDTO;
 import com.grandport.erp.modules.assinatura.service.AssinaturaService;
+import com.grandport.erp.modules.assinatura.service.CobrancaAssinaturaService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -21,9 +25,11 @@ import java.util.Map;
 public class AssinaturaController {
 
     private final AssinaturaService assinaturaService;
+    private final CobrancaAssinaturaService cobrancaAssinaturaService;
 
-    public AssinaturaController(AssinaturaService assinaturaService) {
+    public AssinaturaController(AssinaturaService assinaturaService, CobrancaAssinaturaService cobrancaAssinaturaService) {
         this.assinaturaService = assinaturaService;
+        this.cobrancaAssinaturaService = cobrancaAssinaturaService;
     }
 
     @PostMapping("/nova-empresa")
@@ -137,6 +143,36 @@ public class AssinaturaController {
         try {
             assinaturaService.validarAcessoPlataforma();
             return ResponseEntity.ok(assinaturaService.atualizarPlanoEmpresa(id, dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/empresas/{id}/cobrancas")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public List<CobrancaAssinaturaDTO> listarCobrancas(@PathVariable Long id) {
+        assinaturaService.validarAcessoPlataforma();
+        return cobrancaAssinaturaService.listarPorEmpresa(id);
+    }
+
+    @PostMapping("/empresas/{id}/cobrancas")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public ResponseEntity<?> criarCobranca(@PathVariable Long id, @RequestBody CriarCobrancaDTO dto) {
+        try {
+            assinaturaService.validarAcessoPlataforma();
+            return ResponseEntity.ok(cobrancaAssinaturaService.criarCobranca(id, dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/webhooks/pagamentos")
+    public ResponseEntity<?> processarWebhookPagamento(
+            @RequestHeader(value = "X-Webhook-Token", required = false) String token,
+            @RequestBody WebhookPagamentoDTO dto) {
+        try {
+            cobrancaAssinaturaService.processarWebhook(dto, token);
+            return ResponseEntity.ok(Map.of("message", "Webhook processado."));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }

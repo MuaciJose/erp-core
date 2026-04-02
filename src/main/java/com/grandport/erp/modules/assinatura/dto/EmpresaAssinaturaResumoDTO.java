@@ -13,5 +13,9 @@ public record EmpresaAssinaturaResumoDTO(
         String adminPrincipal,
         String plano,
         Double valorMensal,
-        Integer diasTolerancia
+        Integer diasTolerancia,
+        String ultimaCobrancaStatus,
+        String ultimaCobrancaVencimento,
+        Double ultimaCobrancaValor,
+        String ultimoLinkCobranca
 ) {}

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
-import { Sparkles, TrendingUp, AlertOctagon, Lightbulb, ArrowRight, PackageX } from 'lucide-react';
+import { Sparkles, TrendingUp, AlertOctagon, Lightbulb, ArrowRight, PackageX, ChevronDown, ChevronUp } from 'lucide-react';
 
-export const PainelInteligencia = () => {
+export const PainelInteligencia = ({ compacto = false }) => {
     const [insights, setInsights] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [expandido, setExpandido] = useState(false);
 
     useEffect(() => {
         const carregarInsights = async () => {
@@ -21,9 +22,9 @@ export const PainelInteligencia = () => {
     }, []);
 
     if (loading) return (
-        <div className="bg-gradient-to-r from-indigo-900 to-slate-900 rounded-3xl p-8 animate-pulse flex items-center gap-4 mb-8">
-            <Sparkles className="text-indigo-400 animate-spin-slow" size={32} />
-            <div className="text-indigo-200 font-bold">Analisando dados da GrandPort para gerar insights...</div>
+        <div className="bg-slate-900 rounded-[2rem] p-5 animate-pulse flex items-center gap-3 mb-8">
+            <Sparkles className="text-indigo-400 animate-spin-slow" size={24} />
+            <div className="text-indigo-200 font-bold text-sm">Analisando dados da GrandPort para gerar insights...</div>
         </div>
     );
 
@@ -47,39 +48,75 @@ export const PainelInteligencia = () => {
         }
     };
 
+    const insightsExibidos = compacto && !expandido ? insights.slice(0, 2) : insights;
+    const insightPrincipal = insights[0];
+
     return (
-        <div className="bg-slate-900 rounded-3xl shadow-2xl p-8 mb-8 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="bg-slate-900 rounded-[2rem] shadow-xl p-5 mb-8 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none"></div>
 
-            <div className="flex items-center gap-3 mb-6 relative z-10">
-                <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-600/30">
-                    <Sparkles size={24} />
-                </div>
-                <div>
-                    <h2 className="text-2xl font-black text-white tracking-tight">ASSISTENTE INTELIGENTE</h2>
-                    <p className="text-indigo-300 text-sm font-medium">Análise automática do seu negócio</p>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
-                {insights.map((insight, index) => (
-                    <div key={index} className={`p-6 rounded-2xl border transition-all cursor-default flex flex-col justify-between ${getEstiloCard(insight.cor)}`}>
+            <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="lg:max-w-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-600/30">
+                            <Sparkles size={18} />
+                        </div>
                         <div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-                                    {getIcone(insight.tipo)}
+                            <h2 className="text-lg font-black text-white tracking-tight">Assistente Inteligente</h2>
+                            <p className="text-indigo-200 text-xs font-semibold uppercase tracking-[0.18em]">Prioridades do dia</p>
+                        </div>
+                    </div>
+
+                    {insightPrincipal && (
+                        <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-xl bg-white/10 p-2 text-white">
+                                    {getIcone(insightPrincipal.tipo)}
                                 </div>
-                                <h3 className="font-bold text-white tracking-wide">{insight.titulo}</h3>
+                                <div>
+                                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-200">Maior prioridade</div>
+                                    <div className="text-sm font-black text-white">{insightPrincipal.titulo}</div>
+                                </div>
                             </div>
-                            <p className="text-sm opacity-90 leading-relaxed mb-6 text-slate-300">
-                                {insight.mensagem}
+                            <p className="mt-3 text-sm leading-6 text-slate-300">
+                                {insightPrincipal.mensagem}
                             </p>
                         </div>
-                        <button className="w-full py-3 bg-white/10 hover:bg-white/20 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-colors flex items-center justify-center gap-2 backdrop-blur-sm">
-                            {insight.acaoSugestao} <ArrowRight size={14} />
-                        </button>
+                    )}
+                </div>
+
+                <div className="flex-1">
+                    <div className={`grid gap-3 ${compacto ? 'xl:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-3'}`}>
+                        {insightsExibidos.map((insight, index) => (
+                            <div key={index} className={`rounded-2xl border p-4 transition-all cursor-default ${getEstiloCard(insight.cor)}`}>
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="rounded-xl bg-white/10 p-2 backdrop-blur-sm">
+                                            {getIcone(insight.tipo)}
+                                        </div>
+                                        <h3 className="font-bold text-white tracking-wide text-sm">{insight.titulo}</h3>
+                                    </div>
+                                </div>
+                                <p className="mt-3 text-sm opacity-90 leading-6 text-slate-300">
+                                    {insight.mensagem}
+                                </p>
+                                <div className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-white">
+                                    {insight.acaoSugestao} <ArrowRight size={12} />
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                ))}
+
+                    {compacto && insights.length > 2 && (
+                        <button
+                            onClick={() => setExpandido(valorAtual => !valorAtual)}
+                            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-indigo-100 transition hover:bg-white/10"
+                        >
+                            {expandido ? 'Mostrar menos' : `Mostrar ${insights.length - 2} insight(s)`}
+                            {expandido ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
