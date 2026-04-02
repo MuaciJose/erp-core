@@ -1,5 +1,7 @@
 package com.grandport.erp.modules.financeiro.service;
 
+import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
+import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
 import com.grandport.erp.modules.financeiro.dto.DashboardResumoDTO;
 import com.grandport.erp.modules.financeiro.repository.ContaReceberRepository;
 import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
@@ -48,6 +50,9 @@ class DashboardServiceTest {
     @Mock
     private RevisaoRepository revisaoRepository;
 
+    @Mock
+    private ConfiguracaoRepository configuracaoRepository;
+
     @InjectMocks
     private DashboardService dashboardService;
 
@@ -59,6 +64,12 @@ class DashboardServiceTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(usuario, null, usuario.getAuthorities())
         );
+
+        ConfiguracaoSistema configuracao = new ConfiguracaoSistema();
+        configuracao.setEmpresaId(99L);
+        configuracao.setMetaFaturamentoPeriodo(new BigDecimal("15000.00"));
+        configuracao.setMetaPedidosPeriodo(12);
+        when(configuracaoRepository.findFirstByEmpresaIdOrderByIdDesc(99L)).thenReturn(Optional.of(configuracao));
     }
 
     @AfterEach
@@ -72,6 +83,10 @@ class DashboardServiceTest {
         when(vendaRepository.sumTotalVendasPeriodoEmpresa(any(), any(), eq(99L)))
                 .thenReturn(Optional.of(new BigDecimal("12500.00")))
                 .thenReturn(Optional.of(new BigDecimal("10000.00")));
+        when(vendaRepository.sumTotalDescontosPeriodoEmpresa(any(), any(), eq(99L)))
+                .thenReturn(Optional.of(new BigDecimal("500.00")));
+        when(vendaRepository.sumCmvPeriodoEmpresa(any(), any(), eq(99L)))
+                .thenReturn(Optional.of(new BigDecimal("4200.00")));
         when(contaReceberRepository.sumContasAtrasadas(99L))
                 .thenReturn(Optional.of(new BigDecimal("750.00")));
         when(vendaRepository.countVendasByDataEmpresa(any(), any(), eq(99L))).thenReturn(8L).thenReturn(6L);
@@ -88,9 +103,16 @@ class DashboardServiceTest {
         assertNotNull(resumo);
         assertEquals(new BigDecimal("12500.00"), resumo.getFaturamentoMes());
         assertEquals(new BigDecimal("10000.00"), resumo.getFaturamentoPeriodoAnterior());
+        assertEquals(new BigDecimal("15000.00"), resumo.getMetaFaturamentoPeriodo());
+        assertEquals(new BigDecimal("500.00"), resumo.getDescontosPeriodo());
+        assertEquals(new BigDecimal("4200.00"), resumo.getCmvPeriodo());
+        assertEquals(new BigDecimal("12000.00"), resumo.getReceitaLiquidaPeriodo());
+        assertEquals(new BigDecimal("7800.00"), resumo.getLucroBrutoPeriodo());
+        assertEquals(new BigDecimal("65.0000"), resumo.getMargemBrutaPeriodo());
         assertEquals(new BigDecimal("750.00"), resumo.getReceberAtrasado());
         assertEquals(8L, resumo.getVendasHoje());
         assertEquals(6L, resumo.getVendasPeriodoAnterior());
+        assertEquals(12L, resumo.getMetaPedidosPeriodo());
         assertEquals(3L, resumo.getProdutosBaixoEstoque());
         assertEquals(2L, resumo.getCrmAtrasados());
         assertEquals(4L, resumo.getCrmHoje());
@@ -178,6 +200,10 @@ class DashboardServiceTest {
         clearInvocations(vendaRepository, contaReceberRepository, produtoRepository, revisaoRepository);
         when(vendaRepository.sumTotalVendasPeriodoEmpresa(any(), any(), eq(99L)))
                 .thenReturn(Optional.of(BigDecimal.ZERO))
+                .thenReturn(Optional.of(BigDecimal.ZERO));
+        when(vendaRepository.sumTotalDescontosPeriodoEmpresa(any(), any(), eq(99L)))
+                .thenReturn(Optional.of(BigDecimal.ZERO));
+        when(vendaRepository.sumCmvPeriodoEmpresa(any(), any(), eq(99L)))
                 .thenReturn(Optional.of(BigDecimal.ZERO));
         when(contaReceberRepository.sumContasAtrasadas(99L))
                 .thenReturn(Optional.of(BigDecimal.ZERO));

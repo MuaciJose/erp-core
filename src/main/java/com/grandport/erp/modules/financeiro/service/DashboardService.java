@@ -2,6 +2,7 @@ package com.grandport.erp.modules.financeiro.service;
 
 import com.grandport.erp.modules.financeiro.dto.DashboardResumoDTO;
 import com.grandport.erp.modules.financeiro.dto.InsightDTO;
+import com.grandport.erp.modules.configuracoes.repository.ConfiguracaoRepository;
 import com.grandport.erp.modules.financeiro.repository.ContaReceberRepository;
 import com.grandport.erp.modules.estoque.model.Produto;
 import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
@@ -28,6 +29,7 @@ public class DashboardService {
     @Autowired private ContaReceberRepository contaReceberRepository;
     @Autowired private ProdutoRepository produtoRepository;
     @Autowired private RevisaoRepository revisaoRepository;
+    @Autowired private ConfiguracaoRepository configuracaoRepository;
 
     // =========================================================================
     // 🛡️ MTODO TTICO PARA PEGAR O ID DA EMPRESA
@@ -47,6 +49,10 @@ public class DashboardService {
         PeriodoDashboard periodoDashboard = resolverPeriodo(periodo);
         LocalDateTime inicioPeriodoAnterior = periodoDashboard.inicio().minus(periodoDashboard.duracao());
         LocalDateTime fimPeriodoAnterior = periodoDashboard.inicio().minusNanos(1);
+        configuracaoRepository.findFirstByEmpresaIdOrderByIdDesc(empresaId).ifPresent(config -> {
+            resumo.setMetaFaturamentoPeriodo(config.getMetaFaturamentoPeriodo());
+            resumo.setMetaPedidosPeriodo(config.getMetaPedidosPeriodo() == null ? 0L : config.getMetaPedidosPeriodo().longValue());
+        });
 
         LocalDateTime inicioMes = periodoDashboard.inicio();
         LocalDateTime fimMes = periodoDashboard.fim();
@@ -56,6 +62,17 @@ public class DashboardService {
         resumo.setFaturamentoMes(vendaRepository.sumTotalVendasPeriodoEmpresa(inicioMes, fimMes, empresaId).orElse(BigDecimal.ZERO));
         resumo.setFaturamentoPeriodoAnterior(
                 vendaRepository.sumTotalVendasPeriodoEmpresa(inicioPeriodoAnterior, fimPeriodoAnterior, empresaId).orElse(BigDecimal.ZERO)
+        );
+        resumo.setDescontosPeriodo(vendaRepository.sumTotalDescontosPeriodoEmpresa(inicioMes, fimMes, empresaId).orElse(BigDecimal.ZERO));
+        resumo.setCmvPeriodo(vendaRepository.sumCmvPeriodoEmpresa(inicioMes, fimMes, empresaId).orElse(BigDecimal.ZERO));
+        resumo.setReceitaLiquidaPeriodo(resumo.getFaturamentoMes().subtract(resumo.getDescontosPeriodo()));
+        resumo.setLucroBrutoPeriodo(resumo.getReceitaLiquidaPeriodo().subtract(resumo.getCmvPeriodo()));
+        resumo.setMargemBrutaPeriodo(
+                resumo.getReceitaLiquidaPeriodo().compareTo(BigDecimal.ZERO) > 0
+                        ? resumo.getLucroBrutoPeriodo()
+                            .divide(resumo.getReceitaLiquidaPeriodo(), 4, java.math.RoundingMode.HALF_UP)
+                            .multiply(new BigDecimal("100"))
+                        : BigDecimal.ZERO
         );
 
         // 🚀 O CONSERTO DO ERRO DE COMPILAO AQUI!

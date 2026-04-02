@@ -106,6 +106,11 @@ public class ConfiguracaoSistema extends BaseEntityMultiEmpresa {
     @Column(precision = 5, scale = 2)
     private BigDecimal descontoMaximoPermitido = new BigDecimal("10.00");
 
+    @Column(precision = 12, scale = 2)
+    private BigDecimal metaFaturamentoPeriodo = BigDecimal.ZERO;
+
+    private Integer metaPedidosPeriodo = 0;
+
     private Boolean permitirEstoqueNegativoGlobal = false;
     private Integer diasValidadeOrcamento = 5;
 

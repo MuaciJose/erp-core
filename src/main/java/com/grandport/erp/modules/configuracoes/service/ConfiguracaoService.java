@@ -122,6 +122,8 @@ public class ConfiguracaoService {
         config.setRazaoSocial("");
         config.setCnpj("");
         config.setTelefone("");
+        config.setMetaFaturamentoPeriodo(java.math.BigDecimal.ZERO);
+        config.setMetaPedidosPeriodo(0);
         config.setLayoutHtmlOs(loadDefaultTemplate(DEFAULT_OS_TEMPLATE_PATH, config.getLayoutHtmlOs()));
         config.setLayoutHtmlVenda(loadDefaultTemplate(DEFAULT_VENDA_TEMPLATE_PATH, config.getLayoutHtmlVenda()));
         config.setLayoutHtmlRecibo(loadDefaultTemplate(DEFAULT_RECIBO_TEMPLATE_PATH, config.getLayoutHtmlRecibo()));
@@ -147,6 +149,8 @@ public class ConfiguracaoService {
     private ConfiguracaoSistema aplicarDefaults(ConfiguracaoSistema config) {
         if (config.getHorarioBackupAuto() == null) config.setHorarioBackupAuto("03:00");
         if (config.getTipoCertificado() == null) config.setTipoCertificado("A1");
+        if (config.getMetaFaturamentoPeriodo() == null) config.setMetaFaturamentoPeriodo(java.math.BigDecimal.ZERO);
+        if (config.getMetaPedidosPeriodo() == null) config.setMetaPedidosPeriodo(0);
         if (config.getSerieNfce() == null) config.setSerieNfce(1);
         if (config.getNumeroProximaNfce() == null) config.setNumeroProximaNfce(1L);
         if (config.getCscIdToken() == null) config.setCscIdToken("");

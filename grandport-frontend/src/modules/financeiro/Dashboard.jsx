@@ -4,7 +4,7 @@ import {
     DollarSign, TrendingUp, PackageSearch, AlertTriangle,
     Calendar, ArrowRight, Activity, Layers,
     BarChart3, PieChart as PieIcon, Printer,
-    CalendarClock, CheckCircle, ArrowDownRight, ArrowUpRight, Minus
+    CalendarClock, CheckCircle, ArrowDownRight, ArrowUpRight, Minus, CircleDollarSign
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -243,15 +243,24 @@ export const Dashboard = ({ setPaginaAtiva }) => {
     const faturamentoAtual = Number(resumo.faturamentoMes || 0);
     const faturamentoAnterior = Number(resumo.faturamentoPeriodoAnterior || 0);
     const vendasPeriodoAnterior = Number(resumo.vendasPeriodoAnterior || 0);
+    const metaFaturamento = Number(resumo.metaFaturamentoPeriodo || 0);
+    const metaPedidos = Number(resumo.metaPedidosPeriodo || 0);
     const variacaoReceita = faturamentoAnterior > 0
         ? (((faturamentoAtual - faturamentoAnterior) / faturamentoAnterior) * 100)
         : null;
     const variacaoPedidos = vendasPeriodoAnterior > 0
         ? (((totalPedidosHoje - vendasPeriodoAnterior) / vendasPeriodoAnterior) * 100)
         : null;
+    const percentualMetaFaturamento = metaFaturamento > 0 ? Math.min((faturamentoAtual / metaFaturamento) * 100, 100) : 0;
+    const percentualMetaPedidos = metaPedidos > 0 ? Math.min((totalPedidosHoje / metaPedidos) * 100, 100) : 0;
     const totalAgendaHoje = agendaHoje.length;
     const alertasCriticos = (resumo.alertas || []).length;
     const agendaAtrasados = agendaResumo?.atrasados || 0;
+    const receitaLiquidaPeriodo = Number(resumo.receitaLiquidaPeriodo || 0);
+    const lucroBrutoPeriodo = Number(resumo.lucroBrutoPeriodo || 0);
+    const margemBrutaPeriodo = Number(resumo.margemBrutaPeriodo || 0);
+    const descontosPeriodo = Number(resumo.descontosPeriodo || 0);
+    const cmvPeriodo = Number(resumo.cmvPeriodo || 0);
     const resumoTurno = [
         {
             rotulo: 'Financeiro',
@@ -480,6 +489,109 @@ export const Dashboard = ({ setPaginaAtiva }) => {
                                 <div className="mt-2 text-sm font-medium text-slate-500">{item.detalhe}</div>
                             </button>
                         ))}
+                    </div>
+
+                    <div className="mb-10 rounded-[2rem] border border-emerald-100 bg-white p-8 shadow-sm">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-700">Meta x Realizado</div>
+                                <h3 className="mt-2 text-2xl font-black text-slate-900">Acompanhamento do período</h3>
+                                <p className="mt-2 text-sm font-medium text-slate-500">Compare o realizado com as metas definidas nas configurações da empresa.</p>
+                            </div>
+                            <button
+                                onClick={() => setPaginaAtiva('configuracoes')}
+                                className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-xs font-black uppercase tracking-[0.16em] text-emerald-700 transition hover:bg-emerald-100"
+                            >
+                                Ajustar metas <ArrowRight size={14} />
+                            </button>
+                        </div>
+
+                        <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Faturamento</div>
+                                        <div className="mt-2 text-2xl font-black text-slate-900">R$ {faturamentoAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Meta</div>
+                                        <div className="mt-2 text-lg font-black text-emerald-700">
+                                            {metaFaturamento > 0 ? `R$ ${metaFaturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Nao definida'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-200">
+                                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-green-400" style={{ width: `${percentualMetaFaturamento}%` }}></div>
+                                </div>
+                                <div className="mt-3 text-sm font-medium text-slate-600">
+                                    {metaFaturamento > 0 ? `${percentualMetaFaturamento.toFixed(1)}% da meta atingida.` : 'Defina a meta de faturamento em Configuracoes para acompanhar o progresso.'}
+                                </div>
+                            </div>
+
+                            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Pedidos</div>
+                                        <div className="mt-2 text-2xl font-black text-slate-900">{totalPedidosHoje}</div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Meta</div>
+                                        <div className="mt-2 text-lg font-black text-emerald-700">
+                                            {metaPedidos > 0 ? metaPedidos : 'Nao definida'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-200">
+                                    <div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-400" style={{ width: `${percentualMetaPedidos}%` }}></div>
+                                </div>
+                                <div className="mt-3 text-sm font-medium text-slate-600">
+                                    {metaPedidos > 0 ? `${percentualMetaPedidos.toFixed(1)}% da meta de pedidos atingida.` : 'Defina a meta de pedidos em Configuracoes para acompanhar o progresso.'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mb-10 rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-700">Rentabilidade</div>
+                                <h3 className="mt-2 flex items-center gap-3 text-2xl font-black text-slate-900">
+                                    <CircleDollarSign className="text-blue-600" size={24} /> Margem e lucro estimado
+                                </h3>
+                                <p className="mt-2 text-sm font-medium text-slate-500">Leitura executiva baseada na receita líquida e no custo das mercadorias vendidas no período.</p>
+                            </div>
+                            <div className="rounded-2xl bg-blue-50 px-4 py-3 text-right">
+                                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-700">Margem Bruta</div>
+                                <div className="mt-1 text-2xl font-black text-blue-700">{margemBrutaPeriodo.toFixed(1)}%</div>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Receita líquida</div>
+                                <div className="mt-3 text-2xl font-black text-slate-900">R$ {receitaLiquidaPeriodo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                <div className="mt-3 text-sm font-medium text-slate-500">Receita bruta menos descontos comerciais do período.</div>
+                            </div>
+                            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Lucro bruto estimado</div>
+                                <div className="mt-3 text-2xl font-black text-emerald-700">R$ {lucroBrutoPeriodo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                <div className="mt-3 text-sm font-medium text-slate-500">Receita líquida menos CMV do período selecionado.</div>
+                            </div>
+                            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Composição</div>
+                                <div className="mt-3 space-y-3">
+                                    <div className="flex items-center justify-between text-sm font-bold text-slate-600">
+                                        <span>Descontos</span>
+                                        <span>R$ {descontosPeriodo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm font-bold text-slate-600">
+                                        <span>CMV</span>
+                                        <span>R$ {cmvPeriodo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                </div>
+                                <div className="mt-4 text-sm font-medium text-slate-500">Use isso como indicador executivo; despesas operacionais ficam no DRE.</div>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="mb-10 grid grid-cols-1 xl:grid-cols-5 gap-8 items-start">

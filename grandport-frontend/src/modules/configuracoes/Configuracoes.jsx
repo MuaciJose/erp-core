@@ -4,7 +4,7 @@ import {
     Settings, Building2, Printer, Sliders, Save, CheckCircle,
     AlertTriangle, Info, X, Store, Percent, Search, Loader2, Camera, Plus,
     Database, Users, MapPin, Plug, Smartphone, Clock, ShieldCheck, Download, Trash2, UploadCloud, Bomb, QrCode, RefreshCw, Receipt,
-    Landmark, Wrench, Palette, LogOut, Link
+    Landmark, Wrench, Palette, LogOut, Link, Target
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CentralDeLayouts } from './CentralDeLayouts';
@@ -84,6 +84,8 @@ export const Configuracoes = () => {
         exibirVendedorCupom: true,
 
         descontoMaximoPermitido: 10.00,
+        metaFaturamentoPeriodo: 0,
+        metaPedidosPeriodo: 0,
         permitirEstoqueNegativoGlobal: false,
         diasValidadeOrcamento: 5,
         horarioBackupAuto: '03:00',
@@ -154,6 +156,8 @@ export const Configuracoes = () => {
                     whatsappInstancia: data.whatsappInstancia || '', // 🚀 CAMPO NOVO ADICIONADO AQUI
                     tamanhoImpressora: data.tamanhoImpressora || '80mm',
                     mensagemRodape: data.mensagemRodape || '',
+                    metaFaturamentoPeriodo: data.metaFaturamentoPeriodo || 0,
+                    metaPedidosPeriodo: data.metaPedidosPeriodo || 0,
 
                     smtpHost: data.smtpHost || 'smtp.gmail.com',
                     smtpPort: data.smtpPort || 587,
@@ -1070,6 +1074,25 @@ export const Configuracoes = () => {
                                     <div>
                                         <label htmlFor="permitirEstoqueNegativoGlobal" className="font-black text-orange-900 text-lg cursor-pointer block">Permitir Estoque Negativo Global</label>
                                         <p className="text-sm text-orange-800 font-medium mt-1">Se marcado, o sistema não bloqueará vendas de produtos que constam com estoque zero no sistema. Útil se você faz vendas sem dar entrada em nota primeiro.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
+                                <h3 className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
+                                    <Target size={16} /> Metas do Dashboard
+                                </h3>
+                                <p className="mt-2 text-sm font-medium text-emerald-800">
+                                    Defina as metas principais que o dashboard vai usar no bloco de meta x realizado para o período selecionado.
+                                </p>
+                                <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-xs font-bold text-emerald-700 uppercase">Meta de Faturamento</label>
+                                        <input type="number" step="0.01" name="metaFaturamentoPeriodo" value={config.metaFaturamentoPeriodo || 0} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-emerald-200 rounded-xl font-black text-emerald-700 focus:border-emerald-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-emerald-700 uppercase">Meta de Pedidos</label>
+                                        <input type="number" name="metaPedidosPeriodo" value={config.metaPedidosPeriodo || 0} onChange={handleChange} className="w-full p-3 mt-1 bg-white border-2 border-emerald-200 rounded-xl font-black text-emerald-700 focus:border-emerald-500 outline-none" />
                                     </div>
                                 </div>
                             </div>

@@ -11,9 +11,16 @@ import java.util.List;
 public class DashboardResumoDTO {
     private BigDecimal faturamentoMes = BigDecimal.ZERO;
     private BigDecimal faturamentoPeriodoAnterior = BigDecimal.ZERO;
+    private BigDecimal metaFaturamentoPeriodo = BigDecimal.ZERO;
+    private BigDecimal descontosPeriodo = BigDecimal.ZERO;
+    private BigDecimal cmvPeriodo = BigDecimal.ZERO;
+    private BigDecimal receitaLiquidaPeriodo = BigDecimal.ZERO;
+    private BigDecimal lucroBrutoPeriodo = BigDecimal.ZERO;
+    private BigDecimal margemBrutaPeriodo = BigDecimal.ZERO;
     private BigDecimal receberAtrasado = BigDecimal.ZERO;
     private Long vendasHoje = 0L;
     private Long vendasPeriodoAnterior = 0L;
+    private Long metaPedidosPeriodo = 0L;
     private Long produtosBaixoEstoque = 0L;
     private List<TopProdutoDTO> topProdutos;
     private List<AlertaDTO> alertas;

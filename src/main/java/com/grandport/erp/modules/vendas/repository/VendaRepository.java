@@ -81,6 +81,9 @@ public interface VendaRepository extends JpaRepository<Venda, Long> {
     @Query("SELECT SUM(v.desconto) FROM Venda v WHERE v.status = 'CONCLUIDA' AND v.dataHora BETWEEN :inicio AND :fim AND v.empresaId = :empresaId")
     Optional<BigDecimal> sumTotalDescontosPeriodoEmpresa(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim, @Param("empresaId") Long empresaId);
 
+    @Query("SELECT SUM(iv.quantidade * iv.produto.precoCusto) FROM ItemVenda iv WHERE iv.venda.status = 'CONCLUIDA' AND iv.venda.dataHora BETWEEN :inicio AND :fim AND iv.venda.empresaId = :empresaId")
+    Optional<BigDecimal> sumCmvPeriodoEmpresa(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim, @Param("empresaId") Long empresaId);
+
     /**
      * 🚀 Novo: Contar vendas por período de uma empresa específica
      */
