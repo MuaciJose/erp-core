@@ -38,21 +38,29 @@ public class DashboardService {
     }
 
     public DashboardResumoDTO getResumoDashboard() {
+        return getResumoDashboard("MONTH");
+    }
+
+    public DashboardResumoDTO getResumoDashboard(String periodo) {
         DashboardResumoDTO resumo = new DashboardResumoDTO();
         Long empresaId = getEmpresaId(); // 🚀 Pegamos a empresa logada!
+        PeriodoDashboard periodoDashboard = resolverPeriodo(periodo);
 
-        // Calcula incio do ms no Java
-        LocalDateTime inicioMes = LocalDate.now().withDayOfMonth(1).atStartOfDay();
-        LocalDateTime fimMes = LocalDateTime.now();
+        LocalDateTime inicioMes = periodoDashboard.inicio();
+        LocalDateTime fimMes = periodoDashboard.fim();
 
         // KPIs Financeiros com tratamento de nulo
         // (Nota: assumindo que a sua VendaRepository tambm no tem blindagem ainda, vamos focar no erro atual)
-        resumo.setFaturamentoMes(vendaRepository.sumTotalVendasPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
+        resumo.setFaturamentoMes(vendaRepository.sumTotalVendasPeriodoEmpresa(inicioMes, fimMes, empresaId).orElse(BigDecimal.ZERO));
 
         // 🚀 O CONSERTO DO ERRO DE COMPILAO AQUI!
         resumo.setReceberAtrasado(contaReceberRepository.sumContasAtrasadas(empresaId).orElse(BigDecimal.ZERO));
 
-        Long vendasHoje = vendaRepository.countVendasByData(LocalDate.now().atStartOfDay(), LocalDate.now().atTime(LocalTime.MAX));
+        Long vendasHoje = vendaRepository.countVendasByDataEmpresa(
+                LocalDate.now().atStartOfDay(),
+                LocalDate.now().atTime(LocalTime.MAX),
+                empresaId
+        );
         resumo.setVendasHoje(vendasHoje != null ? vendasHoje : 0L);
 
         // KPIs de Estoque
@@ -63,10 +71,10 @@ public class DashboardService {
         // KPIs DO CRM (Ps-Venda)
         // =========================================================================
         try {
-            Long crmAtrasados = revisaoRepository.countRevisoesAtrasadas();
+            Long crmAtrasados = revisaoRepository.countRevisoesAtrasadasByEmpresa(empresaId);
             resumo.setCrmAtrasados(crmAtrasados != null ? crmAtrasados : 0L);
 
-            Long crmHoje = revisaoRepository.countRevisoesParaHoje();
+            Long crmHoje = revisaoRepository.countRevisoesParaHojeByEmpresa(empresaId);
             resumo.setCrmHoje(crmHoje != null ? crmHoje : 0L);
 
             // Adiciona um Alerta se tiver reviso atrasada!
@@ -79,7 +87,7 @@ public class DashboardService {
         }
 
         // Top Produtos
-        List<DashboardResumoDTO.TopProdutoDTO> top = vendaRepository.findTop5ProdutosMaisVendidosMes();
+        List<DashboardResumoDTO.TopProdutoDTO> top = vendaRepository.findTop5ProdutosMaisVendidosMesEmpresa(inicioMes, fimMes, empresaId);
         resumo.setTopProdutos(top != null ? top : new ArrayList<>());
 
         // Alertas Financeiros e Estoque
@@ -93,13 +101,13 @@ public class DashboardService {
 
         // 1. Grfico Semanal
         List<DashboardResumoDTO.VendaSemanalDTO> graficoSemanal = new ArrayList<>();
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = fimMes.toLocalDate();
         for (int i = 6; i >= 0; i--) {
             LocalDate dataAlvo = hoje.minusDays(i);
             LocalDateTime inicioDia = dataAlvo.atStartOfDay();
             LocalDateTime fimDia = dataAlvo.atTime(LocalTime.MAX);
 
-            BigDecimal totalDia = vendaRepository.sumTotalVendasPeriodo(inicioDia, fimDia).orElse(BigDecimal.ZERO);
+            BigDecimal totalDia = vendaRepository.sumTotalVendasPeriodoEmpresa(inicioDia, fimDia, empresaId).orElse(BigDecimal.ZERO);
 
             String diaSemana = dataAlvo.getDayOfWeek().getDisplayName(TextStyle.SHORT, new Locale("pt", "BR"));
             String diaFormatado = diaSemana.substring(0, 1).toUpperCase() + diaSemana.substring(1);
@@ -108,16 +116,28 @@ public class DashboardService {
         }
         resumo.setVendasSemanal(graficoSemanal);
 
-        // 2. Grfico de Categorias
-        List<DashboardResumoDTO.CategoriaVendaDTO> categorias = new ArrayList<>();
-        categorias.add(new DashboardResumoDTO.CategoriaVendaDTO("Suspenso", 350));
-        categorias.add(new DashboardResumoDTO.CategoriaVendaDTO("Freios", 420));
-        categorias.add(new DashboardResumoDTO.CategoriaVendaDTO("Filtros", 210));
-        categorias.add(new DashboardResumoDTO.CategoriaVendaDTO("leos", 300));
-        resumo.setVendasPorCategoria(categorias);
+        // 2. Gráfico de Categorias
+        List<DashboardResumoDTO.CategoriaVendaDTO> categorias =
+                vendaRepository.findCategoriasMaisVendidasPeriodoEmpresa(inicioMes, fimMes, empresaId);
+        resumo.setVendasPorCategoria(categorias != null ? categorias : new ArrayList<>());
 
         return resumo;
     }
+
+    private PeriodoDashboard resolverPeriodo(String periodo) {
+        LocalDate hoje = LocalDate.now();
+        String valor = periodo == null ? "MONTH" : periodo.trim().toUpperCase(Locale.ROOT);
+
+        return switch (valor) {
+            case "TODAY" -> new PeriodoDashboard(hoje.atStartOfDay(), LocalDateTime.now());
+            case "7D" -> new PeriodoDashboard(hoje.minusDays(6).atStartOfDay(), LocalDateTime.now());
+            case "30D" -> new PeriodoDashboard(hoje.minusDays(29).atStartOfDay(), LocalDateTime.now());
+            case "MONTH" -> new PeriodoDashboard(hoje.withDayOfMonth(1).atStartOfDay(), LocalDateTime.now());
+            default -> new PeriodoDashboard(hoje.withDayOfMonth(1).atStartOfDay(), LocalDateTime.now());
+        };
+    }
+
+    private record PeriodoDashboard(LocalDateTime inicio, LocalDateTime fim) {}
 
     public List<InsightDTO> getInsightsInteligentes() {
         List<InsightDTO> insights = new ArrayList<>();

@@ -108,7 +108,6 @@ function App() {
     const [modoAplicacao, setModoAplicacao] = useState('erp');
     const [carregandoApp, setCarregandoApp] = useState(true);
     const [isFullScreen, setIsFullScreen] = useState(false);
-    const [resumoAgendaTopo, setResumoAgendaTopo] = useState(null);
     const [senhaAtualObrigatoria, setSenhaAtualObrigatoria] = useState('');
     const [novaSenhaObrigatoria, setNovaSenhaObrigatoria] = useState('');
     const [confirmacaoSenhaObrigatoria, setConfirmacaoSenhaObrigatoria] = useState('');
@@ -188,27 +187,6 @@ function App() {
         };
     }, []);
 
-    useEffect(() => {
-        if (!usuarioLogado || modoAplicacao !== 'erp' || paginaAtiva !== 'dash') {
-            setResumoAgendaTopo(null);
-            return;
-        }
-
-        const carregarResumoAgenda = async () => {
-            try {
-                const hoje = new Date().toISOString().slice(0, 10);
-                const res = await api.get('/api/agenda/resumo', { params: { data: hoje } });
-                setResumoAgendaTopo(res.data || null);
-            } catch (error) {
-                console.error('Falha ao carregar resumo da agenda no topo.', error);
-            }
-        };
-
-        carregarResumoAgenda();
-        const intervalo = window.setInterval(carregarResumoAgenda, 120000);
-        return () => window.clearInterval(intervalo);
-    }, [usuarioLogado, modoAplicacao, paginaAtiva]);
-
     const handleLoginSucesso = (usuario) => {
         setUsuarioLogado(usuario);
         setPaginaAtiva(definirTelaInicial(usuario));
@@ -247,15 +225,9 @@ function App() {
         usuarioLogado.permissoes.includes(paginaAtiva) ||
         permissoesExtra.includes(paginaAtiva) ||
         ((paginaAtiva === 'liberacao-acessos' || paginaAtiva === 'central-saas') && usuarioLogado.tipoAcesso === 'PLATFORM_ADMIN');
-    const agendaTemAtrasos = (resumoAgendaTopo?.atrasados || 0) > 0;
     const podeVerAgenda = usuarioLogado?.permissoes?.includes('agenda');
     const exigeTrocaSenha = !!usuarioLogado?.forcePasswordChange;
     const isPlatformAdmin = usuarioLogado?.tipoAcesso === 'PLATFORM_ADMIN';
-
-    const abrirAgendaAtrasados = () => {
-        localStorage.setItem('agenda_quick_filter', 'atrasados');
-        setPaginaAtiva('agenda');
-    };
 
     const handleTrocarSenhaObrigatoria = async () => {
         setErroTrocaSenha('');
@@ -396,47 +368,6 @@ function App() {
 
             <main className={`flex-1 h-full overflow-y-auto ${isFullScreen ? 'p-0' : 'p-4'}`}>
                 <div className={`${isFullScreen ? 'w-full h-full' : 'max-w-[1600px] mx-auto'}`}>
-                    {!isFullScreen && paginaAtiva === 'dash' && podeVerAgenda && resumoAgendaTopo && (
-                        <div className={`mb-4 rounded-2xl border px-5 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 ${
-                            agendaTemAtrasos
-                                ? 'bg-rose-50 border-rose-200'
-                                : 'bg-blue-50 border-blue-200'
-                        }`}>
-                            <div>
-                                <div className={`text-[11px] font-black uppercase tracking-[0.2em] ${
-                                    agendaTemAtrasos ? 'text-rose-700' : 'text-blue-700'
-                                }`}>
-                                    Agenda Operacional
-                                </div>
-                                <div className="text-sm md:text-base font-black text-slate-800 mt-1">
-                                    {agendaTemAtrasos
-                                        ? `${resumoAgendaTopo.atrasados} compromisso(s) atrasado(s) exigem ação.`
-                                        : `${resumoAgendaTopo.hoje || 0} compromisso(s) previstos para hoje, sem atraso crítico no momento.`}
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {agendaTemAtrasos && (
-                                    <button
-                                        onClick={abrirAgendaAtrasados}
-                                        className="px-4 py-2 rounded-xl bg-rose-600 text-white font-black text-xs uppercase tracking-wide hover:bg-rose-500 transition-colors"
-                                    >
-                                        Ver Atrasados
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => setPaginaAtiva('agenda')}
-                                    className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wide transition-colors ${
-                                        agendaTemAtrasos
-                                            ? 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-100'
-                                            : 'bg-white text-blue-700 border border-blue-200 hover:bg-blue-100'
-                                    }`}
-                                >
-                                    Abrir Agenda
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
                     {!temPermissao ? (
                         <div className="p-10 text-center mt-20">
                             <h2 className="text-2xl font-black text-red-500 mb-2">ACESSO NEGADO</h2>

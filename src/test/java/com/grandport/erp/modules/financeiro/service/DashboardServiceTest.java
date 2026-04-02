@@ -1,0 +1,131 @@
+package com.grandport.erp.modules.financeiro.service;
+
+import com.grandport.erp.modules.financeiro.dto.DashboardResumoDTO;
+import com.grandport.erp.modules.financeiro.repository.ContaReceberRepository;
+import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
+import com.grandport.erp.modules.usuario.model.Usuario;
+import com.grandport.erp.modules.vendas.repository.RevisaoRepository;
+import com.grandport.erp.modules.vendas.repository.VendaRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("Testes - Dashboard Service")
+class DashboardServiceTest {
+
+    @Mock
+    private VendaRepository vendaRepository;
+
+    @Mock
+    private ContaReceberRepository contaReceberRepository;
+
+    @Mock
+    private ProdutoRepository produtoRepository;
+
+    @Mock
+    private RevisaoRepository revisaoRepository;
+
+    @InjectMocks
+    private DashboardService dashboardService;
+
+    @BeforeEach
+    void setUp() {
+        Usuario usuario = new Usuario();
+        usuario.setUsername("admin");
+        usuario.setEmpresaId(99L);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(usuario, null, usuario.getAuthorities())
+        );
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("Deve gerar resumo do dashboard com isolamento por empresa")
+    void deveGerarResumoComIsolamentoPorEmpresa() {
+        when(vendaRepository.sumTotalVendasPeriodoEmpresa(any(), any(), eq(99L)))
+                .thenReturn(Optional.of(new BigDecimal("12500.00")));
+        when(contaReceberRepository.sumContasAtrasadas(99L))
+                .thenReturn(Optional.of(new BigDecimal("750.00")));
+        when(vendaRepository.countVendasByDataEmpresa(any(), any(), eq(99L))).thenReturn(8L);
+        when(produtoRepository.countProdutosBaixoEstoqueByEmpresa(99L)).thenReturn(3L);
+        when(revisaoRepository.countRevisoesAtrasadasByEmpresa(99L)).thenReturn(2L);
+        when(revisaoRepository.countRevisoesParaHojeByEmpresa(99L)).thenReturn(4L);
+        when(vendaRepository.findTop5ProdutosMaisVendidosMesEmpresa(any(), any(), eq(99L)))
+                .thenReturn(List.of(new DashboardResumoDTO.TopProdutoDTO("Filtro de Oleo", 10L, new BigDecimal("900.00"))));
+        when(vendaRepository.findCategoriasMaisVendidasPeriodoEmpresa(any(), any(), eq(99L)))
+                .thenReturn(List.of(new DashboardResumoDTO.CategoriaVendaDTO("Filtros", 10)));
+
+        DashboardResumoDTO resumo = dashboardService.getResumoDashboard("MONTH");
+
+        assertNotNull(resumo);
+        assertEquals(new BigDecimal("12500.00"), resumo.getFaturamentoMes());
+        assertEquals(new BigDecimal("750.00"), resumo.getReceberAtrasado());
+        assertEquals(8L, resumo.getVendasHoje());
+        assertEquals(3L, resumo.getProdutosBaixoEstoque());
+        assertEquals(2L, resumo.getCrmAtrasados());
+        assertEquals(4L, resumo.getCrmHoje());
+        assertEquals(1, resumo.getTopProdutos().size());
+        assertEquals("Filtro de Oleo", resumo.getTopProdutos().get(0).getNome());
+        assertEquals(1, resumo.getVendasPorCategoria().size());
+        assertEquals("Filtros", resumo.getVendasPorCategoria().get(0).getName());
+
+        verify(contaReceberRepository).sumContasAtrasadas(99L);
+        verify(produtoRepository).countProdutosBaixoEstoqueByEmpresa(99L);
+        verify(revisaoRepository).countRevisoesAtrasadasByEmpresa(99L);
+        verify(revisaoRepository).countRevisoesParaHojeByEmpresa(99L);
+        verify(vendaRepository).findTop5ProdutosMaisVendidosMesEmpresa(any(), any(), eq(99L));
+        verify(vendaRepository).findCategoriasMaisVendidasPeriodoEmpresa(any(), any(), eq(99L));
+    }
+
+    @Test
+    @DisplayName("Deve respeitar periodo de 7 dias ao consultar vendas")
+    void deveRespeitarPeriodoDeSeteDias() {
+        when(vendaRepository.sumTotalVendasPeriodoEmpresa(any(), any(), eq(99L)))
+                .thenReturn(Optional.of(BigDecimal.ZERO));
+        when(contaReceberRepository.sumContasAtrasadas(99L))
+                .thenReturn(Optional.of(BigDecimal.ZERO));
+        when(vendaRepository.countVendasByDataEmpresa(any(), any(), eq(99L))).thenReturn(0L);
+        when(produtoRepository.countProdutosBaixoEstoqueByEmpresa(99L)).thenReturn(0L);
+        when(revisaoRepository.countRevisoesAtrasadasByEmpresa(99L)).thenReturn(0L);
+        when(revisaoRepository.countRevisoesParaHojeByEmpresa(99L)).thenReturn(0L);
+        when(vendaRepository.findTop5ProdutosMaisVendidosMesEmpresa(any(), any(), eq(99L))).thenReturn(List.of());
+        when(vendaRepository.findCategoriasMaisVendidasPeriodoEmpresa(any(), any(), eq(99L))).thenReturn(List.of());
+
+        dashboardService.getResumoDashboard("7D");
+
+        ArgumentCaptor<LocalDateTime> inicioCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> fimCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+
+        verify(vendaRepository).findTop5ProdutosMaisVendidosMesEmpresa(inicioCaptor.capture(), fimCaptor.capture(), eq(99L));
+
+        LocalDate inicioEsperado = LocalDate.now().minusDays(6);
+        assertEquals(inicioEsperado, inicioCaptor.getValue().toLocalDate());
+        assertEquals(LocalDate.now(), fimCaptor.getValue().toLocalDate());
+    }
+}

@@ -86,4 +86,22 @@ public interface VendaRepository extends JpaRepository<Venda, Long> {
      */
     @Query("SELECT COUNT(v) FROM Venda v WHERE v.status = 'CONCLUIDA' AND v.dataHora BETWEEN :inicio AND :fim AND v.empresaId = :empresaId")
     Long countVendasByDataEmpresa(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim, @Param("empresaId") Long empresaId);
+
+    @Query("SELECT new com.grandport.erp.modules.financeiro.dto.DashboardResumoDTO$TopProdutoDTO(iv.produto.nome, SUM(iv.quantidade), SUM(iv.quantidade * iv.precoUnitario)) " +
+           "FROM ItemVenda iv WHERE iv.venda.status = 'CONCLUIDA' AND iv.venda.dataHora BETWEEN :inicio AND :fim AND iv.venda.empresaId = :empresaId " +
+           "GROUP BY iv.produto.nome ORDER BY SUM(iv.quantidade * iv.precoUnitario) DESC")
+    List<DashboardResumoDTO.TopProdutoDTO> findTop5ProdutosMaisVendidosMesEmpresa(
+            @Param("inicio") LocalDateTime inicio,
+            @Param("fim") LocalDateTime fim,
+            @Param("empresaId") Long empresaId
+    );
+
+    @Query("SELECT new com.grandport.erp.modules.financeiro.dto.DashboardResumoDTO$CategoriaVendaDTO(COALESCE(iv.produto.categoria.nome, 'Sem Categoria'), CAST(SUM(iv.quantidade) as integer)) " +
+           "FROM ItemVenda iv WHERE iv.venda.status = 'CONCLUIDA' AND iv.venda.dataHora BETWEEN :inicio AND :fim AND iv.venda.empresaId = :empresaId " +
+           "GROUP BY COALESCE(iv.produto.categoria.nome, 'Sem Categoria') ORDER BY SUM(iv.quantidade) DESC")
+    List<DashboardResumoDTO.CategoriaVendaDTO> findCategoriasMaisVendidasPeriodoEmpresa(
+            @Param("inicio") LocalDateTime inicio,
+            @Param("fim") LocalDateTime fim,
+            @Param("empresaId") Long empresaId
+    );
 }
