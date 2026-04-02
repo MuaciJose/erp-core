@@ -70,10 +70,11 @@ class DashboardServiceTest {
     @DisplayName("Deve gerar resumo do dashboard com isolamento por empresa")
     void deveGerarResumoComIsolamentoPorEmpresa() {
         when(vendaRepository.sumTotalVendasPeriodoEmpresa(any(), any(), eq(99L)))
-                .thenReturn(Optional.of(new BigDecimal("12500.00")));
+                .thenReturn(Optional.of(new BigDecimal("12500.00")))
+                .thenReturn(Optional.of(new BigDecimal("10000.00")));
         when(contaReceberRepository.sumContasAtrasadas(99L))
                 .thenReturn(Optional.of(new BigDecimal("750.00")));
-        when(vendaRepository.countVendasByDataEmpresa(any(), any(), eq(99L))).thenReturn(8L);
+        when(vendaRepository.countVendasByDataEmpresa(any(), any(), eq(99L))).thenReturn(8L).thenReturn(6L);
         when(produtoRepository.countProdutosBaixoEstoqueByEmpresa(99L)).thenReturn(3L);
         when(revisaoRepository.countRevisoesAtrasadasByEmpresa(99L)).thenReturn(2L);
         when(revisaoRepository.countRevisoesParaHojeByEmpresa(99L)).thenReturn(4L);
@@ -86,8 +87,10 @@ class DashboardServiceTest {
 
         assertNotNull(resumo);
         assertEquals(new BigDecimal("12500.00"), resumo.getFaturamentoMes());
+        assertEquals(new BigDecimal("10000.00"), resumo.getFaturamentoPeriodoAnterior());
         assertEquals(new BigDecimal("750.00"), resumo.getReceberAtrasado());
         assertEquals(8L, resumo.getVendasHoje());
+        assertEquals(6L, resumo.getVendasPeriodoAnterior());
         assertEquals(3L, resumo.getProdutosBaixoEstoque());
         assertEquals(2L, resumo.getCrmAtrasados());
         assertEquals(4L, resumo.getCrmHoje());
@@ -174,10 +177,11 @@ class DashboardServiceTest {
     private void mockResumoVazio() {
         clearInvocations(vendaRepository, contaReceberRepository, produtoRepository, revisaoRepository);
         when(vendaRepository.sumTotalVendasPeriodoEmpresa(any(), any(), eq(99L)))
+                .thenReturn(Optional.of(BigDecimal.ZERO))
                 .thenReturn(Optional.of(BigDecimal.ZERO));
         when(contaReceberRepository.sumContasAtrasadas(99L))
                 .thenReturn(Optional.of(BigDecimal.ZERO));
-        when(vendaRepository.countVendasByDataEmpresa(any(), any(), eq(99L))).thenReturn(0L);
+        when(vendaRepository.countVendasByDataEmpresa(any(), any(), eq(99L))).thenReturn(0L).thenReturn(0L);
         when(produtoRepository.countProdutosBaixoEstoqueByEmpresa(99L)).thenReturn(0L);
         when(revisaoRepository.countRevisoesAtrasadasByEmpresa(99L)).thenReturn(0L);
         when(revisaoRepository.countRevisoesParaHojeByEmpresa(99L)).thenReturn(0L);

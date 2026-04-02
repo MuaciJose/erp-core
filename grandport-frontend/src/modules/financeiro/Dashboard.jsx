@@ -4,7 +4,7 @@ import {
     DollarSign, TrendingUp, PackageSearch, AlertTriangle,
     Calendar, ArrowRight, Activity, Layers,
     BarChart3, PieChart as PieIcon, Printer,
-    CalendarClock, CheckCircle
+    CalendarClock, CheckCircle, ArrowDownRight, ArrowUpRight, Minus
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -240,6 +240,15 @@ export const Dashboard = ({ setPaginaAtiva }) => {
     const periodoSelecionado = PERIODOS.find(periodo => periodo.id === periodoAtivo) || PERIODOS[3];
     const totalPedidosHoje = resumo.vendasHoje || 0;
     const ticketMedioHoje = totalPedidosHoje > 0 ? (resumo.faturamentoMes || 0) / totalPedidosHoje : 0;
+    const faturamentoAtual = Number(resumo.faturamentoMes || 0);
+    const faturamentoAnterior = Number(resumo.faturamentoPeriodoAnterior || 0);
+    const vendasPeriodoAnterior = Number(resumo.vendasPeriodoAnterior || 0);
+    const variacaoReceita = faturamentoAnterior > 0
+        ? (((faturamentoAtual - faturamentoAnterior) / faturamentoAnterior) * 100)
+        : null;
+    const variacaoPedidos = vendasPeriodoAnterior > 0
+        ? (((totalPedidosHoje - vendasPeriodoAnterior) / vendasPeriodoAnterior) * 100)
+        : null;
     const totalAgendaHoje = agendaHoje.length;
     const alertasCriticos = (resumo.alertas || []).length;
     const agendaAtrasados = agendaResumo?.atrasados || 0;
@@ -322,6 +331,26 @@ export const Dashboard = ({ setPaginaAtiva }) => {
             cta: 'Ver previsao'
         }
     ].filter(Boolean);
+    const renderVariacao = (variacao, modoNeutro) => {
+        if (variacao === null) {
+            return (
+                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
+                    <Minus size={12} />
+                    {modoNeutro}
+                </span>
+            );
+        }
+
+        const positiva = variacao >= 0;
+        return (
+            <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black ${
+                positiva ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+            }`}>
+                {positiva ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                {positiva ? '+' : ''}{variacao.toFixed(1)}%
+            </span>
+        );
+    };
 
     return (
         <div className="p-8 max-w-7xl mx-auto animate-fade-in bg-gray-50/50 min-h-screen">
@@ -381,7 +410,10 @@ export const Dashboard = ({ setPaginaAtiva }) => {
                             </div>
                             <h2 className="text-3xl font-black text-slate-800 tracking-tighter">R$ {(resumo.faturamentoMes || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h2>
                             <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-wider">Receita no Período</p>
-                            <p className="mt-4 text-sm font-medium text-slate-500">Base principal para medir ritmo comercial {periodoSelecionado.resumo}.</p>
+                            <div className="mt-4 flex items-center gap-3">
+                                {renderVariacao(variacaoReceita, 'Sem base anterior')}
+                                <span className="text-sm font-medium text-slate-500">vs período anterior</span>
+                            </div>
                         </div>
 
                         <div onClick={() => setPaginaAtiva('contas-receber')} className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100 cursor-pointer text-left hover:border-red-200 hover:shadow-md transition-all">
@@ -401,7 +433,11 @@ export const Dashboard = ({ setPaginaAtiva }) => {
                             </div>
                             <h2 className="text-3xl font-black text-slate-800 tracking-tighter">{resumo.vendasHoje || 0}</h2>
                             <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-wider">Pedidos no Período</p>
-                            <p className="mt-4 text-sm font-medium text-slate-500">Ticket medio estimado: R$ {ticketMedioHoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            <div className="mt-4 flex flex-wrap items-center gap-3">
+                                {renderVariacao(variacaoPedidos, 'Sem base anterior')}
+                                <span className="text-sm font-medium text-slate-500">vs período anterior</span>
+                            </div>
+                            <p className="mt-3 text-sm font-medium text-slate-500">Ticket médio estimado: R$ {ticketMedioHoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                         </div>
 
                         <div onClick={() => setPaginaAtiva('previsao')} className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100 cursor-pointer text-left hover:border-orange-200 hover:shadow-md transition-all">

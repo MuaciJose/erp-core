@@ -45,6 +45,8 @@ public class DashboardService {
         DashboardResumoDTO resumo = new DashboardResumoDTO();
         Long empresaId = getEmpresaId(); // 🚀 Pegamos a empresa logada!
         PeriodoDashboard periodoDashboard = resolverPeriodo(periodo);
+        LocalDateTime inicioPeriodoAnterior = periodoDashboard.inicio().minus(periodoDashboard.duracao());
+        LocalDateTime fimPeriodoAnterior = periodoDashboard.inicio().minusNanos(1);
 
         LocalDateTime inicioMes = periodoDashboard.inicio();
         LocalDateTime fimMes = periodoDashboard.fim();
@@ -52,6 +54,9 @@ public class DashboardService {
         // KPIs Financeiros com tratamento de nulo
         // (Nota: assumindo que a sua VendaRepository tambm no tem blindagem ainda, vamos focar no erro atual)
         resumo.setFaturamentoMes(vendaRepository.sumTotalVendasPeriodoEmpresa(inicioMes, fimMes, empresaId).orElse(BigDecimal.ZERO));
+        resumo.setFaturamentoPeriodoAnterior(
+                vendaRepository.sumTotalVendasPeriodoEmpresa(inicioPeriodoAnterior, fimPeriodoAnterior, empresaId).orElse(BigDecimal.ZERO)
+        );
 
         // 🚀 O CONSERTO DO ERRO DE COMPILAO AQUI!
         resumo.setReceberAtrasado(contaReceberRepository.sumContasAtrasadas(empresaId).orElse(BigDecimal.ZERO));
@@ -62,6 +67,8 @@ public class DashboardService {
                 empresaId
         );
         resumo.setVendasHoje(vendasHoje != null ? vendasHoje : 0L);
+        Long vendasPeriodoAnterior = vendaRepository.countVendasByDataEmpresa(inicioPeriodoAnterior, fimPeriodoAnterior, empresaId);
+        resumo.setVendasPeriodoAnterior(vendasPeriodoAnterior != null ? vendasPeriodoAnterior : 0L);
 
         // KPIs de Estoque
         Long baixoEstoque = produtoRepository.countProdutosBaixoEstoqueByEmpresa(empresaId);
@@ -137,7 +144,11 @@ public class DashboardService {
         };
     }
 
-    private record PeriodoDashboard(LocalDateTime inicio, LocalDateTime fim) {}
+    private record PeriodoDashboard(LocalDateTime inicio, LocalDateTime fim) {
+        java.time.Duration duracao() {
+            return java.time.Duration.between(inicio, fim).plusNanos(1);
+        }
+    }
 
     public List<InsightDTO> getInsightsInteligentes() {
         List<InsightDTO> insights = new ArrayList<>();
