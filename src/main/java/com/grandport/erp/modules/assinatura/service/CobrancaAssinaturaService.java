@@ -28,6 +28,7 @@ public class CobrancaAssinaturaService {
     private final CobrancaWebhookEventoRepository webhookEventoRepository;
     private final EmpresaRepository empresaRepository;
     private final SecurityEventService securityEventService;
+    private final LicenciamentoModuloService licenciamentoModuloService;
     private final String webhookToken;
 
     public CobrancaAssinaturaService(
@@ -35,11 +36,13 @@ public class CobrancaAssinaturaService {
             CobrancaWebhookEventoRepository webhookEventoRepository,
             EmpresaRepository empresaRepository,
             SecurityEventService securityEventService,
+            LicenciamentoModuloService licenciamentoModuloService,
             @Value("${app.billing.webhook-token:}") String webhookToken) {
         this.cobrancaRepository = cobrancaRepository;
         this.webhookEventoRepository = webhookEventoRepository;
         this.empresaRepository = empresaRepository;
         this.securityEventService = securityEventService;
+        this.licenciamentoModuloService = licenciamentoModuloService;
         this.webhookToken = webhookToken;
     }
 
@@ -51,16 +54,28 @@ public class CobrancaAssinaturaService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<AssinaturaCobranca> listarEntidadesPorEmpresa(Long empresaId) {
+        return cobrancaRepository.findTop10ByEmpresaIdOrderByCreatedAtDesc(empresaId);
+    }
+
     @Transactional
     public CobrancaAssinaturaDTO criarCobranca(Long empresaId, CriarCobrancaDTO dto) {
         Empresa empresa = empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
 
-        if (dto == null || dto.valor() == null || dto.valor() <= 0) {
-            throw new RuntimeException("Informe um valor válido para a cobrança.");
-        }
         if (dto.dataVencimento() == null || dto.dataVencimento().isBlank()) {
             throw new RuntimeException("Informe a data de vencimento da cobrança.");
+        }
+
+        BigDecimal valorPlano = empresa.getValorMensal() == null ? BigDecimal.ZERO : empresa.getValorMensal();
+        BigDecimal valorExtras = licenciamentoModuloService.somarExtrasCobraveisEmpresa(empresaId);
+        BigDecimal valorTotal = dto == null || dto.valor() == null || dto.valor() <= 0
+                ? valorPlano.add(valorExtras)
+                : BigDecimal.valueOf(dto.valor());
+
+        if (valorTotal.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Informe um valor válido para a cobrança.");
         }
 
         AssinaturaCobranca cobranca = new AssinaturaCobranca();
@@ -68,13 +83,23 @@ public class CobrancaAssinaturaService {
         cobranca.setReferencia(dto.referencia() == null || dto.referencia().isBlank()
                 ? "MENSALIDADE-" + LocalDate.parse(dto.dataVencimento())
                 : dto.referencia().trim().toUpperCase());
-        cobranca.setValor(BigDecimal.valueOf(dto.valor()));
+        cobranca.setValor(valorTotal);
         cobranca.setDataVencimento(LocalDate.parse(dto.dataVencimento()));
         cobranca.setGatewayNome(normalize(dto.gatewayNome()));
         cobranca.setGatewayCobrancaId(blankToNull(dto.gatewayCobrancaId()));
         cobranca.setPaymentLink(blankToNull(dto.paymentLink()));
-        cobranca.setDescricao(blankToNull(dto.descricao()));
-        cobranca.setObservacoes(blankToNull(dto.observacoes()));
+        String descricaoBase = blankToNull(dto.descricao());
+        if (descricaoBase == null) {
+            descricaoBase = "Plano " + (empresa.getPlano() == null ? "ESSENCIAL" : empresa.getPlano()) + " - Base R$ " + valorPlano;
+        }
+        cobranca.setDescricao(descricaoBase);
+        String observacoes = blankToNull(dto.observacoes());
+        List<String> extras = licenciamentoModuloService.listarExtrasCobraveisEmpresa(empresaId);
+        if (!extras.isEmpty()) {
+            String extrasDescricao = "Add-ons cobrados: " + String.join(", ", extras) + ".";
+            observacoes = observacoes == null ? extrasDescricao : observacoes + " | " + extrasDescricao;
+        }
+        cobranca.setObservacoes(observacoes);
 
         AssinaturaCobranca salva = cobrancaRepository.save(cobranca);
         securityEventService.registrar(
@@ -83,7 +108,7 @@ public class CobrancaAssinaturaService {
                 "INFO",
                 "PLATFORM",
                 null,
-                "Cobrança " + salva.getReferencia() + " criada com vencimento em " + salva.getDataVencimento() + "."
+                "Cobrança " + salva.getReferencia() + " criada com vencimento em " + salva.getDataVencimento() + " no valor de R$ " + salva.getValor() + "."
         );
         return toDto(salva);
     }
@@ -130,6 +155,7 @@ public class CobrancaAssinaturaService {
         AssinaturaCobranca cobranca = cobrancaRepository.findTopByEmpresaIdOrderByDataVencimentoDescCreatedAtDesc(empresaId)
                 .orElse(null);
         if (cobranca == null) {
+            licenciamentoModuloService.liberarBloqueiosAutomaticosPorPagamento(empresaId);
             return;
         }
         cobranca.setStatus(CobrancaStatus.PAGA);
@@ -139,6 +165,7 @@ public class CobrancaAssinaturaService {
             cobranca.setObservacoes(appendObs(cobranca.getObservacoes(), "Pagamento manual registrado. Próximo vencimento: " + novaDataVencimento));
         }
         cobrancaRepository.save(cobranca);
+        licenciamentoModuloService.liberarBloqueiosAutomaticosPorPagamento(empresaId);
     }
 
     private AssinaturaCobranca localizarCobranca(WebhookPagamentoDTO dto) {
@@ -167,6 +194,7 @@ public class CobrancaAssinaturaService {
                 empresa.setStatusAssinatura(StatusAssinatura.ATIVA);
                 empresa.setMotivoBloqueio(null);
                 empresa.setDataVencimento(cobranca.getDataVencimento().plusMonths(1));
+                licenciamentoModuloService.liberarBloqueiosAutomaticosPorPagamento(empresa.getId());
             }
             case "OVERDUE", "VENCIDA", "EXPIRED" -> {
                 cobranca.setStatus(CobrancaStatus.VENCIDA);

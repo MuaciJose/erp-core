@@ -44,6 +44,13 @@ public class TenantAccessService {
         }
 
         if (empresa.getDataVencimento() != null && empresa.getDataVencimento().isBefore(LocalDate.now())) {
+            LocalDate dataCorte = empresa.getDataVencimento()
+                    .plusDays(Math.max(empresa.getDiasTolerancia() == null ? 0 : empresa.getDiasTolerancia(), 0));
+
+            if (!dataCorte.isBefore(LocalDate.now())) {
+                return;
+            }
+
             if (empresa.getStatusAssinatura() == StatusAssinatura.ATIVA) {
                 empresa.setStatusAssinatura(StatusAssinatura.INADIMPLENTE);
                 empresa.setMotivoBloqueio("Assinatura vencida em " + empresa.getDataVencimento() + ".");

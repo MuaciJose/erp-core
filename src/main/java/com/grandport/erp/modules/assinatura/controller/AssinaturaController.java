@@ -11,8 +11,13 @@ import com.grandport.erp.modules.assinatura.dto.RegistrarPagamentoDTO;
 import com.grandport.erp.modules.assinatura.dto.AtualizarPlanoEmpresaDTO;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoResumoDTO;
 import com.grandport.erp.modules.assinatura.dto.WebhookPagamentoDTO;
+import com.grandport.erp.modules.assinatura.dto.AtualizarLicencaModuloDTO;
+import com.grandport.erp.modules.assinatura.dto.EmpresaTimelineEventoDTO;
+import com.grandport.erp.modules.assinatura.dto.ModuloLicencaResumoDTO;
+import com.grandport.erp.modules.assinatura.dto.SaasOperacaoResumoDTO;
 import com.grandport.erp.modules.assinatura.service.AssinaturaService;
 import com.grandport.erp.modules.assinatura.service.CobrancaAssinaturaService;
+import com.grandport.erp.modules.assinatura.service.LicenciamentoModuloService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -26,10 +31,12 @@ public class AssinaturaController {
 
     private final AssinaturaService assinaturaService;
     private final CobrancaAssinaturaService cobrancaAssinaturaService;
+    private final LicenciamentoModuloService licenciamentoModuloService;
 
-    public AssinaturaController(AssinaturaService assinaturaService, CobrancaAssinaturaService cobrancaAssinaturaService) {
+    public AssinaturaController(AssinaturaService assinaturaService, CobrancaAssinaturaService cobrancaAssinaturaService, LicenciamentoModuloService licenciamentoModuloService) {
         this.assinaturaService = assinaturaService;
         this.cobrancaAssinaturaService = cobrancaAssinaturaService;
+        this.licenciamentoModuloService = licenciamentoModuloService;
     }
 
     @PostMapping("/nova-empresa")
@@ -104,6 +111,13 @@ public class AssinaturaController {
         return assinaturaService.listarEmpresas();
     }
 
+    @GetMapping("/resumo-operacao")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public SaasOperacaoResumoDTO resumoOperacao() {
+        assinaturaService.validarAcessoPlataforma();
+        return assinaturaService.obterResumoOperacao();
+    }
+
     @PostMapping("/empresas/{id}/bloquear")
     @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<?> bloquearEmpresa(@PathVariable Long id, @RequestBody(required = false) Map<String, String> payload) {
@@ -143,6 +157,31 @@ public class AssinaturaController {
         try {
             assinaturaService.validarAcessoPlataforma();
             return ResponseEntity.ok(assinaturaService.atualizarPlanoEmpresa(id, dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/empresas/{id}/modulos")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public List<ModuloLicencaResumoDTO> listarModulosEmpresa(@PathVariable Long id) {
+        assinaturaService.validarAcessoPlataforma();
+        return licenciamentoModuloService.listarLicencasEmpresa(id);
+    }
+
+    @GetMapping("/empresas/{id}/timeline")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public List<EmpresaTimelineEventoDTO> listarTimelineEmpresa(@PathVariable Long id) {
+        assinaturaService.validarAcessoPlataforma();
+        return assinaturaService.listarTimelineEmpresa(id);
+    }
+
+    @PostMapping("/empresas/{id}/modulos")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public ResponseEntity<?> atualizarModuloEmpresa(@PathVariable Long id, @RequestBody AtualizarLicencaModuloDTO dto) {
+        try {
+            assinaturaService.validarAcessoPlataforma();
+            return ResponseEntity.ok(licenciamentoModuloService.atualizarLicencaEmpresa(id, dto));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }

@@ -4,11 +4,19 @@ import com.grandport.erp.modules.assinatura.dto.NovaEmpresaDTO;
 import com.grandport.erp.modules.assinatura.dto.ConviteAssinaturaDTO;
 import com.grandport.erp.modules.assinatura.dto.ConvitePublicoDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaAssinaturaResumoDTO;
+import com.grandport.erp.modules.assinatura.dto.EmpresaCobrancaComposicaoDTO;
+import com.grandport.erp.modules.assinatura.dto.EmpresaTimelineEventoDTO;
 import com.grandport.erp.modules.assinatura.dto.RegistrarPagamentoDTO;
+import com.grandport.erp.modules.assinatura.dto.SaasOperacaoResumoDTO;
 import com.grandport.erp.modules.assinatura.dto.AtualizarPlanoEmpresaDTO;
 import com.grandport.erp.modules.assinatura.model.AssinaturaCobranca;
+import com.grandport.erp.modules.assinatura.dto.ModuloLicencaResumoDTO;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoDTO;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoResumoDTO;
+import com.grandport.erp.modules.admin.model.LogAuditoria;
+import com.grandport.erp.modules.admin.model.SecurityEvent;
+import com.grandport.erp.modules.admin.repository.LogAuditoriaRepository;
+import com.grandport.erp.modules.admin.repository.SecurityEventRepository;
 import com.grandport.erp.modules.assinatura.model.AssinaturaInvite;
 import com.grandport.erp.modules.assinatura.model.SolicitacaoAcesso;
 import com.grandport.erp.modules.assinatura.repository.AssinaturaInviteRepository;
@@ -29,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -43,8 +53,11 @@ public class AssinaturaService {
     private final AssinaturaInviteRepository assinaturaInviteRepository;
     private final SolicitacaoAcessoRepository solicitacaoAcessoRepository;
     private final CobrancaAssinaturaService cobrancaAssinaturaService;
+    private final LicenciamentoModuloService licenciamentoModuloService;
+    private final LogAuditoriaRepository logAuditoriaRepository;
+    private final SecurityEventRepository securityEventRepository;
 
-    public AssinaturaService(EmpresaRepository empresaRepository, UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, PasswordPolicyService passwordPolicyService, AssinaturaInviteRepository assinaturaInviteRepository, SolicitacaoAcessoRepository solicitacaoAcessoRepository, CobrancaAssinaturaService cobrancaAssinaturaService) {
+    public AssinaturaService(EmpresaRepository empresaRepository, UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, PasswordPolicyService passwordPolicyService, AssinaturaInviteRepository assinaturaInviteRepository, SolicitacaoAcessoRepository solicitacaoAcessoRepository, CobrancaAssinaturaService cobrancaAssinaturaService, LicenciamentoModuloService licenciamentoModuloService, LogAuditoriaRepository logAuditoriaRepository, SecurityEventRepository securityEventRepository) {
         this.empresaRepository = empresaRepository;
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
@@ -52,6 +65,9 @@ public class AssinaturaService {
         this.assinaturaInviteRepository = assinaturaInviteRepository;
         this.solicitacaoAcessoRepository = solicitacaoAcessoRepository;
         this.cobrancaAssinaturaService = cobrancaAssinaturaService;
+        this.licenciamentoModuloService = licenciamentoModuloService;
+        this.logAuditoriaRepository = logAuditoriaRepository;
+        this.securityEventRepository = securityEventRepository;
     }
 
     @Transactional
@@ -206,6 +222,85 @@ public class AssinaturaService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public SaasOperacaoResumoDTO obterResumoOperacao() {
+        List<Empresa> empresas = empresaRepository.findAll();
+        LocalDate hoje = LocalDate.now();
+        LocalDate limite = hoje.plusDays(7);
+        double mrrBase = empresas.stream()
+                .map(Empresa::getValorMensal)
+                .filter(valor -> valor != null)
+                .mapToDouble(BigDecimal::doubleValue)
+                .sum();
+        int empresasVencendo7Dias = (int) empresas.stream()
+                .filter(item -> item.getDataVencimento() != null)
+                .filter(item -> !item.getDataVencimento().isBefore(hoje) && !item.getDataVencimento().isAfter(limite))
+                .count();
+        int empresasComBloqueioComercial = (int) empresas.stream()
+                .filter(item -> licenciamentoModuloService.listarLicencasEmpresa(item.getId()).stream().anyMatch(ModuloLicencaResumoDTO::bloqueadoComercial))
+                .count();
+
+        return new SaasOperacaoResumoDTO(
+                empresas.size(),
+                (int) empresas.stream().filter(item -> item.getStatusAssinatura() == StatusAssinatura.ATIVA).count(),
+                (int) empresas.stream().filter(item -> item.getStatusAssinatura() == StatusAssinatura.INADIMPLENTE).count(),
+                (int) empresas.stream().filter(item -> item.getStatusAssinatura() == StatusAssinatura.BLOQUEADA).count(),
+                empresasVencendo7Dias,
+                mrrBase,
+                licenciamentoModuloService.somarReceitaExtrasMensal().doubleValue(),
+                (int) licenciamentoModuloService.totalModulosExtrasAtivos(),
+                (int) licenciamentoModuloService.totalTrialsAtivos(),
+                empresasComBloqueioComercial,
+                (int) licenciamentoModuloService.totalModulosBloqueadosComercialmente()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<EmpresaTimelineEventoDTO> listarTimelineEmpresa(Long empresaId) {
+        empresaRepository.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
+
+        List<EmpresaTimelineEventoDTO> eventos = new ArrayList<>();
+
+        for (LogAuditoria logItem : logAuditoriaRepository.findTop20ByEmpresaIdOrderByDataHoraDesc(empresaId)) {
+            eventos.add(new EmpresaTimelineEventoDTO(
+                    logItem.getDataHora() == null ? null : logItem.getDataHora().toString(),
+                    "AUDITORIA",
+                    logItem.getAcao(),
+                    logItem.getDetalhes(),
+                    "INFO",
+                    logItem.getModulo()
+            ));
+        }
+
+        for (SecurityEvent event : securityEventRepository.findTop20ByEmpresaIdOrderByDataHoraDesc(empresaId)) {
+            eventos.add(new EmpresaTimelineEventoDTO(
+                    event.getDataHora() == null ? null : event.getDataHora().toString(),
+                    "SEGURANCA",
+                    event.getTipo(),
+                    event.getDetalhes(),
+                    event.getSeveridade(),
+                    "SECURITY_EVENT"
+            ));
+        }
+
+        for (AssinaturaCobranca cobranca : cobrancaAssinaturaService.listarEntidadesPorEmpresa(empresaId)) {
+            eventos.add(new EmpresaTimelineEventoDTO(
+                    cobranca.getCreatedAt() == null ? null : cobranca.getCreatedAt().toString(),
+                    "COBRANCA",
+                    "COBRANCA_" + cobranca.getStatus().name(),
+                    "Cobrança " + cobranca.getReferencia() + " no valor de R$ " + cobranca.getValor(),
+                    cobranca.getStatus().name(),
+                    "BILLING"
+            ));
+        }
+
+        return eventos.stream()
+                .sorted(Comparator.comparing(EmpresaTimelineEventoDTO::dataHora, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(25)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public EmpresaAssinaturaResumoDTO bloquearEmpresa(Long empresaId, String motivoBloqueio) {
         Empresa empresa = empresaRepository.findById(empresaId)
@@ -330,6 +425,12 @@ public class AssinaturaService {
                 .map(Usuario::getUsername)
                 .orElse(empresa.getEmailContato());
         AssinaturaCobranca ultimaCobranca = cobrancaAssinaturaService.obterUltimaCobranca(empresa.getId());
+        List<ModuloLicencaResumoDTO> licencas = licenciamentoModuloService.listarLicencasEmpresa(empresa.getId());
+        int totalModulosAtivos = (int) licencas.stream().filter(ModuloLicencaResumoDTO::ativo).count();
+        int totalModulosExtras = (int) licencas.stream().filter(item -> item.ativo() && !item.disponivelNoPlano()).count();
+        int totalModulosBloqueados = (int) licencas.stream().filter(item -> !item.ativo()).count();
+        int totalModulosBloqueadosComercialmente = (int) licencas.stream().filter(ModuloLicencaResumoDTO::bloqueadoComercial).count();
+        EmpresaCobrancaComposicaoDTO composicao = licenciamentoModuloService.montarComposicaoCobrancaEmpresa(empresa);
 
         return new EmpresaAssinaturaResumoDTO(
                 empresa.getId(),
@@ -345,6 +446,13 @@ public class AssinaturaService {
                 empresa.getPlano(),
                 empresa.getValorMensal() == null ? 0D : empresa.getValorMensal().doubleValue(),
                 empresa.getDiasTolerancia(),
+                totalModulosAtivos,
+                totalModulosExtras,
+                totalModulosBloqueados,
+                totalModulosBloqueadosComercialmente,
+                composicao.valorExtras(),
+                composicao.valorTotalPrevisto(),
+                composicao.extrasCobrados(),
                 ultimaCobranca == null || ultimaCobranca.getStatus() == null ? null : ultimaCobranca.getStatus().name(),
                 ultimaCobranca == null || ultimaCobranca.getDataVencimento() == null ? null : ultimaCobranca.getDataVencimento().toString(),
                 ultimaCobranca == null || ultimaCobranca.getValor() == null ? null : ultimaCobranca.getValor().doubleValue(),

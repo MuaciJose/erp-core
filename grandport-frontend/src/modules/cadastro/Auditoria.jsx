@@ -6,8 +6,8 @@ import {
 } from 'lucide-react';
 
 export const Auditoria = () => {
-    // 🚀 ESTADOS DO MOTOR DE PAGINAÇÃO
     const [logs, setLogs] = useState([]);
+    const [empresas, setEmpresas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
@@ -16,13 +16,28 @@ export const Auditoria = () => {
 
     // ESTADOS DE FILTRO
     const [busca, setBusca] = useState('');
+    const [empresaFiltro, setEmpresaFiltro] = useState('TODAS');
     const [moduloFiltro, setModuloFiltro] = useState('TODOS');
     const [filtroInteligente, setFiltroInteligente] = useState('TUDO');
+    const [acaoFiltro, setAcaoFiltro] = useState('');
+    const [dataInicio, setDataInicio] = useState('');
+    const [dataFim, setDataFim] = useState('');
 
     const carregarLogs = async () => {
         setLoading(true);
         try {
-            const res = await api.get(`/api/auditoria?page=${page}&size=${tamanhoPagina}`);
+            const res = await api.get('/api/auditoria', {
+                params: {
+                    page,
+                    size: tamanhoPagina,
+                    empresaId: empresaFiltro === 'TODAS' ? undefined : Number(empresaFiltro),
+                    modulo: moduloFiltro === 'TODOS' ? undefined : moduloFiltro,
+                    acao: acaoFiltro || undefined,
+                    busca: busca || undefined,
+                    dataInicio: dataInicio || undefined,
+                    dataFim: dataFim || undefined
+                }
+            });
             setLogs(res.data.content || []);
             setTotalPages(res.data.totalPages || 0);
             setTotalElements(res.data.totalElements || 0);
@@ -34,12 +49,27 @@ export const Auditoria = () => {
     };
 
     useEffect(() => {
-        carregarLogs();
-    }, [page]);
+        const loadEmpresas = async () => {
+            try {
+                const res = await api.get('/api/assinaturas/empresas');
+                setEmpresas(Array.isArray(res.data) ? res.data : []);
+            } catch (error) {
+                setEmpresas([]);
+            }
+        };
+        loadEmpresas();
+    }, []);
 
     useEffect(() => {
         setPage(0);
-    }, [moduloFiltro, filtroInteligente]);
+    }, [empresaFiltro, moduloFiltro, filtroInteligente, acaoFiltro, dataInicio, dataFim, busca]);
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            carregarLogs();
+        }, 250);
+        return () => clearTimeout(timeout);
+    }, [page, empresaFiltro, moduloFiltro, acaoFiltro, dataInicio, dataFim, busca]);
 
     // 🚀 MOTOR DE CORES INTELIGENTE (ESTILO FERRARI)
     const getBadgeConfig = (acao) => {
@@ -68,19 +98,12 @@ export const Auditoria = () => {
     };
 
     const logsFiltrados = logs.filter(log => {
-        const atendeModulo = moduloFiltro === 'TODOS' || log.modulo === moduloFiltro;
-        const termo = busca.toLowerCase();
-        const atendeBusca = (log.usuarioNome?.toLowerCase() || '').includes(termo) ||
-            (log.detalhes?.toLowerCase() || '').includes(termo) ||
-            (log.ipOrigem?.toLowerCase() || '').includes(termo) ||
-            (log.acao?.toLowerCase() || '').includes(termo);
-
         let atendeInteligente = true;
         if (filtroInteligente === 'EXCLUSOES') atendeInteligente = log.acao?.toUpperCase().includes('EXCLUSAO') || log.acao?.toUpperCase().includes('CANCELAMENTO') || log.acao?.toUpperCase().includes('FORCADA');
         if (filtroInteligente === 'FINANCEIRO') atendeInteligente = log.modulo === 'FINANCEIRO' || log.modulo === 'CAIXA';
         if (filtroInteligente === 'FISCAL') atendeInteligente = log.modulo === 'FISCAL';
 
-        return atendeModulo && atendeBusca && atendeInteligente;
+        return atendeInteligente;
     });
 
     return (
@@ -125,6 +148,20 @@ export const Auditoria = () => {
                     <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 hover:border-slate-300 transition-colors">
                         <Filter size={16} className="text-slate-400" />
                         <select
+                            value={empresaFiltro}
+                            onChange={(e) => setEmpresaFiltro(e.target.value)}
+                            className="py-2.5 px-1 bg-transparent outline-none text-sm font-bold text-slate-700 w-full md:w-56 cursor-pointer"
+                        >
+                            <option value="TODAS">Todas as empresas</option>
+                            {empresas.map((empresa) => (
+                                <option key={empresa.id} value={empresa.id}>{empresa.razaoSocial}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 hover:border-slate-300 transition-colors">
+                        <Filter size={16} className="text-slate-400" />
+                        <select
                             value={moduloFiltro}
                             onChange={(e) => setModuloFiltro(e.target.value)}
                             className="py-2.5 px-1 bg-transparent outline-none text-sm font-bold text-slate-700 w-full md:w-48 cursor-pointer"
@@ -140,6 +177,26 @@ export const Auditoria = () => {
                             <option value="SISTEMA">Configurações/Sistema</option>
                         </select>
                     </div>
+
+                    <input
+                        type="text"
+                        placeholder="Filtrar ação..."
+                        value={acaoFiltro}
+                        onChange={(e) => setAcaoFiltro(e.target.value)}
+                        className="w-full md:w-48 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+                    />
+                    <input
+                        type="date"
+                        value={dataInicio}
+                        onChange={(e) => setDataInicio(e.target.value)}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+                    />
+                    <input
+                        type="date"
+                        value={dataFim}
+                        onChange={(e) => setDataFim(e.target.value)}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+                    />
                 </div>
 
                 {/* FILTROS INTELIGENTES RAPIDOS */}
@@ -158,6 +215,7 @@ export const Auditoria = () => {
                         <thead className="bg-slate-50/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-10">
                         <tr className="text-[11px] text-slate-500 uppercase tracking-widest">
                             <th className="p-4 pl-6 font-black w-48 whitespace-nowrap">Data / Hora</th>
+                            <th className="p-4 font-black w-48 whitespace-nowrap">Empresa</th>
                             <th className="p-4 font-black w-48 whitespace-nowrap">Usuário Operador</th>
                             <th className="p-4 font-black w-32 text-center whitespace-nowrap">IP Origem</th>
                             <th className="p-4 font-black w-32 whitespace-nowrap">Módulo</th>
@@ -171,6 +229,7 @@ export const Auditoria = () => {
                             [...Array(7)].map((_, i) => (
                                 <tr key={i} className="animate-pulse">
                                     <td className="p-4 pl-6"><div className="h-4 bg-slate-100 rounded w-24 mb-2"></div><div className="h-3 bg-slate-100 rounded w-16"></div></td>
+                                    <td className="p-4"><div className="h-4 bg-slate-100 rounded w-40"></div></td>
                                     <td className="p-4"><div className="h-4 bg-slate-100 rounded w-32"></div></td>
                                     <td className="p-4"><div className="h-5 bg-slate-100 rounded-full w-24 mx-auto"></div></td>
                                     <td className="p-4"><div className="h-4 bg-slate-100 rounded w-20"></div></td>
@@ -180,7 +239,7 @@ export const Auditoria = () => {
                             ))
                         ) : logsFiltrados.length === 0 ? (
                             <tr>
-                                <td colSpan="6" className="p-16 text-center">
+                                <td colSpan="7" className="p-16 text-center">
                                     <div className="flex flex-col items-center justify-center gap-3">
                                         <div className="bg-slate-50 p-4 rounded-full text-slate-300">
                                             <Search size={40} />
@@ -201,6 +260,14 @@ export const Auditoria = () => {
                                             </div>
                                             <div className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-0.5">
                                                 <Clock size={10} /> {new Date(log.dataHora).toLocaleTimeString('pt-BR')}
+                                            </div>
+                                        </td>
+                                        <td className="p-4 align-top">
+                                            <div className="font-bold text-slate-800 text-sm">
+                                                {log.empresaRazaoSocial || `Empresa #${log.empresaId || '-'}`}
+                                            </div>
+                                            <div className="text-[11px] font-medium text-slate-400">
+                                                #{log.empresaId || 'PLATAFORMA'}
                                             </div>
                                         </td>
                                         <td className="p-4 align-top">

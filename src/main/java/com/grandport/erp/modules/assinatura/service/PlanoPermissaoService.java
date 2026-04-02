@@ -22,14 +22,14 @@ import java.util.Set;
 public class PlanoPermissaoService {
 
     private final EmpresaRepository empresaRepository;
+    private final LicenciamentoModuloService licenciamentoModuloService;
 
     public List<String> filtrarPermissoes(Long empresaId, List<String> permissoes) {
         if (permissoes == null) {
             return List.of();
         }
 
-        Empresa empresa = empresaRepository.findById(empresaId).orElse(null);
-        Set<String> permitidas = permissoesPermitidasPorPlano(empresa == null ? "ESSENCIAL" : empresa.getPlano());
+        Set<String> permitidas = licenciamentoModuloService.modulosLiberados(empresaId);
 
         return permissoes.stream()
                 .filter(p -> p != null && !p.isBlank())
@@ -80,36 +80,4 @@ public class PlanoPermissaoService {
         return authorities.stream().map(SimpleGrantedAuthority::new).toList();
     }
 
-    private Set<String> permissoesPermitidasPorPlano(String plano) {
-        String valor = plano == null ? "ESSENCIAL" : plano.trim().toUpperCase(Locale.ROOT);
-        Set<String> permissoes = new LinkedHashSet<>();
-
-        permissoes.addAll(List.of(
-                "dash", "pdv", "vendas", "checklist", "os", "listagem-os",
-                "fila-caixa", "caixa",
-                "estoque", "marcas", "categorias", "ajuste_estoque",
-                "parceiros", "servicos",
-                "agenda", "manual", "usuarios", "configuracoes"
-        ));
-
-        if ("PROFISSIONAL".equals(valor) || "PREMIUM".equals(valor)) {
-            permissoes.addAll(List.of(
-                    "orcamentos", "relatorio-comissoes",
-                    "crm", "revisoes", "whatsapp",
-                    "compras", "previsao", "faltas", "curva-abc", "etiquetas",
-                    "contas-pagar", "contas-receber", "bancos", "conciliacao",
-                    "recibo-avulso", "historico-recibos"
-            ));
-        }
-
-        if ("PREMIUM".equals(valor)) {
-            permissoes.addAll(List.of(
-                    "plano-contas", "dre", "fluxo-caixa-projecao",
-                    "fiscal", "regras-fiscais", "gerenciador-nfe", "emitir-nfe-avulsa",
-                    "auditoria"
-            ));
-        }
-
-        return permissoes;
-    }
 }

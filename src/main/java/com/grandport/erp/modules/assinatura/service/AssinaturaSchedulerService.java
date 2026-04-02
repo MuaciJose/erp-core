@@ -20,6 +20,7 @@ public class AssinaturaSchedulerService {
 
     private final EmpresaRepository empresaRepository;
     private final SecurityEventService securityEventService;
+    private final LicenciamentoModuloService licenciamentoModuloService;
 
     @Scheduled(cron = "${app.jobs.assinaturas.verificacao-cron:0 0 2 * * *}")
     @Transactional
@@ -27,6 +28,7 @@ public class AssinaturaSchedulerService {
         LocalDate hoje = LocalDate.now();
         List<Empresa> empresas = empresaRepository.findAll();
         int bloqueadas = 0;
+        int addOnsBloqueados = 0;
 
         for (Empresa empresa : empresas) {
             if (!Boolean.TRUE.equals(empresa.getAtivo())) {
@@ -38,6 +40,11 @@ public class AssinaturaSchedulerService {
             LocalDate dataCorte = empresa.getDataVencimento() == null
                     ? null
                     : empresa.getDataVencimento().plusDays(Math.max(empresa.getDiasTolerancia() == null ? 0 : empresa.getDiasTolerancia(), 0));
+            if (empresa.getDataVencimento() != null && empresa.getDataVencimento().isBefore(hoje)) {
+                String motivoAddon = "Bloqueio automático por inadimplência de add-ons. Vencimento em " + empresa.getDataVencimento() + ".";
+                addOnsBloqueados += licenciamentoModuloService.bloquearAddonsPorInadimplencia(empresa.getId(), motivoAddon);
+            }
+
             if (dataCorte == null || !dataCorte.isBefore(hoje)) {
                 continue;
             }
@@ -61,6 +68,15 @@ public class AssinaturaSchedulerService {
             log.warn("Verificação diária de assinaturas marcou {} empresa(s) como inadimplente(s).", bloqueadas);
         } else {
             log.info("Verificação diária de assinaturas concluída sem bloqueios automáticos.");
+        }
+
+        if (addOnsBloqueados > 0) {
+            log.warn("Verificação diária bloqueou comercialmente {} add-on(s) por atraso.", addOnsBloqueados);
+        }
+
+        int trialsExpirados = licenciamentoModuloService.expirarTrialsVencidos();
+        if (trialsExpirados > 0) {
+            log.warn("Verificação diária expirou {} trial(s) de módulos SaaS.", trialsExpirados);
         }
     }
 }

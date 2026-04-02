@@ -8,7 +8,6 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Rate Limiting: Máximo de requisições por IP
@@ -19,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class RateLimitInterceptor implements HandlerInterceptor {
 
     private static final int MAX_REQUESTS = 100;
-    private static final long WINDOW_MS = 60_000; // 1 minuto
+    static final long WINDOW_MS = 60_000; // 1 minuto
     private final ConcurrentHashMap<String, RequestCounter> requestCounts = new ConcurrentHashMap<>();
 
     @Override
@@ -50,26 +49,4 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         return request.getRemoteAddr();
     }
 
-    private static class RequestCounter {
-        private final AtomicInteger count = new AtomicInteger(0);
-        private long lastResetTime = System.currentTimeMillis();
-
-        public int increment() {
-            return count.incrementAndGet();
-        }
-
-        public int getCount() {
-            return count.get();
-        }
-
-        public void reset() {
-            count.set(0);
-            lastResetTime = System.currentTimeMillis();
-        }
-
-        public boolean isExpired() {
-            return System.currentTimeMillis() - lastResetTime > WINDOW_MS;
-        }
-    }
 }
-

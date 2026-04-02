@@ -9,4 +9,6 @@ import java.util.List;
 public interface SecurityEventRepository extends JpaRepository<SecurityEvent, Long> {
 
     List<SecurityEvent> findByEmpresaIdOrderByDataHoraDesc(Long empresaId, Pageable pageable);
+
+    List<SecurityEvent> findTop20ByEmpresaIdOrderByDataHoraDesc(Long empresaId);
 }

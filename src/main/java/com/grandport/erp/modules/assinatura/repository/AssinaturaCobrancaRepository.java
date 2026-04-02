@@ -12,4 +12,5 @@ public interface AssinaturaCobrancaRepository extends JpaRepository<AssinaturaCo
     Optional<AssinaturaCobranca> findTopByEmpresaIdOrderByDataVencimentoDescCreatedAtDesc(Long empresaId);
     Optional<AssinaturaCobranca> findByGatewayNomeAndGatewayCobrancaId(String gatewayNome, String gatewayCobrancaId);
     List<AssinaturaCobranca> findByStatus(CobrancaStatus status);
+    List<AssinaturaCobranca> findTop10ByEmpresaIdOrderByCreatedAtDesc(Long empresaId);
 }

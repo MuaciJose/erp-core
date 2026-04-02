@@ -3,7 +3,8 @@ import api from './api/axios';
 import { clearSession, syncAuthHeader, updateStoredUser } from './utils/authStorage';
 
 // --- IMPORTAÇÃO DO TOAST ---
-import { Toaster, toast } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
+import { AppToaster } from './components/AppToaster';
 
 import { Sidebar } from './components/Sidebar';
 import { PlatformConsoleLayout } from './components/PlatformConsoleLayout';
@@ -17,6 +18,7 @@ import CadastroEmpresa from './modules/auth/CadastroEmpresa'; // 🚀 IMPORTAÇ�
 import FinalizarCadastroEmpresa from './modules/auth/FinalizarCadastroEmpresa';
 import { CargaNcm } from './modules/admin/CargaNcm';
 import { RelatorioFaltas } from './modules/admin/RelatorioFaltas';
+import { PlatformOverview } from './modules/admin/PlatformOverview';
 import { ContasPagar } from './modules/financeiro/ContasPagar';
 import { ControleCaixa } from './modules/financeiro/ControleCaixa';
 import { FluxoCaixaDre } from './modules/financeiro/FluxoCaixaDre';
@@ -274,59 +276,10 @@ function App() {
         setPaginaAtiva(telaInicialErp);
     };
 
-    const renderPlatformOverview = () => (
-        <div className="space-y-6">
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
-                <div className="max-w-3xl">
-                    <div className="text-[11px] font-black uppercase tracking-[0.28em] text-blue-700">Governanca</div>
-                    <h2 className="mt-3 text-4xl font-black tracking-tight text-slate-900">Painel mestre da plataforma</h2>
-                    <p className="mt-4 text-base leading-7 text-slate-600">
-                        Este ambiente separa a operacao SaaS do ERP operacional. Daqui voce controla empresas, licenciamento, cobrancas, seguranca e decide quando entrar no ERP.
-                    </p>
-                </div>
-                <div className="mt-8 grid gap-4 md:grid-cols-3">
-                    <button
-                        onClick={() => setPaginaAtiva('central-saas')}
-                        className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                    >
-                        <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">Operacao</div>
-                        <div className="mt-2 text-xl font-black text-slate-900">Central SaaS</div>
-                        <p className="mt-2 text-sm text-slate-600">Empresas, planos, modulos, cobrancas e status comercial.</p>
-                    </button>
-                    <button
-                        onClick={() => setPaginaAtiva('auditoria')}
-                        className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                    >
-                        <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">Seguranca</div>
-                        <div className="mt-2 text-xl font-black text-slate-900">Auditoria</div>
-                        <p className="mt-2 text-sm text-slate-600">Eventos sensiveis, rastreabilidade e investigacao operacional.</p>
-                    </button>
-                    <button
-                        onClick={handleEntrarErp}
-                        className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                    >
-                        <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">Produto</div>
-                        <div className="mt-2 text-xl font-black text-slate-900">Entrar no ERP</div>
-                        <p className="mt-2 text-sm text-slate-600">Acesse o ambiente operacional sem misturar a governanca da plataforma.</p>
-                    </button>
-                </div>
-            </section>
-        </div>
-    );
-
     if (isPlatformAdmin && modoAplicacao === 'platform') {
         return (
             <>
-                <Toaster
-                    position="top-right"
-                    reverseOrder={false}
-                    toastOptions={{
-                        duration: 4000,
-                        style: { background: '#1e293b', color: '#fff', borderRadius: '12px', fontWeight: 'bold' },
-                        success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
-                        error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } }
-                    }}
-                />
+                <AppToaster />
                 <PlatformConsoleLayout
                     paginaAtiva={paginaAtiva}
                     setPaginaAtiva={setPaginaAtiva}
@@ -334,7 +287,13 @@ function App() {
                     onLogout={handleLogout}
                     onEntrarErp={handleEntrarErp}
                 >
-                    {paginaAtiva === 'platform-overview' && renderPlatformOverview()}
+                    {paginaAtiva === 'platform-overview' && (
+                        <PlatformOverview
+                            onAbrirCentralSaas={() => setPaginaAtiva('central-saas')}
+                            onAbrirAuditoria={() => setPaginaAtiva('auditoria')}
+                            onEntrarErp={handleEntrarErp}
+                        />
+                    )}
                     {paginaAtiva === 'central-saas' && <CentralSaas />}
                     {paginaAtiva === 'auditoria' && <Auditoria />}
                 </PlatformConsoleLayout>
@@ -345,16 +304,7 @@ function App() {
     return (
         <div className="flex h-screen w-screen bg-slate-50 overflow-hidden font-sans">
 
-            <Toaster
-                position="top-right"
-                reverseOrder={false}
-                toastOptions={{
-                    duration: 4000,
-                    style: { background: '#1e293b', color: '#fff', borderRadius: '12px', fontWeight: 'bold' },
-                    success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
-                    error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } }
-                }}
-            />
+            <AppToaster />
 
             {!isFullScreen && (
                 <Sidebar

@@ -2,12 +2,57 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Copy, KeyRound, Mail, RefreshCcw, ShieldAlert, ShieldCheck, UserRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
+import { TooltipHint } from '../../components/TooltipHint';
+
+const formatCurrencyBRL = (value) => {
+    const numero = Number(value || 0);
+    return numero.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
+
+const parseCurrencyBRL = (value) => {
+    if (typeof value === 'number') return value;
+    const normalizado = String(value || '')
+        .replace(/\./g, '')
+        .replace(',', '.')
+        .replace(/[^\d.-]/g, '');
+    const numero = Number(normalizado);
+    return Number.isFinite(numero) ? numero : 0;
+};
+
+const maskCurrencyInput = (value) => {
+    const digits = String(value || '').replace(/\D/g, '');
+    const cents = Number(digits || '0') / 100;
+    return cents.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const maskCnpj = (value) => {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 14);
+    return digits
+        .replace(/^(\d{2})(\d)/, '$1.$2')
+        .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+        .replace(/\.(\d{3})(\d)/, '.$1/$2')
+        .replace(/(\d{4})(\d)/, '$1-$2');
+};
+
+const maskPhone = (value) => {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 11);
+    if (digits.length <= 10) {
+        return digits
+            .replace(/^(\d{2})(\d)/g, '($1) $2')
+            .replace(/(\d{4})(\d)/, '$1-$2');
+    }
+    return digits
+        .replace(/^(\d{2})(\d)/g, '($1) $2')
+        .replace(/(\d{5})(\d)/, '$1-$2');
+};
 
 export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
+    const checklistStorageKey = 'grandport_saas_manual_checklist';
     const [solicitacoes, setSolicitacoes] = useState([]);
     const [convites, setConvites] = useState([]);
     const [empresas, setEmpresas] = useState([]);
     const [eventosSeguranca, setEventosSeguranca] = useState([]);
+    const [resumoOperacao, setResumoOperacao] = useState(null);
     const [loading, setLoading] = useState(true);
     const [processandoId, setProcessandoId] = useState(null);
     const [filtro, setFiltro] = useState('PENDENTE');
@@ -17,26 +62,49 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
     const [planosEmpresa, setPlanosEmpresa] = useState({});
     const [valoresEmpresa, setValoresEmpresa] = useState({});
     const [toleranciasEmpresa, setToleranciasEmpresa] = useState({});
+    const [licencasPorEmpresa, setLicencasPorEmpresa] = useState({});
+    const [licencasLoading, setLicencasLoading] = useState({});
+    const [observacoesModulo, setObservacoesModulo] = useState({});
+    const [timelinePorEmpresa, setTimelinePorEmpresa] = useState({});
+    const [timelineLoading, setTimelineLoading] = useState({});
+    const [manualChecklist, setManualChecklist] = useState(() => {
+        try {
+            const raw = localStorage.getItem(checklistStorageKey);
+            return raw ? JSON.parse(raw) : {};
+        } catch {
+            return {};
+        }
+    });
     const [abaAtiva, setAbaAtiva] = useState('solicitacoes');
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(checklistStorageKey, JSON.stringify(manualChecklist));
+        } catch {
+            // ignora falha de persistencia local
+        }
+    }, [manualChecklist]);
 
     const carregarDados = async () => {
         setLoading(true);
         try {
-            const [resSolicitacoes, resConvites, resEmpresas, resEventos] = await Promise.all([
+            const [resSolicitacoes, resConvites, resEmpresas, resEventos, resResumo] = await Promise.all([
                 api.get('/api/assinaturas/solicitacoes-acesso'),
                 api.get('/api/assinaturas/convites'),
                 api.get('/api/assinaturas/empresas'),
-                api.get('/api/security-events', { params: { limit: 10 } })
+                api.get('/api/security-events', { params: { limit: 10 } }),
+                api.get('/api/assinaturas/resumo-operacao')
             ]);
             setSolicitacoes(Array.isArray(resSolicitacoes.data) ? resSolicitacoes.data : []);
             setConvites(Array.isArray(resConvites.data) ? resConvites.data : []);
             const empresasRecebidas = Array.isArray(resEmpresas.data) ? resEmpresas.data : [];
             setEmpresas(empresasRecebidas);
             setEventosSeguranca(Array.isArray(resEventos.data) ? resEventos.data : []);
+            setResumoOperacao(resResumo.data || null);
             setDatasVencimento(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.dataVencimento || ''])));
             setMotivosBloqueio(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.motivoBloqueio || ''])));
             setPlanosEmpresa(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.plano || 'ESSENCIAL'])));
-            setValoresEmpresa(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.valorMensal ?? 0])));
+            setValoresEmpresa(Object.fromEntries(empresasRecebidas.map(item => [item.id, maskCurrencyInput(item.valorMensal ?? 0)])));
             setToleranciasEmpresa(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.diasTolerancia ?? 0])));
         } catch (error) {
             toast.error('Não foi possível carregar os dados da operação SaaS.');
@@ -158,6 +226,10 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
         return 'bg-slate-100 text-slate-700';
     };
 
+    const alternarChecklistManual = (id) => {
+        setManualChecklist((prev) => ({ ...prev, [id]: !prev[id] }));
+    };
+
     const bloquearEmpresa = async (empresa) => {
         setProcessandoId(`bloquear-${empresa.id}`);
         const toastId = toast.loading(`Bloqueando ${empresa.razaoSocial}...`);
@@ -212,7 +284,7 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
         try {
             await api.post(`/api/assinaturas/empresas/${empresa.id}/plano`, {
                 plano: planosEmpresa[empresa.id],
-                valorMensal: Number(valoresEmpresa[empresa.id] || 0),
+                valorMensal: parseCurrencyBRL(valoresEmpresa[empresa.id]),
                 diasTolerancia: Number(toleranciasEmpresa[empresa.id] || 0)
             });
             toast.success('Plano atualizado com sucesso.', { id: toastId });
@@ -230,7 +302,7 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
         try {
             await api.post(`/api/assinaturas/empresas/${empresa.id}/cobrancas`, {
                 referencia: `MENSALIDADE-${datasVencimento[empresa.id] || new Date().toISOString().slice(0, 10)}`,
-                valor: Number(valoresEmpresa[empresa.id] || empresa.valorMensal || 0),
+                valor: parseCurrencyBRL(valoresEmpresa[empresa.id]) || empresa.valorMensal || 0,
                 dataVencimento: datasVencimento[empresa.id],
                 gatewayNome: 'MANUAL',
                 descricao: `Cobrança manual do plano ${planosEmpresa[empresa.id] || empresa.plano || 'ESSENCIAL'}`
@@ -244,11 +316,67 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
         }
     };
 
+    const carregarTimelineEmpresa = async (empresaId, force = false) => {
+        if (!force && timelinePorEmpresa[empresaId]) return;
+        setTimelineLoading(prev => ({ ...prev, [empresaId]: true }));
+        try {
+            const res = await api.get(`/api/assinaturas/empresas/${empresaId}/timeline`);
+            setTimelinePorEmpresa(prev => ({ ...prev, [empresaId]: Array.isArray(res.data) ? res.data : [] }));
+        } catch (error) {
+            toast.error('Não foi possível carregar a timeline desta empresa.');
+        } finally {
+            setTimelineLoading(prev => ({ ...prev, [empresaId]: false }));
+        }
+    };
+
+    const carregarLicencasEmpresa = async (empresaId, force = false) => {
+        if (!force && licencasPorEmpresa[empresaId]) return;
+        setLicencasLoading(prev => ({ ...prev, [empresaId]: true }));
+        try {
+            const res = await api.get(`/api/assinaturas/empresas/${empresaId}/modulos`);
+            const licencas = Array.isArray(res.data) ? res.data : [];
+            setLicencasPorEmpresa(prev => ({ ...prev, [empresaId]: licencas }));
+            setObservacoesModulo(prev => ({
+                ...prev,
+                ...Object.fromEntries(licencas.map(item => [`${empresaId}:${item.modulo}`, item.observacao || '']))
+            }));
+        } catch (error) {
+            toast.error('Não foi possível carregar o licenciamento desta empresa.');
+        } finally {
+            setLicencasLoading(prev => ({ ...prev, [empresaId]: false }));
+        }
+    };
+
+    const atualizarModuloEmpresa = async (empresa, modulo) => {
+        const chave = `${empresa.id}:${modulo.modulo}`;
+        setProcessandoId(`modulo-${empresa.id}-${modulo.modulo}`);
+        const toastId = toast.loading(`Atualizando ${modulo.nomeExibicao} de ${empresa.razaoSocial}...`);
+        try {
+            const res = await api.post(`/api/assinaturas/empresas/${empresa.id}/modulos`, {
+                modulo: modulo.modulo,
+                ativo: modulo.ativo,
+                observacao: observacoesModulo[chave] || null,
+                valorMensalExtra: modulo.valorMensalExtra ?? 0,
+                trialAte: modulo.trialAte || null,
+                bloqueadoComercial: modulo.bloqueadoComercial ?? false,
+                motivoBloqueioComercial: modulo.motivoBloqueioComercial || null
+            });
+            setLicencasPorEmpresa(prev => ({ ...prev, [empresa.id]: Array.isArray(res.data) ? res.data : [] }));
+            toast.success('Licenciamento atualizado.', { id: toastId });
+            await carregarDados();
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Não foi possível atualizar o módulo.', { id: toastId });
+        } finally {
+            setProcessandoId(null);
+        }
+    };
+
     const abas = [
         { id: 'solicitacoes', label: 'Solicitações', count: solicitacoes.filter(item => item.status === 'PENDENTE').length },
         { id: 'empresas', label: 'Empresas', count: empresas.length },
         { id: 'convites', label: 'Convites', count: convites.length },
-        { id: 'seguranca', label: 'Segurança', count: eventosSeguranca.length }
+        { id: 'seguranca', label: 'Segurança', count: eventosSeguranca.length },
+        { id: 'manual', label: 'Manual', count: 'OPS' }
     ];
 
     return (
@@ -325,6 +453,33 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
                         <div className="mt-2 text-3xl font-black text-blue-900">{resumoEmpresas.vencendo7Dias}</div>
                     </div>
                 </section>
+
+                {resumoOperacao && (
+                    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-slate-500">
+                                MRR Base
+                                <TooltipHint text="Receita recorrente mensal somando os planos base das empresas ativas na plataforma." />
+                            </div>
+                            <div className="mt-2 text-3xl font-black text-slate-900">{formatCurrencyBRL(resumoOperacao.mrrBase)}</div>
+                        </div>
+                        <div className="rounded-3xl border border-violet-200 bg-violet-50 p-5 shadow-sm">
+                            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-violet-700">
+                                MRR Extras
+                                <TooltipHint text="Receita recorrente adicional gerada por módulos liberados fora do plano base da empresa." />
+                            </div>
+                            <div className="mt-2 text-3xl font-black text-violet-900">{formatCurrencyBRL(resumoOperacao.mrrExtras)}</div>
+                        </div>
+                        <div className="rounded-3xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
+                            <div className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Add-ons Ativos</div>
+                            <div className="mt-2 text-3xl font-black text-blue-900">{resumoOperacao.modulosExtrasAtivos}</div>
+                        </div>
+                        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                            <div className="text-xs font-black uppercase tracking-[0.22em] text-amber-700">Trials Ativos</div>
+                            <div className="mt-2 text-3xl font-black text-amber-900">{resumoOperacao.trialsAtivos}</div>
+                        </div>
+                    </section>
+                )}
 
                 {abaAtiva === 'solicitacoes' && (
                     <section className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
@@ -526,14 +681,24 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
                                         </div>
                                         <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
                                             <div><span className="font-bold text-slate-700">Admin:</span> {empresa.adminPrincipal || '-'}</div>
-                                            <div><span className="font-bold text-slate-700">Contato:</span> {empresa.telefone || '-'}</div>
-                                            <div><span className="font-bold text-slate-700">CNPJ:</span> {empresa.cnpj}</div>
+                                            <div><span className="font-bold text-slate-700">Contato:</span> {maskPhone(empresa.telefone) || '-'}</div>
+                                            <div><span className="font-bold text-slate-700">CNPJ:</span> {maskCnpj(empresa.cnpj)}</div>
                                             <div><span className="font-bold text-slate-700">Vencimento:</span> {empresa.dataVencimento ? new Date(`${empresa.dataVencimento}T00:00:00`).toLocaleDateString('pt-BR') : '-'}</div>
                                             <div><span className="font-bold text-slate-700">Plano:</span> {empresa.plano || 'ESSENCIAL'}</div>
-                                            <div><span className="font-bold text-slate-700">Valor:</span> R$ {Number(empresa.valorMensal || 0).toFixed(2)}</div>
+                                            <div><span className="font-bold text-slate-700">Plano base:</span> {formatCurrencyBRL(empresa.valorMensal || 0)}</div>
+                                            <div><span className="font-bold text-slate-700">Módulos ativos:</span> {empresa.totalModulosAtivos ?? '-'}</div>
+                                            <div><span className="font-bold text-slate-700">Extras liberados:</span> {empresa.totalModulosExtras ?? 0}</div>
+                                            <div><span className="font-bold text-slate-700">Bloqueios manuais:</span> {empresa.totalModulosBloqueados ?? 0}</div>
+                                            <div><span className="font-bold text-slate-700">Extras cobrados:</span> {formatCurrencyBRL(empresa.valorExtrasMensal || 0)}</div>
+                                            <div><span className="font-bold text-slate-700">Total previsto:</span> {formatCurrencyBRL(empresa.valorTotalMensalPrevisto || empresa.valorMensal || 0)}</div>
                                             <div><span className="font-bold text-slate-700">Última cobrança:</span> {empresa.ultimaCobrancaStatus || '-'}</div>
                                             <div><span className="font-bold text-slate-700">Venc. cobrança:</span> {empresa.ultimaCobrancaVencimento ? new Date(`${empresa.ultimaCobrancaVencimento}T00:00:00`).toLocaleDateString('pt-BR') : '-'}</div>
                                         </div>
+                                        {Array.isArray(empresa.extrasCobrados) && empresa.extrasCobrados.length > 0 && (
+                                            <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950">
+                                                <span className="font-black">Add-ons faturáveis:</span> {empresa.extrasCobrados.join(', ')}
+                                            </div>
+                                        )}
                                         {empresa.motivoBloqueio && (
                                             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                                                 <span className="font-black">Motivo atual:</span> {empresa.motivoBloqueio}
@@ -575,11 +740,10 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
                                             <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
                                                 Valor mensal
                                                 <input
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
-                                                    value={valoresEmpresa[empresa.id] ?? 0}
-                                                    onChange={(e) => setValoresEmpresa(prev => ({ ...prev, [empresa.id]: e.target.value }))}
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={valoresEmpresa[empresa.id] ?? '0,00'}
+                                                    onChange={(e) => setValoresEmpresa(prev => ({ ...prev, [empresa.id]: maskCurrencyInput(e.target.value) }))}
                                                     className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
                                                 />
                                             </label>
@@ -622,6 +786,20 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
                                                 {processandoId === `cobranca-${empresa.id}` ? 'CRIANDO...' : 'Criar cobrança'}
                                             </button>
                                             <button
+                                                onClick={() => carregarLicencasEmpresa(empresa.id, true)}
+                                                disabled={licencasLoading[empresa.id]}
+                                                className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-black text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                            >
+                                                {licencasLoading[empresa.id] ? 'SINCRONIZANDO...' : 'Licenciamento'}
+                                            </button>
+                                            <button
+                                                onClick={() => carregarTimelineEmpresa(empresa.id, true)}
+                                                disabled={timelineLoading[empresa.id]}
+                                                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                            >
+                                                {timelineLoading[empresa.id] ? 'CARREGANDO...' : 'Timeline'}
+                                            </button>
+                                            <button
                                                 onClick={() => registrarPagamento(empresa)}
                                                 disabled={processandoId === `pagamento-${empresa.id}` || !datasVencimento[empresa.id]}
                                                 className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
@@ -645,6 +823,163 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
                                         >
                                             {processandoId === `bloquear-${empresa.id}` ? 'BLOQUEANDO...' : 'Bloquear'}
                                         </button>
+
+                                        {licencasPorEmpresa[empresa.id] && (
+                                            <div className="rounded-3xl border border-violet-200 bg-white p-4">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <div>
+                                                        <h4 className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-violet-700">
+                                                            Licenciamento por módulo
+                                                            <TooltipHint text="O plano base libera o conjunto padrão. Aqui você faz override por empresa: add-on comercial, trial ou bloqueio manual." />
+                                                        </h4>
+                                                        <p className="mt-1 text-xs font-medium text-slate-500">
+                                                            O plano base libera o padrão. Aqui você concede extras ou bloqueia módulos por empresa.
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => carregarLicencasEmpresa(empresa.id, true)}
+                                                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-slate-50"
+                                                    >
+                                                        Atualizar grade
+                                                    </button>
+                                                </div>
+
+                                                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                                                    {licencasPorEmpresa[empresa.id].map((modulo) => {
+                                                        const chave = `${empresa.id}:${modulo.modulo}`;
+                                                        return (
+                                                            <div key={modulo.modulo} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                                                <div className="flex items-start justify-between gap-3">
+                                                                    <div>
+                                                                        <div className="text-sm font-black text-slate-900">{modulo.nomeExibicao}</div>
+                                                                        <div className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                                                                            {modulo.categoria} · {modulo.origem === 'PLANO' ? 'PLANO' : modulo.origem === 'LIBERACAO_MANUAL' ? 'EXTRA MANUAL' : 'BLOQUEIO MANUAL'}
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${modulo.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                                        {modulo.ativo ? 'ATIVO' : 'BLOQUEADO'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="mt-3 text-xs font-medium text-slate-500">
+                                                                    Base do plano: <span className="font-black text-slate-700">{modulo.disponivelNoPlano ? 'SIM' : 'NAO'}</span>
+                                                                </div>
+                                                                {modulo.bloqueadoComercial && (
+                                                                    <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-900">
+                                                                        Bloqueio comercial ativo{modulo.motivoBloqueioComercial ? `: ${modulo.motivoBloqueioComercial}` : '.'}
+                                                                    </div>
+                                                                )}
+                                                                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                                                                    <label className="grid gap-1 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                                                                        Valor extra mensal
+                                                                        <span className="normal-case tracking-normal text-[10px] font-semibold text-slate-400">Use quando o módulo virar add-on cobrado à parte.</span>
+                                                                        <input
+                                                                            value={observacoesModulo[`${chave}:valor`] ?? maskCurrencyInput(modulo.valorMensalExtra ?? modulo.valorBaseMensal ?? 0)}
+                                                                            onChange={(e) => setObservacoesModulo(prev => ({ ...prev, [`${chave}:valor`]: maskCurrencyInput(e.target.value) }))}
+                                                                            className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 outline-none focus:border-violet-500"
+                                                                        />
+                                                                    </label>
+                                                                    <label className="grid gap-1 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                                                                        Trial até
+                                                                        <span className="normal-case tracking-normal text-[10px] font-semibold text-slate-400">Preencha se quiser liberar por prazo promocional.</span>
+                                                                        <input
+                                                                            type="date"
+                                                                            value={observacoesModulo[`${chave}:trial`] ?? modulo.trialAte ?? ''}
+                                                                            onChange={(e) => setObservacoesModulo(prev => ({ ...prev, [`${chave}:trial`]: e.target.value }))}
+                                                                            className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 outline-none focus:border-violet-500"
+                                                                        />
+                                                                    </label>
+                                                                </div>
+                                                                <textarea
+                                                                    value={observacoesModulo[chave] || ''}
+                                                                    onChange={(e) => setObservacoesModulo(prev => ({ ...prev, [chave]: e.target.value }))}
+                                                                    placeholder="Observação operacional do módulo..."
+                                                                    className="mt-3 min-h-[72px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700 outline-none focus:border-violet-500"
+                                                                />
+                                                                <input
+                                                                    value={observacoesModulo[`${chave}:motivoBloqueio`] ?? modulo.motivoBloqueioComercial ?? ''}
+                                                                    onChange={(e) => setObservacoesModulo(prev => ({ ...prev, [`${chave}:motivoBloqueio`]: e.target.value }))}
+                                                                    placeholder="Motivo do bloqueio comercial do add-on"
+                                                                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700 outline-none focus:border-amber-500"
+                                                                />
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const moduloComCampos = {
+                                                                            ...modulo,
+                                                                            ativo: !modulo.ativo,
+                                                                            valorMensalExtra: parseCurrencyBRL(observacoesModulo[`${chave}:valor`] ?? modulo.valorMensalExtra ?? modulo.valorBaseMensal ?? 0),
+                                                                            trialAte: observacoesModulo[`${chave}:trial`] ?? modulo.trialAte ?? '',
+                                                                            bloqueadoComercial: modulo.bloqueadoComercial,
+                                                                            motivoBloqueioComercial: observacoesModulo[`${chave}:motivoBloqueio`] ?? modulo.motivoBloqueioComercial ?? ''
+                                                                        };
+                                                                        atualizarModuloEmpresa(empresa, moduloComCampos);
+                                                                    }}
+                                                                    disabled={processandoId === `modulo-${empresa.id}-${modulo.modulo}`}
+                                                                    className={`mt-3 w-full rounded-2xl px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${
+                                                                        modulo.ativo
+                                                                            ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                                                                            : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                                                    }`}
+                                                                >
+                                                                    {processandoId === `modulo-${empresa.id}-${modulo.modulo}`
+                                                                        ? 'SALVANDO...'
+                                                                        : modulo.ativo ? 'Bloquear módulo' : 'Liberar módulo'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const moduloComCampos = {
+                                                                            ...modulo,
+                                                                            valorMensalExtra: parseCurrencyBRL(observacoesModulo[`${chave}:valor`] ?? modulo.valorMensalExtra ?? modulo.valorBaseMensal ?? 0),
+                                                                            trialAte: observacoesModulo[`${chave}:trial`] ?? modulo.trialAte ?? '',
+                                                                            bloqueadoComercial: !modulo.bloqueadoComercial,
+                                                                            motivoBloqueioComercial: observacoesModulo[`${chave}:motivoBloqueio`] ?? modulo.motivoBloqueioComercial ?? ''
+                                                                        };
+                                                                        atualizarModuloEmpresa(empresa, moduloComCampos);
+                                                                    }}
+                                                                    disabled={processandoId === `modulo-${empresa.id}-${modulo.modulo}`}
+                                                                    className={`mt-2 w-full rounded-2xl px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${
+                                                                        modulo.bloqueadoComercial
+                                                                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                                                            : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                                                                    }`}
+                                                                >
+                                                                    {modulo.bloqueadoComercial ? 'Liberar comercialmente' : 'Bloquear comercialmente'}
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {timelinePorEmpresa[empresa.id] && (
+                                            <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <div>
+                                                        <h4 className="text-sm font-black uppercase tracking-[0.18em] text-slate-700">Timeline da empresa</h4>
+                                                        <p className="mt-1 text-xs font-medium text-slate-500">
+                                                            Auditoria, segurança e cobrança em uma única leitura operacional.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-4 space-y-3">
+                                                    {timelinePorEmpresa[empresa.id].map((evento, index) => (
+                                                        <div key={`${evento.dataHora}-${evento.titulo}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <span className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
+                                                                    {evento.tipo}
+                                                                </span>
+                                                                <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{evento.origem}</span>
+                                                                <span className="text-xs font-medium text-slate-400">
+                                                                    {evento.dataHora ? new Date(evento.dataHora).toLocaleString('pt-BR') : '-'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="mt-2 text-sm font-black text-slate-900">{evento.titulo}</div>
+                                                            <div className="mt-1 text-sm text-slate-600">{evento.descricao}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </article>
@@ -691,6 +1026,249 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos' }) => {
                                     </div>
                                 </article>
                             ))}
+                        </div>
+                    </section>
+                )}
+
+                {abaAtiva === 'manual' && (
+                    <section className="space-y-6">
+                        <div className="grid gap-4 xl:grid-cols-[1.25fr,0.75fr]">
+                            <div className="rounded-3xl border border-blue-200 bg-blue-50 p-6 shadow-sm">
+                                <p className="text-xs font-black uppercase tracking-[0.28em] text-blue-700">Playbook da Plataforma</p>
+                                <h2 className="mt-2 text-2xl font-black text-slate-900">Manual técnico de operação SaaS</h2>
+                                <p className="mt-3 max-w-4xl text-sm font-medium leading-relaxed text-slate-600">
+                                    Use esta área quando precisar lembrar a sequência correta de operação da plataforma: abertura do dia, rotina comercial,
+                                    cobrança, incidentes, deploy e verificação de produção.
+                                </p>
+                            </div>
+
+                            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                                <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Ações rápidas</div>
+                                <div className="mt-4 grid gap-3">
+                                    <button
+                                        onClick={() => setAbaAtiva('solicitacoes')}
+                                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-black text-slate-700 transition hover:bg-slate-100"
+                                    >
+                                        Ir para Solicitações pendentes
+                                    </button>
+                                    <button
+                                        onClick={() => setAbaAtiva('empresas')}
+                                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-black text-slate-700 transition hover:bg-slate-100"
+                                    >
+                                        Ir para Empresas e licenças
+                                    </button>
+                                    <button
+                                        onClick={() => setAbaAtiva('seguranca')}
+                                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-black text-slate-700 transition hover:bg-slate-100"
+                                    >
+                                        Ir para Eventos de segurança
+                                    </button>
+                                    <button
+                                        onClick={() => window.dispatchEvent(new CustomEvent('grandport:navigate', { detail: { page: 'auditoria' } }))}
+                                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-black text-slate-700 transition hover:bg-slate-100"
+                                    >
+                                        Abrir Auditoria da plataforma
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-900">Checklist operacional</h3>
+                                    <p className="mt-1 text-sm font-medium text-slate-500">
+                                        Marque o que já foi validado no seu fluxo. O estado fica salvo neste navegador.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setManualChecklist({})}
+                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50"
+                                >
+                                    Limpar checklist
+                                </button>
+                            </div>
+
+                            <div className="mt-5 grid gap-3 md:grid-cols-2">
+                                {[
+                                    ['redis-prod', 'Redis online e obrigatório em produção'],
+                                    ['cookie-https', 'Cookie seguro e HTTPS validados'],
+                                    ['solicitacoes', 'Solicitações pendentes revisadas'],
+                                    ['vencimentos', 'Empresas vencendo em breve revisadas'],
+                                    ['addons', 'Add-ons faturáveis conferidos'],
+                                    ['trials', 'Trials ativos e trials vencidos revisados'],
+                                    ['auditoria', 'Auditoria de ações críticas conferida'],
+                                    ['seguranca', 'Eventos de segurança analisados'],
+                                    ['cobranca', 'Cobranças do dia emitidas ou conferidas'],
+                                    ['deploy', 'Checklist pós-deploy validado'],
+                                ].map(([id, label]) => (
+                                    <button
+                                        key={id}
+                                        onClick={() => alternarChecklistManual(id)}
+                                        className={`flex items-center gap-3 rounded-2xl border px-4 py-4 text-left text-sm font-black transition ${
+                                            manualChecklist[id]
+                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                                                : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${manualChecklist[id] ? 'bg-emerald-600 text-white' : 'bg-white text-slate-400'}`}>
+                                            {manualChecklist[id] ? 'OK' : '•'}
+                                        </span>
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="grid gap-4 xl:grid-cols-2">
+                            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                                <h3 className="text-lg font-black text-slate-900">1. Rotina diária do dono da plataforma</h3>
+                                <div className="mt-4 space-y-3 text-sm font-medium leading-relaxed text-slate-600">
+                                    <div className="rounded-2xl bg-slate-50 p-4">
+                                        <span className="font-black text-slate-900">Antes de abrir o dia:</span> confira `MRR base`, `MRR extras`, empresas inadimplentes,
+                                        trials ativos e últimos eventos de segurança.
+                                    </div>
+                                    <div className="rounded-2xl bg-slate-50 p-4">
+                                        <span className="font-black text-slate-900">Solicitações pendentes:</span> aprove, rejeite ou gere convite manual somente depois de validar
+                                        contato, CNPJ e escopo comercial.
+                                    </div>
+                                    <div className="rounded-2xl bg-slate-50 p-4">
+                                        <span className="font-black text-slate-900">Empresas ativas:</span> revise vencimentos próximos, bloqueios manuais e add-ons faturáveis.
+                                    </div>
+                                    <div className="rounded-2xl bg-slate-50 p-4">
+                                        <span className="font-black text-slate-900">Auditoria:</span> verifique ações críticas, acessos negados, bloqueios, reset de senha,
+                                        alterações fiscais e eventos fora do padrão.
+                                    </div>
+                                </div>
+                            </article>
+
+                            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                                <h3 className="text-lg font-black text-slate-900">2. Checklist de liberação comercial</h3>
+                                <div className="mt-4 space-y-3 text-sm font-medium leading-relaxed text-slate-600">
+                                    <div className="rounded-2xl bg-emerald-50 p-4">
+                                        <span className="font-black text-emerald-900">Passo 1:</span> aprovar solicitação e gerar convite para o e-mail correto.
+                                    </div>
+                                    <div className="rounded-2xl bg-emerald-50 p-4">
+                                        <span className="font-black text-emerald-900">Passo 2:</span> confirmar plano base, valor mensal, dias de tolerância e vencimento inicial.
+                                    </div>
+                                    <div className="rounded-2xl bg-emerald-50 p-4">
+                                        <span className="font-black text-emerald-900">Passo 3:</span> revisar licenciamento por módulo. Só liberar add-on manual com observação comercial.
+                                    </div>
+                                    <div className="rounded-2xl bg-emerald-50 p-4">
+                                        <span className="font-black text-emerald-900">Passo 4:</span> se houver trial, preencher data final. Trial sem data é risco operacional.
+                                    </div>
+                                    <div className="rounded-2xl bg-emerald-50 p-4">
+                                        <span className="font-black text-emerald-900">Passo 5:</span> validar na timeline se convite, licenças e primeira cobrança ficaram registrados.
+                                    </div>
+                                </div>
+                            </article>
+
+                            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                                <h3 className="text-lg font-black text-slate-900">3. Cobrança e mensalidade</h3>
+                                <div className="mt-4 space-y-3 text-sm font-medium leading-relaxed text-slate-600">
+                                    <div className="rounded-2xl bg-violet-50 p-4">
+                                        <span className="font-black text-violet-900">Composição:</span> a cobrança usa `plano base + add-ons fora de trial`.
+                                    </div>
+                                    <div className="rounded-2xl bg-violet-50 p-4">
+                                        <span className="font-black text-violet-900">Antes de criar cobrança:</span> confira `Total previsto` e a lista `Add-ons faturáveis`.
+                                    </div>
+                                    <div className="rounded-2xl bg-violet-50 p-4">
+                                        <span className="font-black text-violet-900">Registrar pagamento:</span> só após confirmar nova data de vencimento.
+                                    </div>
+                                    <div className="rounded-2xl bg-violet-50 p-4">
+                                        <span className="font-black text-violet-900">Trials vencidos:</span> o scheduler expira automaticamente; revise diariamente se algum módulo caiu por fim de trial.
+                                    </div>
+                                </div>
+                            </article>
+
+                            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                                <h3 className="text-lg font-black text-slate-900">4. Incidentes e suporte</h3>
+                                <div className="mt-4 space-y-3 text-sm font-medium leading-relaxed text-slate-600">
+                                    <div className="rounded-2xl bg-amber-50 p-4">
+                                        <span className="font-black text-amber-900">Erro de acesso geral:</span> validar primeiro status da empresa, vencimento, bloqueio manual e eventos de segurança.
+                                    </div>
+                                    <div className="rounded-2xl bg-amber-50 p-4">
+                                        <span className="font-black text-amber-900">Problema só em módulo específico:</span> revisar grade de licenciamento, trial, add-on e origem do bloqueio.
+                                    </div>
+                                    <div className="rounded-2xl bg-amber-50 p-4">
+                                        <span className="font-black text-amber-900">Falha de autenticação:</span> checar cookie, MFA, Redis e eventos `LOGIN_FALHA`, `MFA_FALHA`, `TENANT_BLOQUEADO`.
+                                    </div>
+                                    <div className="rounded-2xl bg-amber-50 p-4">
+                                        <span className="font-black text-amber-900">Mudança sensível:</span> tudo que envolver fiscal, licenças ou bloqueio precisa deixar rastro na auditoria.
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+
+                        <div className="grid gap-4 xl:grid-cols-2">
+                            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                                <h3 className="text-lg font-black text-slate-900">5. Checklist técnico de produção</h3>
+                                <div className="mt-4 space-y-3 text-sm font-medium leading-relaxed text-slate-600">
+                                    <div className="rounded-2xl bg-slate-50 p-4">
+                                        `APP_SECURITY_REDIS_REQUIRED=true` em produção.
+                                    </div>
+                                    <div className="rounded-2xl bg-slate-50 p-4">
+                                        Redis deve estar online antes do app subir.
+                                    </div>
+                                    <div className="rounded-2xl bg-slate-50 p-4">
+                                        Cookie com `secure=true` e HTTPS ativo.
+                                    </div>
+                                    <div className="rounded-2xl bg-slate-50 p-4">
+                                        `JWT_SECRET`, banco e webhook token configurados.
+                                    </div>
+                                    <div className="rounded-2xl bg-slate-50 p-4">
+                                        Rodar healthcheck pós-deploy e validar login, Central SaaS e cobrança manual.
+                                    </div>
+                                </div>
+                            </article>
+
+                            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                                <h3 className="text-lg font-black text-slate-900">6. Pós-deploy rápido</h3>
+                                <div className="mt-4 space-y-3 text-sm font-medium leading-relaxed text-slate-600">
+                                    <div className="rounded-2xl bg-red-50 p-4">
+                                        <span className="font-black text-red-900">Validar:</span> login, `/auth/me`, dashboard, Central SaaS, auditoria e criação de cobrança.
+                                    </div>
+                                    <div className="rounded-2xl bg-red-50 p-4">
+                                        <span className="font-black text-red-900">Conferir:</span> se o build novo foi servido e se o navegador não ficou com bundle antigo do PWA.
+                                    </div>
+                                    <div className="rounded-2xl bg-red-50 p-4">
+                                        <span className="font-black text-red-900">Revisar:</span> eventos de segurança e logs de acesso negado nos primeiros minutos.
+                                    </div>
+                                    <div className="rounded-2xl bg-red-50 p-4">
+                                        <span className="font-black text-red-900">Se algo falhar:</span> rollback antes de mexer manualmente em dados sensíveis.
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <h3 className="text-lg font-black text-slate-900">7. Resposta rápida a incidentes</h3>
+                            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+                                    <div className="text-xs font-black uppercase tracking-[0.18em] text-red-700">Login falhando</div>
+                                    <div className="mt-2 text-sm font-medium text-red-950">
+                                        Verificar `/auth/me`, cookie, CORS, MFA, Redis e eventos `LOGIN_FALHA`.
+                                    </div>
+                                </div>
+                                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                                    <div className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Módulo sumiu</div>
+                                    <div className="mt-2 text-sm font-medium text-amber-950">
+                                        Revisar licenciamento da empresa, trial, valor extra e bloqueio manual do módulo.
+                                    </div>
+                                </div>
+                                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                                    <div className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">Cobrança divergente</div>
+                                    <div className="mt-2 text-sm font-medium text-blue-950">
+                                        Conferir `Plano base`, `Extras cobrados`, add-ons faturáveis e observação da cobrança gerada.
+                                    </div>
+                                </div>
+                                <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                                    <div className="text-xs font-black uppercase tracking-[0.18em] text-violet-700">Pós-deploy ruim</div>
+                                    <div className="mt-2 text-sm font-medium text-violet-950">
+                                        Verificar bundle novo, service worker, healthcheck, Redis e rota de auditoria antes de mexer em dados.
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </section>
                 )}
