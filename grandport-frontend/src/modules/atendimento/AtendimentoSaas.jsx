@@ -76,9 +76,72 @@ const calcularEstadoSla = (incidente) => {
     };
 };
 
+const ordenarTimeline = (eventos) => [...eventos].sort((a, b) => {
+    const dataA = a.data ? new Date(a.data).getTime() : 0;
+    const dataB = b.data ? new Date(b.data).getTime() : 0;
+    return dataA - dataB;
+});
+
+const csvCell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+const baixarCsv = (nomeArquivo, cabecalhos, linhas) => {
+    const csvString = `\uFEFF${[cabecalhos.join(';'), ...linhas.map((linha) => linha.join(';'))].join('\n')}`;
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', nomeArquivo);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+};
+
+const templatesPadraoPlataforma = [
+    'Recebemos seu atendimento e já estamos analisando o caso. Em instantes retornaremos com o próximo passo.',
+    'Conseguimos reproduzir o cenário informado. Vamos seguir com a validação técnica e te atualizamos neste ticket.',
+    'Precisamos de mais contexto para avançar. Envie, por favor, prints, horário do erro e o passo a passo realizado.',
+    'Ajuste aplicado pela plataforma. Valide novamente no sistema e nos confirme neste atendimento se o fluxo normalizou.',
+    'Atendimento concluído pela plataforma. Se precisar continuar este assunto, abra um novo ticket com a nova evidência.'
+];
+
+const descricaoAutorMensagem = (autorTipo) => {
+    if (autorTipo === 'PLATAFORMA') return 'Operador da plataforma';
+    if (autorTipo === 'CLIENTE') return 'Cliente da empresa';
+    return autorTipo || 'Origem não identificada';
+};
+
+const identificacaoAutorMensagem = (mensagem) => {
+    if (!mensagem?.autorLogin && !mensagem?.autorPerfil) return mensagem?.autorNome || 'Autor não identificado';
+
+    const identificadores = [];
+    if (mensagem?.autorLogin) identificadores.push(`@${mensagem.autorLogin}`);
+    if (mensagem?.autorPerfil) identificadores.push(mensagem.autorPerfil);
+
+    return `${mensagem.autorNome} (${identificadores.join(' · ')})`;
+};
+
+const identificacaoAutorTicket = (ticket) => {
+    if (!ticket?.ultimaMensagemAutorNome) return '';
+
+    const identificadores = [];
+    if (ticket?.ultimaMensagemAutorLogin) identificadores.push(`@${ticket.ultimaMensagemAutorLogin}`);
+    if (ticket?.ultimaMensagemAutorPerfil) identificadores.push(ticket.ultimaMensagemAutorPerfil);
+
+    if (!identificadores.length) return ticket.ultimaMensagemAutorNome;
+    return `${ticket.ultimaMensagemAutorNome} (${identificadores.join(' · ')})`;
+};
+
 export const AtendimentoSaas = ({ modo = 'cliente' }) => {
     const isPlataforma = modo === 'plataforma';
+    const templatesPadrao = templatesPadraoPlataforma.map((conteudo, index) => ({
+        id: `padrao-${index}`,
+        titulo: `Template ${index + 1}`,
+        conteudo,
+        isPadrao: true
+    }));
     const [tickets, setTickets] = useState([]);
+    const [resumoSuporte, setResumoSuporte] = useState(null);
     const [ticketAtivo, setTicketAtivo] = useState(null);
     const [mensagens, setMensagens] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -88,6 +151,8 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
     const [filtroSla, setFiltroSla] = useState('');
     const [filtroSeveridade, setFiltroSeveridade] = useState('');
     const [filtroResponsavel, setFiltroResponsavel] = useState('');
+    const [filtroFinalizados, setFiltroFinalizados] = useState(false);
+    const [contextoTriagem, setContextoTriagem] = useState(null);
     const [novaMensagem, setNovaMensagem] = useState('');
     const [arquivoSelecionado, setArquivoSelecionado] = useState(null);
     const [incidentesEmpresa, setIncidentesEmpresa] = useState([]);
@@ -112,6 +177,7 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
         resolucao: ''
     });
     const [processando, setProcessando] = useState(false);
+    const [templatesRapidos, setTemplatesRapidos] = useState(templatesPadrao);
     const ultimoTimestampMensagensRef = useRef(null);
     const audioLiberadoRef = useRef(false);
 
@@ -143,26 +209,103 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
                 !filtroResponsavel ||
                 (filtroResponsavel === 'SEM_RESPONSAVEL' && !ticket.plataformaResponsavel) ||
                 (filtroResponsavel === 'COM_RESPONSAVEL' && !!ticket.plataformaResponsavel);
+            const passouFinalizados = !filtroFinalizados || ['RESOLVIDO', 'ENCERRADO'].includes(ticket.status);
 
-            return passouSla && passouSeveridade && passouResponsavel;
+            return passouSla && passouSeveridade && passouResponsavel && passouFinalizados;
         });
-    }, [tickets, isPlataforma, filtroSla, filtroSeveridade, filtroResponsavel]);
+    }, [tickets, isPlataforma, filtroSla, filtroSeveridade, filtroResponsavel, filtroFinalizados]);
 
-    const resumoInbox = useMemo(() => {
-        const ticketsBase = isPlataforma ? tickets : [];
-        return {
-            aguardandoPlataforma: ticketsBase.filter((ticket) => ticket.status === 'AGUARDANDO_PLATAFORMA').length,
-            criticos: ticketsBase.filter((ticket) => ticket.incidenteSeveridade === 'CRITICA' || ticket.prioridade === 'CRITICA').length,
-            slaVencido: ticketsBase.filter((ticket) => ['SLA vencido', 'Resposta vencida'].includes(
-                calcularEstadoSla(ticket.incidenteId ? {
-                    status: ticket.incidenteStatus,
-                    prazoResposta: ticket.incidentePrazoResposta,
-                    prazoResolucao: ticket.incidentePrazoResolucao
-                } : null)?.label
-            )).length,
-            semResponsavel: ticketsBase.filter((ticket) => !ticket.plataformaResponsavel).length
+    const limparFiltrosResumo = () => {
+        setStatusFiltro('');
+        setFiltroSla('');
+        setFiltroSeveridade('');
+        setFiltroResponsavel('');
+        setFiltroFinalizados(false);
+        setContextoTriagem(null);
+    };
+
+    const aplicarFiltroResumo = (tipo) => {
+        const aguardandoAtivo =
+            statusFiltro === 'AGUARDANDO_PLATAFORMA' &&
+            !filtroSla &&
+            !filtroSeveridade &&
+            !filtroResponsavel &&
+            !filtroFinalizados;
+        const criticosAtivo =
+            filtroSeveridade === 'CRITICA' &&
+            !statusFiltro &&
+            !filtroSla &&
+            !filtroResponsavel &&
+            !filtroFinalizados;
+        const slaVencidoAtivo =
+            filtroSla === 'VENCIDO' &&
+            !statusFiltro &&
+            !filtroSeveridade &&
+            !filtroResponsavel &&
+            !filtroFinalizados;
+        const semResponsavelAtivo =
+            filtroResponsavel === 'SEM_RESPONSAVEL' &&
+            !statusFiltro &&
+            !filtroSla &&
+            !filtroSeveridade &&
+            !filtroFinalizados;
+
+        const handlers = {
+            AGUARDANDO_PLATAFORMA: aguardandoAtivo,
+            CRITICOS: criticosAtivo,
+            SLA_VENCIDO: slaVencidoAtivo,
+            SEM_RESPONSAVEL: semResponsavelAtivo,
+            FINALIZADOS: filtroFinalizados
         };
-    }, [tickets, isPlataforma]);
+
+        if (handlers[tipo]) {
+            limparFiltrosResumo();
+            return;
+        }
+
+        limparFiltrosResumo();
+
+        if (tipo === 'AGUARDANDO_PLATAFORMA') {
+            setStatusFiltro('AGUARDANDO_PLATAFORMA');
+            setContextoTriagem({
+                titulo: 'Fila aguardando plataforma',
+                descricao: 'Tickets que dependem de resposta ou ação imediata da plataforma.'
+            });
+        }
+        if (tipo === 'CRITICOS') {
+            setFiltroSeveridade('CRITICA');
+            setContextoTriagem({
+                titulo: 'Fila crítica',
+                descricao: 'Tickets com severidade crítica para triagem prioritária.'
+            });
+        }
+        if (tipo === 'SLA_VENCIDO') {
+            setFiltroSla('VENCIDO');
+            setContextoTriagem({
+                titulo: 'Fila com SLA vencido',
+                descricao: 'Tickets com prazo de resposta ou resolução já vencido.'
+            });
+        }
+        if (tipo === 'SEM_RESPONSAVEL') {
+            setFiltroResponsavel('SEM_RESPONSAVEL');
+            setContextoTriagem({
+                titulo: 'Fila sem responsável',
+                descricao: 'Tickets que ainda precisam ser assumidos por um operador.'
+            });
+        }
+        if (tipo === 'FINALIZADOS') {
+            setFiltroFinalizados(true);
+            setContextoTriagem({
+                titulo: 'Fila de tickets finalizados',
+                descricao: 'Atendimentos já resolvidos ou encerrados para conferência e auditoria.'
+            });
+        }
+    };
+
+    const classeCardResumo = (ativo, palette) =>
+        `rounded-3xl border p-5 text-left transition ${
+            ativo ? `${palette.activeBorder} ${palette.activeBg} shadow-sm` : `${palette.border} ${palette.bg} hover:${palette.hoverBorder}`
+        }`;
 
     const carregarTickets = async (preservarSelecionado = true) => {
         setLoading(true);
@@ -239,8 +382,19 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
         }
     };
 
+    const carregarResumoSuporte = async () => {
+        if (!isPlataforma) return;
+        try {
+            const res = await api.get('/api/atendimentos/plataforma/resumo');
+            setResumoSuporte(res.data || null);
+        } catch (error) {
+            setResumoSuporte(null);
+        }
+    };
+
     useEffect(() => {
         carregarTickets(false);
+        carregarResumoSuporte();
     }, [endpointTickets]);
 
     useEffect(() => {
@@ -252,6 +406,22 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
     useEffect(() => {
         carregarMensagens(ticketAtivo);
     }, [ticketAtivo?.id, isPlataforma]);
+
+    useEffect(() => {
+        if (!isPlataforma) return;
+
+        if (!ticketsFiltrados.length) {
+            if (ticketAtivo) {
+                setTicketAtivo(null);
+            }
+            return;
+        }
+
+        const ticketAtualAindaVisivel = ticketAtivo && ticketsFiltrados.some((ticket) => ticket.id === ticketAtivo.id);
+        if (!ticketAtualAindaVisivel) {
+            setTicketAtivo(ticketsFiltrados[0]);
+        }
+    }, [ticketsFiltrados, ticketAtivo, isPlataforma]);
 
     useEffect(() => {
         carregarIncidentesEmpresa(ticketAtivo);
@@ -290,8 +460,29 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
     }, []);
 
     useEffect(() => {
+        if (!isPlataforma) return;
+        const carregarTemplates = async () => {
+            try {
+                const res = await api.get('/api/atendimentos/plataforma/templates');
+                const itens = Array.isArray(res.data) ? res.data : [];
+                const customizados = itens.map((item) => ({
+                    id: item.id,
+                    titulo: item.titulo,
+                    conteudo: item.conteudo,
+                    isPadrao: false
+                }));
+                setTemplatesRapidos([...templatesPadrao, ...customizados]);
+            } catch (error) {
+                setTemplatesRapidos(templatesPadrao);
+            }
+        };
+        carregarTemplates();
+    }, [isPlataforma]);
+
+    useEffect(() => {
         const interval = window.setInterval(() => {
             carregarTickets(true);
+            carregarResumoSuporte();
             if (ticketAtivo?.id) {
                 carregarMensagens(ticketAtivo);
             }
@@ -506,12 +697,194 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
         };
     };
 
+    const aplicarTemplate = (texto) => {
+        setNovaMensagem(texto);
+    };
+
+    const salvarTemplateAtual = async () => {
+        const texto = novaMensagem.trim();
+        if (!texto) {
+            toast.error('Digite uma resposta antes de salvar como template.');
+            return;
+        }
+        if (templatesRapidos.some((item) => item.conteudo === texto)) {
+            toast.error('Esse template já existe.');
+            return;
+        }
+        const toastId = toast.loading('Salvando template...');
+        try {
+            const tituloBase = texto.length > 42 ? `${texto.slice(0, 42)}...` : texto;
+            const res = await api.post('/api/atendimentos/plataforma/templates', {
+                titulo: tituloBase,
+                conteudo: texto
+            });
+            const item = res?.data;
+            setTemplatesRapidos((prev) => [
+                ...prev,
+                {
+                    id: item?.id || `custom-${Date.now()}`,
+                    titulo: item?.titulo || tituloBase,
+                    conteudo: item?.conteudo || texto,
+                    isPadrao: false
+                }
+            ]);
+            toast.success('Template salvo para respostas rápidas.', { id: toastId });
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Não foi possível salvar o template.', { id: toastId });
+        }
+    };
+
+    const excluirTemplate = async (templateId) => {
+        const toastId = toast.loading('Removendo template...');
+        try {
+            await api.delete(`/api/atendimentos/plataforma/templates/${templateId}`);
+            setTemplatesRapidos((prev) => prev.filter((item) => item.id !== templateId));
+            toast.success('Template removido.', { id: toastId });
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Não foi possível remover o template.', { id: toastId });
+        }
+    };
+
     const incidenteVinculado = useMemo(
         () => incidentesEmpresa.find((item) => String(item.id) === String(ticketAtivo?.incidenteId || incidenteSelecionado)),
         [incidentesEmpresa, ticketAtivo?.incidenteId, incidenteSelecionado]
     );
     const estadoSla = useMemo(() => calcularEstadoSla(incidenteVinculado), [incidenteVinculado]);
     const atendimentoFinalizado = ticketAtivo?.status === 'ENCERRADO' || ticketAtivo?.status === 'RESOLVIDO';
+    const timelineTicket = useMemo(() => {
+        if (!ticketAtivo) return [];
+
+        const eventos = [
+            {
+                id: `ticket-open-${ticketAtivo.id}`,
+                tipo: 'ABERTURA',
+                titulo: 'Ticket aberto',
+                descricao: `${ticketAtivo.titulo} · ${ticketAtivo.categoria}`,
+                data: ticketAtivo.createdAt
+            }
+        ];
+
+        if (ticketAtivo.plataformaResponsavel) {
+            eventos.push({
+                id: `ticket-owner-${ticketAtivo.id}`,
+                tipo: 'RESPONSAVEL',
+                titulo: 'Responsável definido',
+                descricao: ticketAtivo.plataformaResponsavel,
+                data: ticketAtivo.updatedAt
+            });
+        }
+
+        if (ticketAtivo.incidenteId) {
+            eventos.push({
+                id: `ticket-incident-${ticketAtivo.id}`,
+                tipo: 'INCIDENTE',
+                titulo: `Incidente #${ticketAtivo.incidenteId} vinculado`,
+                descricao: ticketAtivo.incidenteTitulo || 'Incidente operacional associado ao atendimento',
+                data: incidenteVinculado?.createdAt || ticketAtivo.updatedAt
+            });
+        }
+
+        if (ticketAtivo.closedAt) {
+            eventos.push({
+                id: `ticket-closed-${ticketAtivo.id}`,
+                tipo: 'FECHAMENTO',
+                titulo: 'Atendimento finalizado',
+                descricao: `Status final: ${ticketAtivo.status}`,
+                data: ticketAtivo.closedAt
+            });
+        } else if (ticketAtivo.updatedAt && ticketAtivo.updatedAt !== ticketAtivo.createdAt) {
+            eventos.push({
+                id: `ticket-status-${ticketAtivo.id}`,
+                tipo: 'STATUS',
+                titulo: 'Status atualizado',
+                descricao: ticketAtivo.status,
+                data: ticketAtivo.updatedAt
+            });
+        }
+
+        mensagens.forEach((mensagem) => {
+            eventos.push({
+                id: `msg-${mensagem.id}`,
+                tipo: mensagem.arquivoUrl ? 'ANEXO' : 'MENSAGEM',
+                titulo: mensagem.arquivoUrl ? 'Anexo enviado' : 'Mensagem enviada',
+                descricao: mensagem.arquivoUrl
+                    ? `${identificacaoAutorMensagem(mensagem)} enviou ${mensagem.arquivoNome || 'um arquivo'}`
+                    : `${identificacaoAutorMensagem(mensagem)}: ${mensagem.mensagem}`,
+                data: mensagem.createdAt,
+                destaque: mensagem.autorTipo,
+                origem: descricaoAutorMensagem(mensagem.autorTipo),
+                autorNome: mensagem.autorNome || '',
+                autorLogin: mensagem.autorLogin || '',
+                autorPerfil: mensagem.autorPerfil || ''
+            });
+        });
+
+        return ordenarTimeline(eventos);
+    }, [ticketAtivo, mensagens, incidenteVinculado]);
+
+    const exportarInboxFiltrado = () => {
+        if (!ticketsFiltrados.length) {
+            toast.error('Não há tickets no filtro atual para exportar.');
+            return;
+        }
+
+        const cabecalhos = [
+            'Ticket',
+            'Empresa',
+            'Titulo',
+            'Categoria',
+            'Prioridade',
+            'Status',
+            'Responsavel',
+            'Incidente',
+            'Severidade',
+            'SLA',
+            'Ultima Atualizacao'
+        ];
+        const linhas = ticketsFiltrados.map((ticket) => {
+            const sla = calcularEstadoSla(ticket.incidenteId ? {
+                status: ticket.incidenteStatus,
+                prazoResposta: ticket.incidentePrazoResposta,
+                prazoResolucao: ticket.incidentePrazoResolucao
+            } : null);
+            return [
+                csvCell(ticket.id),
+                csvCell(ticket.empresaNome),
+                csvCell(ticket.titulo),
+                csvCell(ticket.categoria),
+                csvCell(ticket.prioridade),
+                csvCell(ticket.status),
+                csvCell(ticket.plataformaResponsavel || ''),
+                csvCell(ticket.incidenteTitulo || ''),
+                csvCell(ticket.incidenteSeveridade || ''),
+                csvCell(sla?.label || ''),
+                csvCell(ticket.ultimaMensagemAt || '')
+            ];
+        });
+        baixarCsv(`atendimento_inbox_${new Date().toISOString().slice(0, 10)}.csv`, cabecalhos, linhas);
+        toast.success('CSV do inbox exportado.');
+    };
+
+    const exportarTimelineTicket = () => {
+        if (!ticketAtivo || !timelineTicket.length) {
+            toast.error('Não há timeline para exportar neste ticket.');
+            return;
+        }
+        const cabecalhos = ['Ticket', 'Tipo', 'Titulo', 'Descricao', 'Origem', 'Autor', 'Login', 'Perfil', 'Data'];
+        const linhas = timelineTicket.map((evento) => [
+            csvCell(ticketAtivo.id),
+            csvCell(evento.tipo),
+            csvCell(evento.titulo),
+            csvCell(evento.descricao),
+            csvCell(evento.origem || ''),
+            csvCell(evento.autorNome || ''),
+            csvCell(evento.autorLogin || ''),
+            csvCell(evento.autorPerfil || ''),
+            csvCell(evento.data || '')
+        ]);
+        baixarCsv(`ticket_${ticketAtivo.id}_timeline.csv`, cabecalhos, linhas);
+        toast.success('CSV da timeline exportado.');
+    };
 
     return (
         <div className="space-y-6">
@@ -531,16 +904,24 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
                         </p>
                     </div>
                     {isPlataforma && (
-                        <div className="grid gap-3 md:grid-cols-4">
+                        <div className="grid gap-3 md:grid-cols-5">
                             <input
                                 value={busca}
-                                onChange={(e) => setBusca(e.target.value)}
+                                onChange={(e) => {
+                                    setBusca(e.target.value);
+                                    setFiltroFinalizados(false);
+                                    setContextoTriagem(null);
+                                }}
                                 placeholder="Buscar empresa, cliente ou categoria"
                                 className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
                             />
                             <select
                                 value={statusFiltro}
-                                onChange={(e) => setStatusFiltro(e.target.value)}
+                                onChange={(e) => {
+                                    setStatusFiltro(e.target.value);
+                                    setFiltroFinalizados(false);
+                                    setContextoTriagem(null);
+                                }}
                                 className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
                             >
                                 <option value="">Todos os status</option>
@@ -552,7 +933,11 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
                             </select>
                             <select
                                 value={filtroSla}
-                                onChange={(e) => setFiltroSla(e.target.value)}
+                                onChange={(e) => {
+                                    setFiltroSla(e.target.value);
+                                    setFiltroFinalizados(false);
+                                    setContextoTriagem(null);
+                                }}
                                 className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
                             >
                                 <option value="">Todos os SLAs</option>
@@ -562,51 +947,144 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
                             </select>
                             <select
                                 value={filtroResponsavel}
-                                onChange={(e) => setFiltroResponsavel(e.target.value)}
+                                onChange={(e) => {
+                                    setFiltroResponsavel(e.target.value);
+                                    setFiltroFinalizados(false);
+                                    setContextoTriagem(null);
+                                }}
                                 className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
                             >
                                 <option value="">Todos os responsáveis</option>
                                 <option value="SEM_RESPONSAVEL">Sem responsável</option>
                                 <option value="COM_RESPONSAVEL">Com responsável</option>
                             </select>
+                            <button
+                                onClick={exportarInboxFiltrado}
+                                className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-blue-500 hover:text-blue-700"
+                            >
+                                Exportar inbox
+                            </button>
                         </div>
                     )}
                 </div>
             </section>
 
             {isPlataforma && (
-                <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
                     <button
-                        onClick={() => setStatusFiltro('AGUARDANDO_PLATAFORMA')}
-                        className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-left transition hover:border-amber-300"
+                        onClick={() => aplicarFiltroResumo('AGUARDANDO_PLATAFORMA')}
+                        className={classeCardResumo(
+                            statusFiltro === 'AGUARDANDO_PLATAFORMA' &&
+                                !filtroSla &&
+                                !filtroSeveridade &&
+                                !filtroResponsavel &&
+                                !filtroFinalizados,
+                            {
+                                border: 'border-amber-200',
+                                bg: 'bg-amber-50',
+                                hoverBorder: 'border-amber-300',
+                                activeBorder: 'border-amber-400',
+                                activeBg: 'bg-amber-100'
+                            }
+                        )}
                     >
                         <div className="text-xs font-black uppercase tracking-[0.22em] text-amber-700">Ação imediata</div>
-                        <div className="mt-3 text-3xl font-black text-slate-900">{resumoInbox.aguardandoPlataforma}</div>
+                        <div className="mt-3 text-3xl font-black text-slate-900">{resumoSuporte?.aguardandoPlataforma || 0}</div>
                         <div className="mt-1 text-sm font-semibold text-slate-600">Aguardando plataforma</div>
                     </button>
                     <button
-                        onClick={() => setFiltroSeveridade('CRITICA')}
-                        className="rounded-3xl border border-red-200 bg-red-50 p-5 text-left transition hover:border-red-300"
+                        onClick={() => aplicarFiltroResumo('CRITICOS')}
+                        className={classeCardResumo(
+                            filtroSeveridade === 'CRITICA' &&
+                                !statusFiltro &&
+                                !filtroSla &&
+                                !filtroResponsavel &&
+                                !filtroFinalizados,
+                            {
+                                border: 'border-red-200',
+                                bg: 'bg-red-50',
+                                hoverBorder: 'border-red-300',
+                                activeBorder: 'border-red-400',
+                                activeBg: 'bg-red-100'
+                            }
+                        )}
                     >
                         <div className="text-xs font-black uppercase tracking-[0.22em] text-red-700">Prioridade</div>
-                        <div className="mt-3 text-3xl font-black text-slate-900">{resumoInbox.criticos}</div>
+                        <div className="mt-3 text-3xl font-black text-slate-900">{resumoSuporte?.ticketsCriticos || 0}</div>
                         <div className="mt-1 text-sm font-semibold text-slate-600">Tickets críticos</div>
                     </button>
                     <button
-                        onClick={() => setFiltroSla('VENCIDO')}
-                        className="rounded-3xl border border-rose-200 bg-rose-50 p-5 text-left transition hover:border-rose-300"
+                        onClick={() => aplicarFiltroResumo('SLA_VENCIDO')}
+                        className={classeCardResumo(
+                            filtroSla === 'VENCIDO' &&
+                                !statusFiltro &&
+                                !filtroSeveridade &&
+                                !filtroResponsavel &&
+                                !filtroFinalizados,
+                            {
+                                border: 'border-rose-200',
+                                bg: 'bg-rose-50',
+                                hoverBorder: 'border-rose-300',
+                                activeBorder: 'border-rose-400',
+                                activeBg: 'bg-rose-100'
+                            }
+                        )}
                     >
                         <div className="text-xs font-black uppercase tracking-[0.22em] text-rose-700">SLA</div>
-                        <div className="mt-3 text-3xl font-black text-slate-900">{resumoInbox.slaVencido}</div>
+                        <div className="mt-3 text-3xl font-black text-slate-900">{resumoSuporte?.slaVencido || 0}</div>
                         <div className="mt-1 text-sm font-semibold text-slate-600">SLA vencido</div>
                     </button>
                     <button
-                        onClick={() => setFiltroResponsavel('SEM_RESPONSAVEL')}
-                        className="rounded-3xl border border-slate-300 bg-slate-100 p-5 text-left transition hover:border-slate-400"
+                        onClick={() => aplicarFiltroResumo('SEM_RESPONSAVEL')}
+                        className={classeCardResumo(
+                            filtroResponsavel === 'SEM_RESPONSAVEL' &&
+                                !statusFiltro &&
+                                !filtroSla &&
+                                !filtroSeveridade &&
+                                !filtroFinalizados,
+                            {
+                                border: 'border-slate-300',
+                                bg: 'bg-slate-100',
+                                hoverBorder: 'border-slate-400',
+                                activeBorder: 'border-slate-500',
+                                activeBg: 'bg-slate-200'
+                            }
+                        )}
                     >
                         <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-700">Cobertura</div>
-                        <div className="mt-3 text-3xl font-black text-slate-900">{resumoInbox.semResponsavel}</div>
+                        <div className="mt-3 text-3xl font-black text-slate-900">{resumoSuporte?.semResponsavel || 0}</div>
                         <div className="mt-1 text-sm font-semibold text-slate-600">Sem responsável</div>
+                    </button>
+                    <button
+                        onClick={() => aplicarFiltroResumo('FINALIZADOS')}
+                        className={classeCardResumo(filtroFinalizados, {
+                            border: 'border-emerald-200',
+                            bg: 'bg-emerald-50',
+                            hoverBorder: 'border-emerald-300',
+                            activeBorder: 'border-emerald-400',
+                            activeBg: 'bg-emerald-100'
+                        })}
+                    >
+                        <div className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Fechamento</div>
+                        <div className="mt-3 text-3xl font-black text-slate-900">{resumoSuporte?.finalizados || 0}</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-600">Tickets finalizados</div>
+                    </button>
+                    <button
+                        onClick={limparFiltrosResumo}
+                        className={classeCardResumo(
+                            !statusFiltro && !filtroSla && !filtroSeveridade && !filtroResponsavel && !filtroFinalizados,
+                            {
+                                border: 'border-blue-200',
+                                bg: 'bg-blue-50',
+                                hoverBorder: 'border-blue-300',
+                                activeBorder: 'border-blue-400',
+                                activeBg: 'bg-blue-100'
+                            }
+                        )}
+                    >
+                        <div className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Resposta</div>
+                        <div className="mt-3 text-3xl font-black text-slate-900">{resumoSuporte?.tempoMedioPrimeiraRespostaMinutos || 0} min</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-600">Média da primeira resposta</div>
                     </button>
                 </section>
             )}
@@ -668,7 +1146,11 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
                             <div className="mt-3">
                                 <select
                                     value={filtroSeveridade}
-                                    onChange={(e) => setFiltroSeveridade(e.target.value)}
+                                    onChange={(e) => {
+                                        setFiltroSeveridade(e.target.value);
+                                        setFiltroFinalizados(false);
+                                        setContextoTriagem(null);
+                                    }}
                                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
                                 >
                                     <option value="">Todas as severidades</option>
@@ -728,6 +1210,13 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
                                     <div className="mt-1 text-xs font-medium text-slate-500">
                                         Última atualização: {ticket.ultimaMensagemAt ? new Date(ticket.ultimaMensagemAt).toLocaleString('pt-BR') : '-'}
                                     </div>
+                                    {isPlataforma && ticket.ultimaMensagemAutorTipo && (
+                                        <div className="mt-2 text-xs font-semibold text-slate-500">
+                                            Última interação: <span className="font-black text-slate-700">{descricaoAutorMensagem(ticket.ultimaMensagemAutorTipo)}</span>
+                                            {' · '}
+                                            <span className="text-slate-600">{identificacaoAutorTicket(ticket)}</span>
+                                        </div>
+                                    )}
                                     {isPlataforma && (
                                         <div className="mt-3 flex flex-wrap gap-2">
                                             {!ticket.plataformaResponsavel && ticket.status !== 'ENCERRADO' && (
@@ -798,10 +1287,25 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
                                         <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${statusClasses(ticketAtivo.status)}`}>
                                             {ticketAtivo.status}
                                         </span>
+                                        {isPlataforma && contextoTriagem && (
+                                            <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-blue-700">
+                                                {contextoTriagem.titulo}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="mt-2 text-sm text-slate-600">
                                         {isPlataforma ? `${ticketAtivo.empresaNome} · ` : ''}{ticketAtivo.categoria} · Prioridade {ticketAtivo.prioridade}
                                     </div>
+                                    {isPlataforma && (
+                                        <div className="mt-2 text-sm font-semibold text-slate-600">
+                                            Responsável atual da plataforma: <span className="font-black text-slate-900">{ticketAtivo.plataformaResponsavel || 'Não definido'}</span>
+                                        </div>
+                                    )}
+                                    {isPlataforma && contextoTriagem && (
+                                        <div className="mt-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900">
+                                            {contextoTriagem.descricao}
+                                        </div>
+                                    )}
                                 </div>
                                 {isPlataforma && (
                                     <div className="grid gap-2 md:grid-cols-3">
@@ -982,8 +1486,22 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
                                             }`}
                                         >
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">{mensagem.autorTipo}</span>
+                                                <span className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${
+                                                    mensagem.autorTipo === 'PLATAFORMA'
+                                                        ? 'bg-violet-100 text-violet-800'
+                                                        : 'bg-blue-100 text-blue-800'
+                                                }`}>
+                                                    {descricaoAutorMensagem(mensagem.autorTipo)}
+                                                </span>
                                                 <span className="text-sm font-black text-slate-900">{mensagem.autorNome}</span>
+                                                {(mensagem.autorLogin || mensagem.autorPerfil) && (
+                                                    <span className="text-xs font-semibold text-slate-500">
+                                                        {[
+                                                            mensagem.autorLogin ? `@${mensagem.autorLogin}` : null,
+                                                            mensagem.autorPerfil || null
+                                                        ].filter(Boolean).join(' · ')}
+                                                    </span>
+                                                )}
                                                 <span className="text-xs text-slate-400">
                                                     {mensagem.createdAt ? new Date(mensagem.createdAt).toLocaleString('pt-BR') : '-'}
                                                 </span>
@@ -1004,6 +1522,41 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
                                 </div>
                             </div>
 
+                            <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                    <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Timeline do atendimento</div>
+                                    <button
+                                        onClick={exportarTimelineTicket}
+                                        className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-blue-500 hover:text-blue-700"
+                                    >
+                                        Exportar timeline
+                                    </button>
+                                </div>
+                                <div className="mt-4 space-y-3">
+                                    {timelineTicket.map((evento) => (
+                                        <div key={evento.id} className="flex gap-3">
+                                            <div className="mt-1 h-3 w-3 rounded-full bg-blue-600" />
+                                            <div className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                                                        {evento.tipo}
+                                                    </span>
+                                                    <span className="text-sm font-black text-slate-900">
+                                                        {evento.titulo}
+                                                    </span>
+                                                    <span className="text-xs text-slate-400">
+                                                        {evento.data ? new Date(evento.data).toLocaleString('pt-BR') : '-'}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-2 text-sm text-slate-600">
+                                                    {evento.descricao}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="space-y-3">
                                 {!isPlataforma && atendimentoFinalizado ? (
                                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-semibold text-emerald-800">
@@ -1011,6 +1564,40 @@ export const AtendimentoSaas = ({ modo = 'cliente' }) => {
                                     </div>
                                 ) : (
                                     <>
+                                        {isPlataforma && (
+                                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                                    <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Respostas rápidas</div>
+                                                    <button
+                                                        onClick={salvarTemplateAtual}
+                                                        className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-slate-700 transition hover:border-blue-500 hover:text-blue-700"
+                                                    >
+                                                        Salvar como template
+                                                    </button>
+                                                </div>
+                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                {templatesRapidos.map((template, index) => (
+                                                    <React.Fragment key={template.id || `${index}-${template.conteudo.slice(0, 16)}`}>
+                                                        <button
+                                                            onClick={() => aplicarTemplate(template.conteudo)}
+                                                            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-left text-[11px] font-black uppercase tracking-[0.16em] text-slate-700 transition hover:border-blue-500 hover:text-blue-700"
+                                                            title={template.conteudo}
+                                                        >
+                                                            {template.titulo || `Template ${index + 1}`}
+                                                        </button>
+                                                        {!template.isPadrao && (
+                                                            <button
+                                                                onClick={() => excluirTemplate(template.id)}
+                                                                className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-rose-700 transition hover:border-rose-400"
+                                                            >
+                                                                Remover
+                                                            </button>
+                                                        )}
+                                                    </React.Fragment>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        )}
                                         <textarea
                                             value={novaMensagem}
                                             onChange={(e) => setNovaMensagem(e.target.value)}

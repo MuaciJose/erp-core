@@ -2,6 +2,7 @@ package com.grandport.erp.modules.atendimento.service;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.atendimento.dto.AbrirAtendimentoDTO;
+import com.grandport.erp.modules.atendimento.dto.AtendimentoResumoDTO;
 import com.grandport.erp.modules.atendimento.dto.AtualizarAtendimentoStatusDTO;
 import com.grandport.erp.modules.atendimento.dto.EnviarAtendimentoMensagemDTO;
 import com.grandport.erp.modules.atendimento.model.AtendimentoMensagem;
@@ -33,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -189,6 +191,42 @@ class AtendimentoServiceTest {
 
         assertEquals("Este atendimento já foi finalizado e não aceita novas mensagens.", exception.getMessage());
         verify(mensagemRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve calcular resumo da plataforma com primeira resposta")
+    void deveCalcularResumoDaPlataforma() {
+        autenticar(usuarioPlataforma());
+
+        AtendimentoTicket aguardando = new AtendimentoTicket();
+        aguardando.setId(40L);
+        aguardando.setEmpresaId(7L);
+        aguardando.setPrioridade("CRITICA");
+        aguardando.setStatus("AGUARDANDO_PLATAFORMA");
+        aguardando.setCreatedAt(LocalDateTime.of(2026, 4, 2, 10, 0));
+
+        AtendimentoTicket finalizado = new AtendimentoTicket();
+        finalizado.setId(41L);
+        finalizado.setEmpresaId(7L);
+        finalizado.setPrioridade("MEDIA");
+        finalizado.setStatus("ENCERRADO");
+        finalizado.setPlataformaResponsavel("Owner");
+        finalizado.setCreatedAt(LocalDateTime.of(2026, 4, 2, 9, 0));
+
+        AtendimentoMensagem resposta = new AtendimentoMensagem();
+        resposta.setTicketId(41L);
+        resposta.setAutorTipo("PLATAFORMA");
+        resposta.setCreatedAt(LocalDateTime.of(2026, 4, 2, 9, 20));
+
+        when(ticketRepository.findAllByOrderByUpdatedAtDesc()).thenReturn(List.of(aguardando, finalizado));
+        when(mensagemRepository.findByTicketIdInOrderByCreatedAtAsc(List.of(40L, 41L))).thenReturn(List.of(resposta));
+        AtendimentoResumoDTO dto = atendimentoService.resumoPlataforma();
+
+        assertEquals(1, dto.aguardandoPlataforma());
+        assertEquals(1, dto.ticketsCriticos());
+        assertEquals(1, dto.semResponsavel());
+        assertEquals(1, dto.finalizados());
+        assertEquals(20, dto.tempoMedioPrimeiraRespostaMinutos());
     }
 
     private void autenticar(Usuario usuario) {

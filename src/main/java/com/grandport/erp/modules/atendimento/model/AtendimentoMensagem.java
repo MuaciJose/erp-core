@@ -26,6 +26,12 @@ public class AtendimentoMensagem {
     @Column(name = "autor_nome", nullable = false, length = 160)
     private String autorNome;
 
+    @Column(name = "autor_login", length = 160)
+    private String autorLogin;
+
+    @Column(name = "autor_perfil", length = 80)
+    private String autorPerfil;
+
     @Column(name = "mensagem", nullable = false, columnDefinition = "TEXT")
     private String mensagem;
 

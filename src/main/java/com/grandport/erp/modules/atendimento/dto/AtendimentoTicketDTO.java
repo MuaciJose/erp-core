@@ -17,6 +17,10 @@ public record AtendimentoTicketDTO(
         String incidentePrazoResposta,
         String incidentePrazoResolucao,
         String ultimaMensagemAt,
+        String ultimaMensagemAutorTipo,
+        String ultimaMensagemAutorNome,
+        String ultimaMensagemAutorLogin,
+        String ultimaMensagemAutorPerfil,
         String createdAt,
         String updatedAt,
         String closedAt

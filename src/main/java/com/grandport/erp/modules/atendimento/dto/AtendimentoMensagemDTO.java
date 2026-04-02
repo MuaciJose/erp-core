@@ -6,6 +6,8 @@ public record AtendimentoMensagemDTO(
         Long empresaId,
         String autorTipo,
         String autorNome,
+        String autorLogin,
+        String autorPerfil,
         String mensagem,
         String arquivoNome,
         String arquivoUrl,

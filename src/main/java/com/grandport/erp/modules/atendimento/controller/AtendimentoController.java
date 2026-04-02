@@ -2,9 +2,12 @@ package com.grandport.erp.modules.atendimento.controller;
 
 import com.grandport.erp.modules.atendimento.dto.AbrirAtendimentoDTO;
 import com.grandport.erp.modules.atendimento.dto.AtendimentoMensagemDTO;
+import com.grandport.erp.modules.atendimento.dto.AtendimentoResumoDTO;
+import com.grandport.erp.modules.atendimento.dto.AtendimentoTemplateDTO;
 import com.grandport.erp.modules.atendimento.dto.AtendimentoTicketDTO;
 import com.grandport.erp.modules.atendimento.dto.AtualizarAtendimentoStatusDTO;
 import com.grandport.erp.modules.atendimento.dto.EnviarAtendimentoMensagemDTO;
+import com.grandport.erp.modules.atendimento.dto.SalvarAtendimentoTemplateDTO;
 import com.grandport.erp.modules.atendimento.service.AtendimentoService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -81,6 +84,11 @@ public class AtendimentoController {
         return atendimentoService.listarTicketsPlataforma(status, busca);
     }
 
+    @GetMapping("/plataforma/resumo")
+    public AtendimentoResumoDTO resumoPlataforma() {
+        return atendimentoService.resumoPlataforma();
+    }
+
     @GetMapping("/plataforma/tickets/{ticketId}/mensagens")
     public List<AtendimentoMensagemDTO> listarMensagensPlataforma(@PathVariable Long ticketId) {
         return atendimentoService.listarMensagensPlataforma(ticketId);
@@ -112,6 +120,30 @@ public class AtendimentoController {
     public ResponseEntity<?> atualizarStatusTicket(@PathVariable Long ticketId, @RequestBody AtualizarAtendimentoStatusDTO dto) {
         try {
             return ResponseEntity.ok(atendimentoService.atualizarStatusPlataforma(ticketId, dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/plataforma/templates")
+    public List<AtendimentoTemplateDTO> listarTemplatesPlataforma() {
+        return atendimentoService.listarTemplatesPlataforma();
+    }
+
+    @PostMapping("/plataforma/templates")
+    public ResponseEntity<?> criarTemplatePlataforma(@RequestBody SalvarAtendimentoTemplateDTO dto) {
+        try {
+            return ResponseEntity.ok(atendimentoService.criarTemplatePlataforma(dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/plataforma/templates/{templateId}")
+    public ResponseEntity<?> excluirTemplatePlataforma(@PathVariable Long templateId) {
+        try {
+            atendimentoService.excluirTemplatePlataforma(templateId);
+            return ResponseEntity.ok(Map.of("message", "Template removido com sucesso."));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
