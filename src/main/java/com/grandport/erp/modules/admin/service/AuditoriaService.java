@@ -5,6 +5,7 @@ import com.grandport.erp.modules.admin.model.LogAuditoria;
 import com.grandport.erp.modules.admin.repository.LogAuditoriaRepository;
 import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.empresa.repository.EmpresaRepository;
+import com.grandport.erp.modules.usuario.model.TipoAcesso;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -106,11 +107,12 @@ public class AuditoriaService {
             LocalDate dataFim,
             Pageable pageable
     ) {
+        Long empresaIdEfetivo = resolverEmpresaIdEfetivo(empresaId);
         LocalDateTime inicio = dataInicio == null ? null : dataInicio.atStartOfDay();
         LocalDateTime fim = dataFim == null ? null : dataFim.plusDays(1).atStartOfDay();
 
         Page<LogAuditoria> pagina = repository.buscarFiltrado(
-                empresaId,
+                empresaIdEfetivo,
                 textoNormalizado(modulo),
                 textoNormalizado(acao),
                 textoNormalizado(busca),
@@ -141,5 +143,18 @@ public class AuditoriaService {
 
     private String textoNormalizado(String valor) {
         return valor == null || valor.isBlank() ? null : valor.trim();
+    }
+
+    private Long resolverEmpresaIdEfetivo(Long empresaIdSolicitado) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof Usuario usuario)) {
+            return empresaIdSolicitado;
+        }
+
+        if (usuario.getTipoAcesso() == TipoAcesso.PLATFORM_ADMIN) {
+            return empresaIdSolicitado;
+        }
+
+        return usuario.getEmpresaId();
     }
 }

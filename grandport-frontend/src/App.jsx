@@ -354,7 +354,7 @@ function App() {
                     )}
                     {paginaAtiva === 'central-saas' && <CentralSaas contextoInicial={contextoCentralSaas} />}
                     {paginaAtiva === 'atendimento-saas' && <AtendimentoSaas modo="plataforma" />}
-                    {paginaAtiva === 'auditoria' && <Auditoria />}
+                    {paginaAtiva === 'auditoria' && <Auditoria usuarioLogado={usuarioLogado} />}
                 </PlatformConsoleLayout>
             </>
         );
@@ -529,7 +529,7 @@ function App() {
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
                             {paginaAtiva === 'liberacao-acessos' && <LiberacaoAcessos />}
                             {paginaAtiva === 'central-saas' && <CentralSaas contextoInicial={contextoCentralSaas} />}
-                            {paginaAtiva === 'auditoria' && <Auditoria />}
+                            {paginaAtiva === 'auditoria' && <Auditoria usuarioLogado={usuarioLogado} />}
                             {paginaAtiva === 'configuracoes' && (
                                 <Suspense fallback={
                                     <div className="min-h-[40vh] flex items-center justify-center text-slate-500 font-semibold">

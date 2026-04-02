@@ -5,7 +5,7 @@ import {
     AlertCircle, Edit, Globe, ChevronLeft, ChevronRight, RefreshCw, Filter, ShieldAlert
 } from 'lucide-react';
 
-export const Auditoria = () => {
+export const Auditoria = ({ usuarioLogado }) => {
     const [logs, setLogs] = useState([]);
     const [empresas, setEmpresas] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -22,6 +22,7 @@ export const Auditoria = () => {
     const [acaoFiltro, setAcaoFiltro] = useState('');
     const [dataInicio, setDataInicio] = useState('');
     const [dataFim, setDataFim] = useState('');
+    const isPlatformAdmin = usuarioLogado?.tipoAcesso === 'PLATFORM_ADMIN';
 
     const carregarLogs = async () => {
         setLoading(true);
@@ -49,6 +50,12 @@ export const Auditoria = () => {
     };
 
     useEffect(() => {
+        if (!isPlatformAdmin) {
+            setEmpresas([]);
+            setEmpresaFiltro('TODAS');
+            return;
+        }
+
         const loadEmpresas = async () => {
             try {
                 const res = await api.get('/api/assinaturas/empresas');
@@ -58,7 +65,7 @@ export const Auditoria = () => {
             }
         };
         loadEmpresas();
-    }, []);
+    }, [isPlatformAdmin]);
 
     useEffect(() => {
         setPage(0);
@@ -145,19 +152,21 @@ export const Auditoria = () => {
                         />
                     </div>
 
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 hover:border-slate-300 transition-colors">
-                        <Filter size={16} className="text-slate-400" />
-                        <select
-                            value={empresaFiltro}
-                            onChange={(e) => setEmpresaFiltro(e.target.value)}
-                            className="py-2.5 px-1 bg-transparent outline-none text-sm font-bold text-slate-700 w-full md:w-56 cursor-pointer"
-                        >
-                            <option value="TODAS">Todas as empresas</option>
-                            {empresas.map((empresa) => (
-                                <option key={empresa.id} value={empresa.id}>{empresa.razaoSocial}</option>
-                            ))}
-                        </select>
-                    </div>
+                    {isPlatformAdmin && (
+                        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 hover:border-slate-300 transition-colors">
+                            <Filter size={16} className="text-slate-400" />
+                            <select
+                                value={empresaFiltro}
+                                onChange={(e) => setEmpresaFiltro(e.target.value)}
+                                className="py-2.5 px-1 bg-transparent outline-none text-sm font-bold text-slate-700 w-full md:w-56 cursor-pointer"
+                            >
+                                <option value="TODAS">Todas as empresas</option>
+                                {empresas.map((empresa) => (
+                                    <option key={empresa.id} value={empresa.id}>{empresa.razaoSocial}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 hover:border-slate-300 transition-colors">
                         <Filter size={16} className="text-slate-400" />
