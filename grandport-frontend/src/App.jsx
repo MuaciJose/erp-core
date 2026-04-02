@@ -108,6 +108,7 @@ function App() {
     const [usuarioLogado, setUsuarioLogado] = useState(null);
     const [paginaAtiva, setPaginaAtiva] = useState('');
     const [modoAplicacao, setModoAplicacao] = useState('erp');
+    const [contextoCentralSaas, setContextoCentralSaas] = useState(null);
     const [carregandoApp, setCarregandoApp] = useState(true);
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [senhaAtualObrigatoria, setSenhaAtualObrigatoria] = useState('');
@@ -268,6 +269,11 @@ function App() {
         setPaginaAtiva('platform-overview');
     };
 
+    const handleAbrirCentralSaas = (contexto = null) => {
+        setContextoCentralSaas(contexto);
+        setPaginaAtiva('central-saas');
+    };
+
     const handleEntrarErp = () => {
         const telaInicialErp = usuarioLogado?.tipoAcesso === 'PLATFORM_ADMIN'
             ? 'dash'
@@ -289,12 +295,12 @@ function App() {
                 >
                     {paginaAtiva === 'platform-overview' && (
                         <PlatformOverview
-                            onAbrirCentralSaas={() => setPaginaAtiva('central-saas')}
+                            onAbrirCentralSaas={handleAbrirCentralSaas}
                             onAbrirAuditoria={() => setPaginaAtiva('auditoria')}
                             onEntrarErp={handleEntrarErp}
                         />
                     )}
-                    {paginaAtiva === 'central-saas' && <CentralSaas />}
+                    {paginaAtiva === 'central-saas' && <CentralSaas contextoInicial={contextoCentralSaas} />}
                     {paginaAtiva === 'auditoria' && <Auditoria />}
                 </PlatformConsoleLayout>
             </>
@@ -361,7 +367,7 @@ function App() {
                             {paginaAtiva === 'conciliacao' && <ConciliacaoBancaria />}
                             {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
                             {paginaAtiva === 'liberacao-acessos' && <LiberacaoAcessos />}
-                            {paginaAtiva === 'central-saas' && <CentralSaas />}
+                            {paginaAtiva === 'central-saas' && <CentralSaas contextoInicial={contextoCentralSaas} />}
                             {paginaAtiva === 'auditoria' && <Auditoria />}
                             {paginaAtiva === 'configuracoes' && (
                                 <Suspense fallback={

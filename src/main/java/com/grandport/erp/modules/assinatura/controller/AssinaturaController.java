@@ -7,7 +7,9 @@ import com.grandport.erp.modules.assinatura.dto.CobrancaAssinaturaDTO;
 import com.grandport.erp.modules.assinatura.dto.CriarCobrancaDTO;
 import com.grandport.erp.modules.assinatura.dto.ConvitePublicoDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaAssinaturaResumoDTO;
+import com.grandport.erp.modules.assinatura.dto.EmpresaIncidenteDTO;
 import com.grandport.erp.modules.assinatura.dto.RegistrarPagamentoDTO;
+import com.grandport.erp.modules.assinatura.dto.SalvarEmpresaIncidenteDTO;
 import com.grandport.erp.modules.assinatura.dto.AtualizarPlanoEmpresaDTO;
 import com.grandport.erp.modules.assinatura.dto.SolicitacaoAcessoResumoDTO;
 import com.grandport.erp.modules.assinatura.dto.WebhookPagamentoDTO;
@@ -17,6 +19,7 @@ import com.grandport.erp.modules.assinatura.dto.ModuloLicencaResumoDTO;
 import com.grandport.erp.modules.assinatura.dto.SaasOperacaoResumoDTO;
 import com.grandport.erp.modules.assinatura.service.AssinaturaService;
 import com.grandport.erp.modules.assinatura.service.CobrancaAssinaturaService;
+import com.grandport.erp.modules.assinatura.service.IncidenteEmpresaService;
 import com.grandport.erp.modules.assinatura.service.LicenciamentoModuloService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,11 +35,13 @@ public class AssinaturaController {
     private final AssinaturaService assinaturaService;
     private final CobrancaAssinaturaService cobrancaAssinaturaService;
     private final LicenciamentoModuloService licenciamentoModuloService;
+    private final IncidenteEmpresaService incidenteEmpresaService;
 
-    public AssinaturaController(AssinaturaService assinaturaService, CobrancaAssinaturaService cobrancaAssinaturaService, LicenciamentoModuloService licenciamentoModuloService) {
+    public AssinaturaController(AssinaturaService assinaturaService, CobrancaAssinaturaService cobrancaAssinaturaService, LicenciamentoModuloService licenciamentoModuloService, IncidenteEmpresaService incidenteEmpresaService) {
         this.assinaturaService = assinaturaService;
         this.cobrancaAssinaturaService = cobrancaAssinaturaService;
         this.licenciamentoModuloService = licenciamentoModuloService;
+        this.incidenteEmpresaService = incidenteEmpresaService;
     }
 
     @PostMapping("/nova-empresa")
@@ -174,6 +179,35 @@ public class AssinaturaController {
     public List<EmpresaTimelineEventoDTO> listarTimelineEmpresa(@PathVariable Long id) {
         assinaturaService.validarAcessoPlataforma();
         return assinaturaService.listarTimelineEmpresa(id);
+    }
+
+    @GetMapping("/empresas/{id}/incidentes")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public List<EmpresaIncidenteDTO> listarIncidentesEmpresa(@PathVariable Long id) {
+        assinaturaService.validarAcessoPlataforma();
+        return incidenteEmpresaService.listarPorEmpresa(id);
+    }
+
+    @PostMapping("/empresas/{id}/incidentes")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public ResponseEntity<?> criarIncidenteEmpresa(@PathVariable Long id, @RequestBody SalvarEmpresaIncidenteDTO dto) {
+        try {
+            assinaturaService.validarAcessoPlataforma();
+            return ResponseEntity.ok(incidenteEmpresaService.criar(id, dto, assinaturaService.usuarioAtual()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/empresas/{empresaId}/incidentes/{incidenteId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public ResponseEntity<?> atualizarIncidenteEmpresa(@PathVariable Long empresaId, @PathVariable Long incidenteId, @RequestBody SalvarEmpresaIncidenteDTO dto) {
+        try {
+            assinaturaService.validarAcessoPlataforma();
+            return ResponseEntity.ok(incidenteEmpresaService.atualizar(empresaId, incidenteId, dto, assinaturaService.usuarioAtual()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @PostMapping("/empresas/{id}/modulos")

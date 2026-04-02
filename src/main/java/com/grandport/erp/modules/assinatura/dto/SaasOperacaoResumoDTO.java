@@ -11,5 +11,7 @@ public record SaasOperacaoResumoDTO(
         Integer modulosExtrasAtivos,
         Integer trialsAtivos,
         Integer empresasComBloqueioComercial,
-        Integer modulosBloqueadosComercialmente
+        Integer modulosBloqueadosComercialmente,
+        Integer incidentesAbertos,
+        Integer incidentesSlaVencido
 ) {}

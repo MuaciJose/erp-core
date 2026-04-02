@@ -5,6 +5,7 @@ import com.grandport.erp.modules.assinatura.dto.ConviteAssinaturaDTO;
 import com.grandport.erp.modules.assinatura.dto.ConvitePublicoDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaAssinaturaResumoDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaCobrancaComposicaoDTO;
+import com.grandport.erp.modules.assinatura.dto.EmpresaIncidenteDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaTimelineEventoDTO;
 import com.grandport.erp.modules.assinatura.dto.RegistrarPagamentoDTO;
 import com.grandport.erp.modules.assinatura.dto.SaasOperacaoResumoDTO;
@@ -54,10 +55,11 @@ public class AssinaturaService {
     private final SolicitacaoAcessoRepository solicitacaoAcessoRepository;
     private final CobrancaAssinaturaService cobrancaAssinaturaService;
     private final LicenciamentoModuloService licenciamentoModuloService;
+    private final IncidenteEmpresaService incidenteEmpresaService;
     private final LogAuditoriaRepository logAuditoriaRepository;
     private final SecurityEventRepository securityEventRepository;
 
-    public AssinaturaService(EmpresaRepository empresaRepository, UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, PasswordPolicyService passwordPolicyService, AssinaturaInviteRepository assinaturaInviteRepository, SolicitacaoAcessoRepository solicitacaoAcessoRepository, CobrancaAssinaturaService cobrancaAssinaturaService, LicenciamentoModuloService licenciamentoModuloService, LogAuditoriaRepository logAuditoriaRepository, SecurityEventRepository securityEventRepository) {
+    public AssinaturaService(EmpresaRepository empresaRepository, UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, PasswordPolicyService passwordPolicyService, AssinaturaInviteRepository assinaturaInviteRepository, SolicitacaoAcessoRepository solicitacaoAcessoRepository, CobrancaAssinaturaService cobrancaAssinaturaService, LicenciamentoModuloService licenciamentoModuloService, IncidenteEmpresaService incidenteEmpresaService, LogAuditoriaRepository logAuditoriaRepository, SecurityEventRepository securityEventRepository) {
         this.empresaRepository = empresaRepository;
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
@@ -66,6 +68,7 @@ public class AssinaturaService {
         this.solicitacaoAcessoRepository = solicitacaoAcessoRepository;
         this.cobrancaAssinaturaService = cobrancaAssinaturaService;
         this.licenciamentoModuloService = licenciamentoModuloService;
+        this.incidenteEmpresaService = incidenteEmpresaService;
         this.logAuditoriaRepository = logAuditoriaRepository;
         this.securityEventRepository = securityEventRepository;
     }
@@ -251,7 +254,9 @@ public class AssinaturaService {
                 (int) licenciamentoModuloService.totalModulosExtrasAtivos(),
                 (int) licenciamentoModuloService.totalTrialsAtivos(),
                 empresasComBloqueioComercial,
-                (int) licenciamentoModuloService.totalModulosBloqueadosComercialmente()
+                (int) licenciamentoModuloService.totalModulosBloqueadosComercialmente(),
+                (int) incidenteEmpresaService.totalIncidentesAbertos(),
+                (int) incidenteEmpresaService.totalSlaVencido()
         );
     }
 
@@ -292,6 +297,23 @@ public class AssinaturaService {
                     "Cobrança " + cobranca.getReferencia() + " no valor de R$ " + cobranca.getValor(),
                     cobranca.getStatus().name(),
                     "BILLING"
+            ));
+        }
+
+        for (EmpresaIncidenteDTO incidente : incidenteEmpresaService.listarPorEmpresa(empresaId)) {
+            String prazo = incidente.prazoResolucao() != null
+                    ? " · SLA resolução: " + incidente.prazoResolucao()
+                    : incidente.prazoResposta() != null ? " · SLA resposta: " + incidente.prazoResposta() : "";
+            String descricao = incidente.descricao() == null || incidente.descricao().isBlank()
+                    ? "Incidente sem descrição operacional." + prazo
+                    : incidente.descricao() + prazo;
+            eventos.add(new EmpresaTimelineEventoDTO(
+                    incidente.updatedAt() != null ? incidente.updatedAt() : incidente.createdAt(),
+                    "INCIDENTE",
+                    incidente.status() + " · " + incidente.titulo(),
+                    descricao,
+                    incidente.severidade(),
+                    "INCIDENTES"
             ));
         }
 
@@ -460,7 +482,7 @@ public class AssinaturaService {
         );
     }
 
-    private String usuarioAtual() {
+    public String usuarioAtual() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return "SISTEMA";

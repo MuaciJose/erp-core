@@ -3,6 +3,7 @@ package com.grandport.erp.modules.assinatura.controller;
 import com.grandport.erp.modules.assinatura.dto.*;
 import com.grandport.erp.modules.assinatura.service.AssinaturaService;
 import com.grandport.erp.modules.assinatura.service.CobrancaAssinaturaService;
+import com.grandport.erp.modules.assinatura.service.IncidenteEmpresaService;
 import com.grandport.erp.modules.assinatura.service.LicenciamentoModuloService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,13 +33,16 @@ class AssinaturaControllerTest {
     @Mock
     private LicenciamentoModuloService licenciamentoModuloService;
 
+    @Mock
+    private IncidenteEmpresaService incidenteEmpresaService;
+
     @InjectMocks
     private AssinaturaController assinaturaController;
 
     @Test
     @DisplayName("GET /assinaturas/resumo-operacao deve retornar resumo da plataforma")
     void deveRetornarResumoOperacao() {
-        SaasOperacaoResumoDTO dto = new SaasOperacaoResumoDTO(10, 7, 2, 1, 3, 1990.0, 390.0, 5, 2, 2, 4);
+        SaasOperacaoResumoDTO dto = new SaasOperacaoResumoDTO(10, 7, 2, 1, 3, 1990.0, 390.0, 5, 2, 2, 4, 6, 2);
         when(assinaturaService.obterResumoOperacao()).thenReturn(dto);
 
         var response = assinaturaController.resumoOperacao();
@@ -91,5 +95,44 @@ class AssinaturaControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(assinaturaService).validarAcessoPlataforma();
         verify(licenciamentoModuloService).atualizarLicencaEmpresa(11L, payload);
+    }
+
+    @Test
+    @DisplayName("GET /assinaturas/empresas/{id}/incidentes deve listar incidentes da empresa")
+    void deveListarIncidentesEmpresa() {
+        when(incidenteEmpresaService.listarPorEmpresa(8L)).thenReturn(List.of(
+                new EmpresaIncidenteDTO(1L, 8L, "OPERACIONAL", "Acesso indisponível", "ALTA", "ABERTO", "owner",
+                        "2026-04-03", "2026-04-04", "Cliente sem acesso ao módulo fiscal", null,
+                        "2026-04-02T10:00:00", "2026-04-02T10:30:00", "owner", "owner")
+        ));
+
+        var response = assinaturaController.listarIncidentesEmpresa(8L);
+
+        assertEquals(1, response.size());
+        assertEquals("Acesso indisponível", response.get(0).titulo());
+        verify(assinaturaService).validarAcessoPlataforma();
+        verify(incidenteEmpresaService).listarPorEmpresa(8L);
+    }
+
+    @Test
+    @DisplayName("POST /assinaturas/empresas/{id}/incidentes deve criar incidente")
+    void deveCriarIncidenteEmpresa() {
+        SalvarEmpresaIncidenteDTO payload = new SalvarEmpresaIncidenteDTO(
+                "OPERACIONAL", "Módulo fiscal indisponível", "ALTA", "ABERTO", "owner",
+                "2026-04-03", "2026-04-04", "Cliente sem acesso ao módulo", null
+        );
+        when(assinaturaService.usuarioAtual()).thenReturn("owner");
+        when(incidenteEmpresaService.criar(8L, payload, "owner")).thenReturn(
+                new EmpresaIncidenteDTO(1L, 8L, "OPERACIONAL", "Módulo fiscal indisponível", "ALTA", "ABERTO", "owner",
+                        "2026-04-03", "2026-04-04", "Cliente sem acesso ao módulo", null,
+                        "2026-04-02T10:00:00", "2026-04-02T10:00:00", "owner", "owner")
+        );
+
+        var response = assinaturaController.criarIncidenteEmpresa(8L, payload);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(assinaturaService).validarAcessoPlataforma();
+        verify(assinaturaService).usuarioAtual();
+        verify(incidenteEmpresaService).criar(8L, payload, "owner");
     }
 }
