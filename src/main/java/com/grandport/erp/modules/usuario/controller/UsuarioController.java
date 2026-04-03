@@ -103,9 +103,10 @@ public class UsuarioController {
         }
         usuario.setTipoAcesso(tipoSolicitado);
 
-        if (dto.getSenha() != null && !dto.getSenha().isEmpty()) {
-            passwordPolicyService.validateOrThrow(dto.getSenha());
-            usuario.setSenha(passwordEncoder.encode(dto.getSenha()));
+        String senhaNormalizada = dto.getSenha() == null ? null : dto.getSenha().trim();
+        if (senhaNormalizada != null && !senhaNormalizada.isEmpty()) {
+            passwordPolicyService.validateOrThrow(senhaNormalizada);
+            usuario.setSenha(passwordEncoder.encode(senhaNormalizada));
             usuario.setForcePasswordChange(true);
         }
 

@@ -3,11 +3,20 @@ package com.grandport.erp.modules.assinatura.service;
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.assinatura.dto.AtualizarLicencaModuloDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaCobrancaComposicaoDTO;
+import com.grandport.erp.modules.assinatura.dto.ModuloCatalogoDTO;
 import com.grandport.erp.modules.assinatura.dto.ModuloLicencaResumoDTO;
+import com.grandport.erp.modules.assinatura.dto.PlanoSaasDTO;
+import com.grandport.erp.modules.assinatura.dto.SalvarPlanoSaasDTO;
 import com.grandport.erp.modules.assinatura.model.LicencaModuloEmpresa;
+import com.grandport.erp.modules.assinatura.model.PlanoSaas;
+import com.grandport.erp.modules.assinatura.model.PlanoSaasModulo;
 import com.grandport.erp.modules.assinatura.repository.LicencaModuloEmpresaRepository;
+import com.grandport.erp.modules.assinatura.repository.PlanoSaasModuloRepository;
+import com.grandport.erp.modules.assinatura.repository.PlanoSaasRepository;
 import com.grandport.erp.modules.empresa.model.Empresa;
 import com.grandport.erp.modules.empresa.repository.EmpresaRepository;
+import com.grandport.erp.modules.usuario.model.TipoAcesso;
+import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,6 +36,9 @@ public class LicenciamentoModuloService {
     private final EmpresaRepository empresaRepository;
     private final LicencaModuloEmpresaRepository licencaModuloEmpresaRepository;
     private final AuditoriaService auditoriaService;
+    private final UsuarioRepository usuarioRepository;
+    private final PlanoSaasRepository planoSaasRepository;
+    private final PlanoSaasModuloRepository planoSaasModuloRepository;
 
     private static final List<ModuloCatalogoItem> CATALOGO = List.of(
             item("dash", "Dashboard", "Operacao", "ESSENCIAL", BigDecimal.ZERO),
@@ -44,6 +56,8 @@ public class LicenciamentoModuloService {
             item("parceiros", "Parceiros", "Cadastros", "ESSENCIAL", BigDecimal.ZERO),
             item("servicos", "Servicos", "Cadastros", "ESSENCIAL", BigDecimal.ZERO),
             item("agenda", "Agenda", "Operacao", "ESSENCIAL", BigDecimal.ZERO),
+            item("atendimento", "Atendimento SaaS", "Relacionamento", "ESSENCIAL", BigDecimal.ZERO),
+            item("ficha-cadastral", "Ficha Cadastral da Empresa", "Relacionamento", "ESSENCIAL", BigDecimal.ZERO),
             item("manual", "Manual", "Sistema", "ESSENCIAL", BigDecimal.ZERO),
             item("usuarios", "Usuarios", "Sistema", "ESSENCIAL", BigDecimal.ZERO),
             item("configuracoes", "Configuracoes", "Sistema", "ESSENCIAL", BigDecimal.ZERO),
@@ -55,6 +69,7 @@ public class LicenciamentoModuloService {
             item("compras", "Compras", "Operacao", "PROFISSIONAL", BigDecimal.ZERO),
             item("previsao", "Previsao", "Operacao", "PROFISSIONAL", BigDecimal.ZERO),
             item("faltas", "Faltas", "Gestao", "PROFISSIONAL", new BigDecimal("29.90")),
+            item("inventario", "Inventario PWA", "Operacao", "PROFISSIONAL", BigDecimal.ZERO),
             item("curva-abc", "Curva ABC", "Operacao", "PROFISSIONAL", new BigDecimal("19.90")),
             item("etiquetas", "Etiquetas", "Operacao", "PROFISSIONAL", new BigDecimal("14.90")),
             item("contas-pagar", "Contas a Pagar", "Financeiro", "PROFISSIONAL", BigDecimal.ZERO),
@@ -82,6 +97,11 @@ public class LicenciamentoModuloService {
 
     @Transactional(readOnly = true)
     public Set<String> modulosLiberados(Long empresaId) {
+        if (empresaInterna(empresaId)) {
+            return CATALOGO.stream()
+                    .map(ModuloCatalogoItem::modulo)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+        }
         Empresa empresa = empresaRepository.findById(empresaId).orElse(null);
         String plano = empresa == null ? "ESSENCIAL" : empresa.getPlano();
         Set<String> modulos = new LinkedHashSet<>(modulosDoPlano(plano));
@@ -100,8 +120,11 @@ public class LicenciamentoModuloService {
     public List<ModuloLicencaResumoDTO> listarLicencasEmpresa(Long empresaId) {
         Empresa empresa = empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
+        boolean empresaInterna = empresaInterna(empresaId);
         String plano = empresa.getPlano();
-        Set<String> base = modulosDoPlano(plano);
+        Set<String> base = empresaInterna
+                ? CATALOGO.stream().map(ModuloCatalogoItem::modulo).collect(Collectors.toCollection(LinkedHashSet::new))
+                : modulosDoPlano(plano);
         Map<String, LicencaModuloEmpresa> overrides = licencaModuloEmpresaRepository.findByEmpresaIdOrderByModuloAsc(empresaId).stream()
                 .collect(Collectors.toMap(item -> normalizarModulo(item.getModulo()), item -> item, (a, b) -> b, LinkedHashMap::new));
 
@@ -111,7 +134,9 @@ public class LicenciamentoModuloService {
             LicencaModuloEmpresa override = overrides.get(item.modulo());
             boolean bloqueadoComercial = override != null && Boolean.TRUE.equals(override.getBloqueadoComercial());
             boolean ativo = (override != null ? Boolean.TRUE.equals(override.getAtivo()) : disponivelNoPlano) && !bloqueadoComercial;
-            String origem = override == null
+            String origem = empresaInterna
+                    ? "EMPRESA_INTERNA"
+                    : override == null
                     ? "PLANO"
                     : bloqueadoComercial
                         ? "BLOQUEIO_COMERCIAL"
@@ -183,10 +208,105 @@ public class LicenciamentoModuloService {
 
     @Transactional(readOnly = true)
     public Set<String> modulosDoPlano(String plano) {
+        Set<String> modulosBanco = modulosDoPlanoDoBanco(plano);
+        if (modulosBanco != null) {
+            return modulosBanco;
+        }
+
         return CATALOGO.stream()
                 .filter(item -> nivelPlano(plano) >= nivelPlano(item.planoBase()))
                 .map(ModuloCatalogoItem::modulo)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ModuloCatalogoDTO> listarCatalogoModulos() {
+        return CATALOGO.stream()
+                .map(item -> new ModuloCatalogoDTO(
+                        item.modulo(),
+                        item.nomeExibicao(),
+                        item.categoria(),
+                        item.valorBaseMensal().doubleValue()
+                ))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlanoSaasDTO> listarPlanos() {
+        Map<Long, List<String>> modulosPorPlano = planoSaasModuloRepository.findAll().stream()
+                .collect(Collectors.groupingBy(
+                        PlanoSaasModulo::getPlanoId,
+                        LinkedHashMap::new,
+                        Collectors.mapping(PlanoSaasModulo::getModulo, Collectors.toList())
+                ));
+
+        return planoSaasRepository.findAllByOrderByValorMensalBaseAscNomeExibicaoAsc().stream()
+                .map(plano -> new PlanoSaasDTO(
+                        plano.getId(),
+                        plano.getCodigo(),
+                        plano.getNomeExibicao(),
+                        plano.getDescricao(),
+                        plano.getValorMensalBase() == null ? 0D : plano.getValorMensalBase().doubleValue(),
+                        Boolean.TRUE.equals(plano.getAtivo()),
+                        modulosPorPlano.getOrDefault(plano.getId(), List.of())
+                ))
+                .toList();
+    }
+
+    @Transactional
+    public PlanoSaasDTO salvarPlano(SalvarPlanoSaasDTO dto) {
+        if (dto == null) {
+            throw new RuntimeException("Dados do plano não informados.");
+        }
+        if (dto.codigo() == null || dto.codigo().isBlank()) {
+            throw new RuntimeException("Informe o código do plano.");
+        }
+        if (dto.nomeExibicao() == null || dto.nomeExibicao().isBlank()) {
+            throw new RuntimeException("Informe o nome do plano.");
+        }
+
+        String codigo = dto.codigo().trim().toUpperCase(Locale.ROOT);
+        Set<String> modulosValidos = CATALOGO.stream()
+                .map(ModuloCatalogoItem::modulo)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        List<String> modulos = (dto.modulos() == null ? List.<String>of() : dto.modulos()).stream()
+                .map(this::normalizarModulo)
+                .filter(modulosValidos::contains)
+                .distinct()
+                .toList();
+
+        PlanoSaas plano = planoSaasRepository.findByCodigoIgnoreCase(codigo).orElseGet(PlanoSaas::new);
+        plano.setCodigo(codigo);
+        plano.setNomeExibicao(dto.nomeExibicao().trim());
+        plano.setDescricao(dto.descricao() == null || dto.descricao().isBlank() ? null : dto.descricao().trim());
+        plano.setValorMensalBase(BigDecimal.valueOf(dto.valorMensalBase() == null ? 0D : dto.valorMensalBase()));
+        plano.setAtivo(dto.ativo() == null || dto.ativo());
+        plano.setUpdatedAt(LocalDateTime.now());
+        if (plano.getCreatedAt() == null) {
+            plano.setCreatedAt(LocalDateTime.now());
+        }
+        PlanoSaas salvo = planoSaasRepository.save(plano);
+
+        planoSaasModuloRepository.deleteByPlanoId(salvo.getId());
+        for (String modulo : modulos) {
+            PlanoSaasModulo vinculo = new PlanoSaasModulo();
+            vinculo.setPlanoId(salvo.getId());
+            vinculo.setModulo(modulo);
+            vinculo.setValorExtraPadrao(BigDecimal.ZERO);
+            planoSaasModuloRepository.save(vinculo);
+        }
+
+        auditoriaService.registrar("SAAS", "PLANO_SAAS_SALVO", "Plano " + codigo + " atualizado com " + modulos.size() + " módulo(s).");
+
+        return listarPlanos().stream()
+                .filter(item -> codigo.equalsIgnoreCase(item.codigo()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Plano salvo, mas não foi possível recarregá-lo."));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean empresaInterna(Long empresaId) {
+        return empresaId != null && usuarioRepository.existsByEmpresaIdAndTipoAcesso(empresaId, TipoAcesso.PLATFORM_ADMIN);
     }
 
     @Transactional(readOnly = true)
@@ -357,6 +477,19 @@ public class LicenciamentoModuloService {
             case "PROFISSIONAL" -> 2;
             default -> 1;
         };
+    }
+
+    private Set<String> modulosDoPlanoDoBanco(String plano) {
+        if (plano == null || plano.isBlank()) {
+            return null;
+        }
+
+        return planoSaasRepository.findByCodigoIgnoreCase(plano.trim())
+                .map(item -> planoSaasModuloRepository.findByPlanoIdOrderByModuloAsc(item.getId()).stream()
+                        .map(PlanoSaasModulo::getModulo)
+                        .map(this::normalizarModulo)
+                        .collect(Collectors.toCollection(LinkedHashSet::new)))
+                .orElse(null);
     }
 
     private String normalizarModulo(String modulo) {

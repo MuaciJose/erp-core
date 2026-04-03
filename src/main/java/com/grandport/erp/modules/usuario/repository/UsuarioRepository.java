@@ -18,4 +18,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByIdAndEmpresaId(Long id, Long empresaId);
 
     Optional<Usuario> findFirstByEmpresaIdAndTipoAcessoOrderByIdAsc(Long empresaId, TipoAcesso tipoAcesso);
+
+    boolean existsByEmpresaIdAndTipoAcesso(Long empresaId, TipoAcesso tipoAcesso);
 }

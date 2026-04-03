@@ -194,7 +194,7 @@ public class AutenticacaoController {
     }
 
     private boolean requiresMfa(Usuario usuario) {
-        return usuario != null && (usuario.isMfaEnabled() || usuario.getTipoAcesso() != null && usuario.getTipoAcesso() != com.grandport.erp.modules.usuario.model.TipoAcesso.TENANT_USER);
+        return usuario != null && usuario.isMfaEnabled();
     }
 
     private AuthFlowResponseDTO buildSuccessResponse(Usuario usuario) {

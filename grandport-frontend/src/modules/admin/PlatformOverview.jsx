@@ -637,8 +637,13 @@ export const PlatformOverview = ({ onAbrirCentralSaas, onAbrirAuditoria, onEntra
                                 >
                                     <div className="text-sm font-black text-slate-900">{empresa.razaoSocial}</div>
                                     <div className="mt-1 text-sm text-slate-600">
-                                        Plano: {empresa.plano || '-'} · Total previsto: {formatCurrencyBRL(empresa.valorTotalMensalPrevisto || empresa.valorMensal || 0)}
+                                        Plano: {empresa.empresaInterna ? 'INTERNO' : (empresa.plano || '-')} · Total previsto: {formatCurrencyBRL(empresa.valorTotalMensalPrevisto || empresa.valorMensal || 0)}
                                     </div>
+                                    {empresa.empresaInterna && (
+                                        <div className="mt-2 inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-violet-700">
+                                            Empresa interna · licenciamento total
+                                        </div>
+                                    )}
                                 </button>
                             ))}
                         </div>

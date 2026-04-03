@@ -16,6 +16,7 @@ import {
     Shield
 } from 'lucide-react';
 import apiSidebar from '../api/axios';
+import { ERP_MODULE_GROUPS, ROTAS_LIVRES_ERP } from '../utils/moduleCatalog';
 
 export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout, onOpenPlatformConsole }) => {
     const [menuExpandido, setMenuExpandido] = useState('vendas');
@@ -78,91 +79,49 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout, 
 
     const permissoesUsuario = usuarioLogado?.permissoes || [];
     const isPlatformAdmin = usuarioLogado?.tipoAcesso === 'PLATFORM_ADMIN';
+    const isTenantAdmin = usuarioLogado?.tipoAcesso === 'TENANT_ADMIN';
 
-    // ============================================================================
-    // 🚀 MENUS ATUALIZADOS E SINCRONIZADOS COM A GESTÃO DE USUÁRIOS
-    // ============================================================================
-    const menus = [
-        { id: 'dashboard', titulo: 'Dashboard', icone: <LayoutDashboard size={20} />, acao: 'dash' },
-        {
-            id: 'vendas', titulo: 'Vendas & Frente de Loja', icone: <ShoppingCart size={20} />,
-            submenus: [
-                { titulo: 'Ponto de Venda (PDV)', acao: 'pdv' },
-                { titulo: 'Balcão / Central', acao: 'vendas' },
-                { titulo: 'Checklist de Entrada', acao: 'checklist' },
-                { titulo: 'Painel de OS (Kanban)', acao: 'os' },
-                { titulo: 'Consulta de OS (Lista)', acao: 'listagem-os' },
-                //{ titulo: 'Orçamentos e Pedidos', acao: 'orcamentos' }, // 🚀 ADICIONADO
-                { titulo: 'Fila do Caixa', acao: 'fila-caixa' },
-                { titulo: 'Controle de Caixa', acao: 'caixa' },
-                { titulo: 'Relatório de Comissões', acao: 'relatorio-comissoes' }
-            ]
-        },
-        {
-            id: 'crm', titulo: 'CRM & Relacionamento', icone: <MessageCircle size={20} />, // 🚀 NOVO GRUPO CRIADO
-            submenus: [
-                { titulo: 'Painel de CRM', acao: 'crm' },
-                { titulo: 'Gestão de Revisões', acao: 'revisoes' }, // 🚀 MOVIDO PARA CÁ
-                { titulo: 'Agenda Corporativa', acao: 'agenda' },
-                { titulo: 'Atendimento SaaS', acao: 'atendimento' },
-                { titulo: 'Ficha Cadastral', acao: 'ficha-cadastral' },
-                { titulo: 'Integração WhatsApp', acao: 'whatsapp' }
-            ]
-        },
-        {
-            id: 'estoque', titulo: 'Estoque & Compras', icone: <Package size={20} />,
-            submenus: [
-                { titulo: 'Buscar Peças', acao: 'estoque' },
-                { titulo: 'Marcas', acao: 'marcas' },
-                { titulo: 'Categorias', acao: 'categorias' },
-                { titulo: 'Gerador de Etiquetas', acao: 'etiquetas' },
-                { titulo: 'Ajuste de Estoque', acao: 'ajuste_estoque' },
-                { titulo: 'Importar NF-e (XML)', acao: 'compras' },
-                { titulo: 'Previsão de Compras', acao: 'previsao' },
-                { titulo: 'Relatório de Faltas', acao: 'faltas' },
-                { titulo: 'Curva ABC', acao: 'curva-abc' }
-            ]
-        },
-        {
-            id: 'financeiro', titulo: 'Financeiro', icone: <DollarSign size={20} />,
-            submenus: [
-                { titulo: 'Contas a Pagar', acao: 'contas-pagar' },
-                { titulo: 'Contas a Receber', acao: 'contas-receber' },
-                { titulo: 'Contas Bancárias', acao: 'bancos' },
-                { titulo: 'Conciliação Bancária', acao: 'conciliacao' },
-                { titulo: 'Plano de Contas', acao: 'plano-contas' },
-                { titulo: 'Resultado (DRE)', acao: 'dre' },
-                {titulo: 'Fluxo de Caixa Projetado', acao: 'fluxo-caixa-projecao'}, // 🚀 ADICIONADO
-                { titulo: 'Recibo Avulso', acao: 'recibo-avulso' },
-                { titulo: 'Histórico de Recibos', acao: 'historico-recibos' } // 🚀 ADICIONADO
-            ]
-        },
-        {
-            id: 'cadastros', titulo: 'Administrativo', icone: <Users size={20} />,
-            submenus: [
-                { titulo: 'Clientes & Fornecedores', acao: 'parceiros' },
-                { titulo: 'Tabela de Mão de Obra', acao: 'servicos' },
-                { titulo: 'Equipe e Acessos', acao: 'usuarios' },
-                { titulo: 'Central SaaS', acao: 'central-saas', permissao: 'usuarios' },
-                { titulo: 'Auditoria de Sistema', acao: 'auditoria' },
-                { titulo: 'Fiscal / NCM', acao: 'fiscal' },
-                { titulo: 'Regras Fiscais (NF-e)', acao: 'regras-fiscais' },
-                { titulo: 'Gerenciador de NF-e', acao: 'gerenciador-nfe' },
-                { titulo: 'Emitir NF-e Avulsa', acao: 'emitir-nfe-avulsa' }
-            ]
-        },
-        { id: 'configuracoes', titulo: 'Configurações', icone: <Settings size={20} />, acao: 'configuracoes' },
-        { id: 'manual', titulo: 'Manual do Usuário', icone: <HelpCircle size={20} />, acao: 'manual' }
-    ];
+    const iconMap = {
+        dashboard: <LayoutDashboard size={20} />,
+        vendas: <ShoppingCart size={20} />,
+        crm: <MessageCircle size={20} />,
+        estoque: <Package size={20} />,
+        financeiro: <DollarSign size={20} />,
+        administrativo: <Users size={20} />,
+        configuracoes: <Settings size={20} />,
+        manual: <HelpCircle size={20} />
+    };
 
-    const rotasLivres = ['manual', 'agenda', 'atendimento', 'ficha-cadastral'];
+    const menus = ERP_MODULE_GROUPS.map((grupo) => {
+        if (grupo.telas) {
+            return {
+                id: grupo.id,
+                titulo: grupo.titulo,
+                icone: iconMap[grupo.icone],
+                submenus: grupo.telas.map((item) => ({
+                    titulo: item.menuTitulo || item.nome,
+                    acao: item.acao,
+                    permissao: item.permissao,
+                    platformOnly: item.platformOnly
+                }))
+            };
+        }
+
+        return {
+            id: grupo.id,
+            titulo: grupo.titulo,
+            icone: iconMap[grupo.icone],
+            acao: grupo.acao
+        };
+    });
 
     const menusFiltrados = menus.map(menu => {
         if (menu.submenus) {
             // Verifica se o usuário tem permissão para alguma tela do submenu
             const submenusPermitidos = menu.submenus.filter(sub => {
-                if (sub.acao === 'central-saas') return isPlatformAdmin;
-                return permissoesUsuario.includes(sub.permissao || sub.acao) || rotasLivres.includes(sub.acao);
+                if (sub.platformOnly) return isPlatformAdmin;
+                if (isTenantAdmin) return true;
+                return permissoesUsuario.includes(sub.permissao || sub.acao) || ROTAS_LIVRES_ERP.includes(sub.acao);
             });
             // Se tiver pelo menos um submenu liberado, renderiza o menu principal
             if (submenusPermitidos.length > 0) return { ...menu, submenus: submenusPermitidos };
@@ -170,7 +129,7 @@ export const Sidebar = ({ paginaAtiva, setPaginaAtiva, usuarioLogado, onLogout, 
         }
 
         // Menus sem submenus (Dashboard, Config, Manual)
-        if (rotasLivres.includes(menu.acao) || permissoesUsuario.includes(menu.acao)) {
+        if (isTenantAdmin || ROTAS_LIVRES_ERP.includes(menu.acao) || permissoesUsuario.includes(menu.acao)) {
             return menu;
         }
         return null;

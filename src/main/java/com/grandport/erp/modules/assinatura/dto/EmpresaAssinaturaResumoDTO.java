@@ -13,6 +13,7 @@ public record EmpresaAssinaturaResumoDTO(
         String dataVencimento,
         String motivoBloqueio,
         String adminPrincipal,
+        Boolean empresaInterna,
         String plano,
         Double valorMensal,
         Integer diasTolerancia,

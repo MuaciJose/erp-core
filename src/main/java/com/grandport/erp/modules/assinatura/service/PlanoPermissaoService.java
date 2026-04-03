@@ -56,7 +56,11 @@ public class PlanoPermissaoService {
         UsuarioDTO dto = new UsuarioDTO(usuario);
         if (usuario.getTipoAcesso() != TipoAcesso.PLATFORM_ADMIN) {
             dto.setPermissoes(filtrarPermissoes(usuario.getEmpresaId(), usuario.getPermissoes()));
-            dto.setPlanoEmpresa(empresaRepository.findById(usuario.getEmpresaId()).map(Empresa::getPlano).orElse("ESSENCIAL"));
+            dto.setPlanoEmpresa(
+                    licenciamentoModuloService.empresaInterna(usuario.getEmpresaId())
+                            ? "INTERNO"
+                            : empresaRepository.findById(usuario.getEmpresaId()).map(Empresa::getPlano).orElse("ESSENCIAL")
+            );
         } else {
             dto.setPlanoEmpresa("PLATFORM");
         }

@@ -18,10 +18,13 @@ import com.grandport.erp.modules.assinatura.dto.AtualizarLicencaModuloDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaCadastroComplementarDTO;
 import com.grandport.erp.modules.assinatura.dto.EmpresaTimelineEventoDTO;
 import com.grandport.erp.modules.assinatura.dto.LiberacaoManualCadastroComplementarDTO;
+import com.grandport.erp.modules.assinatura.dto.ModuloCatalogoDTO;
 import com.grandport.erp.modules.assinatura.dto.ModuloLicencaResumoDTO;
+import com.grandport.erp.modules.assinatura.dto.PlanoSaasDTO;
 import com.grandport.erp.modules.assinatura.dto.PlataformaAvisoOperacionalDTO;
 import com.grandport.erp.modules.assinatura.dto.ProrrogarCadastroComplementarDTO;
 import com.grandport.erp.modules.assinatura.dto.SaasOperacaoResumoDTO;
+import com.grandport.erp.modules.assinatura.dto.SalvarPlanoSaasDTO;
 import com.grandport.erp.modules.assinatura.dto.SalvarPlataformaAvisoOperacionalDTO;
 import com.grandport.erp.modules.assinatura.service.AssinaturaService;
 import com.grandport.erp.modules.assinatura.service.CobrancaAssinaturaService;
@@ -172,11 +175,41 @@ public class AssinaturaController {
         }
     }
 
+    @GetMapping("/minha-empresa/modulos")
+    public List<ModuloLicencaResumoDTO> listarModulosMinhaEmpresa() {
+        return licenciamentoModuloService.listarLicencasEmpresa(assinaturaService.empresaIdUsuarioAtual());
+    }
+
     @GetMapping("/resumo-operacao")
     @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public SaasOperacaoResumoDTO resumoOperacao() {
         assinaturaService.validarAcessoPlataforma();
         return assinaturaService.obterResumoOperacao();
+    }
+
+    @GetMapping("/planos")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public List<PlanoSaasDTO> listarPlanos() {
+        assinaturaService.validarAcessoPlataforma();
+        return licenciamentoModuloService.listarPlanos();
+    }
+
+    @GetMapping("/catalogo-modulos")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public List<ModuloCatalogoDTO> listarCatalogoModulos() {
+        assinaturaService.validarAcessoPlataforma();
+        return licenciamentoModuloService.listarCatalogoModulos();
+    }
+
+    @PostMapping("/planos")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
+    public ResponseEntity<?> salvarPlano(@RequestBody SalvarPlanoSaasDTO dto) {
+        try {
+            assinaturaService.validarAcessoPlataforma();
+            return ResponseEntity.ok(licenciamentoModuloService.salvarPlano(dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @GetMapping("/plataforma/aviso-manutencao")

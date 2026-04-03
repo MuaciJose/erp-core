@@ -115,6 +115,16 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
     const [planosEmpresa, setPlanosEmpresa] = useState({});
     const [valoresEmpresa, setValoresEmpresa] = useState({});
     const [toleranciasEmpresa, setToleranciasEmpresa] = useState({});
+    const [planosDisponiveis, setPlanosDisponiveis] = useState([]);
+    const [catalogoModulos, setCatalogoModulos] = useState([]);
+    const [planoForm, setPlanoForm] = useState({
+        codigo: '',
+        nomeExibicao: '',
+        descricao: '',
+        valorMensalBase: '0,00',
+        ativo: true,
+        modulos: []
+    });
     const [motivosLiberacaoManual, setMotivosLiberacaoManual] = useState({});
     const [licencasPorEmpresa, setLicencasPorEmpresa] = useState({});
     const [licencasLoading, setLicencasLoading] = useState({});
@@ -158,12 +168,14 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
     const carregarDados = async () => {
         setLoading(true);
         try {
-            const [resSolicitacoes, resConvites, resEmpresas, resEventos, resResumo] = await Promise.all([
+            const [resSolicitacoes, resConvites, resEmpresas, resEventos, resResumo, resPlanos, resCatalogo] = await Promise.all([
                 api.get('/api/assinaturas/solicitacoes-acesso'),
                 api.get('/api/assinaturas/convites'),
                 api.get('/api/assinaturas/empresas'),
                 api.get('/api/security-events', { params: { limit: 10 } }),
-                api.get('/api/assinaturas/resumo-operacao')
+                api.get('/api/assinaturas/resumo-operacao'),
+                api.get('/api/assinaturas/planos'),
+                api.get('/api/assinaturas/catalogo-modulos')
             ]);
             setSolicitacoes(Array.isArray(resSolicitacoes.data) ? resSolicitacoes.data : []);
             setConvites(Array.isArray(resConvites.data) ? resConvites.data : []);
@@ -171,6 +183,9 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
             setEmpresas(empresasRecebidas);
             setEventosSeguranca(Array.isArray(resEventos.data) ? resEventos.data : []);
             setResumoOperacao(resResumo.data || null);
+            const planosRecebidos = Array.isArray(resPlanos.data) ? resPlanos.data : [];
+            setPlanosDisponiveis(planosRecebidos);
+            setCatalogoModulos(Array.isArray(resCatalogo.data) ? resCatalogo.data : []);
             try {
                 const resAviso = await api.get('/api/assinaturas/plataforma/aviso-manutencao');
                 setAvisoManutencao({
@@ -191,6 +206,16 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
             setValoresEmpresa(Object.fromEntries(empresasRecebidas.map(item => [item.id, maskCurrencyInput(item.valorMensal ?? 0)])));
             setToleranciasEmpresa(Object.fromEntries(empresasRecebidas.map(item => [item.id, item.diasTolerancia ?? 0])));
             setMotivosLiberacaoManual(Object.fromEntries(empresasRecebidas.map(item => [item.id, ''])));
+            if (planosRecebidos.length > 0) {
+                setPlanoForm((prev) => prev.codigo ? prev : {
+                    codigo: planosRecebidos[0].codigo || '',
+                    nomeExibicao: planosRecebidos[0].nomeExibicao || '',
+                    descricao: planosRecebidos[0].descricao || '',
+                    valorMensalBase: maskCurrencyInput(planosRecebidos[0].valorMensalBase ?? 0),
+                    ativo: planosRecebidos[0].ativo !== false,
+                    modulos: Array.isArray(planosRecebidos[0].modulos) ? planosRecebidos[0].modulos : []
+                });
+            }
         } catch (error) {
             toast.error('Não foi possível carregar os dados da operação SaaS.');
         } finally {
@@ -335,6 +360,16 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
             vencendo7Dias: empresas.filter(item => item.dataVencimento && item.dataVencimento >= hoje && item.dataVencimento <= limite).length
         };
     }, [empresas]);
+
+    const catalogoModulosAgrupado = useMemo(() => {
+        const grupos = {};
+        catalogoModulos.forEach((modulo) => {
+            const categoria = modulo.categoria || 'Outros';
+            if (!grupos[categoria]) grupos[categoria] = [];
+            grupos[categoria].push(modulo);
+        });
+        return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0]));
+    }, [catalogoModulos]);
 
     const aprovarSolicitacao = async (solicitacao) => {
         setProcessandoId(solicitacao.id);
@@ -509,6 +544,65 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
             toast.error(error?.response?.data?.message || 'Não foi possível atualizar o plano.', { id: toastId });
         } finally {
             setProcessandoId(null);
+        }
+    };
+
+    const abrirPlanoNovo = () => {
+        setPlanoForm({
+            codigo: '',
+            nomeExibicao: '',
+            descricao: '',
+            valorMensalBase: '0,00',
+            ativo: true,
+            modulos: []
+        });
+        setAbaAtiva('planos');
+    };
+
+    const carregarPlanoParaEdicao = (plano) => {
+        setPlanoForm({
+            codigo: plano.codigo || '',
+            nomeExibicao: plano.nomeExibicao || '',
+            descricao: plano.descricao || '',
+            valorMensalBase: maskCurrencyInput(plano.valorMensalBase ?? 0),
+            ativo: plano.ativo !== false,
+            modulos: Array.isArray(plano.modulos) ? plano.modulos : []
+        });
+        setAbaAtiva('planos');
+    };
+
+    const alternarModuloPlanoForm = (modulo) => {
+        setPlanoForm((prev) => {
+            const jaTem = prev.modulos.includes(modulo);
+            return {
+                ...prev,
+                modulos: jaTem
+                    ? prev.modulos.filter((item) => item !== modulo)
+                    : [...prev.modulos, modulo]
+            };
+        });
+    };
+
+    const salvarPlanoSaas = async () => {
+        const toastId = toast.loading(planoForm.codigo ? `Salvando plano ${planoForm.codigo}...` : 'Criando plano...');
+        try {
+            const res = await api.post('/api/assinaturas/planos', {
+                codigo: planoForm.codigo,
+                nomeExibicao: planoForm.nomeExibicao,
+                descricao: planoForm.descricao,
+                valorMensalBase: parseCurrencyBRL(planoForm.valorMensalBase),
+                ativo: !!planoForm.ativo,
+                modulos: planoForm.modulos
+            });
+            const planoSalvo = res.data;
+            setPlanosDisponiveis((prev) => {
+                const restantes = prev.filter((item) => item.codigo !== planoSalvo.codigo);
+                return [...restantes, planoSalvo].sort((a, b) => String(a.nomeExibicao || '').localeCompare(String(b.nomeExibicao || '')));
+            });
+            carregarPlanoParaEdicao(planoSalvo);
+            toast.success('Plano SaaS salvo com sucesso.', { id: toastId });
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Não foi possível salvar o plano.', { id: toastId });
         }
     };
 
@@ -1148,6 +1242,7 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
     const abas = [
         { id: 'solicitacoes', label: 'Solicitações', count: solicitacoes.filter(item => item.status === 'PENDENTE').length },
         { id: 'empresas', label: 'Empresas', count: empresas.length },
+        { id: 'planos', label: 'Planos', count: planosDisponiveis.length },
         { id: 'convites', label: 'Convites', count: convites.length },
         { id: 'seguranca', label: 'Segurança', count: eventosSeguranca.length },
         { id: 'manual', label: 'Manual', count: 'OPS' }
@@ -1453,6 +1548,179 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                     <div className="text-xs font-black uppercase tracking-widest text-slate-500">Convites ativos</div>
                                     <div className="mt-2 text-3xl font-black text-slate-900">{convites.filter(item => item.status === 'ATIVO').length}</div>
                                 </div>
+                            </div>
+                        </aside>
+                    </section>
+                )}
+
+                {abaAtiva === 'planos' && (
+                    <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div>
+                                    <h2 className="text-lg font-black text-slate-900">Planos SaaS</h2>
+                                    <p className="text-sm text-slate-500">Cadastre e edite os módulos de cada plano sem depender de código fixo.</p>
+                                </div>
+                                <button
+                                    onClick={abrirPlanoNovo}
+                                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                                >
+                                    Novo plano
+                                </button>
+                            </div>
+
+                            <div className="mt-6 grid gap-4">
+                                {planosDisponiveis.map((plano) => (
+                                    <article key={plano.codigo} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                            <div>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <h3 className="text-base font-black text-slate-900">{plano.nomeExibicao}</h3>
+                                                    <span className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white">
+                                                        {plano.codigo}
+                                                    </span>
+                                                    <span className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.22em] ${plano.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
+                                                        {plano.ativo ? 'Ativo' : 'Inativo'}
+                                                    </span>
+                                                </div>
+                                                <p className="mt-2 text-sm text-slate-600">{plano.descricao || 'Sem descrição operacional.'}</p>
+                                            </div>
+                                            <div className="flex flex-col items-start gap-2 md:items-end">
+                                                <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Base mensal</div>
+                                                <div className="text-2xl font-black text-slate-900">{formatCurrencyBRL(plano.valorMensalBase)}</div>
+                                                <button
+                                                    onClick={() => carregarPlanoParaEdicao(plano)}
+                                                    className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-blue-700 transition hover:bg-blue-100"
+                                                >
+                                                    Editar plano
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 flex flex-wrap gap-2">
+                                            {Array.isArray(plano.modulos) && plano.modulos.length > 0 ? plano.modulos.map((modulo) => (
+                                                <span key={`${plano.codigo}-${modulo}`} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600">
+                                                    {modulo}
+                                                </span>
+                                            )) : (
+                                                <span className="text-sm text-slate-500">Nenhum módulo vinculado.</span>
+                                            )}
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                        </div>
+
+                        <aside className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-[0.3em] text-blue-600">Editor de plano</p>
+                                <h2 className="mt-2 text-lg font-black text-slate-900">{planoForm.codigo ? `Plano ${planoForm.codigo}` : 'Novo plano'}</h2>
+                                <p className="mt-2 text-sm text-slate-500">Defina nome, valor base e exatamente quais módulos entram no plano.</p>
+                            </div>
+
+                            <div className="mt-6 grid gap-4">
+                                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
+                                    Código
+                                    <input
+                                        type="text"
+                                        value={planoForm.codigo}
+                                        onChange={(e) => setPlanoForm((prev) => ({ ...prev, codigo: e.target.value.toUpperCase() }))}
+                                        placeholder="Ex: PROFISSIONAL_PLUS"
+                                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
+                                    />
+                                </label>
+                                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
+                                    Nome de exibição
+                                    <input
+                                        type="text"
+                                        value={planoForm.nomeExibicao}
+                                        onChange={(e) => setPlanoForm((prev) => ({ ...prev, nomeExibicao: e.target.value }))}
+                                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
+                                    />
+                                </label>
+                                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
+                                    Descrição
+                                    <textarea
+                                        rows={3}
+                                        value={planoForm.descricao}
+                                        onChange={(e) => setPlanoForm((prev) => ({ ...prev, descricao: e.target.value }))}
+                                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-blue-500"
+                                    />
+                                </label>
+                                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
+                                    Valor mensal base
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={planoForm.valorMensalBase}
+                                        onChange={(e) => setPlanoForm((prev) => ({ ...prev, valorMensalBase: maskCurrencyInput(e.target.value) }))}
+                                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
+                                    />
+                                </label>
+                                <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={!!planoForm.ativo}
+                                        onChange={(e) => setPlanoForm((prev) => ({ ...prev, ativo: e.target.checked }))}
+                                    />
+                                    Plano ativo para novas atribuições
+                                </label>
+                            </div>
+
+                            <div className="mt-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-black uppercase tracking-[0.22em] text-slate-700">Módulos do plano</h3>
+                                    <span className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">
+                                        {planoForm.modulos.length} selecionado(s)
+                                    </span>
+                                </div>
+                                <div className="mt-4 max-h-[26rem] space-y-4 overflow-y-auto pr-1">
+                                    {catalogoModulosAgrupado.map(([categoria, modulos]) => (
+                                        <div key={categoria} className="rounded-2xl border border-slate-200 p-4">
+                                            <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">{categoria}</div>
+                                            <div className="mt-3 grid gap-2">
+                                                {modulos.map((modulo) => {
+                                                    const marcado = planoForm.modulos.includes(modulo.modulo);
+                                                    return (
+                                                        <button
+                                                            key={modulo.modulo}
+                                                            type="button"
+                                                            onClick={() => alternarModuloPlanoForm(modulo.modulo)}
+                                                            className={`flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                                                                marcado
+                                                                    ? 'border-blue-300 bg-blue-50'
+                                                                    : 'border-slate-200 bg-white hover:border-slate-300'
+                                                            }`}
+                                                        >
+                                                            <div>
+                                                                <div className="text-sm font-black text-slate-800">{modulo.nomeExibicao}</div>
+                                                                <div className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">{modulo.modulo}</div>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div className="text-xs font-black text-slate-500">Base</div>
+                                                                <div className="text-sm font-black text-slate-800">{formatCurrencyBRL(modulo.valorBaseMensal)}</div>
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="mt-6 flex gap-3">
+                                <button
+                                    onClick={abrirPlanoNovo}
+                                    className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                                >
+                                    Limpar editor
+                                </button>
+                                <button
+                                    onClick={salvarPlanoSaas}
+                                    className="flex-1 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800"
+                                >
+                                    Salvar plano
+                                </button>
                             </div>
                         </aside>
                     </section>
@@ -1790,6 +2058,16 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                             <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wider ${badgeClasses(empresa.statusAssinatura)}`}>
                                                 {empresa.statusAssinatura}
                                             </span>
+                                            {empresa.empresaInterna && (
+                                                <>
+                                                    <span className="rounded-full bg-violet-600 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
+                                                        Empresa interna
+                                                    </span>
+                                                    <span className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
+                                                        Licenciamento total
+                                                    </span>
+                                                </>
+                                            )}
                                             {empresaEmFoco && (
                                                 <span className="rounded-full bg-blue-600 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
                                                     Em foco
@@ -1803,7 +2081,7 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                             <div><span className="font-bold text-slate-700">Contato:</span> {maskPhone(empresa.telefone) || '-'}</div>
                                             <div><span className="font-bold text-slate-700">CNPJ:</span> {maskCnpj(empresa.cnpj)}</div>
                                             <div><span className="font-bold text-slate-700">Vencimento:</span> {empresa.dataVencimento ? new Date(`${empresa.dataVencimento}T00:00:00`).toLocaleDateString('pt-BR') : '-'}</div>
-                                            <div><span className="font-bold text-slate-700">Plano:</span> {empresa.plano || 'ESSENCIAL'}</div>
+                                            <div><span className="font-bold text-slate-700">Plano:</span> {empresa.empresaInterna ? 'INTERNO' : (empresa.plano || 'ESSENCIAL')}</div>
                                             <div><span className="font-bold text-slate-700">Plano base:</span> {formatCurrencyBRL(empresa.valorMensal || 0)}</div>
                                             <div><span className="font-bold text-slate-700">Módulos ativos:</span> {empresa.totalModulosAtivos ?? '-'}</div>
                                             <div><span className="font-bold text-slate-700">Extras liberados:</span> {empresa.totalModulosExtras ?? 0}</div>
@@ -1937,13 +2215,15 @@ export const LiberacaoAcessos = ({ modo = 'liberacao-acessos', contextoInicial =
                                             <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">
                                                 Plano
                                                 <select
-                                                    value={planosEmpresa[empresa.id] || 'ESSENCIAL'}
+                                                    value={planosEmpresa[empresa.id] || planosDisponiveis[0]?.codigo || 'ESSENCIAL'}
                                                     onChange={(e) => setPlanosEmpresa(prev => ({ ...prev, [empresa.id]: e.target.value }))}
                                                     className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
                                                 >
-                                                    <option value="ESSENCIAL">ESSENCIAL</option>
-                                                    <option value="PROFISSIONAL">PROFISSIONAL</option>
-                                                    <option value="PREMIUM">PREMIUM</option>
+                                                    {planosDisponiveis.map((plano) => (
+                                                        <option key={plano.codigo} value={plano.codigo}>
+                                                            {plano.codigo} · {plano.nomeExibicao}
+                                                        </option>
+                                                    ))}
                                                 </select>
                                             </label>
                                             <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">

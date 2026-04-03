@@ -4,7 +4,7 @@ import {
     DollarSign, TrendingUp, PackageSearch, AlertTriangle,
     Calendar, ArrowRight, Activity, Layers,
     BarChart3, PieChart as PieIcon, Printer,
-    CalendarClock, CheckCircle, ArrowDownRight, ArrowUpRight, Minus, CircleDollarSign
+    CalendarClock, CheckCircle, ArrowDownRight, ArrowUpRight, Minus, CircleDollarSign, Pin, PinOff, X
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -16,7 +16,7 @@ import { getStoredUser } from '../../utils/authStorage';
 // 🚀 IMPORTAÇÃO DO BANNER DO PWA
 import { InstallPWABanner } from '../../components/InstallPWABanner';
 
-export const Dashboard = ({ setPaginaAtiva }) => {
+export const Dashboard = ({ setPaginaAtiva, onboardingEmpresa, avisoManutencaoPlataforma }) => {
     const PERIODOS = [
         { id: 'TODAY', label: 'Hoje', resumo: 'hoje' },
         { id: '7D', label: '7 dias', resumo: 'nos ultimos 7 dias' },
@@ -30,6 +30,20 @@ export const Dashboard = ({ setPaginaAtiva }) => {
     const [loading, setLoading] = useState(true);
     const [abaAtiva, setAbaAtiva] = useState('geral');
     const [periodoAtivo, setPeriodoAtivo] = useState('MONTH');
+    const [alertasFixados, setAlertasFixados] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('dashboard_alertas_fixados') || '{}');
+        } catch (error) {
+            return {};
+        }
+    });
+    const [alertasOcultos, setAlertasOcultos] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('dashboard_alertas_ocultos') || '{}');
+        } catch (error) {
+            return {};
+        }
+    });
 
     // 🚀 ESTADO PARA O NOME DO USUÁRIO
     const [nomeUsuario, setNomeUsuario] = useState('Admin');
@@ -81,6 +95,14 @@ export const Dashboard = ({ setPaginaAtiva }) => {
         };
         carregarDashboard();
     }, [periodoAtivo]);
+
+    useEffect(() => {
+        localStorage.setItem('dashboard_alertas_fixados', JSON.stringify(alertasFixados));
+    }, [alertasFixados]);
+
+    useEffect(() => {
+        localStorage.setItem('dashboard_alertas_ocultos', JSON.stringify(alertasOcultos));
+    }, [alertasOcultos]);
 
     // =========================================================================
     // 🚀 O NOVO MOTOR DE IMPRESSÃO (Abre nova aba "limpa" estilo Nota Fiscal)
@@ -361,11 +383,137 @@ export const Dashboard = ({ setPaginaAtiva }) => {
         );
     };
 
+    const onboardingPendente =
+        onboardingEmpresa &&
+        ['PENDENTE_COMPLEMENTO', 'EM_PREENCHIMENTO', 'VENCIDO'].includes(onboardingEmpresa.statusOnboarding);
+    const classeManutencao =
+        avisoManutencaoPlataforma?.severidade === 'INCIDENTE'
+            ? 'border-red-200 bg-red-50 text-red-900'
+            : avisoManutencaoPlataforma?.severidade === 'INFORMATIVO'
+                ? 'border-blue-200 bg-blue-50 text-blue-900'
+                : 'border-amber-200 bg-amber-50 text-amber-900';
+    const classeOnboarding =
+        onboardingEmpresa?.statusOnboarding === 'VENCIDO'
+            ? 'border-red-200 bg-red-50 text-red-900'
+            : onboardingEmpresa?.statusOnboarding === 'EM_PREENCHIMENTO'
+                ? 'border-blue-200 bg-blue-50 text-blue-900'
+                : 'border-amber-200 bg-amber-50 text-amber-900';
+
+    const alertasDashboard = [
+        !!avisoManutencaoPlataforma?.ativo && {
+            id: 'manutencao',
+            titulo: avisoManutencaoPlataforma?.titulo || 'Manutenção programada',
+            descricao: avisoManutencaoPlataforma?.mensagem || 'A plataforma publicou um aviso operacional para sua empresa.',
+            detalhe:
+                `${avisoManutencaoPlataforma?.inicioPrevisto
+                    ? `Início: ${new Date(avisoManutencaoPlataforma.inicioPrevisto).toLocaleString('pt-BR')}`
+                    : 'Início não informado'}${avisoManutencaoPlataforma?.fimPrevisto
+                    ? ` · Fim: ${new Date(avisoManutencaoPlataforma.fimPrevisto).toLocaleString('pt-BR')}`
+                    : ''}`,
+            destaque: avisoManutencaoPlataforma?.bloquearAcesso
+                ? 'Atenção: o acesso pode ser interrompido durante a janela.'
+                : 'Aviso informativo da plataforma.',
+            classe: classeManutencao,
+            cta: null
+        },
+        onboardingPendente && {
+            id: 'cadastro',
+            titulo: onboardingEmpresa?.statusOnboarding === 'VENCIDO'
+                ? 'Ficha cadastral vencida'
+                : 'Cadastro da empresa precisa de revisão',
+            descricao: onboardingEmpresa?.statusOnboarding === 'VENCIDO'
+                ? 'O prazo para concluir a ficha cadastral expirou.'
+                : 'Sua empresa ainda precisa concluir a ficha cadastral obrigatória.',
+            detalhe:
+                `${onboardingEmpresa?.prazoConclusao
+                    ? `Prazo: ${new Date(`${onboardingEmpresa.prazoConclusao}T00:00:00`).toLocaleDateString('pt-BR')}`
+                    : 'Prazo não informado'} · ${onboardingEmpresa?.percentualPreenchimento || 0}% preenchido · ${onboardingEmpresa?.pendencias?.length || 0} pendência(s)`,
+            destaque: Array.isArray(onboardingEmpresa?.pendencias) && onboardingEmpresa.pendencias.length > 0
+                ? `Pendências: ${onboardingEmpresa.pendencias.join(', ')}`
+                : 'Ficha cadastral ainda incompleta.',
+            classe: classeOnboarding,
+            cta: () => setPaginaAtiva('ficha-cadastral')
+        }
+    ].filter(Boolean)
+        .filter(alerta => alertasFixados[alerta.id] || !alertasOcultos[alerta.id])
+        .sort((a, b) => Number(!!alertasFixados[b.id]) - Number(!!alertasFixados[a.id]));
+
+    const toggleFixarAlerta = (id) => {
+        setAlertasFixados((atual) => {
+            const proximo = { ...atual, [id]: !atual[id] };
+            if (proximo[id]) {
+                setAlertasOcultos((ocultos) => ({ ...ocultos, [id]: false }));
+            }
+            return proximo;
+        });
+    };
+
+    const ocultarAlerta = (id) => {
+        if (alertasFixados[id]) return;
+        setAlertasOcultos((atual) => ({ ...atual, [id]: true }));
+    };
+
     return (
         <div className="p-8 max-w-7xl mx-auto animate-fade-in bg-gray-50/50 min-h-screen">
 
             {/* 🚀 BANNER DO PWA AQUI NO TOPO */}
             <InstallPWABanner />
+
+            {alertasDashboard.length > 0 && (
+                <div className="mb-6 grid grid-cols-1 gap-4">
+                    {alertasDashboard.map((alerta) => (
+                        <div
+                            key={alerta.id}
+                            className={`rounded-[1.75rem] border px-5 py-4 shadow-sm transition-all ${alerta.classe} ${alertasFixados[alerta.id] ? 'ring-2 ring-slate-900/10' : ''}`}
+                        >
+                            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                                <div className="space-y-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-xs font-black uppercase tracking-[0.22em]">
+                                            {alerta.id === 'manutencao' ? 'Aviso da plataforma' : 'Cadastro obrigatório'}
+                                        </span>
+                                        {alertasFixados[alerta.id] && (
+                                            <span className="rounded-full bg-white/80 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-slate-700">
+                                                Fixado no dashboard
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-lg font-black">{alerta.titulo}</div>
+                                    <div className="text-sm font-semibold">{alerta.descricao}</div>
+                                    <div className="text-sm font-semibold opacity-90">{alerta.detalhe}</div>
+                                    <div className="text-sm font-bold">{alerta.destaque}</div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {alerta.cta && (
+                                        <button
+                                            onClick={alerta.cta}
+                                            className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-700"
+                                        >
+                                            Abrir ficha cadastral
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => toggleFixarAlerta(alerta.id)}
+                                        className="inline-flex items-center gap-2 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-white"
+                                    >
+                                        {alertasFixados[alerta.id] ? <PinOff size={16} /> : <Pin size={16} />}
+                                        {alertasFixados[alerta.id] ? 'Desafixar' : 'Fixar'}
+                                    </button>
+                                    {!alertasFixados[alerta.id] && (
+                                        <button
+                                            onClick={() => ocultarAlerta(alerta.id)}
+                                            className="inline-flex items-center gap-2 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-white"
+                                        >
+                                            <X size={16} />
+                                            Ocultar
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4 mt-2">
                 <div className="text-left">

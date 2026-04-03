@@ -423,7 +423,14 @@ public class AssinaturaService {
             throw new RuntimeException("Informe o nome do plano.");
         }
 
-        empresa.setPlano(dto.plano().trim().toUpperCase());
+        String codigoPlano = dto.plano().trim().toUpperCase();
+        boolean planoExiste = licenciamentoModuloService.listarPlanos().stream()
+                .anyMatch(plano -> codigoPlano.equalsIgnoreCase(plano.codigo()) && Boolean.TRUE.equals(plano.ativo()));
+        if (!planoExiste) {
+            throw new RuntimeException("Plano não encontrado ou inativo: " + codigoPlano + ".");
+        }
+
+        empresa.setPlano(codigoPlano);
         empresa.setValorMensal(BigDecimal.valueOf(dto.valorMensal() == null ? 0D : dto.valorMensal()));
         empresa.setDiasTolerancia(dto.diasTolerancia() == null ? 0 : Math.max(dto.diasTolerancia(), 0));
         return toEmpresaDto(empresaRepository.save(empresa));
@@ -501,6 +508,7 @@ public class AssinaturaService {
         int totalModulosBloqueadosComercialmente = (int) licencas.stream().filter(ModuloLicencaResumoDTO::bloqueadoComercial).count();
         EmpresaCobrancaComposicaoDTO composicao = licenciamentoModuloService.montarComposicaoCobrancaEmpresa(empresa);
         EmpresaCadastroComplementarDTO cadastroComplementar = toCadastroComplementarDto(empresa, obterCadastroComplementarOuPadrao(empresa.getId()));
+        boolean empresaInterna = licenciamentoModuloService.empresaInterna(empresa.getId());
 
         return new EmpresaAssinaturaResumoDTO(
                 empresa.getId(),
@@ -515,6 +523,7 @@ public class AssinaturaService {
                 empresa.getDataVencimento() == null ? null : empresa.getDataVencimento().toString(),
                 empresa.getMotivoBloqueio(),
                 adminPrincipal,
+                empresaInterna,
                 empresa.getPlano(),
                 empresa.getValorMensal() == null ? 0D : empresa.getValorMensal().doubleValue(),
                 empresa.getDiasTolerancia(),
@@ -617,6 +626,10 @@ public class AssinaturaService {
             return "SISTEMA";
         }
         return authentication.getName();
+    }
+
+    public Long empresaIdUsuarioAtual() {
+        return usuarioAutenticado().getEmpresaId();
     }
 
     private Usuario usuarioAutenticado() {

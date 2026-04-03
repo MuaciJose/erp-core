@@ -35,6 +35,7 @@ import { ManualUsuario } from './modules/manual/ManualUsuario';
 import { AgendaCorporativa } from './modules/agenda/AgendaCorporativa';
 import { AtendimentoSaas } from './modules/atendimento/AtendimentoSaas';
 import { FichaCadastralEmpresa } from './modules/assinatura/FichaCadastralEmpresa';
+import { ERP_LOCAL_ALLOWLIST } from './utils/moduleCatalog';
 
 // 🚀 MÓDULOS IMPORTADOS
 import { ReciboAvulso } from './modules/financeiro/ReciboAvulso';
@@ -254,35 +255,18 @@ function App() {
         return <Login onLoginSuccess={handleLoginSucesso} onIrParaCadastro={() => setTelaPublica('cadastro')} />;
     }
 
-    const permissoesExtra = ['revisoes', 'agenda', 'atendimento', 'ficha-cadastral', 'etiquetas', 'os', 'servicos', 'listagem-os', 'manual', 'checklist', 'inventario', 'estoque'];
+    const isTenantAdmin = usuarioLogado?.tipoAcesso === 'TENANT_ADMIN';
     const temPermissao =
+        isTenantAdmin ||
         usuarioLogado.permissoes.includes(paginaAtiva) ||
-        permissoesExtra.includes(paginaAtiva) ||
+        ERP_LOCAL_ALLOWLIST.includes(paginaAtiva) ||
         ((paginaAtiva === 'liberacao-acessos' || paginaAtiva === 'central-saas') && usuarioLogado.tipoAcesso === 'PLATFORM_ADMIN');
     const podeVerAgenda = usuarioLogado?.permissoes?.includes('agenda');
     const exigeTrocaSenha = !!usuarioLogado?.forcePasswordChange;
     const isPlatformAdmin = usuarioLogado?.tipoAcesso === 'PLATFORM_ADMIN';
-    const onboardingPendente =
-        onboardingEmpresa &&
-        ['PENDENTE_COMPLEMENTO', 'EM_PREENCHIMENTO', 'VENCIDO'].includes(onboardingEmpresa.statusOnboarding);
-    const mostrarBannerOnboarding = onboardingPendente && paginaAtiva !== 'ficha-cadastral' && modoAplicacao === 'erp';
-    const mostrarBannerManutencao = !!avisoManutencaoPlataforma?.ativo && modoAplicacao === 'erp';
-    const classeBannerManutencao =
-        avisoManutencaoPlataforma?.severidade === 'INCIDENTE'
-            ? 'border-red-200 bg-red-50 text-red-900'
-            : avisoManutencaoPlataforma?.severidade === 'INFORMATIVO'
-                ? 'border-blue-200 bg-blue-50 text-blue-900'
-                : 'border-amber-200 bg-amber-50 text-amber-900';
     const acessoBloqueadoPorOnboarding =
         onboardingEmpresa?.statusOnboarding === 'VENCIDO' &&
         paginasRestritasPorOnboarding.includes(paginaAtiva);
-
-    const toneBannerOnboarding =
-        onboardingEmpresa?.statusOnboarding === 'VENCIDO'
-            ? 'border-red-200 bg-red-50 text-red-900'
-            : onboardingEmpresa?.statusOnboarding === 'EM_PREENCHIMENTO'
-                ? 'border-blue-200 bg-blue-50 text-blue-900'
-                : 'border-amber-200 bg-amber-50 text-amber-900';
 
     const handleTrocarSenhaObrigatoria = async () => {
         setErroTrocaSenha('');
@@ -334,6 +318,68 @@ function App() {
         setPaginaAtiva(telaInicialErp);
     };
 
+    const erpRouteRenderers = {
+        dash: (
+            <Dashboard
+                setPaginaAtiva={setPaginaAtiva}
+                onboardingEmpresa={onboardingEmpresa}
+                avisoManutencaoPlataforma={avisoManutencaoPlataforma}
+            />
+        ),
+        pdv: <Suspense fallback={lazyFallback}><Pdv setPaginaAtiva={setPaginaAtiva} /></Suspense>,
+        vendas: <Suspense fallback={lazyFallback}><GestaoVendas setPaginaAtiva={setPaginaAtiva} /></Suspense>,
+        'fila-caixa': <Suspense fallback={lazyFallback}><FilaPedidosCaixa setPaginaAtiva={setPaginaAtiva} /></Suspense>,
+        caixa: <ControleCaixa />,
+        'relatorio-comissoes': <RelatorioComissoes />,
+        revisoes: <PainelRevisoes />,
+        agenda: <AgendaCorporativa />,
+        atendimento: <AtendimentoSaas modo="cliente" />,
+        'ficha-cadastral': <FichaCadastralEmpresa />,
+        crm: <PainelRevisoes />,
+        etiquetas: <GeradorEtiquetas />,
+        checklist: <Suspense fallback={lazyFallback}><ChecklistTablet setPaginaAtiva={setPaginaAtiva} /></Suspense>,
+        os: <Suspense fallback={lazyFallback}><PainelOs /></Suspense>,
+        'listagem-os': <ListagemOs setPaginaAtiva={setPaginaAtiva} />,
+        servicos: <GestaoServicos />,
+        estoque: <Suspense fallback={lazyFallback}><Produtos setPaginaAtiva={setPaginaAtiva} /></Suspense>,
+        marcas: <Marcas />,
+        ajuste_estoque: <AjusteEstoque />,
+        parceiros: <Parceiros setPaginaAtiva={setPaginaAtiva} />,
+        previsao: <PrevisaoCompras />,
+        compras: <Suspense fallback={lazyFallback}><ImportarXml /></Suspense>,
+        fiscal: <CargaNcm />,
+        faltas: <RelatorioFaltas />,
+        'contas-receber': <Suspense fallback={lazyFallback}><ContasReceber /></Suspense>,
+        'contas-pagar': <ContasPagar />,
+        dre: <FluxoCaixaDre />,
+        'fluxo-caixa-projecao': <FluxoCaixaProjecao setPaginaAtiva={setPaginaAtiva} />,
+        bancos: <Suspense fallback={lazyFallback}><ContasBancarias /></Suspense>,
+        'plano-contas': <PlanoContas />,
+        conciliacao: <ConciliacaoBancaria />,
+        usuarios: <GestaoUsuarios />,
+        'liberacao-acessos': <LiberacaoAcessos />,
+        'central-saas': <CentralSaas contextoInicial={contextoCentralSaas} />,
+        auditoria: <Auditoria usuarioLogado={usuarioLogado} />,
+        configuracoes: (
+            <Suspense fallback={
+                <div className="min-h-[40vh] flex items-center justify-center text-slate-500 font-semibold">
+                    Carregando central de configuracoes...
+                </div>
+            }>
+                <Configuracoes />
+            </Suspense>
+        ),
+        manual: <ManualUsuario onVoltar={() => setPaginaAtiva('dash')} />,
+        'recibo-avulso': <ReciboAvulso setPaginaAtiva={setPaginaAtiva} />,
+        'historico-recibos': <HistoricoRecibos setPaginaAtiva={setPaginaAtiva} />,
+        'regras-fiscais': <RegrasFiscais setPaginaAtiva={setPaginaAtiva} />,
+        categorias: <Categorias />,
+        'gerenciador-nfe': <Suspense fallback={lazyFallback}><GerenciadorFiscal setPaginaAtiva={setPaginaAtiva} /></Suspense>,
+        'emitir-nfe-avulsa': <Suspense fallback={lazyFallback}><EmitirNfeAvulsa setPaginaAtiva={setPaginaAtiva} /></Suspense>,
+        inventario: <InventarioPWA setPaginaAtiva={setPaginaAtiva} />,
+        'curva-abc': <CurvaABC />
+    };
+
     if (isPlatformAdmin && modoAplicacao === 'platform') {
         return (
             <>
@@ -377,78 +423,6 @@ function App() {
 
             <main className={`flex-1 h-full overflow-y-auto ${isFullScreen ? 'p-0' : 'p-4'}`}>
                 <div className={`${isFullScreen ? 'w-full h-full' : 'max-w-[1600px] mx-auto'}`}>
-                    {mostrarBannerManutencao && (
-                        <div className={`mb-4 rounded-[1.75rem] border px-5 py-4 shadow-sm ${classeBannerManutencao}`}>
-                            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                                <div className="space-y-2">
-                                    <div className="text-xs font-black uppercase tracking-[0.22em]">
-                                        Aviso da plataforma
-                                    </div>
-                                    <div className="text-lg font-black">
-                                        {avisoManutencaoPlataforma?.titulo || 'Manutenção programada'}
-                                    </div>
-                                    {avisoManutencaoPlataforma?.mensagem && (
-                                        <div className="text-sm font-semibold">
-                                            {avisoManutencaoPlataforma.mensagem}
-                                        </div>
-                                    )}
-                                    <div className="text-sm font-semibold opacity-90">
-                                        {avisoManutencaoPlataforma?.inicioPrevisto
-                                            ? `Início previsto: ${new Date(avisoManutencaoPlataforma.inicioPrevisto).toLocaleString('pt-BR')}`
-                                            : 'Início previsto não informado'}
-                                        {avisoManutencaoPlataforma?.fimPrevisto
-                                            ? ` · Fim previsto: ${new Date(avisoManutencaoPlataforma.fimPrevisto).toLocaleString('pt-BR')}`
-                                            : ''}
-                                    </div>
-                                </div>
-                                <div className="rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm font-bold">
-                                    {avisoManutencaoPlataforma?.bloquearAcesso
-                                        ? 'O acesso pode ser bloqueado durante a janela informada.'
-                                        : 'A comunicação foi publicada pela plataforma.'}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    {mostrarBannerOnboarding && (
-                        <div className={`mb-4 rounded-[1.75rem] border px-5 py-4 shadow-sm ${toneBannerOnboarding}`}>
-                            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                                <div className="space-y-2">
-                                    <div className="text-xs font-black uppercase tracking-[0.22em]">
-                                        Ficha cadastral da empresa
-                                    </div>
-                                    <div className="text-lg font-black">
-                                        {onboardingEmpresa?.statusOnboarding === 'VENCIDO'
-                                            ? 'O prazo para completar a ficha cadastral expirou.'
-                                            : 'Sua empresa ainda precisa concluir a ficha cadastral obrigatória.'}
-                                    </div>
-                                    <div className="text-sm font-semibold opacity-80">
-                                        {onboardingEmpresa?.prazoConclusao
-                                            ? `Prazo final: ${new Date(`${onboardingEmpresa.prazoConclusao}T00:00:00`).toLocaleDateString('pt-BR')}`
-                                            : 'Prazo ainda não definido'} · {onboardingEmpresa?.percentualPreenchimento || 0}% preenchido · {onboardingEmpresa?.pendencias?.length || 0} pendência(s)
-                                    </div>
-                                    {Array.isArray(onboardingEmpresa?.pendencias) && onboardingEmpresa.pendencias.length > 0 && (
-                                        <div className="text-sm font-semibold">
-                                            Pendências: {onboardingEmpresa.pendencias.join(', ')}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex flex-wrap items-center gap-3">
-                                    <div className="h-3 w-48 overflow-hidden rounded-full bg-white/60">
-                                        <div
-                                            className="h-full rounded-full bg-slate-900 transition-all"
-                                            style={{ width: `${Math.max(0, Math.min(100, onboardingEmpresa?.percentualPreenchimento || 0))}%` }}
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={() => setPaginaAtiva('ficha-cadastral')}
-                                        className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-700"
-                                    >
-                                        Abrir ficha cadastral
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                     {!temPermissao ? (
                         <div className="p-10 text-center mt-20">
                             <h2 className="text-2xl font-black text-red-500 mb-2">ACESSO NEGADO</h2>
@@ -490,66 +464,7 @@ function App() {
                         </div>
                     ) : (
                         <>
-                            {paginaAtiva === 'dash' && <Dashboard setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'pdv' && <Suspense fallback={lazyFallback}><Pdv setPaginaAtiva={setPaginaAtiva} /></Suspense>}
-                            {paginaAtiva === 'vendas' && <Suspense fallback={lazyFallback}><GestaoVendas setPaginaAtiva={setPaginaAtiva} /></Suspense>}
-                            {paginaAtiva === 'fila-caixa' && <Suspense fallback={lazyFallback}><FilaPedidosCaixa setPaginaAtiva={setPaginaAtiva} /></Suspense>}
-                            {paginaAtiva === 'caixa' && <ControleCaixa />}
-                            {paginaAtiva === 'relatorio-comissoes' && <RelatorioComissoes />}
-
-                            {paginaAtiva === 'revisoes' && <PainelRevisoes />}
-                            {paginaAtiva === 'agenda' && <AgendaCorporativa />}
-                            {paginaAtiva === 'atendimento' && <AtendimentoSaas modo="cliente" />}
-                            {paginaAtiva === 'ficha-cadastral' && <FichaCadastralEmpresa />}
-                            {paginaAtiva === 'crm' && <PainelRevisoes />}
-                            {paginaAtiva === 'etiquetas' && <GeradorEtiquetas />}
-
-                            {/* 🚀 TELAS DA OFICINA */}
-                            {paginaAtiva === 'checklist' && <Suspense fallback={lazyFallback}><ChecklistTablet setPaginaAtiva={setPaginaAtiva} /></Suspense>}
-                            {paginaAtiva === 'os' && <Suspense fallback={lazyFallback}><PainelOs /></Suspense>}
-                            {paginaAtiva === 'listagem-os' && <ListagemOs setPaginaAtiva={setPaginaAtiva} />}
-
-                            {paginaAtiva === 'servicos' && <GestaoServicos />}
-
-                            {paginaAtiva === 'estoque' && <Suspense fallback={lazyFallback}><Produtos setPaginaAtiva={setPaginaAtiva} /></Suspense>}
-                            {paginaAtiva === 'marcas' && <Marcas />}
-                            {paginaAtiva === 'ajuste_estoque' && <AjusteEstoque />}
-                            {paginaAtiva === 'parceiros' && <Parceiros setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'previsao' && <PrevisaoCompras />}
-                            {paginaAtiva === 'compras' && <Suspense fallback={lazyFallback}><ImportarXml /></Suspense>}
-                            {paginaAtiva === 'fiscal' && <CargaNcm />}
-                            {paginaAtiva === 'faltas' && <RelatorioFaltas />}
-                            {paginaAtiva === 'contas-receber' && <Suspense fallback={lazyFallback}><ContasReceber /></Suspense>}
-                            {paginaAtiva === 'contas-pagar' && <ContasPagar />}
-                            {paginaAtiva === 'dre' && <FluxoCaixaDre />}
-                            {paginaAtiva === 'fluxo-caixa-projecao' && <FluxoCaixaProjecao setPaginaAtiva={setPaginaAtiva}/>}
-                            {paginaAtiva === 'bancos' && <Suspense fallback={lazyFallback}><ContasBancarias /></Suspense>}
-                            {paginaAtiva === 'plano-contas' && <PlanoContas />}
-                            {paginaAtiva === 'conciliacao' && <ConciliacaoBancaria />}
-                            {paginaAtiva === 'usuarios' && <GestaoUsuarios />}
-                            {paginaAtiva === 'liberacao-acessos' && <LiberacaoAcessos />}
-                            {paginaAtiva === 'central-saas' && <CentralSaas contextoInicial={contextoCentralSaas} />}
-                            {paginaAtiva === 'auditoria' && <Auditoria usuarioLogado={usuarioLogado} />}
-                            {paginaAtiva === 'configuracoes' && (
-                                <Suspense fallback={
-                                    <div className="min-h-[40vh] flex items-center justify-center text-slate-500 font-semibold">
-                                        Carregando central de configuracoes...
-                                    </div>
-                                }>
-                                    <Configuracoes />
-                                </Suspense>
-                            )}
-                            {paginaAtiva === 'manual' && <ManualUsuario onVoltar={() => setPaginaAtiva('dash')} />}
-
-                            {paginaAtiva === 'recibo-avulso' && <ReciboAvulso setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'historico-recibos' && <HistoricoRecibos setPaginaAtiva={setPaginaAtiva} />}
-
-                            {paginaAtiva === 'regras-fiscais' && <RegrasFiscais setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'categorias' && <Categorias />}
-                            {paginaAtiva === 'gerenciador-nfe' && <Suspense fallback={lazyFallback}><GerenciadorFiscal setPaginaAtiva={setPaginaAtiva} /></Suspense>}
-                            {paginaAtiva === 'emitir-nfe-avulsa' && <Suspense fallback={lazyFallback}><EmitirNfeAvulsa setPaginaAtiva={setPaginaAtiva} /></Suspense>}
-                            {paginaAtiva === 'inventario' && <InventarioPWA  setPaginaAtiva={setPaginaAtiva} />}
-                            {paginaAtiva === 'curva-abc' && <CurvaABC />}
+                            {erpRouteRenderers[paginaAtiva] || null}
                         </>
                     )}
                 </div>
