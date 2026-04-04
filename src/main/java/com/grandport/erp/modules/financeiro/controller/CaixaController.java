@@ -2,6 +2,7 @@ package com.grandport.erp.modules.financeiro.controller;
 
 import com.grandport.erp.modules.financeiro.dto.CaixaDiarioDTO;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.financeiro.service.CaixaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -29,10 +30,13 @@ public class CaixaController {
     @Autowired
     private com.grandport.erp.modules.financeiro.repository.CaixaDiarioRepository caixaRepository;
 
+    @Autowired
+    private EmpresaContextService empresaContextService;
+
     // 🚀 NOVA ROTA: LISTAR HISTÓRICO BLINDADO E COM OPERADOR
     @GetMapping
     public ResponseEntity<java.util.List<java.util.Map<String, Object>>> listarTodos() {
-        java.util.List<java.util.Map<String, Object>> lista = caixaRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"))
+        java.util.List<java.util.Map<String, Object>> lista = caixaRepository.findByEmpresaIdOrderByDataAberturaDesc(empresaContextService.getRequiredEmpresaId())
                 .stream()
                 .map(c -> {
                     java.util.Map<String, Object> map = new java.util.HashMap<>();
@@ -81,9 +85,9 @@ public class CaixaController {
         com.grandport.erp.modules.financeiro.model.CaixaDiario caixaSelecionado;
 
         if (id != null) {
-            caixaSelecionado = caixaRepository.findById(id).orElse(null);
+            caixaSelecionado = caixaRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id).orElse(null);
         } else {
-            caixaSelecionado = caixaRepository.findTopByOrderByIdDesc().orElse(null);
+            caixaSelecionado = caixaRepository.findTopByEmpresaIdOrderByIdDesc(empresaContextService.getRequiredEmpresaId()).orElse(null);
         }
 
         if (caixaSelecionado == null) return ResponseEntity.badRequest().build();

@@ -6,7 +6,10 @@ import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -28,6 +31,8 @@ import java.io.File;
 @Service
 public class NfceCancelamentoService {
 
+    private static final Logger log = LoggerFactory.getLogger(NfceCancelamentoService.class);
+
     @Autowired
     private ConfiguracaoService configuracaoService;
 
@@ -36,6 +41,9 @@ public class NfceCancelamentoService {
 
     @Autowired
     private AuditoriaService auditoriaService;
+
+    @Value("${app.fiscal.allow-simulated-documents:false}")
+    private boolean allowSimulatedDocuments;
 
     // =========================================================================
     // 🔒 VALIDAÇÕES PRÉ-CANCELAMENTO
@@ -175,6 +183,7 @@ public class NfceCancelamentoService {
      * @throws Exception Se ocorrer qualquer erro
      */
     public String executarCancelamento(NotaFiscal nota, String justificativa) throws Exception {
+        validarSimulacaoPermitida();
         
         // ✅ PASSO 1: Validações
         this.validarElegibilidadeCancelamento(nota);
@@ -187,10 +196,7 @@ public class NfceCancelamentoService {
         // Formato: AABBCCCDDEEEEFFFFGGGHHHHHHIIIJJKKKLL (44 dígitos)
         String chaveAcesso = nota.getChaveAcesso().trim();
         
-        System.out.println("📋 CANCELAMENTO NFC-e INICIADO");
-        System.out.println("   Chave de Acesso: " + chaveAcesso);
-        System.out.println("   Protocolo: " + nota.getProtocolo());
-        System.out.println("   Justificativa: " + justificativa);
+        log.info("Cancelamento NFC-e iniciado. chave={} protocolo={}", chaveAcesso, nota.getProtocolo());
 
         // ✅ PASSO 3: Configura conexão com SEFAZ
         ConfiguracoesNfe configSefaz = nfeSetupService.iniciarConfiguracao(config);
@@ -203,7 +209,7 @@ public class NfceCancelamentoService {
             // - Transmissão para SEFAZ
             // - Recebimento da resposta
             
-            System.out.println("   Enviando requisição de cancelamento para SEFAZ...");
+            log.info("Enviando requisição de cancelamento para SEFAZ. chave={}", chaveAcesso);
             
             // Chamada para o método de cancelamento da biblioteca
             // Nota: Esta chamada é simulada pois a resposta real depende da SEFAZ
@@ -237,10 +243,10 @@ public class NfceCancelamentoService {
             );
 
         } catch (Exception e) {
-            System.err.println("❌ ERRO ao enviar evento de cancelamento: " + e.getMessage());
+            log.error("Erro ao enviar evento de cancelamento da NFC-e {}", chaveAcesso, e);
             auditoriaService.registrar("FISCAL", "CANCELAMENTO_NFCE_ERRO",
                 "Falha ao cancelar NFC-e " + nota.getNumero() + ": " + e.getMessage());
-            throw new Exception("Erro ao comunicar com SEFAZ: " + e.getMessage());
+            throw new Exception("Erro ao comunicar com SEFAZ: " + e.getMessage(), e);
         }
     }
 
@@ -274,9 +280,7 @@ public class NfceCancelamentoService {
         // 4. Processar a resposta XML
         
         // Para agora, simulamos sucesso após validações
-        System.out.println("   ✅ Simulação: Evento de cancelamento enviado para SEFAZ");
-        System.out.println("   Chave: " + chaveAcesso);
-        System.out.println("   Protocolo: " + protocolo);
+        log.warn("Simulação de cancelamento NFC-e executada. chave={} protocolo={}", chaveAcesso, protocolo);
         
         return true; // Retorna sucesso
     }
@@ -287,11 +291,15 @@ public class NfceCancelamentoService {
      */
     public void simularCancelamento(NotaFiscal nota) throws Exception {
         this.validarElegibilidadeCancelamento(nota);
-        System.out.println("🧪 SIMULAÇÃO: NFC-e " + nota.getNumero() + 
-                          " estaria elegível para cancelamento");
+        log.info("Simulação de elegibilidade de cancelamento para NFC-e {}", nota.getNumero());
+    }
+
+    private void validarSimulacaoPermitida() throws Exception {
+        if (!allowSimulatedDocuments) {
+            throw new Exception("Cancelamento fiscal bloqueado: implementação atual ainda é simulada. " +
+                    "Libere app.fiscal.allow-simulated-documents=true apenas em homologação.");
+        }
     }
 
 }
-
-
 

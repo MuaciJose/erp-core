@@ -19,9 +19,10 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long
     List<OrdemServico> findAllByEmpresaIdOrderByDataEntradaDesc(Long empresaId);
 
     // 🛡️ NOVAS BUSCAS BLINDADAS
-    List<OrdemServico> findByConsultorId(Long consultorId, Sort sort);
+    @Query("SELECT os FROM OrdemServico os WHERE os.consultor.id = :consultorId AND os.empresaId = :empresaId")
+    List<OrdemServico> findByConsultorIdAndEmpresaId(@Param("consultorId") Long consultorId, @Param("empresaId") Long empresaId, Sort sort);
 
     // 🛡️ BUSCA PARA MECÂNICOS: Acha qualquer OS onde ele tenha algum serviço para fazer
-    @Query("SELECT DISTINCT os FROM OrdemServico os JOIN os.itensServicos s WHERE s.mecanico.id = :mecanicoId")
-    List<OrdemServico> findByMecanicoId(@Param("mecanicoId") Long mecanicoId, Sort sort);
+    @Query("SELECT DISTINCT os FROM OrdemServico os JOIN os.itensServicos s WHERE s.mecanico.id = :mecanicoId AND os.empresaId = :empresaId")
+    List<OrdemServico> findByMecanicoIdAndEmpresaId(@Param("mecanicoId") Long mecanicoId, @Param("empresaId") Long empresaId, Sort sort);
 }

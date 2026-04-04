@@ -9,7 +9,9 @@ export const STORAGE_KEYS = {
 };
 
 export const getApiBaseUrl = () =>
-    process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://192.168.1.104:8080';
+    process.env.EXPO_PUBLIC_API_URL?.trim() || (() => {
+        throw new Error('EXPO_PUBLIC_API_URL não configurada para o app mobile.');
+    })();
 
 export const getCleanToken = async () => {
     const token = await AsyncStorage.getItem(STORAGE_KEYS.token);

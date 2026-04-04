@@ -9,6 +9,8 @@ import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 import com.grandport.erp.modules.vendas.repository.RevisaoRepository;
 import com.grandport.erp.modules.usuario.model.Usuario;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,8 @@ import java.util.Locale;
 
 @Service
 public class DashboardService {
+
+    private static final Logger log = LoggerFactory.getLogger(DashboardService.class);
 
     @Autowired private VendaRepository vendaRepository;
     @Autowired private ContaReceberRepository contaReceberRepository;
@@ -107,7 +111,7 @@ public class DashboardService {
                 resumo.getAlertas().add(new DashboardResumoDTO.AlertaDTO("CRM / PS-VENDA", "Voc tem " + crmAtrasados + " clientes aguardando contato de reviso. No perca vendas!"));
             }
         } catch (Exception e) {
-            System.err.println("Aviso: Falha ao buscar dados do CRM no Dashboard - " + e.getMessage());
+            log.warn("Falha ao buscar dados do CRM no dashboard", e);
         }
 
         // Top Produtos
@@ -185,7 +189,7 @@ public class DashboardService {
 
             insights.add(new InsightDTO("OPORTUNIDADE_VENDA", "Venda Casada (Cross-Sell)", "Notamos que muitos clientes que compram leo no levam o Filtro. Treine a equipe para oferecer o kit completo!", "VER RELATRIO DE VENDAS", "blue"));
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Erro ao montar insights inteligentes do dashboard", e);
         }
         return insights;
     }

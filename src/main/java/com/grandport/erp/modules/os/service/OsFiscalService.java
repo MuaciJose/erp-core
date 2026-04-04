@@ -2,6 +2,7 @@ package com.grandport.erp.modules.os.service;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.os.model.OrdemServico;
 import com.grandport.erp.modules.os.model.OsItemPeca;
 import com.grandport.erp.modules.os.repository.OrdemServicoRepository;
@@ -18,6 +19,7 @@ import com.grandport.erp.modules.fiscal.service.NfeSetupService;
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -49,17 +51,25 @@ public class OsFiscalService {
     @Autowired
     private AuditoriaService auditoriaService;
 
+    @Autowired
+    private EmpresaContextService empresaContextService;
+
+    @Value("${app.fiscal.allow-simulated-documents:false}")
+    private boolean allowSimulatedDocuments;
+
     // ==============================================================
     // 1. EMITIR DOCUMENTO FISCAL DAS PEÇAS (DINÂMICO: 55 OU 65)
     // ==============================================================
     // 🚀 MUDANÇA: Agora recebe o "modeloFiscal" ("55" ou "65") que vem do React
     public Map<String, Object> emitirFiscalPecas(Long osId, String modeloFiscal) throws Exception {
+        validarSimulacaoPermitida("emissão fiscal da OS");
 
         if (!"55".equals(modeloFiscal) && !"65".equals(modeloFiscal)) {
             throw new Exception("Modelo fiscal inválido. Escolha 55 (NF-e) ou 65 (NFC-e).");
         }
 
-        OrdemServico os = osRepository.findById(osId).orElseThrow(() -> new Exception("OS não encontrada"));
+        OrdemServico os = osRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), osId)
+                .orElseThrow(() -> new Exception("OS não encontrada"));
         if (os.getItensPecas().isEmpty()) throw new Exception("Esta OS não possui peças para emitir o documento fiscal.");
 
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
@@ -98,6 +108,7 @@ public class OsFiscalService {
         salvarArquivoXml(chaveAcesso, xml.toString());
 
         NotaFiscal nota = new NotaFiscal();
+        nota.setEmpresaId(empresaContextService.getRequiredEmpresaId());
         nota.setNumero(numeroDocumento);
         nota.setChaveAcesso(chaveAcesso);
         nota.setStatus("AUTORIZADA");
@@ -124,8 +135,10 @@ public class OsFiscalService {
     // 2. EMITIR NFS-E DA MÃO DE OBRA (PREFEITURA - MUNICÍPIO)
     // ==============================================================
     public Map<String, Object> emitirNfseServicos(Long osId) throws Exception {
+        validarSimulacaoPermitida("emissão de NFS-e da OS");
 
-        OrdemServico os = osRepository.findById(osId).orElseThrow(() -> new Exception("OS não encontrada"));
+        OrdemServico os = osRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), osId)
+                .orElseThrow(() -> new Exception("OS não encontrada"));
         if (os.getItensServicos().isEmpty()) throw new Exception("Esta OS não possui mão de obra para emitir NFS-e.");
 
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
@@ -202,5 +215,12 @@ public class OsFiscalService {
         File f = new File(dir);
         if (!f.exists()) f.mkdirs();
         Files.write(Paths.get(dir + nomeArquivo + ".xml"), conteudo.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void validarSimulacaoPermitida(String operacao) throws Exception {
+        if (!allowSimulatedDocuments) {
+            throw new Exception("Fluxo fiscal bloqueado: " + operacao +
+                    " ainda opera em modo simulado. Configure app.fiscal.allow-simulated-documents=true apenas em homologação.");
+        }
     }
 }

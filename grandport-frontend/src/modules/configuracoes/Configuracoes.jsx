@@ -320,7 +320,11 @@ export const Configuracoes = () => {
                 const formData = new FormData();
                 formData.append('file', arquivoCertificado);
 
-                const baseUrl = api.defaults.baseURL || 'http://localhost:8080';
+                const baseUrl = api.defaults.baseURL;
+
+                if (!baseUrl) {
+                    throw new Error('Base URL da API não configurada no frontend.');
+                }
 
                 const uploadRes = await fetch(`${baseUrl}/api/configuracoes/certificado`, {
                     method: 'POST',

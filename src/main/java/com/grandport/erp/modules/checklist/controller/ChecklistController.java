@@ -5,6 +5,8 @@ import com.grandport.erp.modules.checklist.dto.ChecklistRequestDTO;
 import com.grandport.erp.modules.checklist.model.ChecklistVeiculo;
 import com.grandport.erp.modules.checklist.repository.ChecklistRepository;
 import com.grandport.erp.modules.checklist.service.ChecklistService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value; // 🚀 IMPORT NOVO AQUI!
 import org.springframework.http.ResponseEntity;
@@ -16,6 +18,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/checklists")
 public class ChecklistController {
+
+    private static final Logger log = LoggerFactory.getLogger(ChecklistController.class);
 
     @Autowired
     private ChecklistService checklistService;
@@ -79,7 +83,7 @@ public class ChecklistController {
             return ResponseEntity.ok(java.util.Map.of("message", "Fotos anexadas com sucesso ao Laudo!"));
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Erro ao salvar fotos da vistoria do checklist {}", id, e);
             return ResponseEntity.badRequest().body(java.util.Map.of("message", "Erro interno ao salvar fotos: " + e.getMessage()));
         }
     }
@@ -116,7 +120,7 @@ public class ChecklistController {
             return ResponseEntity.ok("Assinatura salva com sucesso!");
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Erro ao salvar assinatura do checklist {}", id, e);
             return ResponseEntity.badRequest().body("Erro ao salvar assinatura: " + e.getMessage());
         }
     }
@@ -138,6 +142,7 @@ public class ChecklistController {
                     .body(relatorioPdf);
 
         } catch (Exception e) {
+            log.error("Erro ao gerar laudo do checklist {}", id, e);
             return ResponseEntity.internalServerError().build();
         }
     }

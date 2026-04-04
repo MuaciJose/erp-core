@@ -5,6 +5,7 @@ import com.grandport.erp.modules.financeiro.model.ContaPagar;
 import com.grandport.erp.modules.financeiro.model.StatusFinanceiro;
 import com.grandport.erp.modules.financeiro.repository.ContaPagarRepository;
 import com.grandport.erp.modules.financeiro.repository.ContaReceberRepository;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 // 🚀 1. IMPORTAÇÃO DA AUDITORIA
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import net.sf.ofx4j.domain.data.ResponseEnvelope;
@@ -29,6 +30,7 @@ public class ConciliacaoService {
 
     @Autowired private ContaPagarRepository pagarRepo;
     @Autowired private ContaReceberRepository receberRepo;
+    @Autowired private EmpresaContextService empresaContextService;
 
     // 🚀 2. INJEÇÃO DO MOTOR DE AUDITORIA
     @Autowired private AuditoriaService auditoriaService;
@@ -90,7 +92,7 @@ public class ConciliacaoService {
 
     private void buscarSugestao(ConciliacaoDTO.TransacaoConciliacaoDTO tDto) {
         if ("SAIDA".equals(tDto.getTipo())) {
-            List<ContaPagar> sugestoes = pagarRepo.findByStatus(StatusFinanceiro.PENDENTE);
+            List<ContaPagar> sugestoes = pagarRepo.findByEmpresaIdAndStatus(empresaContextService.getRequiredEmpresaId(), StatusFinanceiro.PENDENTE);
             Optional<ContaPagar> match = sugestoes.stream()
                     .filter(c -> c.getValorOriginal().compareTo(tDto.getValor()) == 0)
                     .findFirst();

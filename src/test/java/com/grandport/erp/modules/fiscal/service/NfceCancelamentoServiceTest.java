@@ -7,9 +7,14 @@ import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -36,10 +41,12 @@ class NfceCancelamentoServiceTest {
 
     private NotaFiscal notaTeste;
     private ConfiguracaoSistema configTeste;
+    private Path certificadoTestePath;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        ReflectionTestUtils.setField(nfceCancelamentoService, "allowSimulatedDocuments", true);
 
         // Setup de nota fiscal de teste
         notaTeste = new NotaFiscal();
@@ -54,6 +61,27 @@ class NfceCancelamentoServiceTest {
         configTeste.setUf("SP");
         configTeste.setCnpj("12.345.678/0001-90");
         configTeste.setSenhaCertificado("senha123");
+
+        try {
+            Path certificadosDir = Path.of(System.getProperty("user.dir"), "certificados");
+            Files.createDirectories(certificadosDir);
+            certificadoTestePath = certificadosDir.resolve("12345678000190.pfx");
+            if (!Files.exists(certificadoTestePath)) {
+                Files.createFile(certificadoTestePath);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Falha ao preparar certificado de teste", e);
+        }
+    }
+
+    @AfterEach
+    void tearDown() {
+        try {
+            if (certificadoTestePath != null) {
+                Files.deleteIfExists(certificadoTestePath);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     // =========================================================================
@@ -303,4 +331,3 @@ class NfceCancelamentoServiceTest {
         }, "Deve aceitar e tratar espaços extra");
     }
 }
-

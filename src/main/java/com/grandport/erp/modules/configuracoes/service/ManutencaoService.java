@@ -2,6 +2,8 @@ package com.grandport.erp.modules.configuracoes.service;
 
 import com.grandport.erp.modules.checklist.model.ChecklistVeiculo;
 import com.grandport.erp.modules.checklist.repository.ChecklistRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,8 @@ import java.util.Map;
 
 @Service
 public class ManutencaoService {
+
+    private static final Logger log = LoggerFactory.getLogger(ManutencaoService.class);
 
     @Autowired
     private ChecklistRepository checklistRepository;
@@ -48,7 +52,7 @@ public class ManutencaoService {
                             fotosApagadas++;
                         }
                     } catch (Exception e) {
-                        System.out.println("Erro ao apagar foto: " + caminhoFoto);
+                        log.warn("Erro ao apagar foto de vistoria {}", caminhoFoto, e);
                     }
                 }
 

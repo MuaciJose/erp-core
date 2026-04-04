@@ -2,9 +2,12 @@ package com.grandport.erp.modules.assinatura.service;
 
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.assinatura.model.LicencaModuloEmpresa;
+import com.grandport.erp.modules.assinatura.repository.PlanoSaasModuloRepository;
+import com.grandport.erp.modules.assinatura.repository.PlanoSaasRepository;
 import com.grandport.erp.modules.assinatura.repository.LicencaModuloEmpresaRepository;
 import com.grandport.erp.modules.empresa.model.Empresa;
 import com.grandport.erp.modules.empresa.repository.EmpresaRepository;
+import com.grandport.erp.modules.usuario.repository.UsuarioRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +22,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,6 +38,15 @@ class LicenciamentoModuloServiceTest {
 
     @Mock
     private AuditoriaService auditoriaService;
+
+    @Mock
+    private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private PlanoSaasRepository planoSaasRepository;
+
+    @Mock
+    private PlanoSaasModuloRepository planoSaasModuloRepository;
 
     @InjectMocks
     private LicenciamentoModuloService licenciamentoModuloService;
@@ -53,6 +66,7 @@ class LicenciamentoModuloServiceTest {
 
         when(licencaModuloEmpresaRepository.findByAtivoTrueAndTrialAteBefore(any(LocalDate.class))).thenReturn(List.of(licenca));
         when(empresaRepository.findById(3L)).thenReturn(Optional.of(empresa));
+        when(planoSaasRepository.findByCodigoIgnoreCase(anyString())).thenReturn(Optional.empty());
 
         int expirados = licenciamentoModuloService.expirarTrialsVencidos();
 

@@ -3,6 +3,7 @@ package com.grandport.erp.modules.financeiro.controller;
 import com.grandport.erp.modules.financeiro.model.Recibo;
 import com.grandport.erp.modules.financeiro.repository.ReciboRepository;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.pdf.service.PdfService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -27,9 +28,13 @@ public class ReciboController {
     @Autowired
     private ConfiguracaoAtualService configuracaoAtualService;
 
+    @Autowired
+    private EmpresaContextService empresaContextService;
+
     // 🚀 SALVAR NOVO RECIBO NO BANCO
     @PostMapping
     public ResponseEntity<Recibo> salvar(@RequestBody Recibo recibo) {
+        recibo.setEmpresaId(empresaContextService.getRequiredEmpresaId());
         Recibo salvo = repository.save(recibo);
         return ResponseEntity.ok(salvo);
     }
@@ -37,13 +42,15 @@ public class ReciboController {
     // 🚀 LISTAR HISTÓRICO
     @GetMapping
     public List<Recibo> listarTodos() {
-        return repository.findAllByOrderByDataRegistroDesc();
+        return repository.findByEmpresaIdOrderByDataRegistroDesc(empresaContextService.getRequiredEmpresaId());
     }
 
     // 🚀 DELETAR RECIBO DO HISTÓRICO
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(@PathVariable Long id) {
-        repository.deleteById(id);
+        Recibo recibo = repository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id)
+                .orElseThrow(() -> new RuntimeException("Recibo não encontrado."));
+        repository.delete(recibo);
         return ResponseEntity.noContent().build();
     }
 

@@ -4,6 +4,7 @@ import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.model.VendedorComissao;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.estoque.model.Produto;
 import com.grandport.erp.modules.estoque.repository.ProdutoRepository;
 import com.grandport.erp.modules.estoque.service.EstoqueService;
@@ -41,6 +42,7 @@ public class VendaService {
     @Autowired private ConfiguracaoService configService;
     @Autowired private EstoqueService estoqueService;
     @Autowired private AuditoriaService auditoriaService;
+    @Autowired private EmpresaContextService empresaContextService;
 
     // =========================================================================
     // 🛡️ MOTOR DE SEGURANÇA E ESCOPO DE VISÃO (ROW-LEVEL SECURITY)
@@ -55,32 +57,39 @@ public class VendaService {
 
     public List<Venda> listarTodasAsVendas() {
         Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
         Sort ordem = Sort.by(Sort.Direction.DESC, "dataHora");
 
         if (isGestorOuCaixa(usuarioLogado)) {
-            return vendaRepository.findAll(ordem); // Chefe vê tudo
+            return vendaRepository.findAllByEmpresa(empresaId);
         } else {
-            return vendaRepository.findByVendedorId(usuarioLogado.getId(), ordem); // Vendedor vê só o dele
+            return vendaRepository.findByVendedorIdAndEmpresa(usuarioLogado.getId(), empresaId);
         }
     }
 
     public List<Venda> listarOrcamentos() {
         Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
 
         if (isGestorOuCaixa(usuarioLogado)) {
-            return vendaRepository.findByStatus(StatusVenda.ORCAMENTO);
+            return vendaRepository.findByStatusAndEmpresa(StatusVenda.ORCAMENTO, empresaId);
         } else {
-            return vendaRepository.findByStatusAndVendedorId(StatusVenda.ORCAMENTO, usuarioLogado.getId());
+            return vendaRepository.findByVendedorIdAndEmpresa(usuarioLogado.getId(), empresaId).stream()
+                    .filter(venda -> venda.getStatus() == StatusVenda.ORCAMENTO)
+                    .toList();
         }
     }
 
     public List<Venda> listarFilaCaixa() {
         Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
 
         if (isGestorOuCaixa(usuarioLogado)) {
-            return vendaRepository.findByStatus(StatusVenda.AGUARDANDO_PAGAMENTO);
+            return vendaRepository.findByStatusAndEmpresa(StatusVenda.AGUARDANDO_PAGAMENTO, empresaId);
         } else {
-            return vendaRepository.findByStatusAndVendedorId(StatusVenda.AGUARDANDO_PAGAMENTO, usuarioLogado.getId());
+            return vendaRepository.findByVendedorIdAndEmpresa(usuarioLogado.getId(), empresaId).stream()
+                    .filter(venda -> venda.getStatus() == StatusVenda.AGUARDANDO_PAGAMENTO)
+                    .toList();
         }
     }
 
@@ -172,8 +181,7 @@ public class VendaService {
         boolean permitirGlobal = config.getPermitirEstoqueNegativoGlobal() != null && config.getPermitirEstoqueNegativoGlobal();
 
         for (ItemVendaDTO itemDTO : dto.itens()) {
-            Produto produto = produtoRepository.findById(itemDTO.produtoId())
-                    .orElseThrow(() -> new RuntimeException("Produto não encontrado no estoque"));
+            Produto produto = buscarProdutoDaEmpresa(itemDTO.produtoId());
 
             if (permitirGlobal || Boolean.TRUE.equals(produto.getPermitirEstoqueNegativo())) {
                 continue;
@@ -216,8 +224,7 @@ public class VendaService {
 
     @Transactional
     public Venda atualizarVenda(Long id, VendaRequestDTO dto) {
-        Venda venda = vendaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Registro não encontrado"));
+        Venda venda = buscarVendaDaEmpresa(id);
 
         if (venda.getStatus() == StatusVenda.CONCLUIDA) {
             throw new RuntimeException("Operação Negada: Vendas faturadas não podem ser alteradas.");
@@ -254,8 +261,7 @@ public class VendaService {
 
     @Transactional
     public void excluirVenda(Long id) {
-        Venda venda = vendaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Registro não encontrado"));
+        Venda venda = buscarVendaDaEmpresa(id);
 
         if (venda.getStatus() == StatusVenda.CONCLUIDA) {
             throw new RuntimeException("Operação Negada: Vendas faturadas não podem ser excluídas.");
@@ -286,8 +292,9 @@ public class VendaService {
             venda.setVendedorId(null);
         }
 
-        venda.setCliente(dto.parceiroId() != null ? parceiroRepository.findById(dto.parceiroId()).orElse(null) : null);
-        venda.setVeiculo(dto.veiculoId() != null ? veiculoRepository.findById(dto.veiculoId()).orElse(null) : null);
+        venda.setEmpresaId(empresaContextService.getRequiredEmpresaId());
+        venda.setCliente(dto.parceiroId() != null ? buscarParceiroDaEmpresa(dto.parceiroId()) : null);
+        venda.setVeiculo(dto.veiculoId() != null ? buscarVeiculoDaEmpresa(dto.veiculoId()) : null);
 
         venda.setObservacoes(dto.observacoes());
 
@@ -301,8 +308,7 @@ public class VendaService {
         BigDecimal subtotal = BigDecimal.ZERO;
         if (dto.itens() != null) {
             for (ItemVendaDTO itemDTO : dto.itens()) {
-                Produto produto = produtoRepository.findById(itemDTO.produtoId())
-                        .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
+                Produto produto = buscarProdutoDaEmpresa(itemDTO.produtoId());
 
                 ItemVenda item = new ItemVenda(venda, produto, itemDTO.quantidade(),
                         itemDTO.precoUnitario() != null ? itemDTO.precoUnitario() : produto.getPrecoVenda());
@@ -324,7 +330,7 @@ public class VendaService {
     // =========================================================================
     @Transactional
     public Venda finalizarPagamentoPedido(Long vendaId, List<PagamentoVendaDTO> pagamentos) {
-        Venda venda = vendaRepository.findById(vendaId).orElseThrow();
+        Venda venda = buscarVendaDaEmpresa(vendaId);
 
         if(venda.getStatus() == StatusVenda.CONCLUIDA) {
             throw new RuntimeException("Este pedido já foi faturado!");
@@ -381,7 +387,7 @@ public class VendaService {
 
     private void processarVendaAPrazo(Venda venda, Long parceiroId, Integer parcelas) {
         if (parceiroId == null) throw new RuntimeException("Cliente não informado para venda a prazo.");
-        Parceiro cliente = parceiroRepository.findById(parceiroId).orElseThrow();
+        Parceiro cliente = buscarParceiroDaEmpresa(parceiroId);
         BigDecimal saldoDisponivel = cliente.getLimiteCredito().subtract(cliente.getSaldoDevedor());
         if (venda.getValorTotal().compareTo(saldoDisponivel) > 0) {
             throw new RuntimeException("Venda Bloqueada! Limite de crédito insuficiente.");
@@ -393,7 +399,7 @@ public class VendaService {
 
     @Transactional
     public Venda devolverAoVendedor(Long vendaId) {
-        Venda venda = vendaRepository.findById(vendaId).orElseThrow();
+        Venda venda = buscarVendaDaEmpresa(vendaId);
         if (venda.getStatus() != StatusVenda.AGUARDANDO_PAGAMENTO) {
             throw new RuntimeException("Apenas pedidos na fila do caixa podem ser devolvidos.");
         }
@@ -401,5 +407,25 @@ public class VendaService {
 
         auditoriaService.registrar("VENDAS", "DEVOLUCAO_CAIXA", "Pedido #" + vendaId + " foi devolvido/rejeitado pelo operador do Caixa.");
         return vendaRepository.save(venda);
+    }
+
+    private Venda buscarVendaDaEmpresa(Long vendaId) {
+        return vendaRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), vendaId)
+                .orElseThrow(() -> new RuntimeException("Registro não encontrado"));
+    }
+
+    private Produto buscarProdutoDaEmpresa(Long produtoId) {
+        return produtoRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), produtoId)
+                .orElseThrow(() -> new RuntimeException("Produto não encontrado no estoque"));
+    }
+
+    private Parceiro buscarParceiroDaEmpresa(Long parceiroId) {
+        return parceiroRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), parceiroId)
+                .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
+    }
+
+    private Veiculo buscarVeiculoDaEmpresa(Long veiculoId) {
+        return veiculoRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), veiculoId)
+                .orElseThrow(() -> new RuntimeException("Veículo não encontrado"));
     }
 }

@@ -124,7 +124,7 @@ public class VendaController {
     @GetMapping("/{id}")
     public ResponseEntity<?> buscarVendaPorId(@PathVariable Long id) {
         try {
-            Optional<Venda> venda = repository.findById(id);
+            Optional<Venda> venda = repository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id);
             if (venda.isPresent()) {
                 return ResponseEntity.ok(venda.get());
             } else {

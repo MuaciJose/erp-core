@@ -49,12 +49,13 @@ public class ChecklistService {
 
     @Transactional
     public ChecklistVeiculo criar(ChecklistRequestDTO dto) {
-        Veiculo veiculo = veiculoRepository.findById(dto.veiculoId())
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        Veiculo veiculo = veiculoRepository.findByEmpresaIdAndId(empresaId, dto.veiculoId())
                 .orElseThrow(() -> new RuntimeException("Veículo não encontrado."));
 
         Parceiro cliente = null;
         if (dto.clienteId() != null) {
-            cliente = parceiroRepository.findById(dto.clienteId()).orElse(null);
+            cliente = parceiroRepository.findByEmpresaIdAndId(empresaId, dto.clienteId()).orElse(null);
         }
 
         // Pega o recepcionista logado no sistema
@@ -66,6 +67,7 @@ public class ChecklistService {
         }
 
         ChecklistVeiculo checklist = new ChecklistVeiculo();
+        checklist.setEmpresaId(empresaId);
         checklist.setVeiculo(veiculo);
         checklist.setCliente(cliente);
         checklist.setRecepcionista(recepcionista);

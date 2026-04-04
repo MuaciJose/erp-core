@@ -2,6 +2,7 @@ package com.grandport.erp.modules.fiscal.service;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 import com.grandport.erp.modules.fiscal.repository.NotaFiscalRepository;
 import com.grandport.erp.modules.vendas.model.StatusVenda;
@@ -10,6 +11,8 @@ import com.grandport.erp.modules.vendas.model.ItemVenda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 // 🚀 1. IMPORTAÇÃO DA AUDITORIA
 import com.grandport.erp.modules.admin.service.AuditoriaService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,8 +34,13 @@ import static java.util.Map.entry;
 @Service
 public class NfeService {
 
+    private static final Logger log = LoggerFactory.getLogger(NfeService.class);
+
     @Value("${app.jobs.fiscal.contingencia.enabled:true}")
     private boolean contingenciaJobEnabled;
+
+    @Value("${app.fiscal.allow-simulated-documents:false}")
+    private boolean allowSimulatedDocuments;
 
     @Autowired
     private com.grandport.erp.modules.estoque.repository.ProdutoRepository produtoRepository;
@@ -56,6 +64,9 @@ public class NfeService {
     @Autowired
     private AuditoriaService auditoriaService;
 
+    @Autowired
+    private EmpresaContextService empresaContextService;
+
     // =========================================================================
     // 🤖 ROBÔ DE CONTINGÊNCIA (MANTIDO INTACTO)
     // =========================================================================
@@ -65,25 +76,17 @@ public class NfeService {
             return;
         }
 
-        /*
-        List<NotaFiscal> notasPresas = notaFiscalRepository.findByStatus("CONTINGENCIA");
-        if (!notasPresas.isEmpty()) {
-            System.out.println("🤖 ROBÔ FISCAL: Encontrei " + notasPresas.size() + " nota(s) em contingência...");
-            for (NotaFiscal nota : notasPresas) {
-                try {
-                    nota.setStatus("AUTORIZADA");
-                    notaFiscalRepository.save(nota);
-                } catch (Exception e) {}
-            }
-        }
-        */
+        // Fluxo legado de reenvio automático removido.
+        // A sincronização de contingência deve passar pelo serviço dedicado e controlado.
     }
 
     // =========================================================================
     // 🚀 EMISSÃO AUTOMÁTICA PDV -> NFC-e (MOD 65)
     // =========================================================================
     public Map<String, Object> emitirNfeSefaz(Long vendaId) throws Exception {
-        Venda venda = vendaRepository.findById(vendaId)
+        validarSimulacaoPermitida("emissão de NFC-e");
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        Venda venda = vendaRepository.findByEmpresaIdAndId(empresaId, vendaId)
                 .orElseThrow(() -> new Exception("Venda não encontrada."));
 
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
@@ -91,7 +94,7 @@ public class NfeService {
         // 🛡️ TRAVA DE SEGURANÇA: Evita o Erro 400 por falta de dados
         validarConfiguracaoFiscal(config);
 
-        NotaFiscal notaExistente = notaFiscalRepository.findByVendaId(vendaId);
+        NotaFiscal notaExistente = notaFiscalRepository.findByEmpresaIdAndVendaId(empresaId, vendaId);
         if (notaExistente != null && "AUTORIZADA".equals(notaExistente.getStatus())) {
             throw new Exception("NFC-e já autorizada com a chave: " + notaExistente.getChaveAcesso());
         }
@@ -115,6 +118,7 @@ public class NfeService {
         }
 
         NotaFiscal novaNota = new NotaFiscal();
+        novaNota.setEmpresaId(empresaId);
         novaNota.setVenda(venda);
         novaNota.setNumero(numeroNfce);
         novaNota.setChaveAcesso(chaveAcessoReal);
@@ -268,10 +272,12 @@ public class NfeService {
     }
 
     public Map<String, Object> emitirNfeAvancada(com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO dto) throws Exception {
+        validarSimulacaoPermitida("emissão de NF-e avulsa");
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
         validarConfiguracaoFiscal(config);
 
-        var parceiroOpt = parceiroRepository.findById(dto.getClienteId());
+        var parceiroOpt = parceiroRepository.findByEmpresaIdAndId(empresaId, dto.getClienteId());
         com.grandport.erp.modules.parceiro.model.Parceiro clienteDestinatario = parceiroOpt.orElseThrow(() -> new Exception("Cliente não encontrado."));
 
         Long numeroNfe = config.getNumeroProximaNfe();
@@ -284,7 +290,7 @@ public class NfeService {
         double totalIbs = 0.0; double totalCbs = 0.0;
 
         for (com.grandport.erp.modules.fiscal.dto.NfeAvulsaRequestDTO.ItemNfeDTO itemDto : dto.getItens()) {
-            var produto = produtoRepository.findById(itemDto.getProdutoId()).orElseThrow();
+            var produto = produtoRepository.findByEmpresaIdAndId(empresaId, itemDto.getProdutoId()).orElseThrow();
             totalProdutos = totalProdutos.add(itemDto.getQuantidade().multiply(itemDto.getPrecoUnitario()));
             Map<String, String> impostos = motorFiscalService.calcularTributosDoItem(produto, config.getUf(), config.getUf(), config.getCrt());
             totalIbs += Double.parseDouble(impostos.getOrDefault("VALOR_IBS", "0.0")) * itemDto.getQuantidade().doubleValue();
@@ -292,6 +298,7 @@ public class NfeService {
         }
 
         NotaFiscal novaNota = new NotaFiscal();
+        novaNota.setEmpresaId(empresaId);
         novaNota.setNumero(numeroNfe);
         novaNota.setChaveAcesso(chaveAcessoReal);
         novaNota.setStatus("AUTORIZADA");
@@ -313,7 +320,7 @@ public class NfeService {
     // 🚀 NOVO MÉTODO: CANCELAR NFE DA VENDA
     // =========================================================================
     public void cancelarNfeDaVenda(Long vendaId, String justificativa) throws Exception {
-        Venda venda = vendaRepository.findById(vendaId)
+        Venda venda = vendaRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), vendaId)
                 .orElseThrow(() -> new Exception("Venda não encontrada."));
 
         NotaFiscal nota = venda.getNotaFiscal();
@@ -323,9 +330,8 @@ public class NfeService {
 
         // Simula a chamada para o Motor Fiscal SEFAZ (Substituir pela chamada real depois)
         // motorFiscalService.enviarEventoCancelamento(nota.getChaveAcesso(), justificativa);
-        System.out.println(">>> Enviando evento de CANCELAMENTO para a SEFAZ...");
-        System.out.println("Chave: " + nota.getChaveAcesso());
-        System.out.println("Justificativa: " + justificativa);
+        log.warn("Cancelamento de NF-e ainda está em modo simulado. vendaId={} chave={} justificativa={}",
+                vendaId, nota.getChaveAcesso(), justificativa);
 
         nota.setStatus("CANCELADA");
         notaFiscalRepository.save(nota);
@@ -371,7 +377,17 @@ public class NfeService {
             StringBuilder sb = new StringBuilder();
             for (byte b : bytes) sb.append(String.format("%02x", b));
             return sb.toString().toUpperCase();
-        } catch (Exception e) { return ""; }
+        } catch (Exception e) {
+            log.error("Erro ao gerar hash SHA1 do QR Code fiscal", e);
+            return "";
+        }
+    }
+
+    private void validarSimulacaoPermitida(String operacao) throws Exception {
+        if (!allowSimulatedDocuments) {
+            throw new Exception("Fluxo fiscal bloqueado: " + operacao +
+                    " ainda opera em modo simulado. Configure app.fiscal.allow-simulated-documents=true apenas em homologação.");
+        }
     }
 
     private String obterUrlConsultaPorEstado(String uf, Integer ambiente) {

@@ -30,6 +30,9 @@ class TenantAccessServiceTest {
     @Mock
     private SecurityEventService securityEventService;
 
+    @Mock
+    private PlataformaAvisoOperacionalService plataformaAvisoOperacionalService;
+
     @InjectMocks
     private TenantAccessService tenantAccessService;
 
@@ -49,6 +52,7 @@ class TenantAccessServiceTest {
         empresa.setDiasTolerancia(3);
 
         when(empresaRepository.findById(10L)).thenReturn(Optional.of(empresa));
+        when(plataformaAvisoOperacionalService.manutencaoBloqueandoAcesso()).thenReturn(false);
 
         assertDoesNotThrow(() -> tenantAccessService.validarAcesso(usuario));
     }
@@ -69,6 +73,7 @@ class TenantAccessServiceTest {
         empresa.setDiasTolerancia(2);
 
         when(empresaRepository.findById(10L)).thenReturn(Optional.of(empresa));
+        when(plataformaAvisoOperacionalService.manutencaoBloqueandoAcesso()).thenReturn(false);
 
         assertThrows(TenantAccessBlockedException.class, () -> tenantAccessService.validarAcesso(usuario));
     }

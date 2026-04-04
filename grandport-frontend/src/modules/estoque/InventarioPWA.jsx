@@ -115,7 +115,8 @@ const DetalheProduto = ({ produto, onVoltar, onReload }) => {
     const formatarMoeda = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
     // Tratamento de imagem para a Web (Apontando para a base da sua API)
-    const urlImagem = produto.fotoUrl || (produto.fotoLocalPath ? `http://localhost:8080${produto.fotoLocalPath}` : 'https://via.placeholder.com/300?text=Sem+Foto');
+    const apiBaseUrl = api.defaults.baseURL?.replace(/\/$/, '') || '';
+    const urlImagem = produto.fotoUrl || (produto.fotoLocalPath ? `${apiBaseUrl}${produto.fotoLocalPath}` : 'https://via.placeholder.com/300?text=Sem+Foto');
 
     return (
         <div className="flex flex-col h-full bg-white pb-20 animate-fade-in relative z-50">

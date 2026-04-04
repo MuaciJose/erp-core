@@ -109,7 +109,7 @@ public class SincronizacaoErpService {
         }
 
         // ✅ Obtém configuração atual
-        ConfiguracaoSistema config = configuracaoService.obterConfiguracaoSistema();
+        ConfiguracaoSistema config = obterConfiguracaoDoEscopoAtual();
 
         // ✅ Valida se o número retornado é o esperado
         if (!config.getSerieNfce().equals(serieSefaz)) {
@@ -283,7 +283,7 @@ public class SincronizacaoErpService {
      */
     @Transactional
     public Map<String, Object> validarIntegridade() {
-        ConfiguracaoSistema config = configuracaoService.obterConfiguracaoSistema();
+        ConfiguracaoSistema config = obterConfiguracaoDoEscopoAtual();
         
         List<NotaFiscal> notas = listarNotasDoEscopoAtual().stream()
             .filter(n -> "AUTORIZADA".equals(n.getStatus()) || 
@@ -337,5 +337,13 @@ public class SincronizacaoErpService {
             return notaFiscalRepository.findAllByEmpresaIdOrderByIdDesc(empresaId);
         }
         return notaFiscalRepository.findAll();
+    }
+
+    private ConfiguracaoSistema obterConfiguracaoDoEscopoAtual() {
+        Long empresaId = obterEmpresaIdDoUsuarioAutenticado();
+        if (empresaId != null) {
+            return configuracaoService.obterConfiguracao();
+        }
+        return configuracaoService.obterConfiguracaoSistema();
     }
 }

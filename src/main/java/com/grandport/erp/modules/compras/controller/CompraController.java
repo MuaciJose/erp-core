@@ -67,7 +67,7 @@ public class CompraController {
     public ResponseEntity<byte[]> imprimirEspelhoNota(@PathVariable Long id) {
 
         // Puxando o CompraXML (Que tem o getNumero e os Itens)
-        var nota = compraXMLRepository.findById(id)
+        var nota = compraXMLRepository.findByEmpresaIdAndId(configuracaoAtualService.obterAtual().getEmpresaId(), id)
                 .orElseThrow(() -> new RuntimeException("Nota Fiscal não encontrada."));
 
         var empresa = configuracaoAtualService.obterAtual();

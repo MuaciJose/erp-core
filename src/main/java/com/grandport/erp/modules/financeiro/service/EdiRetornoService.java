@@ -3,6 +3,9 @@ package com.grandport.erp.modules.financeiro.service;
 import com.grandport.erp.modules.financeiro.model.ContaReceber;
 import com.grandport.erp.modules.financeiro.model.StatusFinanceiro;
 import com.grandport.erp.modules.financeiro.repository.ContaReceberRepository;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,14 +22,20 @@ import java.util.List;
 @Service
 public class EdiRetornoService {
 
+    private static final Logger log = LoggerFactory.getLogger(EdiRetornoService.class);
+
     @Autowired
     private ContaReceberRepository contaReceberRepo;
+
+    @Autowired
+    private EmpresaContextService empresaContextService;
 
     // =========================================================================
     // 🧠 LEITOR DE INTELIGÊNCIA CNAB 400 (RETORNO)
     // =========================================================================
     @Transactional
     public String processarArquivoRetorno(MultipartFile file) {
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
         int qtdBaixados = 0;
         int qtdErros = 0;
 
@@ -59,7 +68,7 @@ public class EdiRetornoService {
                             BigDecimal valorPago = new BigDecimal(valorPagoStr).divide(new BigDecimal("100"));
 
                             // 4. Procura o Boleto no Banco de Dados
-                            ContaReceber conta = contaReceberRepo.findById(idConta).orElse(null);
+                            ContaReceber conta = contaReceberRepo.findByEmpresaIdAndId(empresaId, idConta).orElse(null);
 
                             if (conta != null && conta.getStatus() == StatusFinanceiro.PENDENTE) {
                                 // 🎯 TIRO CERTEIRO! DÁ BAIXA AUTOMÁTICA!
@@ -79,7 +88,7 @@ public class EdiRetornoService {
                             }
                         }
                     } catch (Exception e) {
-                        System.err.println("❌ Erro ao ler linha do Retorno: " + e.getMessage());
+                        log.warn("Erro ao processar linha do arquivo de retorno bancário", e);
                         qtdErros++;
                     }
                 }
@@ -87,7 +96,7 @@ public class EdiRetornoService {
             return "Operação Concluída! Boletos baixados com sucesso: " + qtdBaixados + " | Ignorados/Erros: " + qtdErros;
 
         } catch (Exception e) {
-            throw new RuntimeException("Falha crítica ao ler o arquivo: " + e.getMessage());
+            throw new RuntimeException("Falha crítica ao ler o arquivo: " + e.getMessage(), e);
         }
     }
 }

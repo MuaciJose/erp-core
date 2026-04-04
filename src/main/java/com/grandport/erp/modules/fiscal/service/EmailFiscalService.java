@@ -6,6 +6,8 @@ import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 // 🚀 1. IMPORTAÇÃO DA AUDITORIA
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import jakarta.mail.internet.MimeMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
@@ -22,6 +24,8 @@ import java.util.zip.ZipOutputStream;
 
 @Service
 public class EmailFiscalService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmailFiscalService.class);
 
     @Autowired
     private ConfiguracaoService configuracaoService;
@@ -122,7 +126,7 @@ public class EmailFiscalService {
                             quantidadeArquivos++;
                         }
                     } catch (Exception e) {
-                        System.err.println("Aviso: Não foi possível gerar PDF para a nota " + nota.getChaveAcesso() + " neste lote.");
+                        log.warn("Não foi possível gerar PDF para a nota {} neste lote", nota.getChaveAcesso(), e);
                     }
                 }
             }

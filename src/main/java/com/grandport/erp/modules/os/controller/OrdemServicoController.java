@@ -37,7 +37,7 @@ public class OrdemServicoController {
     }
     @GetMapping("/{id}")
     public OrdemServico buscarPorId(@PathVariable Long id) {
-        return osRepository.findById(id).orElseThrow(() -> new RuntimeException("OS não encontrada"));
+        return osRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id).orElseThrow(() -> new RuntimeException("OS não encontrada"));
     }
 
     @PostMapping
@@ -52,7 +52,7 @@ public class OrdemServicoController {
 
     @PatchMapping("/{id}/status")
     public OrdemServico mudarStatus(@PathVariable Long id, @RequestParam String status) {
-        OrdemServico os = osRepository.findById(id).orElseThrow(() -> new RuntimeException("OS não encontrada"));
+        OrdemServico os = osRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id).orElseThrow(() -> new RuntimeException("OS não encontrada"));
         os.setStatus(com.grandport.erp.modules.os.model.StatusOS.valueOf(status));
         return osRepository.save(os);
     }
@@ -60,7 +60,7 @@ public class OrdemServicoController {
     // Rota que o Gerente usa na tela de OS (Aguardando Pagamento)
     @PostMapping("/{id}/enviar-caixa")
     public OrdemServico enviarParaCaixa(@PathVariable Long id) {
-        OrdemServico os = osRepository.findById(id).orElseThrow(() -> new RuntimeException("OS não encontrada"));
+        OrdemServico os = osRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id).orElseThrow(() -> new RuntimeException("OS não encontrada"));
 
         // 🚀 Removemos a baixa de estoque daqui para não duplicar,
         // pois a baixa real e a auditoria ocorrem no momento do faturamento final (Caixa).
@@ -203,7 +203,7 @@ public class OrdemServicoController {
     public org.springframework.http.ResponseEntity<?> enviarOsPorWhatsApp(@PathVariable Long id) {
         try {
             // 1. PUXAR A OS E A CONFIGURAÇÃO DO BANCO
-            OrdemServico os = osRepository.findById(id)
+            OrdemServico os = osRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id)
                     .orElseThrow(() -> new RuntimeException("OS não encontrada"));
             var config = obterConfiguracaoAtual();
             if (config.getId() == null) {

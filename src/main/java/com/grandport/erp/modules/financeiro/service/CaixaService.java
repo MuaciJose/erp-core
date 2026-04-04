@@ -7,6 +7,7 @@ import com.grandport.erp.modules.financeiro.model.MovimentacaoCaixa;
 import com.grandport.erp.modules.financeiro.model.StatusCaixa;
 import com.grandport.erp.modules.financeiro.repository.CaixaDiarioRepository;
 import com.grandport.erp.modules.financeiro.repository.MovimentacaoCaixaRepository;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.usuario.model.Usuario;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,22 +24,25 @@ public class CaixaService {
     @Autowired private CaixaDiarioRepository caixaRepository;
     @Autowired private MovimentacaoCaixaRepository movimentacaoRepository;
     @Autowired private AuditoriaService auditoriaService;
+    @Autowired private EmpresaContextService empresaContextService;
 
     public CaixaDiarioDTO getCaixaAtual() {
-        return caixaRepository.findByStatus(StatusCaixa.ABERTO)
+        return caixaRepository.findByEmpresaIdAndStatus(empresaContextService.getRequiredEmpresaId(), StatusCaixa.ABERTO)
                 .map(CaixaDiarioDTO::new)
                 .orElse(new CaixaDiarioDTO());
     }
 
     @Transactional
     public CaixaDiario abrirCaixa(BigDecimal saldoInicial) {
-        Optional<CaixaDiario> caixaAberto = caixaRepository.findByStatus(StatusCaixa.ABERTO);
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        Optional<CaixaDiario> caixaAberto = caixaRepository.findByEmpresaIdAndStatus(empresaId, StatusCaixa.ABERTO);
         if (caixaAberto.isPresent()) throw new RuntimeException("Já existe um caixa aberto.");
 
         CaixaDiario novoCaixa = new CaixaDiario();
         novoCaixa.setDataAbertura(LocalDateTime.now());
         novoCaixa.setSaldoInicial(saldoInicial);
         novoCaixa.setStatus(StatusCaixa.ABERTO);
+        novoCaixa.setEmpresaId(empresaId);
 
         // 🚀 CAPTURA QUEM ESTÁ LOGADO AGORA PARA SER O OPERADOR
         try {
@@ -130,7 +134,7 @@ public class CaixaService {
     }
 
     public CaixaDiario getCaixaAberto() {
-        return caixaRepository.findByStatus(StatusCaixa.ABERTO)
+        return caixaRepository.findByEmpresaIdAndStatus(empresaContextService.getRequiredEmpresaId(), StatusCaixa.ABERTO)
                 .orElseThrow(() -> new RuntimeException("Nenhum caixa aberto no momento. Abra o caixa para realizar operações."));
     }
 

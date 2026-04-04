@@ -1,10 +1,21 @@
 import axios from 'axios';
 import { clearSession } from '../utils/authStorage';
 
+const resolveApiBaseUrl = () => {
+  const configured = import.meta.env.VITE_API_URL?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+
+  throw new Error('VITE_API_URL não configurada para o frontend.');
+};
+
 const api = axios.create({
-  // 🚀 A MÁGICA DO .ENV ENTRA AQUI!
-  // Agora o sistema lê o arquivo .env automaticamente.
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080',
+  baseURL: resolveApiBaseUrl(),
   withCredentials: true
 });
 

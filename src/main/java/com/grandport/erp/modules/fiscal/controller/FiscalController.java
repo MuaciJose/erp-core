@@ -27,6 +27,8 @@ import br.com.swconsultoria.nfe.Nfe;
 import br.com.swconsultoria.nfe.dom.ConfiguracoesNfe;
 import br.com.swconsultoria.nfe.dom.enuns.DocumentoEnum;
 import br.com.swconsultoria.nfe.schema_4.retConsStatServ.TRetConsStatServ;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,6 +40,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/fiscal")
 public class FiscalController {
+
+    private static final Logger log = LoggerFactory.getLogger(FiscalController.class);
 
     @Autowired
     private NfeService nfeService;
@@ -85,7 +89,7 @@ public class FiscalController {
             List<NotaFiscal> notas = notaFiscalRepository.findAllByEmpresaIdOrderByIdDesc(empresaId);
             return ResponseEntity.ok(notas);
         } catch (Exception e) {
-            System.err.println("[ERRO - LISTAR NOTAS] " + e.getMessage());
+            log.error("Erro ao listar notas fiscais", e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -213,7 +217,8 @@ public class FiscalController {
     @PostMapping("/{nfeId}/enviar-contador")
     public ResponseEntity<?> enviarParaContador(@PathVariable Long nfeId, @RequestParam String email) {
         try {
-            NotaFiscal nota = notaFiscalRepository.findById(nfeId)
+            Long empresaId = empresaContextService.getRequiredEmpresaId();
+            NotaFiscal nota = notaFiscalRepository.findByEmpresaIdAndId(empresaId, nfeId)
                     .orElseThrow(() -> new Exception("Nota não encontrada."));
             emailFiscalService.enviarXmlContador(nota, email);
             return ResponseEntity.ok(Map.of("message", "E-mail enviado com sucesso!"));
@@ -229,7 +234,11 @@ public class FiscalController {
             @RequestParam(required = false, defaultValue = "Segue fechamento fiscal.") String mensagem,
             @RequestBody List<Long> nfeIds) {
         try {
-            List<NotaFiscal> notasDoLote = notaFiscalRepository.findAllById(nfeIds);
+            Long empresaId = empresaContextService.getRequiredEmpresaId();
+            List<NotaFiscal> notasDoLote = nfeIds.stream()
+                    .map(id -> notaFiscalRepository.findByEmpresaIdAndId(empresaId, id)
+                            .orElseThrow(() -> new RuntimeException("Nota não encontrada: " + id)))
+                    .toList();
             emailFiscalService.enviarLoteXmlContador(notasDoLote, email, mesAno, mensagem);
             return ResponseEntity.ok(Map.of("message", "Fechamento enviado com sucesso!"));
         } catch (Exception e) {
@@ -281,7 +290,7 @@ public class FiscalController {
                 ));
             }
         } catch (Exception e) {
-            System.err.println("❌ Erro ao testar email: " + e.getMessage());
+            log.error("Erro ao testar configuração de email fiscal", e);
             return ResponseEntity.ok(Map.of(
                 "status", "ERRO_SISTEMA",
                 "configurado", false,
@@ -297,7 +306,7 @@ public class FiscalController {
     @DeleteMapping("/notas/{id}")
     public ResponseEntity<?> excluirNotaComErro(@PathVariable Long id) {
         try {
-            NotaFiscal nota = notaFiscalRepository.findById(id)
+            NotaFiscal nota = notaFiscalRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id)
                     .orElseThrow(() -> new Exception("Nota não encontrada no sistema."));
 
             if ("AUTORIZADA".equals(nota.getStatus())) {
@@ -334,7 +343,7 @@ public class FiscalController {
         
         try {
             // ✅ PASSO 1: Localizar a nota no banco de dados
-            NotaFiscal nota = notaFiscalRepository.findById(id)
+            NotaFiscal nota = notaFiscalRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id)
                     .orElseThrow(() -> new Exception("Nota Fiscal com ID " + id + " não encontrada."));
 
             // ✅ PASSO 2: Chamar serviço de cancelamento (faz todas as validações)
@@ -357,7 +366,7 @@ public class FiscalController {
             ));
 
         } catch (Exception e) {
-            System.err.println("❌ ERRO NO CANCELAMENTO: " + e.getMessage());
+            log.error("Erro ao cancelar NFC-e {}", id, e);
             return ResponseEntity.badRequest().body(Map.of(
                 "status", "ERRO",
                 "mensagem", e.getMessage(),
@@ -375,11 +384,8 @@ public class FiscalController {
     public ResponseEntity<?> emitirEmContingencia(
             @PathVariable Long vendaId,
             @RequestBody Map<String, String> payload) {
-        
-        String justificativa = payload != null ? payload.get("justificativa") : "SEFAZ indisponível";
-
         try {
-            Venda venda = vendaRepository.findById(vendaId)
+            Venda venda = vendaRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), vendaId)
                 .orElseThrow(() -> new Exception("Venda não encontrada"));
 
             Map<String, Object> resultado = nfceContingenciaService.emitirEmContingencia(venda);
@@ -488,7 +494,7 @@ public class FiscalController {
             @RequestBody Map<String, Object> payload) {
         
         try {
-            NotaFiscal nota = notaFiscalRepository.findById(notaId)
+            NotaFiscal nota = notaFiscalRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), notaId)
                 .orElseThrow(() -> new Exception("Nota não encontrada"));
 
             Long numeroSefaz = ((Number) payload.get("numeroSefaz")).longValue();

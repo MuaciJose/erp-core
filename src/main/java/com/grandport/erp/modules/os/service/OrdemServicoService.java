@@ -13,6 +13,7 @@ import com.grandport.erp.modules.veiculo.repository.VeiculoRepository;
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoAtualService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 // 🚀 INJEÇÃO DO FINANCEIRO AQUI:
 import com.grandport.erp.modules.financeiro.service.FinanceiroService;
 
@@ -35,6 +36,7 @@ public class OrdemServicoService {
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private AuditoriaService auditoriaService;
     @Autowired private ConfiguracaoAtualService configuracaoAtualService;
+    @Autowired private EmpresaContextService empresaContextService;
 
     // 🚀 DECLARAÇÃO DO FINANCEIRO AQUI:
     @Autowired private FinanceiroService financeiroService;
@@ -44,6 +46,7 @@ public class OrdemServicoService {
     // =========================================================================
     public List<OrdemServico> listarTodasAsOs() {
         Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
         Sort ordem = Sort.by(Sort.Direction.DESC, "dataEntrada");
 
         if (usuarioLogado.getPermissoes() == null) return List.of();
@@ -53,11 +56,11 @@ public class OrdemServicoService {
         boolean isMecanico = Boolean.TRUE.equals(usuarioLogado.getIsMecanico());
 
         if (isGestor || isCaixa) {
-            return osRepository.findAll(ordem);
+            return osRepository.findAllByEmpresaIdOrderByDataEntradaDesc(empresaId);
         } else if (isMecanico) {
-            return osRepository.findByMecanicoId(usuarioLogado.getId(), ordem);
+            return osRepository.findByMecanicoIdAndEmpresaId(usuarioLogado.getId(), empresaId, ordem);
         } else {
-            return osRepository.findByConsultorId(usuarioLogado.getId(), ordem);
+            return osRepository.findByConsultorIdAndEmpresaId(usuarioLogado.getId(), empresaId, ordem);
         }
     }
 
@@ -68,17 +71,19 @@ public class OrdemServicoService {
     public OrdemServico salvarRascunho(OsRequestDTO dto, Long osId) {
         boolean isNovaOs = (osId == null);
 
-        OrdemServico os = (osId != null) ? osRepository.findById(osId).orElse(new OrdemServico()) : new OrdemServico();
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        OrdemServico os = (osId != null) ? osRepository.findByEmpresaIdAndId(empresaId, osId).orElse(new OrdemServico()) : new OrdemServico();
+        os.setEmpresaId(empresaId);
 
-        os.setCliente(dto.clienteId() != null ? parceiroRepository.findById(dto.clienteId()).orElse(null) : null);
-        os.setVeiculo(dto.veiculoId() != null ? veiculoRepository.findById(dto.veiculoId()).orElse(null) : null);
+        os.setCliente(dto.clienteId() != null ? parceiroRepository.findByEmpresaIdAndId(empresaId, dto.clienteId()).orElse(null) : null);
+        os.setVeiculo(dto.veiculoId() != null ? veiculoRepository.findByEmpresaIdAndId(empresaId, dto.veiculoId()).orElse(null) : null);
         os.setKmEntrada(dto.kmEntrada());
 
         if (isNovaOs && dto.consultorId() == null) {
             Usuario usuarioLogado = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
             os.setConsultor(usuarioLogado);
         } else {
-            os.setConsultor(dto.consultorId() != null ? usuarioRepository.findById(dto.consultorId()).orElse(null) : null);
+            os.setConsultor(dto.consultorId() != null ? usuarioRepository.findByIdAndEmpresaId(dto.consultorId(), empresaId).orElse(null) : null);
         }
 
         os.setDefeitoRelatado(dto.defeitoRelatado());
@@ -96,7 +101,7 @@ public class OrdemServicoService {
             for (var p : dto.pecas()) {
                 OsItemPeca item = new OsItemPeca();
                 item.setOrdemServico(os);
-                item.setProduto(produtoRepository.findById(p.produtoId()).orElseThrow());
+                item.setProduto(produtoRepository.findByEmpresaIdAndId(empresaId, p.produtoId()).orElseThrow());
                 item.setQuantidade(p.quantidade());
                 item.setPrecoUnitario(p.precoUnitario());
                 item.setValorTotal(p.precoUnitario().multiply(BigDecimal.valueOf(p.quantidade())));
@@ -109,8 +114,8 @@ public class OrdemServicoService {
             for (var s : dto.servicos()) {
                 OsItemServico item = new OsItemServico();
                 item.setOrdemServico(os);
-                item.setServico(servicoRepository.findById(s.servicoId()).orElseThrow());
-                item.setMecanico(s.mecanicoId() != null ? usuarioRepository.findById(s.mecanicoId()).orElse(null) : null);
+                item.setServico(servicoRepository.findByEmpresaIdAndId(empresaId, s.servicoId()).orElseThrow());
+                item.setMecanico(s.mecanicoId() != null ? usuarioRepository.findByIdAndEmpresaId(s.mecanicoId(), empresaId).orElse(null) : null);
                 item.setQuantidade(s.quantidade());
                 item.setPrecoUnitario(s.precoUnitario());
                 item.setValorTotal(s.precoUnitario().multiply(BigDecimal.valueOf(s.quantidade())));
@@ -136,7 +141,7 @@ public class OrdemServicoService {
 
     @Transactional
     public OrdemServico faturarOS(Long osId) {
-        OrdemServico os = osRepository.findById(osId)
+        OrdemServico os = osRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), osId)
                 .orElseThrow(() -> new RuntimeException("OS não encontrada"));
 
         if (os.getStatus() == com.grandport.erp.modules.os.model.StatusOS.FATURADA) {
@@ -171,7 +176,7 @@ public class OrdemServicoService {
 
     @Transactional
     public OrdemServico faturarOSPagamento(Long osId, java.util.List<java.util.Map<String, Object>> pagamentosRequest) {
-        OrdemServico os = osRepository.findById(osId)
+        OrdemServico os = osRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), osId)
                 .orElseThrow(() -> new RuntimeException("OS não encontrada"));
 
         if (os.getStatus() == com.grandport.erp.modules.os.model.StatusOS.FATURADA) {

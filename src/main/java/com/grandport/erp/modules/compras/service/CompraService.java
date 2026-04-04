@@ -13,6 +13,8 @@ import com.grandport.erp.modules.parceiro.repository.ParceiroRepository;
 // 🚀 1. IMPORTAÇÃO DA AUDITORIA
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class CompraService {
+
+    private static final Logger log = LoggerFactory.getLogger(CompraService.class);
 
     @Autowired private ProdutoRepository produtoRepository;
     @Autowired private NcmRepository ncmRepository;
@@ -61,7 +65,7 @@ public class CompraService {
                         pDto.setEstoqueAtual(0);
 
                         if (i.getProdutoId() != null) {
-                            produtoRepository.findById(i.getProdutoId()).ifPresent(prod -> {
+                            produtoRepository.findByEmpresaIdAndId(empresaId, i.getProdutoId()).ifPresent(prod -> {
                                 pDto.setNome(prod.getNome());
                                 pDto.setEstoqueAtual(prod.getQuantidadeEstoque());
                             });
@@ -119,13 +123,17 @@ public class CompraService {
             if (codigoEan != null && !codigoEan.equalsIgnoreCase("SEM GTIN") && !codigoEan.trim().isEmpty()) {
                 try {
                     prodOpt = produtoRepository.findByCodigoBarrasAndEmpresa(codigoEan, empresaContextService.getRequiredEmpresaId());
-                } catch (Exception e) {}
+                } catch (Exception e) {
+                    log.warn("Falha ao buscar produto por EAN {} durante importação da nota {}", codigoEan, info.getIde().getNumeroNota(), e);
+                }
             }
 
             if (prodOpt.isEmpty() && codigoFornecedor != null && !codigoFornecedor.trim().isEmpty()) {
                 try {
                     prodOpt = produtoRepository.findBySkuAndEmpresa(codigoFornecedor, empresaContextService.getRequiredEmpresaId());
-                } catch (Exception e) {}
+                } catch (Exception e) {
+                    log.warn("Falha ao buscar produto por SKU {} durante importação da nota {}", codigoFornecedor, info.getIde().getNumeroNota(), e);
+                }
             }
 
             CompraItem item = new CompraItem();
@@ -174,7 +182,7 @@ public class CompraService {
                 Produto produtoFinal;
 
                 if (itemDto.getProdutoId() != null) {
-                    produtoFinal = produtoRepository.findById(itemDto.getProdutoId())
+                    produtoFinal = produtoRepository.findByEmpresaIdAndId(empresaId, itemDto.getProdutoId())
                             .orElseThrow(() -> new RuntimeException("Produto vinculado não encontrado no banco."));
 
                 } else {
@@ -183,10 +191,18 @@ public class CompraService {
                     String skuFornecedor = itemXml.getCodigoFornecedor();
 
                     if (codigoEan != null && !codigoEan.equalsIgnoreCase("SEM GTIN") && !codigoEan.trim().isEmpty()) {
-                        try { prodOpt = produtoRepository.findByCodigoBarrasAndEmpresa(codigoEan, empresaContextService.getRequiredEmpresaId()); } catch (Exception e) {}
+                        try {
+                            prodOpt = produtoRepository.findByCodigoBarrasAndEmpresa(codigoEan, empresaContextService.getRequiredEmpresaId());
+                        } catch (Exception e) {
+                            log.warn("Falha ao buscar produto por EAN {} na finalização da nota {}", codigoEan, nota.getNumero(), e);
+                        }
                     }
                     if (prodOpt.isEmpty() && skuFornecedor != null && !skuFornecedor.trim().isEmpty()) {
-                        try { prodOpt = produtoRepository.findBySkuAndEmpresa(skuFornecedor, empresaContextService.getRequiredEmpresaId()); } catch (Exception e) {}
+                        try {
+                            prodOpt = produtoRepository.findBySkuAndEmpresa(skuFornecedor, empresaContextService.getRequiredEmpresaId());
+                        } catch (Exception e) {
+                            log.warn("Falha ao buscar produto por SKU {} na finalização da nota {}", skuFornecedor, nota.getNumero(), e);
+                        }
                     }
 
                     produtoFinal = prodOpt.orElseGet(() -> criarNovoProdutoPelaNota(itemXml, itemDto.getPrecoVenda()));
@@ -303,13 +319,14 @@ public class CompraService {
 
     @Transactional
     public void excluirImportacao(Long id) {
-        CompraXML nota = compraXMLRepository.findById(id)
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+        CompraXML nota = compraXMLRepository.findByEmpresaIdAndId(empresaId, id)
                 .orElseThrow(() -> new RuntimeException("Nota não encontrada para exclusão."));
 
         if ("Finalizado".equals(nota.getStatus())) {
             for (CompraItem item : nota.getItens()) {
                 if (item.getProdutoId() != null) {
-                    produtoRepository.findById(item.getProdutoId()).ifPresent(produto -> {
+                    produtoRepository.findByEmpresaIdAndId(empresaId, item.getProdutoId()).ifPresent(produto -> {
                         int quantidadeParaSubtrair = item.getQuantidade().intValue();
 
                         estoqueService.registrarMovimentacao(

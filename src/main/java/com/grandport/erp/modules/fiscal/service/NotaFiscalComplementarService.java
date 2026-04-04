@@ -3,6 +3,7 @@ package com.grandport.erp.modules.fiscal.service;
 import com.grandport.erp.modules.admin.service.AuditoriaService;
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 import com.grandport.erp.modules.fiscal.model.NotaFiscalComplementar;
 import com.grandport.erp.modules.fiscal.repository.NotaFiscalRepository;
@@ -38,6 +39,9 @@ public class NotaFiscalComplementarService {
 
     @Autowired
     private AuditoriaService auditoriaService;
+
+    @Autowired
+    private EmpresaContextService empresaContextService;
 
     // 🔜 TODO: Repositório de complementações será implementado quando banco migrar
     // private NotaFiscalComplementarRepository notaFiscalComplementarRepository;
@@ -146,7 +150,7 @@ public class NotaFiscalComplementarService {
             BigDecimal valorComplementacao) throws Exception {
         
         // ✅ PASSO 1: Localiza nota original
-        NotaFiscal notaOriginal = notaFiscalRepository.findById(notaOriginalId)
+        NotaFiscal notaOriginal = notaFiscalRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), notaOriginalId)
             .orElseThrow(() -> new Exception("Nota original não encontrada com ID: " + notaOriginalId));
 
         // ✅ PASSO 2: Validações
@@ -294,7 +298,6 @@ public class NotaFiscalComplementarService {
         };
     }
 }
-
 
 
 

@@ -1,13 +1,19 @@
 package com.grandport.erp.modules.admin.repository;
 
 import com.grandport.erp.modules.admin.model.LogAuditoria;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,13 +22,18 @@ import java.time.LocalDateTime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-@SpringBootTest
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 @Transactional
+@EnabledIfEnvironmentVariable(named = "RUN_DB_INTEGRATION_TESTS", matches = "true")
 @TestPropertySource(properties = {
-        "api.security.token.secret=test-jwt-secret"
+        "api.security.token.secret=test-jwt-secret",
+        "spring.jpa.hibernate.ddl-auto=none",
+        "spring.flyway.enabled=false"
 })
 @DisplayName("Integracao - LogAuditoria Repository")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class LogAuditoriaRepositoryIntegrationTest {
 
     @Autowired
@@ -30,6 +41,25 @@ class LogAuditoriaRepositoryIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private PasswordEncoder passwordEncoder;
+
+    @BeforeAll
+    void migrateDatabase() {
+        jdbcTemplate.execute("""
+                create table if not exists logs_auditoria (
+                    id bigserial primary key,
+                    empresa_id bigint,
+                    data_hora timestamp,
+                    usuario_nome varchar(255),
+                    modulo varchar(255),
+                    acao varchar(255),
+                    detalhes text,
+                    ip_origem varchar(255)
+                )
+                """);
+    }
 
     @Test
     @DisplayName("Deve filtrar por busca em detalhes sem quebrar no Postgres")

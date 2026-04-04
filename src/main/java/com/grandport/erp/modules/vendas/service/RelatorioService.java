@@ -2,6 +2,7 @@ package com.grandport.erp.modules.vendas.service;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
 
@@ -22,6 +23,8 @@ import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -32,14 +35,19 @@ import java.util.Base64;
 @Service
 public class RelatorioService {
 
+    private static final Logger log = LoggerFactory.getLogger(RelatorioService.class);
+
     @Autowired
     private VendaRepository vendaRepository;
 
     @Autowired
     private ConfiguracaoService configuracaoService;
 
+    @Autowired
+    private EmpresaContextService empresaContextService;
+
     public byte[] gerarPdfVenda(Long vendaId) {
-        Venda venda = vendaRepository.findById(vendaId)
+        Venda venda = vendaRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), vendaId)
                 .orElseThrow(() -> new RuntimeException("Venda não encontrada"));
 
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
@@ -77,7 +85,7 @@ public class RelatorioService {
                     logo.setWidth(120);
                     logoCell.add(logo);
                 } catch (Exception e) {
-                    System.err.println("Erro ao processar logo.");
+                    log.warn("Erro ao processar logo da empresa para o PDF da venda {}", vendaId, e);
                 }
             }
             headerTable.addCell(logoCell);
@@ -201,8 +209,7 @@ public class RelatorioService {
             document.close();
 
         } catch (Exception e) {
-            System.err.println("Erro Crítico ao Gerar PDF A4: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Erro crítico ao gerar PDF da venda {}", vendaId, e);
             throw new RuntimeException("Erro ao gerar PDF", e);
         }
 

@@ -5,6 +5,7 @@ import br.com.caelum.stella.boleto.bancos.*; // Pacote correto com 's' no final
 import br.com.caelum.stella.boleto.transformer.GeradorDeBoleto;
 import com.grandport.erp.modules.financeiro.model.ContaBancaria;
 import com.grandport.erp.modules.financeiro.model.ContaReceber;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.financeiro.repository.ContaBancariaRepository;
 import com.grandport.erp.modules.financeiro.repository.ContaReceberRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,14 +22,18 @@ public class BoletoService {
     @Autowired
     private ContaBancariaRepository contaBancariaRepo;
 
-    public byte[] gerarBoletoPdf(Long contaReceberId, Long contaBancariaId) {
+    @Autowired
+    private EmpresaContextService empresaContextService;
 
-        ContaReceber conta = contaReceberRepo.findById(contaReceberId)
+    public byte[] gerarBoletoPdf(Long contaReceberId, Long contaBancariaId) {
+        Long empresaId = empresaContextService.getRequiredEmpresaId();
+
+        ContaReceber conta = contaReceberRepo.findByEmpresaIdAndId(empresaId, contaReceberId)
                 .orElseThrow(() -> new RuntimeException("Conta a Receber não encontrada!"));
 
         // ⚠️ A Conta Bancária ainda é consultada para manter a estrutura,
         // mas as variáveis matemáticas dela serão ignoradas neste teste.
-        ContaBancaria bancoEmpresa = contaBancariaRepo.findById(contaBancariaId)
+        ContaBancaria bancoEmpresa = contaBancariaRepo.findByEmpresaIdAndId(empresaId, contaBancariaId)
                 .orElseThrow(() -> new RuntimeException("Conta Bancária emissora não encontrada!"));
 
         String nomePagador = conta.getParceiro() != null ? conta.getParceiro().getNome() : "Consumidor Final";

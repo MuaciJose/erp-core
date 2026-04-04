@@ -75,35 +75,36 @@ public class ConfiguracaoController {
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
-    public ResponseEntity<ConfiguracaoSistema> obterConfig() {
-        return ResponseEntity.ok(service.obterConfiguracao());
+    public ResponseEntity<ConfiguracaoResponseDTO> obterConfig() {
+        return ResponseEntity.ok(toResponse(service.obterConfiguracao()));
     }
 
     @PutMapping
     @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
-    public ResponseEntity<ConfiguracaoSistema> salvarConfig(@RequestBody ConfiguracaoSistema config) {
-        return ResponseEntity.ok(service.atualizarConfiguracao(config));
+    public ResponseEntity<ConfiguracaoResponseDTO> salvarConfig(@RequestBody ConfiguracaoSistema config) {
+        return ResponseEntity.ok(toResponse(service.atualizarConfiguracao(config)));
     }
 
     // 🆕 POST também funciona (alternativa ao PUT para compatibilidade)
     @PostMapping
     @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
-    public ResponseEntity<ConfiguracaoSistema> salvarConfigPost(@RequestBody ConfiguracaoSistema config) {
-        return ResponseEntity.ok(service.atualizarConfiguracao(config));
+    public ResponseEntity<ConfiguracaoResponseDTO> salvarConfigPost(@RequestBody ConfiguracaoSistema config) {
+        return ResponseEntity.ok(toResponse(service.atualizarConfiguracao(config)));
     }
 
     // 🆕 Inicializar configuração para nova empresa
     @PostMapping("/inicializar")
     @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
-    public ResponseEntity<ConfiguracaoSistema> inicializarConfiguracao() {
+    public ResponseEntity<ConfiguracaoResponseDTO> inicializarConfiguracao() {
         ConfiguracaoSistema config = service.obterConfiguracao();
-        return ResponseEntity.ok(config);
+        return ResponseEntity.ok(toResponse(config));
     }
 
     // =======================================================================
     // 🚀 CERTIFICADO DIGITAL (.PFX) - ATUALIZADO
     // =======================================================================
     @PostMapping("/certificado")
+    @PreAuthorize("hasAnyAuthority('ROLE_CONFIGURACOES', 'ROLE_PLATFORM_ADMIN')")
     public ResponseEntity<?> uploadCertificado(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Arquivo de certificado vazio."));
@@ -126,6 +127,7 @@ public class ConfiguracaoController {
     // =======================================================================
 
     @GetMapping("/backup")
+    @PreAuthorize("hasAnyAuthority('ROLE_CONFIGURACOES', 'ROLE_PLATFORM_ADMIN')")
     public ResponseEntity<Resource> gerarBackup() {
         Resource arquivoBackup = service.gerarArquivoBackup();
         String nomeArquivo = "backup_grandport_" + java.time.LocalDate.now() + ".sql";
@@ -137,12 +139,14 @@ public class ConfiguracaoController {
     }
 
     @PostMapping("/limpar-logs")
+    @PreAuthorize("hasAnyAuthority('ROLE_CONFIGURACOES', 'ROLE_PLATFORM_ADMIN')")
     public ResponseEntity<Void> limparLogs() {
         service.limparLogsTecnicos();
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/restaurar-banco")
+    @PreAuthorize("hasAnyAuthority('ROLE_PLATFORM_ADMIN')")
     public ResponseEntity<String> uploadBanco(@RequestParam("file") MultipartFile file) {
         try {
             service.restaurarBackup(file);
@@ -153,6 +157,7 @@ public class ConfiguracaoController {
     }
 
     @DeleteMapping("/resetar-banco")
+    @PreAuthorize("hasAnyAuthority('ROLE_PLATFORM_ADMIN')")
     public ResponseEntity<Void> resetarBancoDeDados() {
         service.resetarBancoDeDados();
         return ResponseEntity.ok().build();
@@ -164,6 +169,7 @@ public class ConfiguracaoController {
     // 🧹 ROTA DO ROBÔ: LIMPEZA DE FOTOS ANTIGAS
     // =========================================================
     @PostMapping("/manutencao/limpar-fotos-vistorias")
+    @PreAuthorize("hasAnyAuthority('ROLE_CONFIGURACOES', 'ROLE_PLATFORM_ADMIN')")
     public ResponseEntity<Map<String, Object>> limparFotosAntigas(
             @RequestParam(defaultValue = "24") int meses) { // Por padrão, apaga fotos com mais de 2 anos (24 meses)
 
@@ -176,6 +182,7 @@ public class ConfiguracaoController {
     // =======================================================================
 
     @GetMapping("/layouts")
+    @PreAuthorize("hasAnyAuthority('ROLE_USUARIOS', 'ROLE_CONFIGURACOES')")
     public ResponseEntity<Map<String, Object>> obterTodosLayouts() {
         ConfiguracaoSistema config = service.obterConfiguracao();
         
@@ -777,5 +784,9 @@ public class ConfiguracaoController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    private ConfiguracaoResponseDTO toResponse(ConfiguracaoSistema config) {
+        return ConfiguracaoResponseDTO.from(config);
     }
 }

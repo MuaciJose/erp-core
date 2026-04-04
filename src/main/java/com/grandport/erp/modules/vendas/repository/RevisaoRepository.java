@@ -11,7 +11,7 @@ import java.util.List;
 public interface RevisaoRepository extends JpaRepository<Revisao, Long> {
 
     // Traz todas as revisões que não estão concluídas nem canceladas
-    List<Revisao> findByStatusNotInOrderByDataPrevistaAsc(List<String> status);
+    List<Revisao> findByEmpresaIdAndStatusNotInOrderByDataPrevistaAsc(Long empresaId, List<String> status);
 
     // 🚀 CONTA AS REVISÕES ATRASADAS
     @Query("SELECT COUNT(r) FROM Revisao r WHERE r.status = 'PENDENTE' AND r.dataPrevista < CURRENT_DATE")

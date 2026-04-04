@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    url: ${DB_TEST_URL:jdbc:postgresql://localhost:5432/grandport_erp_test}
+    username: ${DB_TEST_USERNAME:postgres}
+    password: ${DB_TEST_PASSWORD:admin}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-migration-naming: true
+    clean-disabled: true
+
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+api:
+  security:
+    token:
+      secret: ${TEST_JWT_SECRET:test-jwt-secret}
+
+app:
+  security:
+    redis:
+      required: false
+
+logging:
+  level:
+    root: WARN
+    com.grandport: INFO

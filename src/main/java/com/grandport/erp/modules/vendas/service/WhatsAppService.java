@@ -2,8 +2,11 @@ package com.grandport.erp.modules.vendas.service;
 
 import com.grandport.erp.modules.configuracoes.model.ConfiguracaoSistema;
 import com.grandport.erp.modules.configuracoes.service.ConfiguracaoService;
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.vendas.model.Venda;
 import com.grandport.erp.modules.vendas.repository.VendaRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -20,6 +23,8 @@ import java.util.Map;
 @Service
 public class WhatsAppService {
 
+    private static final Logger log = LoggerFactory.getLogger(WhatsAppService.class);
+
     @Autowired
     private ConfiguracaoService configuracaoService;
 
@@ -28,6 +33,9 @@ public class WhatsAppService {
 
     @Autowired
     private VendaRepository vendaRepository;
+
+    @Autowired
+    private EmpresaContextService empresaContextService;
 
     // 🚀 CORRIGIDO: Removido o acento (til) que quebrava a URL da Evolution API
     private String getInstanciaConfigurada(ConfiguracaoSistema config) {
@@ -38,6 +46,18 @@ public class WhatsAppService {
         return instancia.trim();
     }
 
+    private String getApiUrlConfigurada(ConfiguracaoSistema config) {
+        String apiUrl = config.getWhatsappApiUrl();
+        if (apiUrl == null || apiUrl.trim().isEmpty()) {
+            throw new RuntimeException("URL da API do WhatsApp não configurada.");
+        }
+        apiUrl = apiUrl.trim();
+        if (apiUrl.endsWith("/")) {
+            apiUrl = apiUrl.substring(0, apiUrl.length() - 1);
+        }
+        return apiUrl;
+    }
+
     /**
      * Envia o PDF da venda via WhatsApp no padrão Evolution API v2.x
      */
@@ -45,20 +65,13 @@ public class WhatsAppService {
 
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
         String token = config.getWhatsappToken();
-        String apiUrl = config.getWhatsappApiUrl();
+        String apiUrl = getApiUrlConfigurada(config);
         String instancia = getInstanciaConfigurada(config);
 
         if (token == null || token.trim().isEmpty()) {
             throw new RuntimeException("Token do WhatsApp não configurado.");
         }
-        if (apiUrl == null || apiUrl.trim().isEmpty()) {
-            apiUrl = "http://localhost:8081";
-        }
-        if (apiUrl.endsWith("/")) {
-            apiUrl = apiUrl.substring(0, apiUrl.length() - 1);
-        }
-
-        Venda venda = vendaRepository.findById(vendaId)
+        Venda venda = vendaRepository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), vendaId)
                 .orElseThrow(() -> new RuntimeException("Venda não encontrada!"));
 
         if (venda.getCliente() == null || venda.getCliente().getTelefone() == null) {
@@ -100,30 +113,25 @@ public class WhatsAppService {
 
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(urlEnvio, request, String.class);
-            System.out.println("WhatsApp enviado com sucesso! Resposta: " + response.getBody());
+            log.info("WhatsApp enviado com sucesso para venda {}. Resposta: {}", vendaId, response.getBody());
         } catch (HttpClientErrorException e) {
+            log.warn("Motor do WhatsApp recusou envio da venda {}: {}", vendaId, e.getResponseBodyAsString());
             throw new RuntimeException("O motor do WhatsApp recusou o envio: " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            throw new RuntimeException("Falha na comunicação com o WhatsApp.");
+            log.error("Falha na comunicação com o WhatsApp ao enviar venda {}", vendaId, e);
+            throw new RuntimeException("Falha na comunicação com o WhatsApp.", e);
         }
     }
 
     public void enviarArquivoPdfBase64(String telefoneDestino, String pdfBase64, String fileName, String caption) {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
         String token = config.getWhatsappToken();
-        String apiUrl = config.getWhatsappApiUrl();
+        String apiUrl = getApiUrlConfigurada(config);
         String instancia = getInstanciaConfigurada(config);
 
         if (token == null || token.trim().isEmpty()) {
             throw new RuntimeException("Token não configurado.");
         }
-        if (apiUrl == null || apiUrl.trim().isEmpty()) {
-            apiUrl = "http://localhost:8081";
-        }
-        if (apiUrl.endsWith("/")) {
-            apiUrl = apiUrl.substring(0, apiUrl.length() - 1);
-        }
-
         telefoneDestino = telefoneDestino.replaceAll("\\D", "");
         if (!telefoneDestino.startsWith("55")) {
             telefoneDestino = "55" + telefoneDestino;
@@ -136,8 +144,8 @@ public class WhatsAppService {
         payload.put("mediatype", "document");
 
         // 🚀 CORREÇÃO DEFINITIVA 2 (EVOLUTON V2): Mimetype separado e Base64 limpo!
-        payload.put("media", "data:application/pdf;base64," + pdfBase64);
         payload.put("media", pdfBase64);
+        payload.put("mimetype", "application/pdf");
 
         payload.put("fileName", fileName);
         payload.put("caption", caption);
@@ -152,11 +160,13 @@ public class WhatsAppService {
 
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(urlEnvio, request, String.class);
-            System.out.println("WhatsApp Curinga enviado: " + response.getBody());
+            log.info("WhatsApp com arquivo enviado para {}. Resposta: {}", telefoneDestino, response.getBody());
         } catch (HttpClientErrorException e) {
+            log.warn("Motor do WhatsApp recusou envio para {}: {}", telefoneDestino, e.getResponseBodyAsString());
             throw new RuntimeException("O motor do WhatsApp recusou o envio: " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            throw new RuntimeException("Falha na comunicação com o WhatsApp.");
+            log.error("Falha na comunicação com o WhatsApp ao enviar arquivo para {}", telefoneDestino, e);
+            throw new RuntimeException("Falha na comunicação com o WhatsApp.", e);
         }
     }
 
@@ -165,13 +175,11 @@ public class WhatsAppService {
      */
     public Map<String, Object> solicitarQrCodeConexao() {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
-        String url = config.getWhatsappApiUrl();
+        String url = getApiUrlConfigurada(config);
         String token = config.getWhatsappToken();
         String instancia = getInstanciaConfigurada(config);
 
         if (token == null || token.isEmpty()) throw new RuntimeException("Token não configurado.");
-        if (url == null || url.isEmpty()) url = "http://localhost:8081";
-        if (url.endsWith("/")) url = url.substring(0, url.length() - 1);
 
         String endpoint = url + "/instance/connect/" + instancia;
 
@@ -190,11 +198,11 @@ public class WhatsAppService {
             );
             return response.getBody();
         } catch (HttpClientErrorException e) {
-            System.err.println("❌ ERRO DA EVOLUTION (QR CODE): " + e.getResponseBodyAsString());
+            log.warn("Erro da Evolution ao solicitar QR Code: {}", e.getResponseBodyAsString());
             throw new RuntimeException("Erro da API: " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            System.err.println("❌ ERRO GERAL (QR CODE): " + e.getMessage());
-            throw new RuntimeException("Erro ao conectar ao motor do WhatsApp.");
+            log.error("Erro ao conectar ao motor do WhatsApp para solicitar QR Code", e);
+            throw new RuntimeException("Erro ao conectar ao motor do WhatsApp.", e);
         }
     }
 
@@ -204,7 +212,9 @@ public class WhatsAppService {
         String token = config.getWhatsappToken();
         String instancia = getInstanciaConfigurada(config);
 
-        if (url == null || url.isEmpty()) url = "http://localhost:8081";
+        if (url == null || url.isEmpty() || token == null || token.isEmpty()) {
+            return Map.of("instance", Map.of("state", "DISCONNECTED"));
+        }
         if (url.endsWith("/")) url = url.substring(0, url.length() - 1);
 
         String endpoint = url + "/instance/connectionState/" + instancia;
@@ -222,6 +232,7 @@ public class WhatsAppService {
             );
             return response.getBody();
         } catch (Exception e) {
+            log.warn("Falha ao consultar status da instância do WhatsApp: {}", e.getMessage());
             Map<String, Object> erro = new HashMap<>();
             erro.put("instance", Map.of("state", "DISCONNECTED"));
             return erro;
@@ -230,12 +241,13 @@ public class WhatsAppService {
 
     public void desconectarInstancia() {
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
-        String url = config.getWhatsappApiUrl();
+        String url = getApiUrlConfigurada(config);
         String token = config.getWhatsappToken();
         String instancia = getInstanciaConfigurada(config);
 
-        if (url == null || url.isEmpty()) url = "http://localhost:8081";
-        if (url.endsWith("/")) url = url.substring(0, url.length() - 1);
+        if (token == null || token.isEmpty()) {
+            throw new RuntimeException("Token não configurado.");
+        }
 
         String endpoint = url + "/instance/logout/" + instancia;
 

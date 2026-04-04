@@ -299,9 +299,9 @@ public class FinanceiroService {
         DreDTO dre = new DreDTO();
         // TODO: Atualizar VendaRepository com métodos sumTotalVendasPeriodoEmpresa, sumTotalDescontosPeriodoEmpresa, sumCmvPeriodoEmpresa
         // Por enquanto, usar métodos antigos (sem filtro de empresa)
-        dre.setReceitaBruta(vendaRepository.sumTotalVendasPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
-        dre.setDevolucoesDescontos(vendaRepository.sumTotalDescontosPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
-        dre.setCmv(vendaRepository.sumCmvPeriodo(inicioMes, fimMes).orElse(BigDecimal.ZERO));
+        dre.setReceitaBruta(vendaRepository.sumTotalVendasPeriodoEmpresa(inicioMes, fimMes, empresaId).orElse(BigDecimal.ZERO));
+        dre.setDevolucoesDescontos(vendaRepository.sumTotalDescontosPeriodoEmpresa(inicioMes, fimMes, empresaId).orElse(BigDecimal.ZERO));
+        dre.setCmv(vendaRepository.sumCmvPeriodoEmpresa(inicioMes, fimMes, empresaId).orElse(BigDecimal.ZERO));
 
         List<DespesaPorPlanoContaDTO> despesasAgrupadas = pagarRepo.sumDespesasPagasAgrupadasPorPlanoConta(empresaId, inicioMes, fimMes);
         Map<String, BigDecimal> despesasOperacionais = despesasAgrupadas.stream()
@@ -336,7 +336,7 @@ public class FinanceiroService {
     // ✅ MULTI-EMPRESA: Atualizado para filtrar por empresa
     public ExtratoParceiroDTO gerarExtratoParceiro(Long parceiroId) {
         Long empresaId = obterEmpresaAtual();
-        Parceiro parceiro = parceiroRepository.findById(parceiroId)
+        Parceiro parceiro = parceiroRepository.findByEmpresaIdAndId(empresaId, parceiroId)
                 .orElseThrow(() -> new RuntimeException("Parceiro não encontrado: ID " + parceiroId));
 
         List<ContaReceberDTO> contas = recebaRepo.findByEmpresaIdAndParceiroIdAndStatus(empresaId, parceiroId, StatusFinanceiro.PENDENTE)
@@ -527,6 +527,6 @@ public class FinanceiroService {
 
     // 🟦 MÉTODO AUXILIAR: Busca um Parceiro por ID (necessário para Extratos)
     public java.util.Optional<Parceiro> findParceiro(Long parceiroId) {
-        return parceiroRepository.findById(parceiroId);
+        return parceiroRepository.findByEmpresaIdAndId(obterEmpresaAtual(), parceiroId);
     }
 }

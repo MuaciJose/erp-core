@@ -1,5 +1,6 @@
 package com.grandport.erp.modules.vendas.controller;
 
+import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.vendas.model.Revisao;
 import com.grandport.erp.modules.vendas.repository.RevisaoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,11 +17,15 @@ public class RevisaoController {
     @Autowired
     private RevisaoRepository repository;
 
+    @Autowired
+    private EmpresaContextService empresaContextService;
+
     // 1. Buscar todas as revisões ativas para preencher o Kanban
     @GetMapping
     public ResponseEntity<List<Revisao>> listarAtivas() {
         // Busca tudo que não é 'CONCLUIDO' nem 'CANCELADO'
-        List<Revisao> ativas = repository.findByStatusNotInOrderByDataPrevistaAsc(
+        List<Revisao> ativas = repository.findByEmpresaIdAndStatusNotInOrderByDataPrevistaAsc(
+                empresaContextService.getRequiredEmpresaId(),
                 List.of("CONCLUIDO", "CANCELADO")
         );
         return ResponseEntity.ok(ativas);
@@ -32,6 +37,7 @@ public class RevisaoController {
         if (novaRevisao.getStatus() == null) {
             novaRevisao.setStatus("PENDENTE");
         }
+        novaRevisao.setEmpresaId(empresaContextService.getRequiredEmpresaId());
         Revisao salva = repository.save(novaRevisao);
         return ResponseEntity.ok(salva);
     }
@@ -39,7 +45,7 @@ public class RevisaoController {
     // 3. Atualizar o status (Quando o atendente clica em "Whatsapp" ou "Concluído")
     @PutMapping("/{id}/status")
     public ResponseEntity<?> atualizarStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
-        return repository.findById(id).map(revisao -> {
+        return repository.findByEmpresaIdAndId(empresaContextService.getRequiredEmpresaId(), id).map(revisao -> {
             revisao.setStatus(payload.get("status"));
             repository.save(revisao);
             return ResponseEntity.ok().build();

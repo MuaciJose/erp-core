@@ -7,7 +7,10 @@ import com.grandport.erp.modules.configuracoes.service.EmpresaContextService;
 import com.grandport.erp.modules.fiscal.model.NotaFiscal;
 import com.grandport.erp.modules.fiscal.repository.NotaFiscalRepository;
 import com.grandport.erp.modules.vendas.model.Venda;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +35,8 @@ import java.util.Map;
 @Service
 public class NfceContingenciaService {
 
+    private static final Logger log = LoggerFactory.getLogger(NfceContingenciaService.class);
+
     @Autowired
     private ConfiguracaoService configuracaoService;
 
@@ -43,6 +48,9 @@ public class NfceContingenciaService {
 
     @Autowired
     private EmpresaContextService empresaContextService;
+
+    @Value("${app.fiscal.allow-simulated-documents:false}")
+    private boolean allowSimulatedDocuments;
 
     // =========================================================================
     // 📊 VERIFICAÇÕES PRÉ-CONTINGÊNCIA
@@ -56,14 +64,14 @@ public class NfceContingenciaService {
         try {
             // Simular teste de conexão com SEFAZ
             // Em produção, isso faria uma chamada real à SEFAZ
-            System.out.println("✅ Verificando disponibilidade da SEFAZ...");
+            log.info("Verificando disponibilidade da SEFAZ para UF {}", config.getUf());
             
             // Para agora, simulamos sucesso
             // Em implementação real, seria: Nfe.statusServico(config, DocumentoEnum.NFCE)
             return true;
             
         } catch (Exception e) {
-            System.err.println("❌ SEFAZ indisponível: " + e.getMessage());
+            log.warn("SEFAZ indisponível durante verificação de contingência", e);
             return false;
         }
     }
@@ -104,6 +112,7 @@ public class NfceContingenciaService {
      */
     @Transactional
     public Map<String, Object> emitirEmContingencia(Venda venda) throws Exception {
+        validarSimulacaoPermitida("emissão em contingência");
         
         // ✅ PASSO 1: Validações
         ConfiguracaoSistema config = configuracaoService.obterConfiguracao();
@@ -119,7 +128,7 @@ public class NfceContingenciaService {
             );
         }
 
-        System.out.println("⚠️  SEFAZ OFFLINE - Emitindo em modo contingência...");
+        log.warn("SEFAZ offline para empresa {}. Emitindo NFC-e em contingência.", empresaContextService.getRequiredEmpresaId());
 
         // ✅ PASSO 3: Gera número da nota (usa série/número do config)
         Long numeroNfce = config.getNumeroProximaNfce();
@@ -155,10 +164,7 @@ public class NfceContingenciaService {
             )
         );
 
-        System.out.println("✅ NFC-e emitida em contingência!");
-        System.out.println("   Número: " + numeroNfce);
-        System.out.println("   Chave: " + chaveAcessoSimulada);
-        System.out.println("   ⚠️  Status: CONTINGENCIA (Pendente sincronização)");
+        log.warn("NFC-e emitida em contingência. numero={} chave={} status=CONTINGENCIA", numeroNfce, chaveAcessoSimulada);
 
         return Map.of(
             "status", "CONTINGENCIA",
@@ -189,6 +195,7 @@ public class NfceContingenciaService {
      */
     @Transactional
     public Map<String, Object> sincronizarContingencias() throws Exception {
+        validarSimulacaoPermitida("sincronização de contingências");
         
         // ✅ PASSO 1: Localiza notas em contingência
         Long empresaId = empresaContextService.getRequiredEmpresaId();
@@ -197,7 +204,7 @@ public class NfceContingenciaService {
             .toList();
 
         if (notasContingencia.isEmpty()) {
-            System.out.println("ℹ️  Nenhuma nota em contingência para sincronizar");
+            log.info("Nenhuma nota em contingência para sincronizar");
             return Map.of(
                 "status", "SUCESSO",
                 "mensagem", "Nenhuma nota em contingência",
@@ -205,7 +212,7 @@ public class NfceContingenciaService {
             );
         }
 
-        System.out.println("🔄 Sincronizando " + notasContingencia.size() + " notas em contingência...");
+        log.info("Sincronizando {} notas em contingência", notasContingencia.size());
 
         int sincronizadas = 0;
         int rejeitadas = 0;
@@ -233,6 +240,7 @@ public class NfceContingenciaService {
 
             } catch (Exception e) {
                 rejeitadas++;
+                log.error("Falha ao sincronizar nota em contingência {}", nota.getId(), e);
 
                 nota.setStatus("REJEITADA");
                 notaFiscalRepository.save(nota);
@@ -246,9 +254,7 @@ public class NfceContingenciaService {
             }
         }
 
-        System.out.println("✅ Sincronização concluída!");
-        System.out.println("   Sincronizadas: " + sincronizadas);
-        System.out.println("   Rejeitadas: " + rejeitadas);
+        log.info("Sincronização de contingências concluída. sincronizadas={} rejeitadas={}", sincronizadas, rejeitadas);
 
         return Map.of(
             "status", "SUCESSO",
@@ -330,5 +336,11 @@ public class NfceContingenciaService {
             .filter(n -> "CONTINGENCIA".equals(n.getStatus()))
             .count();
     }
-}
 
+    private void validarSimulacaoPermitida(String operacao) throws Exception {
+        if (!allowSimulatedDocuments) {
+            throw new Exception("Fluxo fiscal bloqueado: " + operacao +
+                    " ainda opera em modo simulado. Configure app.fiscal.allow-simulated-documents=true apenas em homologação.");
+        }
+    }
+}
